@@ -335,7 +335,11 @@ void UDF_Setup(nrs_t *nrs)
 {
   // only ciMode 1 exercises the particles
   if(ciMode == 1){
-    particles = new lpm_t(nrs, 0.0);
+
+    const dfloat newton_tol = 5e-13;
+    const dfloat bb_tol = 0.01;
+
+    particles = new lpm_t(nrs, bb_tol, newton_tol);
 
     particles->setSolver("AB");
 

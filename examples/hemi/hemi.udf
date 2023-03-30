@@ -95,7 +95,11 @@ void UDF_Setup(nrs_t *nrs)
   yMax = platform->linAlg->max(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
   zMax = platform->linAlg->max(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm);
 
-  particles = new lpm_t(nrs, 0.0);
+
+  const dfloat newton_tol = 5e-13;
+  const dfloat bb_tol = 1e-4;
+
+  particles = new lpm_t(nrs, bb_tol, newton_tol);
   particles->setUserRHS(userRHS);
 
   particles->setSolver("AB");

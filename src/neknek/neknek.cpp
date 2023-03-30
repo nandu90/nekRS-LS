@@ -129,13 +129,13 @@ void updateInterpPoints(nrs_t *nrs)
   // TODO: possible to cache this in moving mesh case?
   std::vector<std::shared_ptr<pointInterpolation_t>> sessionInterpolators(nsessions);
   for (dlong i = 0; i < nsessions; ++i) {
-    sessionInterpolators[i] = std::make_shared<pointInterpolation_t>(nrs, tol, i == sessionID);
+    sessionInterpolators[i] = std::make_shared<pointInterpolation_t>(nrs, bb_tol, tol, i == sessionID);
     sessionInterpolators[i]->setTimerLevel(TimerLevel::Basic);
     sessionInterpolators[i]->setTimerName("neknek_t::");
   }
 
   neknek->interpolator.reset();
-  neknek->interpolator = std::make_shared<pointInterpolation_t>(nrs, tol);
+  neknek->interpolator = std::make_shared<pointInterpolation_t>(nrs, bb_tol, tol);
   neknek->interpolator->setTimerLevel(TimerLevel::Basic);
   neknek->interpolator->setTimerName("neknek_t::");
 
@@ -219,13 +219,13 @@ void findInterpPoints(nrs_t *nrs)
   // TODO: possible to cache this in moving mesh case?
   std::vector<std::shared_ptr<pointInterpolation_t>> sessionInterpolators(nsessions);
   for (dlong i = 0; i < nsessions; ++i) {
-    sessionInterpolators[i] = std::make_shared<pointInterpolation_t>(nrs, tol, i == sessionID);
+    sessionInterpolators[i] = std::make_shared<pointInterpolation_t>(nrs, bb_tol, tol, i == sessionID);
     sessionInterpolators[i]->setTimerLevel(TimerLevel::Basic);
     sessionInterpolators[i]->setTimerName("neknek_t::");
   }
 
   neknek->interpolator.reset();
-  neknek->interpolator = std::make_shared<pointInterpolation_t>(nrs, tol);
+  neknek->interpolator = std::make_shared<pointInterpolation_t>(nrs, bb_tol, tol);
   neknek->interpolator->setTimerLevel(TimerLevel::Basic);
   neknek->interpolator->setTimerName("neknek_t::");
 

@@ -10,14 +10,15 @@
 #include "pointInterpolation.hpp"
 #include <algorithm>
 
-pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_, double newton_tol_, bool mySession_)
-    : pointInterpolation_t(nrs_, nrs_->meshV->Nlocal, nrs_->meshV->Nlocal, newton_tol_, mySession_)
+pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_, double bb_tol, double newton_tol_, bool mySession_)
+    : pointInterpolation_t(nrs_, nrs_->meshV->Nlocal, nrs_->meshV->Nlocal, bb_tol, newton_tol_, mySession_)
 {
 }
 
 pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_,
                                            dlong localHashSize,
                                            dlong globalHashSize,
+                                           double bb_tol,
                                            double newton_tol_,
                                            bool mySession_)
     : nrs(nrs_), newton_tol(newton_tol_), mySession(mySession_), nPoints(0)
@@ -26,7 +27,6 @@ pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_,
   newton_tol = std::max(5e-13, newton_tol_);
 
   const int npt_max = 128;
-  const dfloat bb_tol = 0.01;
 
   mesh_t *mesh = nrs->meshV;
 

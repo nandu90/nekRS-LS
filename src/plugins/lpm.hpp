@@ -49,7 +49,7 @@ public:
                                              void *userdata,
                                              occa::memory o_ydot)>;
 
-  lpm_t(nrs_t *nrs, dfloat newton_tol_ = 0.0);
+  lpm_t(nrs_t *nrs, dfloat bb_tol_ = 0.01, dfloat newton_tol_ = 0.0);
 
   ~lpm_t() = default;
 
@@ -332,6 +332,7 @@ private:
   nrs_t *nrs = nullptr;
   int solverOrder;
   dfloat newton_tol;
+  dfloat bb_tol;
   std::unique_ptr<pointInterpolation_t> interp;
 
   int nParticles_ = 0;

@@ -22,9 +22,9 @@ int computeFieldOffset(int n)
 }
 } // namespace
 
-lpm_t::lpm_t(nrs_t *nrs_, dfloat newton_tol_)
-    : nrs(nrs_), solverOrder(nrs->nEXT), newton_tol(newton_tol_),
-      interp(std::make_unique<pointInterpolation_t>(nrs, newton_tol))
+lpm_t::lpm_t(nrs_t *nrs_, dfloat bb_tol_, dfloat newton_tol_)
+    : nrs(nrs_), solverOrder(nrs->nEXT), bb_tol(bb_tol_), newton_tol(newton_tol_),
+      interp(std::make_unique<pointInterpolation_t>(nrs, bb_tol, newton_tol))
 {
   nrsCheck(!kernelsRegistered_,
            platform->comm.mpiComm,
@@ -474,7 +474,7 @@ void lpm_t::integrate(dfloat tf)
 
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     interp.reset();
-    interp = std::make_unique<pointInterpolation_t>(nrs, newton_tol);
+    interp = std::make_unique<pointInterpolation_t>(nrs, bb_tol, newton_tol);
   }
 
   // set extrapolated state to t^n (copy from laggedInterpFields)
