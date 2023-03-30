@@ -880,6 +880,16 @@ void ciTestErrors(nrs_t *nrs,
     prErr = abs((err[1] - 2.364E-2) / err[1]);
     s01IterErr = abs(NiterS01 + 1);
     break;
+  case 14:
+    velIterErr = abs(NiterU - 10);
+    s1Err = abs((err[2] - 6.67E-012) / err[2]);
+    s2Err = abs((err[3] - 7.50E-012) / err[3]);
+    pIterErr = abs(NiterP - 7);
+    vxErr = abs((err[0] - 2.78E-010) / err[0]);
+    prErr = abs((err[1] - 7E-010) / err[1]);
+    s01IterErr = abs(NiterS01 - 2);
+    s02IterErr = abs(NiterS02 - 2);
+    break;
   }
 
   // on ci modes 12, 13, confirm that the correct solvers are present
