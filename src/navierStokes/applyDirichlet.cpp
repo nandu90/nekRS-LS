@@ -226,12 +226,12 @@ void applyDirichletScalars(nrs_t *nrs, double time, occa::memory& o_S, occa::mem
   }
 }
 
-void applyDirichletMesh(nrs_t *nrs, double time, occa::memory& o_U, occa::memory& o_Ue)
+void applyDirichletMesh(nrs_t *nrs, double time, occa::memory& o_UM, occa::memory& o_UMe, occa::memory& o_U)
 {
   mesh_t *mesh = nrs->_mesh;
   if (bcMap::unalignedMixedBoundary("mesh")) {
-    applyZeroNormalMask(nrs, mesh, nrs->meshSolver->o_EToB, nrs->o_zeroNormalMaskMeshVelocity, o_U);
-    applyZeroNormalMask(nrs, mesh, nrs->meshSolver->o_EToB, nrs->o_zeroNormalMaskMeshVelocity, o_Ue);
+    applyZeroNormalMask(nrs, mesh, nrs->meshSolver->o_EToB, nrs->o_zeroNormalMaskMeshVelocity, o_UM);
+    applyZeroNormalMask(nrs, mesh, nrs->meshSolver->o_EToB, nrs->o_zeroNormalMaskMeshVelocity, o_UMe);
   }
 
   platform->linAlg->fill(nrs->NVfields * nrs->fieldOffset, TINY, platform->o_mempool.slice0);
@@ -276,7 +276,7 @@ void applyDirichletMesh(nrs_t *nrs, double time, occa::memory& o_U, occa::memory
                         0 * nrs->fieldOffset,
                         nrs->meshSolver->o_maskIds,
                         platform->o_mempool.slice0,
-                        o_U, o_Ue);
+                        o_UM, o_UMe);
 }
 
 void applyDirichlet(nrs_t *nrs, double time)
@@ -288,5 +288,5 @@ void applyDirichlet(nrs_t *nrs, double time)
     applyDirichletScalars(nrs, time, nrs->cds->o_S, nrs->cds->o_Se); 
 
   if (!platform->options.compareArgs("MESH SOLVER", "NONE"))
-    applyDirichletMesh(nrs, time, nrs->_mesh->o_U, nrs->_mesh->o_Ue);
+    applyDirichletMesh(nrs, time, nrs->_mesh->o_U, nrs->_mesh->o_Ue, nrs->o_U);
 }

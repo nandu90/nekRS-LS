@@ -83,7 +83,7 @@ void ciTestErrors(nrs_t *nrs, dfloat time, int tstep)
   }
   if(ciMode == 2)
   {
-    expectedErr[5] = 0.1042903E-05;
+    expectedErr[5] = 0.3E-05;
   }
   if(ciMode == 3)
   {

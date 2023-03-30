@@ -2,7 +2,9 @@
 
 void meshVelocityDirichletConditions(bcData *bc)
 {
-  bc->meshu = bc->u;
-  bc->meshv = bc->v;
-  bc->meshw = bc->w;
+  const dfloat vPiston = p_AMP*sin(p_OMEGA*bc->time);
+
+  bc->u = -vPiston * bc->nx;
+  bc->v = -vPiston * bc->ny;
+  bc->w = -vPiston * bc->nz;
 }
