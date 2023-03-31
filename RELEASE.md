@@ -8,11 +8,11 @@
 * Single source udf+oudf
 * Device support BoomerAMG
 * Improved runtime statistics
-* Improved Chebyshev smoother
-* Flexible time averaging 
-* on boundary condition (aligned)
+* 4th-kind + opt Chebyshev smoothers
+* Configureable time averaging 
 * Extrapolation initialGuess method
 * Scaleable JIT compilation
+* Real gas support for lowMach
 * More examples
 * Various bug fixes 
 
