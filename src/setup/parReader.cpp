@@ -74,6 +74,18 @@ std::string parPrefixFromParSection(const std::string &parSection)
 }
 } // namespace
 
+bool checkForTrue(const std::string &s)
+{
+  return (s.find("true") != std::string::npos) || (s.find("yes") != std::string::npos) ||
+         (s.find("1") != std::string::npos);
+}
+bool checkForFalse(const std::string &s)
+{
+  return (s.find("false") != std::string::npos) || (s.find("no ") != std::string::npos) ||
+         (s.find("0") != std::string::npos);
+}
+
+
 template <typename Printable> void append_error(Printable message) { errorLogger << "\t" << message << "\n"; }
 template <typename Printable> void append_value_error(Printable message)
 {
@@ -175,11 +187,24 @@ static std::vector<std::string> velocityKeys = {
 static std::vector<std::string> temperatureKeys = {
     {"rhoCp"},
     {"conductivity"},
+    {"absolutetol"},
 };
 
 static std::vector<std::string> scalarKeys = {
     {"rho"},
     {"diffusivity"},
+    {"absolutetol"},
+};
+
+static std::vector<std::string> cvodeKeys = {
+    {"relativetol"},
+    {"absolutetol"},
+    {"nvectorsgmr"},
+    {"hmaxratio"},
+    {"epslin"},
+    {"sigscale"},
+    {"jtvrecycleproperties"},
+    {"cvodeendtimeratio"},
 };
 
 static std::vector<std::string> boomeramgKeys = {
@@ -224,6 +249,7 @@ static std::vector<std::string> validSections = {
     {"mesh"},
     {"scalar"},
     {"casedata"},
+    {"cvode"},
 };
 
 void makeStringsLowerCase()
@@ -240,6 +266,7 @@ void makeStringsLowerCase()
   lowerCase(boomeramgKeys);
   lowerCase(pressureKeys);
   lowerCase(occaKeys);
+  lowerCase(cvodeKeys);
   lowerCase(validSections);
 }
 
@@ -272,6 +299,8 @@ const std::vector<std::string> &getValidKeys(const std::string &section)
     return occaKeys;
   if (section == "velocity")
     return velocityKeys;
+  if (section == "cvode")
+    return cvodeKeys;
   else
     return nothing;
 }
@@ -310,6 +339,11 @@ int validateKeys(const inipp::Ini::Sections &sections)
 
     if (sec.first.find("casedata") != std::string::npos)
       continue;
+
+    // convention: sections starting with _ are ignored
+    if (sec.first.front() == '_')
+      continue;
+
     // check that section exists
     if (std::find(validSections.begin(), validSections.end(), sec.first) == validSections.end() &&
         !isScalar) {
@@ -462,6 +496,67 @@ void parseConstFlowRate(const int rank, setupAide &options, inipp::Ini *par)
     }
   }
 }
+
+void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
+{
+  // default values
+  double relativeTol = 1e-4;
+  double absoluteTol = 1e-6;
+  int nvectorsGMR = 10;
+  int maxSteps = 10000;
+  double hmax = 3;
+  double epsLin = 0.1;
+  int maxOrder = 3;
+  double sigScale = 1.0;
+  bool recycleProps = false;
+
+  std::string integrator = "bdf";
+
+  const std::string parScope = "cvode";
+
+  if (par->extract(parScope, "relativetol", relativeTol)) {
+    options.setArgs("CVODE RELATIVE TOLERANCE", to_string_f(relativeTol));
+  }
+
+  if (par->extract(parScope, "absolutetol", absoluteTol)) {
+    options.setArgs("CVODE ABSOLUTE TOLERANCE", to_string_f(absoluteTol));
+  }
+
+  par->extract(parScope, "nvectorsgmr", nvectorsGMR);
+  options.setArgs("CVODE GMR VECTORS", std::to_string(nvectorsGMR));
+
+  par->extract(parScope, "hmaxratio", hmax);
+  options.setArgs("CVODE HMAX RATIO", std::to_string(hmax));
+
+  par->extract(parScope, "epslin", epsLin);
+  options.setArgs("CVODE EPS LIN", std::to_string(epsLin));
+
+  options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
+
+  options.setArgs("CVODE MAX TIMESTEPPER ORDER", std::to_string(maxOrder));
+
+  upperCase(integrator);
+  options.setArgs("CVODE INTEGRATOR", integrator);
+
+  if (par->extract(parScope, "sigscale", sigScale)) {
+    options.setArgs("CVODE SIGMA SCALE", to_string_f(sigScale));
+  }
+
+  std::string recyclePropsStr;
+  if (par->extract(parScope, "jtvrecycleproperties", recyclePropsStr)) {
+    recycleProps = checkForTrue(recyclePropsStr);
+    if (recycleProps) {
+      options.setArgs("CVODE RECYCLE PROPERTIES", "TRUE");
+    }
+    else {
+      options.setArgs("CVODE RECYCLE PROPERTIES", "FALSE");
+    }
+  }
+
+  // only integrate to time + dt if true
+  options.setArgs("CVODE STOP TIME", "TRUE");
+}
+
 void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *par, std::string parScope)
 {
 
@@ -921,17 +1016,6 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
   }
 }
 
-bool checkForTrue(const std::string &s)
-{
-  return (s.find("true") != std::string::npos) || (s.find("yes") != std::string::npos) ||
-         (s.find("1") != std::string::npos);
-}
-bool checkForFalse(const std::string &s)
-{
-  return (s.find("false") != std::string::npos) || (s.find("no ") != std::string::npos) ||
-         (s.find("0") != std::string::npos);
-}
-
 void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std::string parScope)
 {
 
@@ -958,6 +1042,7 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
 
   const std::vector<std::string> validValues = {
       {"user"},
+      {"cvode"},
       {"none"},
       {"nvector"},
       {"pfgmres"},
@@ -1001,6 +1086,9 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
   }
   else if (p_solver.find("user") != std::string::npos) {
     p_solver = "USER";
+  }
+  else if (p_solver.find("cvode") != std::string::npos) {
+    p_solver = "CVODE";
   }
   else if (p_solver.find("none") != std::string::npos) {
     p_solver = "NONE";
@@ -1952,6 +2040,8 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
   int nscal = optionalNscalar ? optionalNscalar.value() : 0;
   int isStart = 0;
 
+  bool cvodeRequested = false;
+
   if (par->sections.count("temperature")) {
     std::string sid = scalarDigitStr(0);
     nscal++;
@@ -1969,6 +2059,12 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
       options.setArgs("SCALAR" + sid + " SOLVER", "NONE");
     }
     else {
+
+      if(solver == "cvode"){
+        cvodeRequested = true;
+        options.setArgs("SCALAR" + sid + " SOLVER", "CVODE");
+      }
+
       options.setArgs("SCALAR" + sid + " ELLIPTIC COEFF FIELD", "TRUE");
 
       parseInitialGuess(rank, options, par, "temperature");
@@ -1995,6 +2091,14 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
         if (err)
           append_error("Invalid expression for rhoCp");
         options.setArgs("SCALAR" + sid + " DENSITY", to_string_f(rhoCp));
+      }
+
+      dfloat cvodeAbsoluteTol = -1.0;
+      if (par->extract("temperature", "absolutetol", cvodeAbsoluteTol)) {
+        options.setArgs("SCALAR" + sid + " CVODE ABSOLUTE TOLERANCE", to_string_f(cvodeAbsoluteTol));
+        if (solver != "cvode") {
+          append_error("absoluteTol is only supported with solver=cvode");
+        }
       }
 
       std::string s_bcMap;
@@ -2070,6 +2174,11 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
       return;
     }
 
+    if (solver == "cvode") {
+      cvodeRequested = true;
+      options.setArgs("SCALAR" + sid + " SOLVER", "CVODE");
+    } 
+
     options.setArgs("SCALAR" + sid + " SOLVER", "PCG");
     options.setArgs("SCALAR" + sid + " ELLIPTIC COEFF FIELD", "TRUE");
 
@@ -2080,6 +2189,14 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
     parseLinearSolver(rank, options, par, parScope);
 
     parseSolverTolerance(rank, options, par, parScope);
+
+    dfloat cvodeAbsoluteTol = -1.0;
+    if (par->extract(parScope, "absolutetol", cvodeAbsoluteTol)) {
+      options.setArgs("SCALAR" + sid + " CVODE ABSOLUTE TOLERANCE", to_string_f(cvodeAbsoluteTol));
+      if (solver != "cvode") {
+        append_error("absoluteTol is only supported with solver=cvode");
+      }
+    }
 
     if (par->extract(parScope, "diffusivity", sbuf)) {
       int err = 0;
@@ -2192,6 +2309,15 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
           append_error("dt not defined!\n");
       }
     }
+  }
+
+  // cvode solver
+  if (par->sections.count("cvode") || cvodeRequested) {
+#ifndef ENABLE_CVODE
+    append_error("ERROR: CVODE not enabled! Recompile with CVODE support!\n");
+#endif
+    options.setArgs("CVODE", "TRUE");
+    parseCvodeSolver(rank, options, par);
   }
 
   // error checking

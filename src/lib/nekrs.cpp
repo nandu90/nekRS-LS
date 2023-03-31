@@ -521,6 +521,7 @@ int nrsFinalize(nrs_t *nrs)
     for(int is; is < nrs->Nscalar; is++) {
       if(nrs->cds->solver[is]) delete nrs->cds->solver[is]; 
     } 
+    if(nrs->cvode) delete nrs->cvode;
     if(nrs->meshSolver) delete nrs->meshSolver;
 
     hypreWrapper::finalize();

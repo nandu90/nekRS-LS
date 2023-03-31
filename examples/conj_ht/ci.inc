@@ -19,6 +19,28 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("PRESSURE SOLVER TOLERANCE", std::string("1e-04"));
   options.setArgs("SCALAR01 SOLVER TOLERANCE", std::string("1e-06"));
   options.setArgs("VARIABLEPROPERTIES", "TRUE");
+
+  // set up CVODE solver details
+  if(ciMode == 3){
+    options.setArgs("CVODE", "TRUE");
+    options.setArgs("CVODE INTEGRATOR", "BDF");
+    options.setArgs("CVODE MAX TIMESTEPPER ORDER", "3");
+    options.setArgs("CVODE EPS LIN", "0.05");
+    options.setArgs("CVODE STOP TIME", "TRUE");
+
+    const auto hmax = 1;
+    options.setArgs("CVODE HMAX", to_string_f(hmax));
+
+    const auto maxSteps = 10000;
+    options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
+
+    options.setArgs("CVODE RELATIVE TOLERANCE", "1e-06");
+    options.setArgs("CVODE ABSOLUTE TOLERANCE", "1e-08");
+    options.setArgs("CVODE GMR VECTORS", "20");
+
+    options.setArgs("SCALAR00 SOLVER", "CVODE");
+
+  }
 }
 
 void ciTestErrors(nrs_t *nrs, dfloat time, int tstep)

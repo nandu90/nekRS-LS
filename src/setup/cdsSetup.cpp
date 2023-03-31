@@ -40,6 +40,8 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
   }
   cds->fieldOffsetSum = sum;
 
+  cds->o_fieldOffsetScan = platform->device.malloc(cds->NSfields * sizeof(dlong), cds->fieldOffsetScan);
+
   cds->gsh = nrs->gsh;
   cds->gshT = (nrs->cht) ? oogs::setup(mesh->ogs, 1, nrs->fieldOffset, ogsDfloat, NULL, OOGS_AUTO) : cds->gsh;
 
@@ -98,14 +100,22 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
   cds->o_relUrst = nrs->o_relUrst;
   cds->o_Urst = nrs->o_Urst;
 
+  cds->anyCvodeSolver = false;
+  cds->anyEllipticSolver = false;
+
   for (int is = 0; is < cds->NSfields; is++) {
     std::string sid = scalarDigitStr(is);
 
     cds->compute[is] = 1;
     if (options.compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
       cds->compute[is] = 0;
+      cds->cvodeSolve[is] = 0;
       continue;
     }
+
+    cds->cvodeSolve[is] = options.compareArgs("SCALAR" + sid + " SOLVER", "CVODE");
+    cds->anyCvodeSolver |= cds->cvodeSolve[is];
+    cds->anyEllipticSolver |= (!cds->cvodeSolve[is] && cds->compute[is]);
 
     mesh_t *mesh;
     (is) ? mesh = cds->meshV : mesh = cds->mesh[0]; // only first scalar can be a CHT mesh
@@ -122,6 +132,9 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
     }
     cds->o_EToB[is] = device.malloc(mesh->Nelements * mesh->Nfaces * sizeof(int), EToB);
   }
+
+  cds->o_compute = platform->device.malloc(cds->NSfields * sizeof(dlong), cds->compute);
+  cds->o_cvodeSolve = platform->device.malloc(cds->NSfields * sizeof(dlong), cds->cvodeSolve);
 
   bool scalarFilteringEnabled = false;
   bool avmEnabled = false;
@@ -223,6 +236,8 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
       cds->subCycleInitU0Kernel = platform->kernels.get(section + kernelName);
     }
   }
+
+  cds->cvode = nullptr;
 
   return cds;
 }

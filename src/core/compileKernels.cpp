@@ -42,6 +42,8 @@ void compileKernels() {
 
   registerPostProcessingKernels();
 
+  registerCvodeKernels(kernelInfoBC);
+
   registerMeshKernels(kernelInfoBC);
 
   registerNrsKernels(kernelInfoBC);

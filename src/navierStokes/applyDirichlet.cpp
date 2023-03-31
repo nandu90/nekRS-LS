@@ -174,6 +174,8 @@ void applyDirichletScalars(nrs_t *nrs, double time, occa::memory& o_S, occa::mem
   for (int is = 0; is < cds->NSfields; is++) {
     if (!cds->compute[is])
       continue;
+    if (cds->cvodeSolve[is])
+      continue;
     mesh_t *mesh = cds->mesh[0];
     oogs_t *gsh = cds->gshT;
     if (is) {

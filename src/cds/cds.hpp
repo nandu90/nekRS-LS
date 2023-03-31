@@ -10,6 +10,7 @@
 #include "mesh3D.h"
 #include "elliptic.h"
 #include "neknek.hpp"
+#include "cvode.hpp"
 
 struct cds_t
 {
@@ -19,10 +20,15 @@ struct cds_t
   mesh_t* mesh[NSCALAR_MAX];
   dlong fieldOffset[NSCALAR_MAX];
   dlong fieldOffsetScan[NSCALAR_MAX];
+  occa::memory o_fieldOffsetScan;
   dlong fieldOffsetSum;
   mesh_t* meshV;
   elliptic_t* solver[NSCALAR_MAX];
   neknek_t* neknek;
+  cvode_t* cvode;
+
+  bool anyCvodeSolver = false;
+  bool anyEllipticSolver = false;
 
   int NVfields;            // Number of velocity fields
   int NSfields;            // Number of scalar fields
@@ -41,6 +47,9 @@ struct cds_t
   int dtAdaptStep;
 
   int compute[NSCALAR_MAX];
+  int cvodeSolve[NSCALAR_MAX];
+  occa::memory o_compute;
+  occa::memory o_cvodeSolve;
 
   dfloat *U, *S;
 

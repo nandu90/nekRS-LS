@@ -20,7 +20,7 @@ ExternalProject_Add(
                 -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 )
 
-add_library(nekrs-hypre SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/elliptic/amgSolver/hypre/hypreWrapper.cpp)
+add_library(nekrs-hypre SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/solvers/elliptic/amgSolver/hypre/hypreWrapper.cpp)
 add_dependencies(nekrs-hypre HYPRE_BUILD)
 target_include_directories(nekrs-hypre PRIVATE ${HYPRE_INSTALL_DIR}/include)
 # lacking of a better alternative adding dependencies manually 
@@ -78,7 +78,7 @@ if(OCCA_CUDA_ENABLED)
 
   )
 
-  add_library(nekrs-hypre-device SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/elliptic/amgSolver/hypre/hypreWrapperDevice.cpp)
+  add_library(nekrs-hypre-device SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/solvers/elliptic/amgSolver/hypre/hypreWrapperDevice.cpp)
   add_dependencies(nekrs-hypre-device HYPRE_BUILD_DEVICE)
   target_compile_definitions(nekrs-hypre-device PRIVATE -DENABLE_HYPRE_GPU)
   target_include_directories(nekrs-hypre-device PRIVATE ${HYPRE_INSTALL_DIR}/include)
@@ -96,6 +96,6 @@ endif()
 
 else()
   #dummy
-  add_library(nekrs-hypre-device SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/elliptic/amgSolver/hypre/hypreWrapperDevice.cpp)
+  add_library(nekrs-hypre-device SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/solvers/elliptic/amgSolver/hypre/hypreWrapperDevice.cpp)
   target_link_libraries(nekrs-hypre-device PUBLIC libocca MPI::MPI_C) 
 endif()

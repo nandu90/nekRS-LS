@@ -44,13 +44,37 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   if(ciMode == 5){
     platform->par->set("casedata", "p_rot", 0.5);
   }
-  if(ciMode == 6){
+  if(ciMode == 6 || ciMode == 8){
     options.setArgs("MESH SOLVER", "PCG");
     options.setArgs("MESH BLOCK SOLVER", "TRUE");
     options.setArgs("MESH SOLVER TOLERANCE", "1e-6");
     options.setArgs("MESH INITIAL GUESS", "PROJECTION");
     options.setArgs("MESH RESIDUAL PROJECTION VECTORS", std::string("1"));
     platform->par->set("casedata", "p_rot", 0.5);
+  }
+  if(ciMode == 7 || ciMode == 8){
+    // cvode
+    options.setArgs("CVODE", "TRUE");
+    options.setArgs("CVODE INTEGRATOR", "BDF");
+    options.setArgs("CVODE MAX TIMESTEPPER ORDER", "3");
+    options.setArgs("CVODE EPS LIN", "0.05");
+    options.setArgs("CVODE STOP TIME", "TRUE");
+
+    double dt0;
+    options.getArgs("DT", dt0);
+
+    const auto hmaxRatio = 1;
+    options.setArgs("CVODE HMAX RATIO", to_string_f(hmaxRatio));
+
+    const auto maxSteps = 10000;
+    options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
+
+    options.setArgs("CVODE RELATIVE TOLERANCE", "1e-06");
+    options.setArgs("CVODE ABSOLUTE TOLERANCE", "1e-08");
+    options.setArgs("CVODE GMR VECTORS", "20");
+
+    options.setArgs("SCALAR00 SOLVER", "CVODE");
+
   }
 }
 

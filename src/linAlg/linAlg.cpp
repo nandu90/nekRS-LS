@@ -195,6 +195,7 @@ void linAlg_t::setup()
     weightedInnerProdMultiDeviceKernel = kernels.get("weightedInnerProdMultiDevice");
     crossProductKernel = kernels.get("crossProduct");
     unitVectorKernel = kernels.get("unitVector");
+    entrywiseMagKernel = kernels.get("entrywiseMag");
   }
 }
 
@@ -1215,4 +1216,13 @@ void linAlg_t::crossProduct(const dlong N,
 void linAlg_t::unitVector(const dlong N, const dlong fieldOffset, occa::memory &o_v)
 {
   unitVectorKernel(N, fieldOffset, o_v);
+}
+
+void linAlg_t::entrywiseMag(const dlong N,
+                  const dlong Nfields,
+                  const dlong fieldOffset,
+                  occa::memory &o_a,
+                  occa::memory &o_b)
+{
+  entrywiseMagKernel(N, Nfields, fieldOffset, o_a, o_b);
 }

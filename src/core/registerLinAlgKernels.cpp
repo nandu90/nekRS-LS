@@ -59,6 +59,7 @@ void registerLinAlgKernels()
       {"weightedInnerProdMultiDevice", false},
       {"crossProduct", false},
       {"unitVector", false},
+      {"entrywiseMag", false},
   };
 
   std::string kernelName;

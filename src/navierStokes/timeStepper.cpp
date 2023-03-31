@@ -10,38 +10,17 @@
 #include "udf.hpp"
 #include "bcMap.hpp"
 #include "bdry.hpp"
+#include "Urst.hpp"
 
-namespace {
+void evaluateProperties(nrs_t *nrs, const double timeNew) {
 
-void advectionFlops(mesh_t *mesh, int Nfields)
-{
-  const auto cubNq = mesh->cubNq;
-  const auto cubNp = mesh->cubNp;
-  const auto Nq = mesh->Nq;
-  const auto Np = mesh->Np;
-  const auto Nelements = mesh->Nelements;
-  double flopCount = 0.0; // per elem basis
-  if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
-    flopCount += 4. * Nq * (cubNp + cubNq * cubNq * Nq + cubNq * Nq * Nq); // interpolation
-    flopCount += 6. * cubNp * cubNq;                                       // apply Dcub
-    flopCount += 5 * cubNp; // compute advection term on cubature mesh
-    flopCount += mesh->Np;  // weight by inv. mass matrix
-  }
-  else {
-    flopCount += 8 * (Np * Nq + Np);
-  }
+  bool rhsCVODE = false;
+  if(nrs->cvode)
+    rhsCVODE = nrs->cvode->isRhsEvaluation();
 
-  flopCount *= Nelements;
-  flopCount *= Nfields;
+  const std::string tag = rhsCVODE ? "udfPropertiesCVODE" : "udfProperties";
 
-  platform->flopCounter->add("advection", flopCount);
-}
-
-} // namespace
-
-void evaluateProperties(nrs_t *nrs, const double timeNew)
-{
-  platform->timer.tic("udfProperties", 1);
+  platform->timer.tic(tag, 1);
   cds_t *cds = nrs->cds;
 
   if (udf.properties) {
@@ -68,12 +47,36 @@ void evaluateProperties(nrs_t *nrs, const double timeNew)
     }
   }
 
-  platform->timer.toc("udfProperties");
+  platform->timer.toc(tag);
 }
 
 namespace timeStepper {
 
-void adjustDt(nrs_t *nrs, int tstep)
+void advectionFlops(mesh_t *mesh, int Nfields)
+{
+  const auto cubNq = mesh->cubNq;
+  const auto cubNp = mesh->cubNp;
+  const auto Nq = mesh->Nq;
+  const auto Np = mesh->Np;
+  const auto Nelements = mesh->Nelements;
+  double flopCount = 0.0; // per elem basis
+  if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+    flopCount += 4. * Nq * (cubNp + cubNq * cubNq * Nq + cubNq * Nq * Nq); // interpolation
+    flopCount += 6. * cubNp * cubNq;                                       // apply Dcub
+    flopCount += 5 * cubNp; // compute advection term on cubature mesh
+    flopCount += mesh->Np;  // weight by inv. mass matrix
+  }
+  else {
+    flopCount += 8 * (Np * Nq + Np);
+  }
+
+  flopCount *= Nelements;
+  flopCount *= Nfields;
+
+  platform->flopCounter->add("advection", flopCount);
+}
+
+void adjustDt(nrs_t* nrs, int tstep)
 {
   const double TOLToZero = 1e-12;
   bool initialTimeStepProvided = true;
@@ -300,37 +303,15 @@ void initStep(nrs_t *nrs, dfloat time, dfloat dt, int tstep)
     }
   }
 
-  const bool relative = movingMesh && nrs->Nsubsteps;
-  occa::memory &o_Urst = relative ? nrs->o_relUrst : nrs->o_Urst;
-  mesh = nrs->meshV;
-  double flopCount = 0.0;
-
-  if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
-    nrs->UrstCubatureKernel(mesh->Nelements,
-                            mesh->o_cubvgeo,
-                            mesh->o_cubInterpT,
-                            nrs->fieldOffset,
-                            nrs->cubatureOffset,
-                            nrs->o_U,
-                            mesh->o_U,
-                            o_Urst);
-    flopCount += 6 * mesh->Np * mesh->cubNq;
-    flopCount += 6 * mesh->Nq * mesh->Nq * mesh->cubNq * mesh->cubNq;
-    flopCount += 6 * mesh->Nq * mesh->cubNp;
-    flopCount += 24 * mesh->cubNp;
-    flopCount *= mesh->Nelements;
-  }
-  else {
-    nrs->UrstKernel(mesh->Nelements, mesh->o_vgeo, nrs->fieldOffset, nrs->o_U, mesh->o_U, o_Urst);
-    flopCount += 24 * static_cast<double>(mesh->Nlocal);
-  }
-  platform->flopCounter->add("Urst", flopCount);
+  computeUrst(nrs);
 
   if (nrs->Nscalar) {
-    platform->timer.tic("makeq", 1);
-    platform->linAlg->fillKernel(cds->fieldOffsetSum, 0.0, cds->o_FS);
-    makeq(nrs, time, tstep, cds->o_FS, cds->o_BF);
-    platform->timer.toc("makeq");
+    if(cds->anyEllipticSolver) {
+      platform->timer.tic("makeq", 1);
+      platform->linAlg->fillKernel(cds->fieldOffsetSum, 0.0, cds->o_FS);
+      makeq(nrs, time, tstep, cds->o_FS, cds->o_BF);
+      platform->timer.toc("makeq");
+    }
   }
 
   if (nrs->flow) {
@@ -399,6 +380,9 @@ bool runStep(nrs_t *nrs, std::function<bool(int)> convergenceCheck, int stage)
 
   if (nrs->neknek)
     nrs->neknek->updateBoundary(nrs, tstep, stage);
+  
+  if (nrs->cvode)
+    scalarSolveCvode(nrs, nrs->timePrevious, timeNew, cds->o_S, stage, tstep);
 
   if (stage == 1)
     lagState(nrs);
@@ -500,7 +484,7 @@ void makeq(nrs_t *nrs, dfloat time, int tstep, occa::memory o_FS, occa::memory o
   }
 
   for (int is = 0; is < cds->NSfields; is++) {
-    if (!cds->compute[is])
+    if (!cds->compute[is] || cds->cvodeSolve[is])
       continue;
 
     std::string sid = scalarDigitStr(is);
@@ -547,39 +531,36 @@ void makeq(nrs_t *nrs, dfloat time, int tstep, occa::memory o_FS, occa::memory o
               scalarSubCycleMovingMesh(cds, std::min(tstep, cds->nEXT), time, is, cds->o_U, cds->o_S);
         else
           o_Usubcycling = scalarSubCycle(cds, std::min(tstep, cds->nEXT), time, is, cds->o_U, cds->o_S);
-      }
-      else {
-        if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE"))
+      } else {
+        if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
           cds->strongAdvectionCubatureVolumeKernel(cds->meshV->Nelements,
+                                                   1,
                                                    mesh->o_vgeo,
                                                    mesh->o_cubDiffInterpT,
                                                    mesh->o_cubInterpT,
                                                    mesh->o_cubProjectT,
+                                                   cds->o_compute + is * sizeof(dlong),
+                                                   cds->o_fieldOffsetScan + is * sizeof(dlong),
                                                    cds->vFieldOffset,
-                                                   isOffset,
                                                    cds->vCubatureOffset,
                                                    cds->o_S,
                                                    cds->o_Urst,
                                                    cds->o_rho,
-                                                   platform->o_mempool.slice0);
-        else
+                                                   o_FS);
+        }
+        else {
           cds->strongAdvectionVolumeKernel(cds->meshV->Nelements,
+                                           1,
                                            mesh->o_vgeo,
                                            mesh->o_D,
+                                           cds->o_compute + is * sizeof(dlong),
+                                           cds->o_fieldOffsetScan + is * sizeof(dlong),
                                            cds->vFieldOffset,
-                                           isOffset,
                                            cds->o_S,
                                            cds->o_Urst,
                                            cds->o_rho,
-                                           platform->o_mempool.slice0);
-        platform->linAlg->axpby(cds->meshV->Nelements * cds->meshV->Np,
-                                -1.0,
-                                platform->o_mempool.slice0,
-                                1.0,
-                                o_FS,
-                                0,
-                                isOffset);
-
+                                           o_FS);
+        }
         advectionFlops(cds->mesh[0], 1);
       }
     }
@@ -616,9 +597,13 @@ void scalarSolve(nrs_t *nrs, dfloat time, occa::memory o_S, int stage)
 {
   cds_t *cds = nrs->cds;
 
+  // avoid invoking the scalarSolve tic in the case there are no elliptic scalars
+  if (!cds->anyEllipticSolver)
+    return;
+
   platform->timer.tic("scalarSolve", 1);
   for (int is = 0; is < cds->NSfields; is++) {
-    if (!cds->compute[is])
+    if (!cds->compute[is] || cds->cvodeSolve[is])
       continue;
 
     mesh_t *mesh;
@@ -640,8 +625,17 @@ void scalarSolve(nrs_t *nrs, dfloat time, occa::memory o_S, int stage)
   platform->timer.toc("scalarSolve");
 }
 
-void makef(nrs_t *nrs, dfloat time, int tstep, occa::memory o_FU, occa::memory o_BF)
+void scalarSolveCvode(nrs_t *nrs, dfloat tn, dfloat time, occa::memory o_S, int stage, int tstep)
 {
+  // CVODE is not supported with sub-stepping
+  if (!nrs->cvode || stage > 1)
+    return;
+
+  nrs->cvode->solve(nrs, tn, time, tstep);
+}
+
+void makef(
+    nrs_t *nrs, dfloat time, int tstep, occa::memory o_FU, occa::memory o_BF) {
   mesh_t *mesh = nrs->meshV;
   const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
   const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
@@ -796,8 +790,9 @@ void printInfo(nrs_t *nrs, dfloat time, int tstep, bool printStepInfo, bool prin
   }
   if (platform->comm.mpiRank == 0) {
     if (verboseInfo && printVerboseInfo) {
+      bool cvodePrinted = false;
       for (int is = 0; is < nrs->Nscalar; is++) {
-        if (cds->compute[is]) {
+        if (cds->compute[is] && !cds->cvodeSolve[is]) {
           elliptic_t *solver = cds->solver[is];
           if (solver->solutionProjection) {
             const int prevVecs = solver->solutionProjection->getPrevNumVecsProjection();
@@ -817,6 +812,9 @@ void printInfo(nrs_t *nrs, dfloat time, int tstep, bool printStepInfo, bool prin
                  solver->Niter,
                  solver->res0Norm,
                  solver->resNorm);
+        } else if (cds->cvodeSolve[is] && !cvodePrinted) {
+          nrs->cvode->printInfo(true);
+          cvodePrinted = true;
         }
       }
 
@@ -948,9 +946,14 @@ void printInfo(nrs_t *nrs, dfloat time, int tstep, bool printStepInfo, bool prin
       printf("step= %d  t= %.8e  dt=%.1e  C= %.2f", tstep, time, nrs->dt[0], cfl);
 
     if (!verboseInfo) {
+      bool cvodePrinted = false;
       for (int is = 0; is < nrs->Nscalar; is++)
-        if (cds->compute[is])
+        if (cds->compute[is] && !cds->cvodeSolve[is]){
           printf("  S: %d", cds->solver[is]->Niter);
+        } else if (cds->cvodeSolve[is] && !cvodePrinted){
+          nrs->cvode->printInfo(false);
+          cvodePrinted = true;
+        }
 
       if (nrs->flow) {
         printf("  P: %d", nrs->pSolver->Niter);

@@ -118,7 +118,7 @@ occa::memory o_NULL;
 
 const std::string scalarDigitStr(int i)
 {
-  static const int scalarWidth = std::to_string(NSCALAR_MAX - 1).length();
+  const int scalarWidth = std::to_string(NSCALAR_MAX - 1).length();
   std::stringstream ss;
   ss << std::setfill('0') << std::setw(scalarWidth) << i;
   return ss.str();

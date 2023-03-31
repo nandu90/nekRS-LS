@@ -214,6 +214,51 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("VELOCITY SOLVER", "NONE");
   }
 
+  // CVODE, both scalars
+  if (ciMode == 16) {
+
+    options.setArgs("CVODE", "TRUE");
+    options.setArgs("CVODE INTEGRATOR", "BDF");
+    options.setArgs("CVODE MAX TIMESTEPPER ORDER", "3");
+    options.setArgs("CVODE EPS LIN", "0.05");
+    options.setArgs("CVODE STOP TIME", "TRUE");
+
+    const auto hmaxRatio = 1;
+    options.setArgs("CVODE HMAX RATIO", to_string_f(hmaxRatio));
+
+    const auto maxSteps = 10000;
+    options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
+
+    options.setArgs("CVODE RELATIVE TOLERANCE", "1e-10");
+    options.setArgs("CVODE ABSOLUTE TOLERANCE", "1e-12");
+    options.setArgs("CVODE GMR VECTORS", "20");
+
+    options.setArgs("SCALAR00 SOLVER", "CVODE");
+    options.setArgs("SCALAR01 SOLVER", "CVODE");
+  }
+
+  // CVODE, just for S01
+  if (ciMode == 17) {
+
+    options.setArgs("CVODE", "TRUE");
+    options.setArgs("CVODE INTEGRATOR", "BDF");
+    options.setArgs("CVODE MAX TIMESTEPPER ORDER", "3");
+    options.setArgs("CVODE EPS LIN", "0.05");
+    options.setArgs("CVODE STOP TIME", "TRUE");
+
+    const auto hmaxRatio = 1;
+    options.setArgs("CVODE HMAX RATIO", to_string_f(hmaxRatio));
+
+    const auto maxSteps = 10000;
+    options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
+
+    options.setArgs("CVODE RELATIVE TOLERANCE", "1e-10");
+    options.setArgs("CVODE ABSOLUTE TOLERANCE", "1e-12");
+    options.setArgs("CVODE GMR VECTORS", "20");
+
+    options.setArgs("SCALAR01 SOLVER", "CVODE");
+  }
+
   options.setArgs("BDF ORDER", "3");
   options.setArgs("VELOCITY SOLVER TOLERANCE", std::string("1e-12"));
   options.setArgs("PRESSURE SOLVER TOLERANCE", std::string("1e-10"));
@@ -766,9 +811,20 @@ void ciTestErrors(nrs_t *nrs,
 
   int NiterP = nrs->pSolver ? nrs->pSolver->Niter : -1;
 
-  int NiterS01 = platform->options.compareArgs("SCALAR00 SOLVER", "NONE") ? -1 : nrs->cds->solver[0]->Niter;
-  int NiterS02 = platform->options.compareArgs("SCALAR01 SOLVER", "NONE") ? -1 : nrs->cds->solver[1]->Niter;
+  int NiterS01 = -1;
+  if(nrs->cds->solver[0]){
+    NiterS01 = nrs->cds->solver[0]->Niter;
+  }
+  int NiterS02 = -1;
+  if(nrs->cds->solver[1]){
+    NiterS02 = nrs->cds->solver[1]->Niter;
+  }
   int s01IterErr, s02IterErr;
+
+  if(ciMode == 16 || ciMode == 17){
+    NiterS01 = nrs->cds->cvode->numSteps();
+    NiterS02 = nrs->cds->cvode->numLinIters();
+  }
 
   s01IterErr = abs(NiterS01 - 2);
   s02IterErr = abs(NiterS02 - 2);
@@ -889,6 +945,26 @@ void ciTestErrors(nrs_t *nrs,
     prErr = abs((err[1] - 7E-010) / err[1]);
     s01IterErr = abs(NiterS01 - 2);
     s02IterErr = abs(NiterS02 - 2);
+    break;
+  case 16:
+    velIterErr = abs(NiterU - 10);
+    s1Err = abs((err[2] - 2.31E-08)/err[2]);
+    s2Err = abs((err[3] - 2.51E-08)/err[3]);
+    pIterErr = abs(NiterP - 4);
+    vxErr = abs((err[0] - 2.78E-10)/err[0]);
+    prErr = abs((err[1] - 7.11E-10)/err[1]);
+    s01IterErr = abs(NiterS01 - 1); // nsteps
+    s02IterErr = abs(NiterS02 - 2); // nli
+    break;
+  case 17:
+    velIterErr = abs(NiterU - 10);
+    s1Err = abs((err[2] - 6.11E-12)/err[2]);
+    s2Err = abs((err[3] - 2.51E-08)/err[3]);
+    pIterErr = abs(NiterP - 4);
+    vxErr = abs((err[0] - 2.78E-10)/err[0]);
+    prErr = abs((err[1] - 7.11E-10)/err[1]);
+    s01IterErr = abs(NiterS01 - 1); // nsteps
+    s02IterErr = abs(NiterS02 - 2); // nli
     break;
   }
 

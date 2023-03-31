@@ -9,6 +9,7 @@
 #include "timer.hpp"
 #include "platform.hpp"
 #include "neknek.hpp"
+#include "cvode.hpp"
 #include "fldFile.hpp"
 
 struct nrs_t {
@@ -32,6 +33,7 @@ struct nrs_t {
   cds_t *cds = nullptr;
 
   neknek_t *neknek = nullptr;
+  cvode_t *cvode = nullptr;
 
   oogs_t *gsh = nullptr;
   oogs_t *gshMesh = nullptr;
@@ -56,6 +58,8 @@ struct nrs_t {
   dfloat p0th[3] = {0.0, 0.0, 0.0};
   dfloat p0the = 0.0;
   dfloat dp0thdt;
+
+  dfloat alpha0Ref;
 
   int nEXT;
   int nBDF;

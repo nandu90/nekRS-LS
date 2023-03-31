@@ -221,6 +221,9 @@ public:
                     occa::memory &o_z);
 
   void unitVector(const dlong N, const dlong fieldOffset, occa::memory &o_v);
+  
+  // o_b[n] = \sqrt{\sum_{i=0}^{Nfields-1} o_a[n+i*fieldOffset]^2}
+  void entrywiseMag(const dlong N, const dlong Nfields, const dlong fieldOffset, occa::memory& o_a, occa::memory& o_b);
 
   occa::kernel fillKernel;
   occa::kernel pfillKernel;
@@ -273,6 +276,7 @@ public:
   occa::kernel weightedInnerProdMultiDeviceKernel;
   occa::kernel crossProductKernel;
   occa::kernel unitVectorKernel;
+  occa::kernel entrywiseMagKernel;
 };
 
 #endif

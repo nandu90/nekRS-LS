@@ -53,6 +53,7 @@ void lowMach::setup(nrs_t *nrs, dfloat alpha_, occa::memory& o_beta_, occa::memo
   the_nrs = nrs;
 
   alpha0 = alpha_;
+  nrs->alpha0Ref = alpha0;
   o_beta = o_beta_;
   o_kappa = o_kappa_;
 
@@ -75,6 +76,11 @@ void lowMach::qThermalSingleComponent(dfloat time, occa::memory& o_div)
   cds_t *cds = nrs->cds;
   mesh_t *mesh = nrs->meshV;
   linAlg_t *linAlg = platform->linAlg;
+
+  bool rhsCVODE = false;
+  if(cds->cvode){
+    rhsCVODE = cds->cvode->isRhsEvaluation();
+  }
 
   nrs->gradientVolumeKernel(mesh->Nelements,
                             mesh->o_vgeo,
@@ -130,7 +136,7 @@ void lowMach::qThermalSingleComponent(dfloat time, occa::memory& o_div)
                       mesh->o_vmapM,
                       nrs->o_EToB,
                       nrs->fieldOffset,
-                      nrs->o_Ue,
+                      rhsCVODE ? nrs->o_U : nrs->o_Ue,
                       platform->o_mempool.slice0);
 
     double surfaceFluxFlops = 13 * mesh->Nq * mesh->Nq;
@@ -158,15 +164,26 @@ void lowMach::qThermalSingleComponent(dfloat time, occa::memory& o_div)
         (termQ - termV) / linAlg->sum(Nlocal, platform->o_mempool.slice0, platform->comm.mpiComm);
     linAlg->axpby(Nlocal, -prhs, platform->o_mempool.slice1, 1.0, o_div);
 
+    const auto *coeff = rhsCVODE ? nrs->cvode->coeffBDF() : nrs->coeffBDF;
     dfloat Saqpq = 0.0;
     for (int i = 0; i < nrs->nBDF; ++i) {
-      Saqpq += nrs->coeffBDF[i] * nrs->p0th[i];
+      Saqpq += coeff[i] * nrs->p0th[i];
     }
-    nrs->p0th[2] = nrs->p0th[1];
-    nrs->p0th[1] = nrs->p0th[0];
 
-    nrs->p0th[0] = Saqpq / (nrs->g0 - nrs->dt[0] * prhs);
-    nrs->dp0thdt = prhs * nrs->p0th[0];
+    const auto g0 = rhsCVODE ? nrs->cvode->g0() : nrs->g0;
+    const auto dt = rhsCVODE ? nrs->cvode->dt() : nrs->dt[0];
+
+    const auto pcoef = (g0 - dt * prhs);
+    const auto p0thn = Saqpq / pcoef;
+
+    // only update p0th when not inside a CVODE evaluation
+    if(!rhsCVODE){
+      nrs->p0th[2] = nrs->p0th[1];
+      nrs->p0th[1] = nrs->p0th[0];
+      nrs->p0th[0] = p0thn;
+    }
+
+    nrs->dp0thdt = prhs * p0thn;
 
     surfaceFlops += surfaceFluxFlops + p0thHelperFlops;
   }
@@ -181,6 +198,8 @@ void lowMach::dpdt(occa::memory& o_FU)
 {
   nrs_t *nrs = the_nrs;
   mesh_t *mesh = nrs->meshV;
+
+  if(nrs->cds->cvodeSolve[0]) return; // contribution is not applied here
 
   if (!qThermal) {
     platform->linAlg->add(mesh->Nlocal, nrs->dp0thdt * alpha0, o_FU);

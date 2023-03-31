@@ -283,10 +283,11 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
   {
     const dlong Nstates = nrs->Nsubsteps ? std::max(nrs->nBDF, nrs->nEXT) : 1;
-    if (nrs->Nsubsteps && platform->options.compareArgs("MOVING MESH", "TRUE"))
+    bool useCVODE = platform->options.compareArgs("CVODE", "TRUE");
+    if ((useCVODE || nrs->Nsubsteps) && platform->options.compareArgs("MOVING MESH", "TRUE"))
       nrs->o_relUrst =
           platform->device.malloc((Nstates * nrs->NVfields * sizeof(dfloat)) * nrs->cubatureOffset);
-    else
+    if (!nrs->Nsubsteps || platform->options.compareArgs("MOVING MESH", "FALSE"))
       nrs->o_Urst = platform->device.malloc((Nstates * nrs->NVfields * sizeof(dfloat)) * nrs->cubatureOffset);
   }
 
@@ -527,6 +528,10 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
   if (nrs->Nscalar) {
     nrs->cds = cdsSetup(nrs, platform->options);
+    if(nrs->cds->anyCvodeSolver){
+      nrs->cvode = new cvode_t(nrs);
+      nrs->cds->cvode = nrs->cvode;
+    }
   }
 
   // get IC + t0 from nek
@@ -563,6 +568,15 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
   nek::ocopyToNek(startTime, 0);
 
+  // CVODE can only be initialized once the initial condition
+  // is known, however, a user may need to set function ptrs
+  // on to cvode_t object.
+  // Hence, the actual CVODE initialization part of cvode_t
+  // is done below.
+  if (nrs->cvode) {
+    nrs->cvode->initialize(nrs);
+  }
+
   if (platform->comm.mpiRank == 0) std::cout << std::endl;
   printMeshMetrics(nrs->_mesh);
   
@@ -582,8 +596,9 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
       mesh_t *mesh;
       (is) ? mesh = cds->meshV : mesh = cds->mesh[0]; // only first scalar can be a CHT mesh
 
+      const auto solverName = cds->cvodeSolve[is] ? "CVODE" : "ELLIPTIC";
       if (platform->comm.mpiRank == 0)
-        std::cout << "================= ELLIPTIC SETUP SCALAR" << sid << " ===============\n";
+        std::cout << "================= " << solverName << " SETUP SCALAR" << sid << " ===============\n";
 
       int nbrBIDs = bcMap::size(0);
       if (nrs->cht && is == 0)
@@ -593,6 +608,9 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
         if (platform->comm.mpiRank == 0 && bcTypeText.size())
           printf("bID %d -> bcType %s\n", bID, bcTypeText.c_str());
       }
+
+      if (cds->cvodeSolve[is])
+        continue;
 
       cds->solver[is] = new elliptic_t();
       cds->solver[is]->name = "scalar" + sid;

@@ -13,7 +13,8 @@ include(FetchContent)
 include(config/utils.cmake)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_INSTALL_MESSAGE NEVER)
+#set(CMAKE_INSTALL_MESSAGE NEVER)
+set(CMAKE_INSTALL_MESSAGE ALWAYS)
 set(FETCHCONTENT_QUIET on)
 set(FETCHCONTENT_UPDATES_DISCONNECTED on)
 set(CMAKE_ENABLE_EXPORTS TRUE)
@@ -101,6 +102,8 @@ set(OCCA_HIP_COMPILER_FLAGS "-w -O3 -g -ffp-contract=fast -funsafe-math-optimiza
 set(OCCA_DPCPP_COMPILER_FLAGS "-w -O3 -fsycl -fdebug-info-for-profiling -gline-tables-only -ffp-contract=fast" CACHE STRING "DPC++ flags for OCCA JIT compile")
 set(OCCA_OPENCL_COMPILER_FLAGS "-w -cl-std=CL2.0 -cl-unsafe-math-optimizations -cl-fast-relaxed-math -cl-mad-enable -cl-no-signed-zeros" CACHE STRING "OPENCL flags for OCCA JIT compile")
 
+set(OCCA_FOUND ON)
+
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(powerpc|ppc)64le")
   string(REPLACE "-march" "-mcpu" OCCA_CXXFLAGS ${OCCA_CXXFLAGS})
   string(REPLACE "-march" "-mcpu" CMAKE_Fortran_FLAGS_RELWITHDEBINFO ${CMAKE_Fortran_FLAGS_RELWITHDEBINFO})
@@ -116,7 +119,7 @@ set(ENABLE_METAL OFF CACHE BOOL "Enable OCCA Metal support")
 
 set(ENABLE_AMGX OFF CACHE BOOL "Enable NVIDIA AMGX support")
 set(NEKRS_GPU_MPI ON CACHE BOOL "Enable GPU aware MPI")
-
+set(ENABLE_CVODE OFF CACHE BOOL "Enable CVODE support")
 
 ###############################################################################
 # Set compiler flags                                                          #
@@ -202,6 +205,31 @@ if(OCCA_CUDA_ENABLED AND ENABLE_AMGX)
 endif()
 
 ###############################################################################
+# CVODE
+###############################################################################
+if(ENABLE_CVODE)
+  # workaround to resolve name conflict (used be OCCA and CVODE) 
+  set(ENABLE_CUDA ${OCCA_CUDA_ENABLED})
+  set(ENABLE_HIP ${OCCA_HIP_ENABLED})
+  set(ENABLE_OPENCL ${OCCA_OPENCL_ENABLED})
+
+  if(OCCA_HIP_ENABLED)
+    message(FATAL_ERROR "CVODE + HIP is not currently supported!")
+  endif()
+  set(ENABLE_MPI ON)
+  set(BUILD_CVODE ON)
+  set(BUILD_ARKODE OFF)
+  set(BUILD_CVODES OFF)
+  set(BUILD_IDA OFF)
+  set(BUILD_IDAS OFF)
+  set(BUILD_KINSOL OFF)
+  set(BUILD_EXAMPLES OFF)
+  set(BUILD_TESTING OFF)
+  set(CMAKE_INSTALL_LIBDIR ${CMAKE_INSTALL_PREFIX}/lib)
+  add_subdirectory(3rd_party/cvode)
+endif()
+
+###############################################################################
 # Build HYPRE
 ###############################################################################
 if(OCCA_CUDA_ENABLED)
@@ -260,6 +288,7 @@ set(SRC
     src/navierStokes/subCycling.cpp
     src/navierStokes/tombo.cpp
     src/navierStokes/constantFlowRate.cpp
+    src/navierStokes/Urst.cpp
     src/cds/cdsSolve.cpp
     src/cds/subCycling.cpp
     src/setup/parReader.cpp
@@ -292,6 +321,8 @@ set(SRC
     src/postProcessing/strainRotationRate.cpp
     src/postProcessing/viscousDrag.cpp
     src/postProcessing/Qcriterion.cpp
+    src/core/registerCvodeKernels.cpp
+    src/solvers/cvode/cvode.cpp
     ${BENCH_SOURCES}
     ${MESH_SOURCES}
     ${ELLIPTIC_SOURCES}
@@ -335,6 +366,7 @@ target_include_directories(nekrs-lib
   src/findpts
   src/postProcessing
   src/pointInterpolation
+  src/solvers/cvode
   src/lns
   ${BENCH_SOURCE_DIR}
   ${BENCH_SOURCE_DIR}/core
@@ -361,6 +393,18 @@ endif()
 
 target_link_libraries(nekrs-lib PRIVATE nekrs-hypre)
 target_link_libraries(nekrs-lib PRIVATE nekrs-hypre-device)
+
+if (ENABLE_CVODE)
+  target_link_libraries (nekrs-lib PUBLIC SUNDIALS::cvode_shared SUNDIALS::nvecmpiplusx_shared SUNDIALS::nvecserial_shared)
+  target_include_directories(nekrs-lib PUBLIC 3rd_party/cvode/include)
+  target_compile_definitions(nekrs-lib PUBLIC -DENABLE_CVODE)
+  if (OCCA_CUDA_ENABLED)
+    find_package(CUDA REQUIRED)
+    target_include_directories(nekrs-lib PRIVATE ${CUDA_INCLUDE_DIRS})
+    target_link_libraries (nekrs-lib PUBLIC SUNDIALS::nveccuda_shared)
+    target_compile_definitions(nekrs-lib PUBLIC -DENABLE_CUDA)
+  endif()
+endif()
 
 add_executable(nekrs-bin src/main.cpp)
 target_include_directories(nekrs-bin PRIVATE src/lib)

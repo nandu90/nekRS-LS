@@ -21,6 +21,28 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("VELOCITY SOLVER TOLERANCE", std::string("1e-12"));
   options.setArgs("PRESSURE SOLVER TOLERANCE", std::string("1e-08"));
   options.setArgs("SCALAR01 SOLVER TOLERANCE", std::string("1e-12"));
+
+  // set up CVODE solver details
+  if(ciMode == 3){
+    options.setArgs("CVODE", "TRUE");
+    options.setArgs("CVODE INTEGRATOR", "BDF");
+    options.setArgs("CVODE MAX TIMESTEPPER ORDER", "3");
+    options.setArgs("CVODE EPS LIN", "0.05");
+    options.setArgs("CVODE STOP TIME", "TRUE");
+
+    const auto hmaxRatio = 1;
+    options.setArgs("CVODE HMAX RATIO", to_string_f(hmaxRatio));
+
+    const auto maxSteps = 10000;
+    options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
+
+    options.setArgs("CVODE RELATIVE TOLERANCE", "1e-08");
+    options.setArgs("CVODE ABSOLUTE TOLERANCE", "1e-12");
+    options.setArgs("CVODE GMR VECTORS", "20");
+
+    options.setArgs("SCALAR00 SOLVER", "CVODE");
+
+  }
 }
 
 dfloat computeLInfError(nrs_t * nrs, occa::memory o_a, occa::memory o_b)

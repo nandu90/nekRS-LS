@@ -124,6 +124,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
                         fs::path("nekInterface"),
                         fs::path("include"),
                         fs::path("gatherScatter"),
+                        fs::path("3rdParty"),
                         fs::path("kernels")}) {
       fileBcast(srcPath / entry, NEKRS_HOME_NEW, comm.mpiComm, verbose);
     }
