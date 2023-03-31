@@ -7,7 +7,7 @@ stopAt = numSteps
 numSteps = 0
 
 [PRESSURE]
-solver = pfgmres+nVector=30
+#solver = pfgmres+nVector=15
 maxIterations = 200
 residualTol = 1e-8+relative
 

@@ -253,7 +253,7 @@ void set_usr_handles(const char *session_in, int verbose)
   const std::string lib = cache_dir + "/nek5000/lib" + session_in + ".so";
 
   if(platform->comm.mpiRank == 0 && platform->verbose)
-    std::cout << "loading " << lib << std::endl;
+    std::cout << "\nloading " << lib << std::endl;
   void *handle = dlopen(lib.c_str(), RTLD_NOW | RTLD_LOCAL);
   nrsCheck(!handle, MPI_COMM_SELF, EXIT_FAILURE, 
            "%s\n", dlerror());

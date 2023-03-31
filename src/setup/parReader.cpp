@@ -962,6 +962,8 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
     if (par->extract(parScope, "pmgschedule", p_mgschedule)) {
       options.setArgs(parSection + "MULTIGRID SCHEDULE", p_mgschedule);
 
+      options.removeArgs(parSection + "MULTIGRID CHEBYSHEV DEGREE");
+
       // validate multigrid schedule
       // note: default order here is not actually required
       auto [scheduleMap, errorString] = parseMultigridSchedule(p_mgschedule, options, 3);
