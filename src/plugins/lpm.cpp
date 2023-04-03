@@ -654,8 +654,11 @@ void lpm_t::integrateRK1()
 
 void lpm_t::integrateRK2()
 {
-  auto o_k1 = o_k + 0 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
-  auto o_k2 = o_k + 1 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+  occa::memory o_k1, o_k2;
+  if(fieldOffset_ > 0){
+    o_k1 = o_k + 0 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+    o_k2 = o_k + 1 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+  }
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
   userRHS_(nrs, this, time, o_y, userdata_, o_k1);
@@ -684,9 +687,12 @@ void lpm_t::integrateRK2()
 
 void lpm_t::integrateRK3()
 {
-  auto o_k1 = o_k + 0 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
-  auto o_k2 = o_k + 1 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
-  auto o_k3 = o_k + 2 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+  occa::memory o_k1, o_k2, o_k3;
+  if(fieldOffset_ > 0){
+    o_k1 = o_k + 0 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+    o_k2 = o_k + 1 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+    o_k3 = o_k + 2 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+  }
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
   userRHS_(nrs, this, time, o_y, userdata_, o_k1);
@@ -730,10 +736,13 @@ void lpm_t::integrateRK3()
 
 void lpm_t::integrateRK4()
 {
-  auto o_k1 = o_k + 0 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
-  auto o_k2 = o_k + 1 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
-  auto o_k3 = o_k + 2 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
-  auto o_k4 = o_k + 3 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+  occa::memory o_k1, o_k2, o_k3, o_k4;
+  if(fieldOffset_ > 0){
+    o_k1 = o_k + 0 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+    o_k2 = o_k + 1 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+    o_k3 = o_k + 2 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+    o_k4 = o_k + 3 * nDOFs_ * fieldOffset_ * sizeof(dfloat);
+  }
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
   userRHS_(nrs, this, time, o_y, userdata_, o_k1);
