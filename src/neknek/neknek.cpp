@@ -104,7 +104,7 @@ void checkValidBoundaryConditions(nrs_t *nrs)
     issueError |= invalid;
   }
 
-  nrsCheck(issueError, platform->comm.mpiComm, EXIT_FAILURE, "\n", "");
+  nrsCheck(issueError, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "");
 }
 
 void updateInterpPoints(nrs_t *nrs)
@@ -309,7 +309,7 @@ void neknekSetup(nrs_t *nrs)
   neknek_t *neknek = nrs->neknek;
 
   nrsCheck(platform->options.compareArgs("CONSTANT FLOW RATE", "TRUE"), platform->comm.mpiComm, EXIT_FAILURE,
-           "constant flow rate support not supported\n", "");
+           "%s\n", "constant flow rate support not supported");
 
   const dlong nsessions = neknek->nsessions;
 
@@ -358,8 +358,7 @@ bool checkCoupled(nrs_t *nrs)
   nrsCheck((minPointsAcrossSessions == 0) && (maxPointsAcrossSessions > 0),
            platform->comm.mpiCommParent,
            EXIT_FAILURE,
-           "One session has no interpolation points, but another session does!\n",
-           "");
+           "%s\n", "One session has no interpolation points, but another session does!");
 
   return minPointsAcrossSessions > 0;
 }
@@ -391,7 +390,7 @@ neknek_t::neknek_t(nrs_t *nrs, dlong _nsessions, dlong _sessionID)
     issueError = 1;
   }
 
-  nrsCheck(issueError, platform->comm.mpiCommParent, EXIT_FAILURE, "variable p0th is not supported!\n", "");
+  nrsCheck(issueError, platform->comm.mpiCommParent, EXIT_FAILURE, "%s\n", "variable p0th is not supported!");
 
   this->copyNekNekPointsKernel = platform->kernels.get("copyNekNekPoints");
 }

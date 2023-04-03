@@ -82,7 +82,7 @@ int check_retval(void *returnvalue, const char *funcname, int opt)
 cvode_t::cvode_t(nrs_t *nrs)
 {
   // assumption: nEXT >= 2, since o_FS lagged state is needed
-  nrsCheck(nrs->nEXT < 2, platform->comm.mpiComm, EXIT_FAILURE, "CVODE requires nEXT >= 2\n", "");
+  nrsCheck(nrs->nEXT < 2, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "CVODE requires nEXT >= 2");
   auto cds = nrs->cds;
 
   o_coeffExt = platform->device.malloc(maxTimestepperOrder * sizeof(dfloat));
@@ -125,7 +125,7 @@ cvode_t::cvode_t(nrs_t *nrs)
     valid &= cds->cvodeSolve[is];
   }
 
-  nrsCheck(!valid, platform->comm.mpiComm, EXIT_FAILURE, "CVODE scalars must be contiguous\n", "");
+  nrsCheck(!valid, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "CVODE scalars must be contiguous");
 
   for (int is = 0; is < cds->NSfields; is++) {
     if (!cds->compute[is]) {
@@ -443,7 +443,7 @@ void cvode_t::initialize(nrs_t *nrs)
     MPI_Abort(platform->comm.mpiComm, 1);
 
 #else
-  nrsCheck(true, platform->comm.mpiComm, EXIT_FAILURE, "No cvode installation found. Bailing...\n", "");
+  nrsCheck(true, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "No cvode installation found. Bailing...");
 
 #endif
 }
@@ -577,7 +577,7 @@ void cvode_t::setupEToLMapping(nrs_t *nrs)
   int err = allNonNegative ? 0 : 1;
   MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
 
-  nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "Encountered negative value in EToL mapping\n", "");
+  nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Encountered negative value in EToL mapping");
 
   o_Lids.free();
 #endif

@@ -120,7 +120,7 @@ void setup(MPI_Comm commg_in, MPI_Comm comm_in,
   const std::string meshFile = options.getArgs("MESH FILE");
   re2::nelg(meshFile, nelgt, nelgv, comm);
   nrsCheck(size > nelgv, platform->comm.mpiComm, EXIT_FAILURE, 
-           "MPI tasks > number of elements!", "");
+           "%s\n", "MPI tasks > number of elements!");
 
   nek::bootstrap();
 
