@@ -313,16 +313,15 @@ void neknekSetup(nrs_t *nrs)
 
   const dlong nsessions = neknek->nsessions;
 
-  MPI_Comm globalComm = neknek->globalComm;
   dlong globalRank;
-  MPI_Comm_rank(globalComm, &globalRank);
+  MPI_Comm_rank(platform->comm.mpiCommParent, &globalRank);
 
   if(globalRank == 0) printf("configuring neknek with %d sessions\n", nsessions);
 
   dlong nFields[2];
   nFields[0] = nrs->Nscalar;
   nFields[1] = -nFields[0];
-  MPI_Allreduce(MPI_IN_PLACE, nFields, 2, MPI_DLONG, MPI_MIN, globalComm);
+  MPI_Allreduce(MPI_IN_PLACE, nFields, 2, MPI_DLONG, MPI_MIN, platform->comm.mpiCommParent);
   nFields[1] = -nFields[1];
   if (nFields[0] != nFields[1]) {
     if(globalRank == 0) {
@@ -333,7 +332,7 @@ void neknekSetup(nrs_t *nrs)
 
   const dlong movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
   dlong globalMovingMesh;
-  MPI_Allreduce(&movingMesh, &globalMovingMesh, 1, MPI_DLONG, MPI_MAX, globalComm);
+  MPI_Allreduce(&movingMesh, &globalMovingMesh, 1, MPI_DLONG, MPI_MAX, platform->comm.mpiCommParent);
   neknek->globalMovingMesh = globalMovingMesh;
 
   findInterpPoints(nrs);
@@ -365,9 +364,8 @@ bool checkCoupled(nrs_t *nrs)
   return minPointsAcrossSessions > 0;
 }
 
-neknek_t::neknek_t(nrs_t *nrs, const session_data_t &session)
-    : nsessions(session.nsessions), sessionID(session.sessionID), globalComm(session.globalComm),
-      localComm(session.localComm)
+neknek_t::neknek_t(nrs_t *nrs, dlong _nsessions, dlong _sessionID)
+    : nsessions(_nsessions), sessionID(_sessionID)
 {
 
   nrs->neknek = this;

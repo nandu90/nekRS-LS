@@ -57,7 +57,7 @@ void setup(MPI_Comm commg_in, MPI_Comm comm_in,
     	   int buildOnly, int commSizeTarget,
            int ciMode, std::string _setupFile,
            std::string _backend, std::string _deviceID,
-           const session_data_t &session,
+           int nSessions, int sessionID,
            int debug)
 {
   MPI_Comm_dup(commg_in, &commg);
@@ -171,7 +171,7 @@ void setup(MPI_Comm commg_in, MPI_Comm comm_in,
 
   nrsSetup(comm, options, nrs);
   if (checkCoupled(nrs)) {
-    new neknek_t(nrs, session);
+    new neknek_t(nrs, nSessions, sessionID);
   }
 
   const double setupTime = platform->timer.query("setup", "DEVICE:MAX");
