@@ -10,6 +10,8 @@
 #include "tuple_for_each.hpp"
 #include "gslib.h" // needed for sarray_transfer
 
+#include <inttypes.h>
+
 namespace {
 
 int computeFieldOffset(int n)
@@ -367,7 +369,7 @@ void lpm_t::initialize(int nParticles, dfloat t0, occa::memory o_y0)
   nrsCheck(o_y0.size() != nParticles * nDOFs_ * sizeof(dfloat),
            platform->comm.mpiComm,
            EXIT_FAILURE,
-           "o_y0.size() = %llu, while expecting %ld bytes!\n",
+           "o_y0.size() = %" PRId64 ", while expecting %ld bytes!\n",
            o_y0.size(),
            nParticles * nDOFs_ * sizeof(dfloat));
 
@@ -1341,19 +1343,19 @@ void lpm_t::addParticles(int newNParticles,
   nrsCheck(o_yNewPart.size() < expectedYSize,
            platform->comm.mpiComm,
            EXIT_FAILURE,
-           "o_yNewPart size is %ld but expected %ld bytes!\n",
+           "o_yNewPart size is %" PRId64 " but expected %ld bytes!\n",
            o_yNewPart.size(),
            expectedYSize);
   nrsCheck(o_propNewPart.size() < expectedPropSize,
            platform->comm.mpiComm,
            EXIT_FAILURE,
-           "o_propNewPart size is %ld but expected %ld bytes!\n",
+           "o_propNewPart size is %" PRId64 " but expected %ld bytes!\n",
            o_propNewPart.size(),
            expectedPropSize);
   nrsCheck(o_ydotNewPart.size() < expectedYdotSize,
            platform->comm.mpiComm,
            EXIT_FAILURE,
-           "o_ydotNewPart size is %ld but expected %ld bytes!\n",
+           "o_ydotNewPart size is %" PRId64 " but expected %ld bytes!\n",
            o_ydotNewPart.size(),
            expectedYdotSize);
 

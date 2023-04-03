@@ -71,7 +71,7 @@ void checkValidBoundaryConditions(nrs_t *nrs)
     auto *EToB = cds->EToB[s];
     for (dlong pt = 0; pt < mesh->Nelements * mesh->Nfaces; ++pt) {
       missingInterpBound[s] |= (nrs->EToB[pt] == bcMap::bcTypeINT && EToB[pt] != bcMap::bcTypeINTS);
-      extraInterpBound[s] |= (!nrs->EToB[pt] == bcMap::bcTypeINT && EToB[pt] == bcMap::bcTypeINTS);
+      extraInterpBound[s] |= (nrs->EToB[pt] != bcMap::bcTypeINT && EToB[pt] == bcMap::bcTypeINTS);
     }
   }
 
