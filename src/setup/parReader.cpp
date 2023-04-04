@@ -1225,32 +1225,31 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *par, st
       append_error("avm regularization is only enabled for scalars!\n");
     }
 
-    if (usesAVM) {
-      if (regularization.find("hpfresidual") != std::string::npos)
-        options.setArgs(parPrefix + "REGULARIZATION METHOD", "AVM_RESIDUAL");
-      else if (regularization.find("highestmodaldecay") != std::string::npos)
-        options.setArgs(parPrefix + "REGULARIZATION METHOD", "AVM_HIGHEST_MODAL_DECAY");
-      else {
-        append_error("avm must be specified with hpfResidual or HighestModalDecay!\n");
-      }
-
-      options.setArgs(parPrefix + "REGULARIZATION VISMAX COEFF", "0.5");
-      options.setArgs(parPrefix + "REGULARIZATION SCALING COEFF", "1.0");
-      options.setArgs(parPrefix + "REGULARIZATION MDH ACTIVATION WIDTH", to_string_f(1.0));
-      options.setArgs(parPrefix + "REGULARIZATION MDH THRESHOLD", to_string_f(-4.0));
-      options.setArgs(parPrefix + "REGULARIZATION AVM C0", "FALSE");
-      options.setArgs(parPrefix + "REGULARIZATION HPF MODES", "1");
-    }
     if (usesHPFRT) {
       options.setArgs(parPrefix + "HPFRT MODES", "1");
       options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPF_RELAXATION");
     }
 
     if (usesAVM) {
+      options.setArgs(parPrefix + "REGULARIZATION METHOD", "AVM_HIGHEST_MODAL_DECAY");
+      options.setArgs(parPrefix + "REGULARIZATION VISMAX COEFF", "0.5");
+      options.setArgs(parPrefix + "REGULARIZATION MDH ACTIVATION WIDTH", to_string_f(1.0));
+      options.setArgs(parPrefix + "REGULARIZATION MDH THRESHOLD", to_string_f(-4.0));
+      options.setArgs(parPrefix + "REGULARIZATION AVM C0", "FALSE");
+      options.setArgs(parPrefix + "REGULARIZATION HPF MODES", "1");
+
+      if (regularization.find("hpfresidual") != std::string::npos) {
+        options.setArgs(parPrefix + "REGULARIZATION METHOD", "AVM_RESIDUAL");
+        options.setArgs(parPrefix + "REGULARIZATION SCALING COEFF", "1.0");
+      }
+
       for (std::string s : list) {
 
         const auto nmodeStr = parseValueForKey(s, "nmodes");
         if (!nmodeStr.empty()) {
+          if (regularization.find("highestmodaldecay") != std::string::npos)
+            append_error("nmodes qualifier is invalid for avm highestmodaldecay!\n");
+
           double value = std::stod(nmodeStr);
           value = round(value);
           options.setArgs(parPrefix + "REGULARIZATION HPF MODES", to_string_f(value));
