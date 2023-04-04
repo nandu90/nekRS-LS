@@ -7,6 +7,7 @@
 #include <limits>
 #include <array>
 #include <numeric>
+#include "ogs.hpp"
 #include "udf.hpp"
 
 #include "timeStepper.hpp"
@@ -335,7 +336,8 @@ void cvode_t::initialize(nrs_t *nrs)
 
   this->cvodeMem = CVodeCreate(integrator, sunctx);
 
-  const auto T0 = nekrs::startTime();
+  auto T0 = 0.0;
+  platform->options.getArgs("START TIME", T0);
 
   this->relTol = 1e-4;
   platform->options.getArgs("CVODE RELATIVE TOLERANCE", this->relTol);
@@ -551,18 +553,29 @@ void cvode_t::setupEToLMapping(nrs_t *nrs)
 
   this->o_EToLUnique = platform->device.malloc(mesh->Nlocal * sizeof(dlong), EToLUnique.data());
 
-  // construct L-vector version of mesh->ogs->invDegree
+  // construct L-vector version of inv degree, based on duplicated points in L-vector
   {
     auto *mesh = nrs->meshV;
     if (nrs->cht)
       mesh = nrs->cds->mesh[0];
 
-    std::vector<dfloat> invDegreeL(LFieldOffset);
+    std::vector<dfloat> degree(mesh->Nlocal, 0.0);
 
     for (int n = 0; n < mesh->Nlocal; ++n) {
       const auto lid = EToLUnique[n];
       if (lid > -1) {
-        invDegreeL[lid] = mesh->ogs->invDegree[n];
+        degree[lid] = 1.0;
+      }
+    }
+
+    ogsGatherScatter(degree.data(), dfloatString, "ogsSum", mesh->ogs);
+
+    std::vector<dfloat> invDegreeL(LFieldOffset, 1.0);
+    
+    for (int n = 0; n < mesh->Nlocal; ++n) {
+      const auto lid = EToLUnique[n];
+      if (lid > -1) {
+        invDegreeL[lid] = 1.0 / degree[n];
       }
     }
 
