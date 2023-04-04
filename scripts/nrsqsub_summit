@@ -128,7 +128,7 @@ echo "" >> $SFILE
 
 echo "export NVME_HOME=\"/mnt/bb/$USER/\"" >> $SFILE
 echo "if [ \$NEKRS_CACHE_BCAST -eq 1 ]; then" >> $SFILE
-echo "  export NEKRS_TMP_DIR=\$NVME_HOME" >> $SFILE
+echo "  export NEKRS_CACHE_TMP_DIR=\$NVME_HOME" >> $SFILE
 echo "fi" >> $SFILE
 echo "" >> $SFILE
 

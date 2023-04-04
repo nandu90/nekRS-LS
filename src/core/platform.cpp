@@ -92,12 +92,14 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 
   flopCounter = std::make_unique<flopCounter_t>();
 
+  tmpDir = "/";
+
   // bcast install dir 
   if(cacheBcast || cacheLocal) {
-    if(getenv("NEKRS_TMP_DIR")) { 
-      tmpDir = getenv("NEKRS_TMP_DIR");
+    if(getenv("NEKRS_LOCAL_TMP_DIR")) { 
+      tmpDir = getenv("NEKRS_LOCAL_TMP_DIR");
     } else {
-      nrsAbort(_comm, EXIT_FAILURE, "%s\n", "NEKRS_TMP_DIR undefined!");
+      nrsAbort(_comm, EXIT_FAILURE, "%s\n", "NEKRS_LOCAL_TMP_DIR undefined!");
     }
 
     int rankLocal;
@@ -105,7 +107,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 
     if(rankLocal == 0)
       nrsCheck(!fs::exists(tmpDir), MPI_COMM_SELF, EXIT_FAILURE,
-               "Cannot find NEKRS_TMP_DIR %s\n", tmpDir.c_str());
+               "Cannot find NEKRS_LOCAL_TMP_DIR %s\n", tmpDir.c_str());
   
     auto nSessions = 1; 
     options.getArgs("NEKNEK NUMBER OF SESSIONS", nSessions);
