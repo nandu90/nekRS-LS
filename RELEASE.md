@@ -18,7 +18,7 @@
 
 ## Good to know
 
-* [udf] Changes in include files do not trigger rebuild 
+* [udf] Changes in include files do not trigger rebuild automatically 
 * [nrsconfig] Optional build settings have to be passed as a command line arg e.g. `-DENABLE_AMGX=ON`
 * [par] Plugins kernels will be loaded automatically (call in `UDF_LoadKernels` no longer required)
 
