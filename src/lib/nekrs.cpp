@@ -72,6 +72,9 @@ void setup(MPI_Comm commg_in, MPI_Comm comm_in,
 
   configRead(comm);
 
+  options.setArgs("NEKNEK NUMBER OF SESSIONS", std::to_string(nSessions));
+  options.setArgs("NEKNEK SESSION ID", std::to_string(sessionID));
+
   options.setArgs("BUILD ONLY", "FALSE");
   if(buildOnly) {
     options.setArgs("BUILD ONLY", "TRUE");
@@ -98,6 +101,9 @@ void setup(MPI_Comm commg_in, MPI_Comm comm_in,
   platform_t* _platform = platform_t::getInstance(options, commg, comm);
   platform = _platform;
   platform->par = par;
+
+  if(nSessions > 1) {
+  }
 
   if (debug)
     platform->options.setArgs("VERBOSE", "TRUE");
