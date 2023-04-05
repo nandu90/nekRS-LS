@@ -379,7 +379,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
         device.malloc(mesh->Nelements * mesh->Nfaces * sizeof(int), nrs->EToBMeshVelocity);
   }
 
-  if (platform->options.compareArgs("VELOCITY REGULARIZATION METHOD", "HPF_RELAXATION")) {
+  if (platform->options.compareArgs("VELOCITY REGULARIZATION METHOD", "HPFRT")) {
 
     nrs->filterNc = -1;
     dfloat filterS;

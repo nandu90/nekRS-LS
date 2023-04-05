@@ -493,7 +493,7 @@ void makeq(nrs_t *nrs, dfloat time, int tstep, occa::memory o_FS, occa::memory o
     (is) ? mesh = cds->meshV : mesh = cds->mesh[0];
     const dlong isOffset = cds->fieldOffsetScan[is];
 
-    if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPF_RELAXATION")) {
+    if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPFRT")) {
       cds->filterRTKernel(cds->meshV->Nelements,
                           is,
                           cds->o_filterMT,
@@ -646,7 +646,7 @@ void makef(
     platform->timer.toc("udfUEqnSource");
   }
 
-  if (platform->options.compareArgs("REGULARIZATION METHOD", "HPF_RELAXATION")) {
+  if (platform->options.compareArgs("REGULARIZATION METHOD", "HPFRT")) {
     nrs->filterRTKernel(mesh->Nelements, nrs->o_filterMT, nrs->filterS, nrs->fieldOffset, nrs->o_U, o_FU);
     double flops = 24 * mesh->Np * mesh->Nq + 3 * mesh->Np;
     flops *= static_cast<double>(mesh->Nelements);

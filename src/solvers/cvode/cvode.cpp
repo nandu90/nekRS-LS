@@ -1093,7 +1093,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
     const auto Nq = mesh->Nq;
     for (int s = scalarStart; s < (scalarStart + Nscalar); ++s) {
       const auto sid = scalarDigitStr(s);
-      if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "RELAXATION")) {
+      if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPFRT")) {
         const dlong isOffset = cds->fieldOffsetScan[s];
         cds->filterRTKernel(cds->meshV->Nelements,
                             s,

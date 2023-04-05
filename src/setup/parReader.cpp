@@ -1227,7 +1227,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *par, st
 
     if (usesHPFRT) {
       options.setArgs(parPrefix + "HPFRT MODES", "1");
-      options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPF_RELAXATION");
+      options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPFRT");
     }
 
     if (usesAVM) {
@@ -1324,7 +1324,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *par, st
     std::string filtering;
     par->extract(parSection, "filtering", filtering);
     if (filtering == "hpfrt") {
-      options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPF_RELAXATION");
+      options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPFRT");
       if (par->extract(parSection, "filterweight", sbuf)) {
         int err = 0;
         double weight = te_interp(sbuf.c_str(), &err);
