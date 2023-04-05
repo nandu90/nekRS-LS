@@ -646,7 +646,7 @@ void makef(
     platform->timer.toc("udfUEqnSource");
   }
 
-  if (platform->options.compareArgs("REGULARIZATION METHOD", "HPFRT")) {
+  if (platform->options.compareArgs("VELOCITY REGULARIZATION METHOD", "HPFRT")) {
     nrs->filterRTKernel(mesh->Nelements, nrs->o_filterMT, nrs->filterS, nrs->fieldOffset, nrs->o_U, o_FU);
     double flops = 24 * mesh->Np * mesh->Nq + 3 * mesh->Np;
     flops *= static_cast<double>(mesh->Nelements);

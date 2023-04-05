@@ -37,7 +37,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
 
   options.setArgs("VELOCITY REGULARIZATION METHOD", "HPFRT");
   options.setArgs("VELOCITY HPFRT MODES", std::string("1"));
-  options.setArgs("VELOCITY HPFRT STRENGTH", std::string("20"));
+  options.setArgs("VELOCITY HPFRT STRENGTH", std::string("10"));
 
   options.setArgs("CONSTANT FLOW RATE", "FALSE");
 
