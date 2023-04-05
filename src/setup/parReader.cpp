@@ -85,7 +85,6 @@ bool checkForFalse(const std::string &s)
          (s.find("0") != std::string::npos);
 }
 
-
 template <typename Printable> void append_error(Printable message) { errorLogger << "\t" << message << "\n"; }
 template <typename Printable> void append_value_error(Printable message)
 {
@@ -1378,10 +1377,8 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *par, st
                         options.getArgs("REGULARIZATION MDH ACTIVATION WIDTH"));
         options.setArgs(parPrefix + "REGULARIZATION MDH THRESHOLD",
                         options.getArgs("REGULARIZATION MDH THRESHOLD"));
-        options.setArgs(parPrefix + "REGULARIZATION AVM C0", 
-                        options.getArgs("REGULARIZATION AVM C0"));
-        options.setArgs(parPrefix + "REGULARIZATION HPF MODES", 
-                        options.getArgs("REGULARIZATION HPF MODES"));
+        options.setArgs(parPrefix + "REGULARIZATION AVM C0", options.getArgs("REGULARIZATION AVM C0"));
+        options.setArgs(parPrefix + "REGULARIZATION HPF MODES", options.getArgs("REGULARIZATION HPF MODES"));
       }
     }
   }
@@ -1427,7 +1424,7 @@ void setDefaultSettings(setupAide &options, std::string casename, int rank)
   options.setArgs("MESH SOLVER", "NONE");
   options.setArgs("MOVING MESH", "FALSE");
 
-  options.setArgs("GS OVERLAP", "TRUE");
+  options.setArgs("GS COMM OVERLAP", "TRUE");
 
   options.setArgs("VARIABLE DT", "FALSE");
 
@@ -1674,7 +1671,8 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
           int NSubCyclesSpecified = 0;
           if (par->extract("general", "subcyclingsteps", NSubCyclesSpecified)) {
             options.setArgs("SUBCYCLING STEPS", std::to_string(NSubCyclesSpecified));
-          } else {
+          }
+          else {
             options.setArgs("SUBCYCLING STEPS", std::to_string(NSubCycles));
           }
 
@@ -2061,7 +2059,7 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
     }
     else {
 
-      if(solver == "cvode"){
+      if (solver == "cvode") {
         cvodeRequested = true;
         options.setArgs("SCALAR" + sid + " SOLVER", "CVODE");
       }
@@ -2178,7 +2176,7 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
     if (solver == "cvode") {
       cvodeRequested = true;
       options.setArgs("SCALAR" + sid + " SOLVER", "CVODE");
-    } 
+    }
 
     options.setArgs("SCALAR" + sid + " SOLVER", "PCG");
     options.setArgs("SCALAR" + sid + " ELLIPTIC COEFF FIELD", "TRUE");
