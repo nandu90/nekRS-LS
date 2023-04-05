@@ -285,6 +285,7 @@ set(SRC
     src/bdry/createEToBV.cpp
     src/navierStokes/applyDirichlet.cpp
     src/navierStokes/timeStepper.cpp
+    src/navierStokes/evaluateProperties.cpp
     src/navierStokes/subCycling.cpp
     src/navierStokes/tombo.cpp
     src/navierStokes/constantFlowRate.cpp
