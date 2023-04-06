@@ -156,9 +156,9 @@ void fileBcast(const fs::path &srcPathIn,
       fs::remove(filePath); 
     }
 
-    int retVal;
+#if 0
     MPI_File fh;
-    retVal = MPI_File_open(commLocal, filePath.c_str(), MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &fh);
+    int retVal = MPI_File_open(commLocal, filePath.c_str(), MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &fh);
     if (retVal) {
       char err_string[MPI_MAX_ERROR_STRING];
       int err_string_len;
@@ -180,9 +180,17 @@ void fileBcast(const fs::path &srcPathIn,
     retVal = MPI_File_close(&fh);
     nrsCheck(retVal, MPI_COMM_SELF, EXIT_FAILURE,
                "MPI_File_close with retVal=%d\n!", retVal);
+#else
+    if (localRank == localRankRoot) {
+      std::ofstream fh (filePath, std::ios::out | std::ios::binary | std::ios::trunc);
+      fh.write(fileBuf, bufSize);
+      fh.close();
+      fileSync(filePath.c_str());
+    }
+    MPI_Barrier(commLocal);
+#endif
 
     if (localRank == localRankRoot) {
-      fileSync(filePath.c_str());
       fs::permissions(filePath, fs::perms::owner_all);
     }
 
