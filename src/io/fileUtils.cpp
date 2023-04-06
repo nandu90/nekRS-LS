@@ -160,7 +160,7 @@ void fileBcast(const fs::path &srcPathIn,
     MPI_File fh;
     retVal = MPI_File_open(commLocal, filePath.c_str(), MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &fh);
     if (retVal) {
-      char err_string[1024];
+      char err_string[MPI_MAX_ERROR_STRING];
       int err_string_len;
       MPI_Error_string(retVal, err_string, &err_string_len);
       nrsAbort(MPI_COMM_SELF, EXIT_FAILURE,
