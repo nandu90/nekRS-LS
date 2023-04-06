@@ -363,14 +363,16 @@ MPI_Comm setupSession(cmdOptions *cmdOpt, const MPI_Comm &comm)
 
 void signalHandler(int signum) 
 {
-   std::cerr << "generating stacktrace ...\n";
+   { // needs to be refactored as this is not async-signal-safe
+     std::cerr << "generating stacktrace ...\n";
 
-   const std::string fileName = "stacktrace." + std::to_string(worldRank);
+     const std::string fileName = "stacktrace." + std::to_string(worldRank);
 
-   FILE *fp;
-   fp = fopen (fileName.c_str(), "w");
-   print_stacktrace(fp);
-   fclose(fp);
+     FILE *fp;
+     fp = fopen (fileName.c_str(), "w");
+     print_stacktrace(fp);
+     fclose(fp);
+   }
 }
 
 } // namespace
