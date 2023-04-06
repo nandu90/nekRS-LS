@@ -159,9 +159,13 @@ void fileBcast(const fs::path &srcPathIn,
     int retVal;
     MPI_File fh;
     retVal = MPI_File_open(commLocal, filePath.c_str(), MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &fh);
-    nrsCheck(retVal, MPI_COMM_SELF, EXIT_FAILURE,
-             "MPI_File_open with retVal=%d\n!", retVal);
-
+    if (retVal) {
+      char err_string[1024];
+      int err_string_len;
+      MPI_Error_string(retVal, err_string, &err_string_len);
+      nrsAbort(MPI_COMM_SELF, EXIT_FAILURE,
+               "MPI_File_open error: %s\n", err_string);
+    }
 
     if (localRank == localRankRoot) {
       MPI_Status status;
