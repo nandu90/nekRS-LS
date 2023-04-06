@@ -380,7 +380,7 @@ bool runStep(nrs_t *nrs, std::function<bool(int)> convergenceCheck, int stage)
   
   if (nrs->cvode)
     scalarSolveCvode(nrs, nrs->timePrevious, timeNew, cds->o_S, stage, tstep);
-
+  
   if (stage == 1)
     lagFields(nrs);
 
@@ -388,6 +388,9 @@ bool runStep(nrs_t *nrs, std::function<bool(int)> convergenceCheck, int stage)
 
   if (nrs->Nscalar)
     scalarSolve(nrs, timeNew, cds->o_S, stage);
+  
+  if(udf.postScalar)
+    udf.postScalar(nrs, timeNew, tstep);
 
   evaluateProperties(nrs, timeNew);
 
@@ -395,6 +398,9 @@ bool runStep(nrs_t *nrs, std::function<bool(int)> convergenceCheck, int stage)
     platform->linAlg->fill(mesh->Nlocal, 0.0, nrs->o_div);
     udf.div(nrs, timeNew, nrs->o_div);
   }
+  
+  if(udf.preFluid)
+    udf.preFluid(nrs, timeNew, tstep);
 
   if (nrs->flow)
     fluidSolve(nrs, timeNew, nrs->o_P, nrs->o_U, stage, tstep);
