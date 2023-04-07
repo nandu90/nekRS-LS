@@ -88,6 +88,8 @@ void printICMinMax(nrs_t *nrs)
   }
 }
 
+occa::memory elliptic_t::o_wrk = occa::memory();
+
 void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 {
   platform_t *platform = platform_t::getInstance();
@@ -267,6 +269,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
   // offset mempool available for elliptic because also used it for ellipticSolve input/output
   auto const o_mempoolElliptic =
       platform->o_mempool.o_ptr.slice((2 * nrs->NVfields * sizeof(dfloat)) * nrs->fieldOffset);
+  elliptic_t::o_wrk = o_mempoolElliptic;
 
   if (options.compareArgs("MOVING MESH", "TRUE")) {
     const int nBDF = std::max(nrs->nBDF, nrs->nEXT);
@@ -621,12 +624,9 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
       cds->solver[is] = new elliptic_t();
       cds->solver[is]->name = "scalar" + sid;
-      cds->solver[is]->blockSolver = 0;
       cds->solver[is]->Nfields = 1;
       cds->solver[is]->fieldOffset = nrs->fieldOffset;
-      cds->solver[is]->o_wrk = o_mempoolElliptic;
       cds->solver[is]->mesh = mesh;
-      cds->solver[is]->elementType = cds->elementType;
 
       cds->solver[is]->poisson = 0;
 
@@ -690,15 +690,12 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
     if (nrs->uvwSolver) {
       nrs->uvwSolver->name = "velocity";
-      nrs->uvwSolver->blockSolver = 1;
       nrs->uvwSolver->stressForm = 0;
       if (options.compareArgs("VELOCITY STRESSFORMULATION", "TRUE"))
         nrs->uvwSolver->stressForm = 1;
       nrs->uvwSolver->Nfields = nrs->NVfields;
       nrs->uvwSolver->fieldOffset = nrs->fieldOffset;
-      nrs->uvwSolver->o_wrk = o_mempoolElliptic;
       nrs->uvwSolver->mesh = mesh;
-      nrs->uvwSolver->elementType = nrs->elementType;
       nrs->uvwSolver->o_lambda0 = nrs->o_ellipticCoeff.slice(0 * nrs->fieldOffset * sizeof(dfloat));
       nrs->uvwSolver->o_lambda1 = nrs->o_ellipticCoeff.slice(1 * nrs->fieldOffset * sizeof(dfloat));
       nrs->uvwSolver->poisson = 0;
@@ -747,12 +744,9 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     else {
       nrs->uSolver = new elliptic_t();
       nrs->uSolver->name = "velocity";
-      nrs->uSolver->blockSolver = 0;
       nrs->uSolver->Nfields = 1;
       nrs->uSolver->fieldOffset = nrs->fieldOffset;
-      nrs->uSolver->o_wrk = o_mempoolElliptic;
       nrs->uSolver->mesh = mesh;
-      nrs->uSolver->elementType = nrs->elementType;
       nrs->uSolver->o_lambda0 = nrs->o_ellipticCoeff.slice(0 * nrs->fieldOffset * sizeof(dfloat));
       nrs->uSolver->o_lambda1 = nrs->o_ellipticCoeff.slice(1 * nrs->fieldOffset * sizeof(dfloat));
       nrs->uSolver->poisson = 0;
@@ -768,12 +762,9 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
       nrs->vSolver = new elliptic_t();
       nrs->vSolver->name = "velocity";
-      nrs->vSolver->blockSolver = 0;
       nrs->vSolver->Nfields = 1;
       nrs->vSolver->fieldOffset = nrs->fieldOffset;
-      nrs->vSolver->o_wrk = o_mempoolElliptic;
       nrs->vSolver->mesh = mesh;
-      nrs->vSolver->elementType = nrs->elementType;
       nrs->vSolver->o_lambda0 = nrs->o_ellipticCoeff.slice(0 * nrs->fieldOffset * sizeof(dfloat));
       nrs->vSolver->o_lambda1 = nrs->o_ellipticCoeff.slice(1 * nrs->fieldOffset * sizeof(dfloat));
       nrs->vSolver->poisson = 0;
@@ -789,12 +780,9 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
       nrs->wSolver = new elliptic_t();
       nrs->wSolver->name = "velocity";
-      nrs->wSolver->blockSolver = 0;
       nrs->wSolver->Nfields = 1;
       nrs->wSolver->fieldOffset = nrs->fieldOffset;
-      nrs->wSolver->o_wrk = o_mempoolElliptic;
       nrs->wSolver->mesh = mesh;
-      nrs->wSolver->elementType = nrs->elementType;
       nrs->wSolver->o_lambda0 = nrs->o_ellipticCoeff.slice(0 * nrs->fieldOffset * sizeof(dfloat));
       nrs->wSolver->o_lambda1 = nrs->o_ellipticCoeff.slice(1 * nrs->fieldOffset * sizeof(dfloat));
       nrs->wSolver->poisson = 0;
@@ -816,12 +804,9 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
     nrs->pSolver = new elliptic_t();
     nrs->pSolver->name = "pressure";
-    nrs->pSolver->blockSolver = 0;
     nrs->pSolver->Nfields = 1;
     nrs->pSolver->fieldOffset = nrs->fieldOffset;
-    nrs->pSolver->o_wrk = o_mempoolElliptic;
     nrs->pSolver->mesh = mesh;
-    nrs->pSolver->elementType = nrs->elementType;
 
     nrs->pSolver->poisson = 1;
 
@@ -871,15 +856,12 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
     nrs->meshSolver = new elliptic_t();
     nrs->meshSolver->name = "mesh";
-    nrs->meshSolver->blockSolver = 1;
     nrs->meshSolver->stressForm = 0;
     if (options.compareArgs("MESH STRESSFORMULATION", "TRUE"))
       nrs->meshSolver->stressForm = 1;
     nrs->meshSolver->Nfields = nrs->NVfields;
     nrs->meshSolver->fieldOffset = nrs->fieldOffset;
-    nrs->meshSolver->o_wrk = o_mempoolElliptic;
     nrs->meshSolver->mesh = mesh;
-    nrs->meshSolver->elementType = nrs->elementType;
     nrs->meshSolver->o_lambda0 = nrs->o_ellipticCoeff.slice(0 * nrs->fieldOffset * sizeof(dfloat));
     nrs->meshSolver->o_lambda1 = nrs->o_ellipticCoeff.slice(1 * nrs->fieldOffset * sizeof(dfloat));
     nrs->meshSolver->poisson = 0;

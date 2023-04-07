@@ -75,6 +75,8 @@ void checkConfig(elliptic_t *elliptic)
       printf("mesh->ogs == NULL!");
     err++;
   }
+  
+  nrsCheck(elliptic->EToB == nullptr, platform->comm.mpiComm, EXIT_FAILURE, "%s", "elliptic->EToB not allocated!\n");
 
   {
     int found = 0;
@@ -111,6 +113,10 @@ void ellipticSolveSetup(elliptic_t *elliptic)
            "Empty elliptic solver name!");
 
   elliptic->options.setArgs("DISCRETIZATION", "CONTINUOUS");
+  
+  platform->options.getArgs("ELEMENT TYPE", elliptic->elementType);
+
+  elliptic->blockSolver = elliptic->Nfields > 1;
 
   // create private options based on platform
   for (auto &entry : platform->options.keyWordToDataMap) {
