@@ -3,7 +3,7 @@
 
 : ${QUEUE:="prod"} # debug, debug-scaling, prod https://docs.alcf.anl.gov/running-jobs/job-and-queue-scheduling/
 : ${NEKRS_HOME:="$HOME/.local/nekrs"}
-: ${NEKRS_CACHE_BCAST:=0}
+: ${NEKRS_CACHE_BCAST:=1}
 : ${NEKRS_SKIP_BUILD_ONLY:=0}
 
 if [ $# -ne 3 ]; then
