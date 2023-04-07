@@ -3,7 +3,7 @@
 ## What is new? 
 
 * Point interpolation
-* Coupled multi-session (neknek)
+* Overset grids (neknek)
 * Particle tracking 
 * Single source udf+oudf
 * Device support BoomerAMG
