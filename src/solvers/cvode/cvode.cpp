@@ -296,8 +296,7 @@ void cvode_t::initialize(nrs_t *nrs)
       nrsCheck(true,
                platform->comm.mpiComm,
                EXIT_FAILURE,
-               "CVODE ENABLE_CUDA not enabled, despite mode being CUDA!\n",
-               "");
+               "%s", "CVODE ENABLE_CUDA not enabled, despite mode being CUDA!\n");
 #endif
     }
     else if (platform->device.mode() == "HIP") {
@@ -309,8 +308,7 @@ void cvode_t::initialize(nrs_t *nrs)
       nrsCheck(true,
                platform->comm.mpiComm,
                EXIT_FAILURE,
-               "CVODE ENABLE_HIP not enabled, despite mode being HIP!\n",
-               "");
+               "%s", "CVODE ENABLE_HIP not enabled, despite mode being HIP!\n");
 #endif
     }
     else if (platform->device.mode() == "Serial") {
@@ -665,8 +663,26 @@ void cvode_t::setupDirichletMask(nrs_t *nrs)
   }
 }
 
-void cvode_t::computeDirichlet(nrs_t *nrs, dfloat time, bool applyToMaskedValues)
+void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
 {
+  // extrapolate masked Dirichlet values to current time state
+  // NOTE: this can only be applied after the extrapolation order is reached
+  // to avoid introducing CVODE convergence issues in the first few time steps
+  if(this->isRhsEvaluation() && (this->externalTStep > nrs->nEXT)){
+    auto cds = nrs->cds;
+    const int extOrder = std::min(this->externalTStep, nrs->nEXT);
+    this->extrapolateDirichletKernel(this->maskOffset,
+                                     nrs->fieldOffset,
+                                     this->Nscalar,
+                                     extOrder,
+                                     this->o_Nmasked,
+                                     this->o_maskIds,
+                                     o_coeffExt,
+                                     this->o_maskValues,
+                                     cds->o_S + this->minCvodeScalarId * nrs->fieldOffset * sizeof(dfloat));
+    return;
+  }
+
   // lower than any other possible Dirichlet value
   static constexpr dfloat TINY = -1e30;
   cds_t *cds = nrs->cds;
@@ -717,44 +733,32 @@ void cvode_t::computeDirichlet(nrs_t *nrs, dfloat time, bool applyToMaskedValues
         oogs::startFinish(platform->o_mempool.slice0, 1, cds->fieldOffset[is], ogsDfloat, ogsMin, gsh);
     }
 
+    occa::memory o_Si =
+        cds->o_S.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));
+    occa::memory o_Si_e =
+        cds->o_Se.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));
+
     auto NmaskId = Nmasked.at(cvodeScalarId);
-    if (applyToMaskedValues) {
-      if (NmaskId)
-        this->mapToMaskedPointKernel(NmaskId,
-                                     o_maskIds + cvodeScalarId * maskOffset * sizeof(dlong),
-                                     platform->o_mempool.slice0,
-                                     o_maskValues + cvodeScalarId * maskOffset * sizeof(dfloat));
-    }
-    else {
-      occa::memory o_Si =
-          cds->o_S.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));
-      occa::memory o_Si_e =
-          cds->o_Se.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));
 
-      if (NmaskId)
-        cds->maskCopy2Kernel(NmaskId,
-                             0,
-                             o_maskIds + cvodeScalarId * maskOffset * sizeof(dlong),
-                             platform->o_mempool.slice0,
-                             o_Si,
-                             o_Si_e);
-    }
+    if (!NmaskId)
+      continue;
+
+    cds->maskCopy2Kernel(NmaskId,
+                         0,
+                         o_maskIds + cvodeScalarId * maskOffset * sizeof(dlong),
+                         platform->o_mempool.slice0,
+                         o_Si,
+                         o_Si_e);
+    
+    // o_maskValues must be at state t0 to be lagged by the subsequent CVODE solve call
+    if(this->isRhsEvaluation())
+      continue;
+
+    this->mapToMaskedPointKernel(NmaskId,
+                                 o_maskIds + cvodeScalarId * maskOffset * sizeof(dlong),
+                                 o_Si,
+                                 o_maskValues + cvodeScalarId * maskOffset * sizeof(dfloat));
   }
-}
-
-void cvode_t::extrapolateDirichlet(nrs_t *nrs, dfloat time, int tstep)
-{
-  auto cds = nrs->cds;
-  const int extOrder = std::min(tstep, nrs->nEXT);
-  this->extrapolateDirichletKernel(this->maskOffset,
-                                   nrs->fieldOffset,
-                                   this->Nscalar,
-                                   extOrder,
-                                   this->o_Nmasked,
-                                   this->o_maskIds,
-                                   o_coeffExt,
-                                   this->o_maskValues,
-                                   cds->o_S + this->minCvodeScalarId * nrs->fieldOffset * sizeof(dfloat));
 }
 
 void cvode_t::computeErrorWeight(occa::memory o_y, occa::memory o_ewt)
@@ -774,10 +778,10 @@ void cvode_t::rhs(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_ydot
   this->setIsRhsEvaluation(true);
 
   if (userRHS) {
-    userRHS(nrs, tstep, time, tnekRS, o_y, o_ydot);
+    userRHS(nrs, time, tnekRS, o_y, o_ydot);
   }
   else {
-    defaultRHS(nrs, tstep, time, tnekRS, o_y, o_ydot);
+    defaultRHS(nrs, time, tnekRS, o_y, o_ydot);
   }
 
   this->setIsRhsEvaluation(false);
@@ -790,7 +794,7 @@ void cvode_t::jtvRHS(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_y
   this->setIsJacobianEvaluation(true);
 
   if (userJacobian) {
-    userJacobian(nrs, tstep, time, tnekRS, o_y, o_ydot);
+    userJacobian(nrs, time, tnekRS, o_y, o_ydot);
   }
   else {
     this->rhs(nrs, time, o_y, o_ydot);
@@ -800,7 +804,7 @@ void cvode_t::jtvRHS(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_y
   platform->timer.toc("scalar cvode jacobian");
 }
 
-void cvode_t::defaultRHS(nrs_t *nrs, int tstep, dfloat time, dfloat t0, occa::memory o_y, occa::memory o_ydot)
+void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, occa::memory o_ydot)
 {
   const bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
   mesh_t *mesh = nrs->meshV;
@@ -826,8 +830,8 @@ void cvode_t::defaultRHS(nrs_t *nrs, int tstep, dfloat time, dfloat t0, occa::me
     dtCvode[1] = nrs->dt[1];
     dtCvode[2] = nrs->dt[2];
 
-    const int bdfOrder = std::min(tstep, nrs->nBDF);
-    const int extOrder = std::min(tstep, nrs->nEXT);
+    const int bdfOrder = std::min(this->externalTStep, nrs->nBDF);
+    const int extOrder = std::min(this->externalTStep, nrs->nEXT);
     nek::extCoeff(_coeffEXT.data(), dtCvode.data(), extOrder, bdfOrder);
     nek::bdfCoeff(&this->_g0, _coeffBDF.data(), dtCvode.data(), bdfOrder);
     for (int i = nrs->nEXT; i > extOrder; i--) {
@@ -856,7 +860,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, int tstep, dfloat time, dfloat t0, occa::me
 
     if (movingMesh) {
 
-      const int meshOrder = std::min(tstep, mesh->nAB);
+      const int meshOrder = std::min(this->externalTStep, mesh->nAB);
       nek::coeffAB(mesh->coeffAB, dtCvode.data(), meshOrder);
       for (int i = 0; i < meshOrder; ++i)
         mesh->coeffAB[i] *= dtCvode[0];
@@ -904,15 +908,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, int tstep, dfloat time, dfloat t0, occa::me
     platform->timer.tic("scalar cvode apply dirichlet", 1);
   }
 
-  // apply boundary condition
-  // during the first nEXT steps, directly apply the boundary condition
-  // rather than extrapolating
-  if (tstep < nrs->nEXT) {
-    this->computeDirichlet(nrs, time, false);
-  }
-  else {
-    this->extrapolateDirichlet(nrs, time, tstep);
-  }
+  this->applyDirichlet(nrs, time);
 
   if (detailedTimersEnabled) {
     platform->timer.toc("scalar cvode apply dirichlet");
@@ -1308,15 +1304,8 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
   for (int s = nrs->nEXT; s > 1; s--) {
     const auto Nbyte = (nrs->NVfields * sizeof(dfloat)) * nrs->fieldOffset;
     o_U.copyFrom(o_U, Nbyte, (s - 1) * Nbyte, (s - 2) * Nbyte);
-
-    const auto NbyteMasked = (Nscalar * sizeof(dfloat)) * maskOffset;
-    if (NbyteMasked)
-      o_maskValues.copyFrom(o_maskValues, NbyteMasked, (s - 1) * NbyteMasked, (s - 2) * NbyteMasked);
   }
   o_U.copyFrom(nrs->o_U, nrs->NVfields * nrs->fieldOffset * sizeof(dfloat));
-
-  // compute Dirichlet values at time t0
-  computeDirichlet(nrs, t0, true);
 
   const auto p0theSave = nrs->p0the;
 
@@ -1336,7 +1325,7 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
   nrsToCv(nrs, nrs->cds->o_S, o_cvodeY);
 
   this->tnekRS = t0;
-  this->tstep = tstep;
+  this->externalTStep = tstep;
 
   double t;
   int retval = 0;
@@ -1344,14 +1333,14 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
   // integrate only to time t1
   if (platform->options.compareArgs("CVODE STOP TIME", "TRUE")) {
     retval = CVodeSetStopTime(cvodeMem, t1);
-    nrsCheck(retval < 0, platform->comm.mpiComm, EXIT_FAILURE, "Error calling CVodeSetStopTime\n", "");
+    nrsCheck(retval < 0, platform->comm.mpiComm, EXIT_FAILURE, "%s", "Error calling CVodeSetStopTime\n");
   }
 
   double hmax = 3.0;
   platform->options.getArgs("CVODE HMAX RATIO", hmax);
   hmax *= nrs->dt[0];
   retval = CVodeSetMaxStep(cvodeMem, hmax);
-  nrsCheck(retval < 0, platform->comm.mpiComm, EXIT_FAILURE, "Error calling CVodeSetMaxStep\n", "");
+  nrsCheck(retval < 0, platform->comm.mpiComm, EXIT_FAILURE, "%s", "Error calling CVodeSetMaxStep\n");
 
   platform->device.finish();
 
@@ -1376,8 +1365,7 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
   nrsCheck(retval < 0,
            platform->comm.mpiComm,
            EXIT_FAILURE,
-           "CVODE failed after restart. Ending simulation.\n",
-           "");
+           "%s", "CVODE failed after restart. Ending simulation.\n");
   platform->device.finish();
 
   if (detailedTimersEnabled) {
@@ -1407,8 +1395,14 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
 
   nrs->p0the = p0theSave;
 
+  for (int s = nrs->nEXT; s > 1; s--) {
+    const auto NbyteMasked = (Nscalar * sizeof(dfloat)) * maskOffset;
+    if (NbyteMasked)
+      o_maskValues.copyFrom(o_maskValues, NbyteMasked, (s - 1) * NbyteMasked, (s - 2) * NbyteMasked);
+  }
+
   // compute scalar boundary condition at time t1
-  computeDirichlet(nrs, t1, false);
+  this->applyDirichlet(nrs, t1);
 
   if (detailedTimersEnabled) {
     platform->timer.toc("scalar cvode restore state");
