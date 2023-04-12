@@ -249,6 +249,22 @@ include(config/nrs.cmake)
 ###############################################################################
 # Link dependencies 
 ###############################################################################
+file(GLOB plugins LIST_DIRECTORIES true ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/plugins/*)
+set(PLUGINS_RPATH "")
+foreach(DIR ${plugins})
+  get_filename_component(PLUGIN_NAME ${DIR} NAME)
+  IF(IS_DIRECTORY ${DIR})
+      message(NOTICE "-- Found plugin: ${PLUGIN_NAME}")
+      add_subdirectory(${DIR})
+  ELSE()
+      CONTINUE()
+  ENDIF()
+  set(UDF_LIBS "${UDF_LIBS} ${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}${PLUGIN_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+  set(PLUGINS_RPATH "${PLUGINS_RPATH};${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib")
+  set(UDF_INCLUDES "${UDF_INCLUDES};${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/include")
+endforeach()
+set_target_properties(nekrs-bin PROPERTIES INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${PLUGINS_RPATH}")
+
 target_link_libraries(nekrs-lib PUBLIC libocca PRIVATE gs ${GSLIB} blas lapack)
 if(OpenMP_FOUND)
 target_link_libraries(nekrs-lib PUBLIC OpenMP::OpenMP_CXX)
@@ -276,23 +292,6 @@ if (ENABLE_CVODE)
 endif()
 
 target_link_libraries(nekrs-bin PRIVATE nekrs-lib ${CMAKE_DL_LIBS})
-
-file(GLOB plugins LIST_DIRECTORIES true ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/plugins/*)
-set(PLUGINS_RPATH "")
-foreach(DIR ${plugins})
-  get_filename_component(PLUGIN_NAME ${DIR} NAME)
-  IF(IS_DIRECTORY ${DIR})
-      message(NOTICE "-- Found plugin: ${PLUGIN_NAME}")
-      add_subdirectory(${DIR})
-  ELSE()
-      CONTINUE()
-  ENDIF()
-  set(UDF_LIBS "${UDF_LIBS} ${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}${PLUGIN_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
-  set(PLUGINS_RPATH "${PLUGINS_RPATH};${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib")
-  set(UDF_INCLUDES "${UDF_INCLUDES};${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/include")
-endforeach()
-
-set_target_properties(nekrs-bin PROPERTIES INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${PLUGINS_RPATH}")
 
 #################################################################################
 ### Install                                                                     #
