@@ -60,7 +60,16 @@ if [ ! -f $case.re2 ]; then
   exit 1
 fi
 
-MPICH_MPIIO_HINTS="*:cray_cb_write_lock_mode=2:cray_cb_nodes_multiplier=8:striping_unit=4194304:striping_factor=128:romio_cb_write=enable:romio_ds_write=disable:romio_no_indep_rw=true"
+striping_factor=256
+striping_unit=67108864
+if [ $nodes -lt 1024 ]; then
+  striping_factor=128
+  striping_unit=16777216
+elif [ $nodes -lt 128 ]; then
+  striping_factor=64
+  striping_unit=16777216
+fi
+MPICH_MPIIO_HINTS="*:cray_cb_write_lock_mode=2:cray_cb_nodes_multiplier=4:striping_unit=${striping_unit}:striping_factor=${striping_factor}:romio_cb_write=enable:romio_ds_write=disable:romio_no_indep_rw=true"
 
 # sbatch
 SFILE=s.bin
@@ -102,7 +111,12 @@ echo "export NEKRS_HOME=$NEKRS_HOME" >>$SFILE
 echo "export NEKRS_GPU_MPI=1 " >>$SFILE
 
 echo "export NVME_HOME=$NVME_HOME" >>$SFILE
-echo "export MPICH_MPIIO_HINTS=$MPICH_MPIIO_HINTS" >>$SFILE
+
+if [ $nodes -gt 32 ]; then
+  echo "export MPICH_MPIIO_HINTS=$MPICH_MPIIO_HINTS" >>$SFILE
+  echo "export MPICH_MPIIO_STATS=1" >>$SFILE
+fi
+
 echo "export MPICH_OFI_NIC_POLICY=NUMA" >>$SFILE
 echo "export NEKRS_CACHE_BCAST=$NEKRS_CACHE_BCAST" >> $SFILE
 
