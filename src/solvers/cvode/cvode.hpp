@@ -61,6 +61,7 @@ public:
   bool isJacobianEvaluation() const { return jacEval; }
 
   int timeStep() const { return externalTStep; }
+  void setTimeStep(int tstep) { externalTStep = tstep; }
   double time() const { return tnekRS; }
 
   void rhs(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_ydot);
