@@ -36,9 +36,6 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${CMAKE_INSTALL_PREFIX}/occa/lib
 set (CMAKE_C_STANDARD 99)
 set (CMAKE_CXX_STANDARD 17)
 
-###############################################################################
-# Check compiler/MPI vendor, version and Fortran/C compatibility              #
-###############################################################################
 set(MPI_C_COMPILER ${CMAKE_C_COMPILER})
 set(MPI_CXX_COMPILER ${CMAKE_CXX_COMPILER})
 set(MPI_Fortran_COMPILER ${CMAKE_Fortran_COMPILER})
@@ -67,6 +64,9 @@ string(COMPARE EQUAL "${CMAKE_CXX_COMPILER_ID}" "AppleClang" USING_APPLE_LLVM)
 
 if(USING_GNU)
   set(NEKRS_COMPILER_FLAGS "-O2 -g -march=native -mtune=native -ftree-vectorize" CACHE STRING "compiler flags")
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.1)
+    message(FATAL_ERROR "GNU compiler version must be at least 9.1!")
+  endif()
 else()
   set(NEKRS_COMPILER_FLAGS "-O2 -g" CACHE STRING "compiler flags")
 endif()
@@ -107,6 +107,7 @@ set(ENABLE_OPENCL OFF CACHE BOOL "Enable OCCA OpenCL support")
 set(ENABLE_METAL OFF CACHE BOOL "Enable OCCA Metal support")
 
 set(ENABLE_AMGX OFF CACHE BOOL "Enable NVIDIA AMGX support")
+set(ENABLE_HYPRE_GPU OFF CACHE BOOL "Enable HYPRE GPU support")
 set(NEKRS_GPU_MPI ON CACHE BOOL "Enable GPU aware MPI")
 set(ENABLE_CVODE OFF CACHE BOOL "Enable CVODE support")
 
@@ -152,31 +153,18 @@ set_external_flags("C")
 set_external_flags("CXX")
 set_external_flags("Fortran")
 
-execute_process(
-  COMMAND git log -1 --format=%h
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_COMMIT_HASH
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-if ("${GIT_COMMIT_HASH}" STREQUAL "")
-  set(GIT_COMMIT_HASH "no sha")
-endif()
-
 set(BSYMBOLIC_FLAG "LINKER:-Bsymbolic LINKER:-Bsymbolic-functions")
 check_linker_flag(C ${BSYMBOLIC_FLAG} Allowed_LD_Flag_BSYMBOLIC)
 if(NOT Allowed_LD_Flag_BSYMBOLIC OR APPLE)
   set(BSYMBOLIC_FLAG "")
 endif()
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.1)
-    message(FATAL_ERROR "GNU compiler version must be at least 9.1!")
-  endif()
-endif()
+################################################################################
 
-###############################################################################
-# OCCA
-###############################################################################
+# nek5000 dependencies
+include(config/nek5000.cmake)
+
+# occa
 include(config/occa.cmake)
 message("-- OCCA_CUDA_ENABLED: ${OCCA_CUDA_ENABLED}")
 message("-- OCCA_HIP_ENABLED: ${OCCA_HIP_ENABLED}")
@@ -184,17 +172,35 @@ message("-- OCCA_DPCPP_ENABLED: ${OCCA_DPCPP_ENABLED}")
 message("-- OCCA_OPENCL_ENABLED: ${OCCA_OPENCL_ENABLED}")
 set(CMAKE_CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER})
 
-###############################################################################
-# AMGX
-###############################################################################
+# amgx
 if(OCCA_CUDA_ENABLED AND ENABLE_AMGX)
   add_subdirectory(3rd_party/AMGX)
 endif()
 
-###############################################################################
-# CVODE
-###############################################################################
-if(ENABLE_CVODE)
+# hypre
+include(config/hypre.cmake)
+
+# blas + lapack
+add_subdirectory(3rd_party/lapack)
+
+# external plugins
+file(GLOB plugins LIST_DIRECTORIES true ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/plugins/*)
+set(PLUGINS_RPATH "")
+foreach(DIR ${plugins})
+  get_filename_component(PLUGIN_NAME ${DIR} NAME)
+  IF(IS_DIRECTORY ${DIR})
+      message(NOTICE "-- Found plugin: ${PLUGIN_NAME}")
+      add_subdirectory(${DIR})
+  ELSE()
+      CONTINUE()
+  ENDIF()
+  set(UDF_LIBS "${UDF_LIBS} ${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}${PLUGIN_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+  set(PLUGINS_RPATH "${PLUGINS_RPATH};${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib")
+  set(UDF_INCLUDES "${UDF_INCLUDES};${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/include")
+endforeach()
+
+# cvode
+if (ENABLE_CVODE)
   # workaround to resolve name conflict (used be OCCA and CVODE) 
   set(ENABLE_CUDA ${OCCA_CUDA_ENABLED})
   set(ENABLE_HIP ${OCCA_HIP_ENABLED})
@@ -220,52 +226,15 @@ if(ENABLE_CVODE)
   set(BUILD_EXAMPLES OFF)
   set(BUILD_TESTING OFF)
   set(CMAKE_INSTALL_LIBDIR ${CMAKE_INSTALL_PREFIX}/lib)
+
   add_subdirectory(3rd_party/cvode)
 endif()
 
-###############################################################################
-# HYPRE
-###############################################################################
-if(OCCA_CUDA_ENABLED)
-  set(ENABLE_HYPRE_GPU OFF CACHE BOOL "Enable HYPRE GPU support")
-endif()
-include(config/hypre.cmake)
-
-###############################################################################
-# BLAS/LAPACK
-###############################################################################
-add_subdirectory(3rd_party/lapack)
-
-###############################################################################
-# Nek5000 dependencies
-###############################################################################
-include(config/nek5000.cmake)
-
-###############################################################################
-# NekRS
-###############################################################################
+# nrs
 include(config/nrs.cmake)
 
-###############################################################################
 # Link dependencies 
-###############################################################################
-file(GLOB plugins LIST_DIRECTORIES true ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/plugins/*)
-set(PLUGINS_RPATH "")
-foreach(DIR ${plugins})
-  get_filename_component(PLUGIN_NAME ${DIR} NAME)
-  IF(IS_DIRECTORY ${DIR})
-      message(NOTICE "-- Found plugin: ${PLUGIN_NAME}")
-      add_subdirectory(${DIR})
-  ELSE()
-      CONTINUE()
-  ENDIF()
-  set(UDF_LIBS "${UDF_LIBS} ${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}${PLUGIN_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
-  set(PLUGINS_RPATH "${PLUGINS_RPATH};${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib")
-  set(UDF_INCLUDES "${UDF_INCLUDES};${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/include")
-endforeach()
-set_target_properties(nekrs-bin PROPERTIES INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${PLUGINS_RPATH}")
-
-target_link_libraries(nekrs-lib PUBLIC libocca PRIVATE gs ${GSLIB} blas lapack)
+target_link_libraries(nekrs-lib PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs ${GSLIB} blas lapack ${CMAKE_DL_LIBS})
 if(OpenMP_FOUND)
 target_link_libraries(nekrs-lib PUBLIC OpenMP::OpenMP_CXX)
 endif()
@@ -275,9 +244,6 @@ if(ENABLE_AMGX AND OCCA_CUDA_ENABLED)
   target_link_libraries(nekrs-lib PUBLIC amgxsh amgx)
   target_include_directories(nekrs-lib PUBLIC 3rd_party/AMGX/base/include 3rd_party/AMGX/core/include)
 endif()
-
-target_link_libraries(nekrs-lib PRIVATE nekrs-hypre)
-target_link_libraries(nekrs-lib PRIVATE nekrs-hypre-device)
 
 if (ENABLE_CVODE)
   target_link_libraries (nekrs-lib PUBLIC SUNDIALS::cvode_shared SUNDIALS::nvecmpiplusx_shared SUNDIALS::nvecserial_shared)
@@ -291,11 +257,13 @@ if (ENABLE_CVODE)
   endif()
 endif()
 
-target_link_libraries(nekrs-bin PRIVATE nekrs-lib ${CMAKE_DL_LIBS})
+target_link_libraries(nekrs-bin PRIVATE nekrs-lib)
 
-#################################################################################
-### Install                                                                     #
-#################################################################################
+###############################################################################
+# install
+###############################################################################
+set_target_properties(nekrs-bin PROPERTIES INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${PLUGINS_RPATH}")
+
 if(OCCA_CUDA_ENABLED)
   set(BACKEND_DEFAULT "CUDA" CACHE STRING "Default occa mode")
 elseif(OCCA_HIP_ENABLED)
@@ -313,6 +281,16 @@ if(NEKRS_GPU_MPI)
   set(GPU_MPI "1")
 else(NEKRS_GPU_MPI)
   set(GPU_MPI "0")
+endif()
+
+execute_process(
+  COMMAND git log -1 --format=%h
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_COMMIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+if ("${GIT_COMMIT_HASH}" STREQUAL "")
+  set(GIT_COMMIT_HASH "no sha")
 endif()
 
 configure_file(
@@ -336,14 +314,13 @@ install(DIRECTORY kernels/ DESTINATION kernels FILES_MATCHING REGEX "\.okl$|\.c|
 install(DIRECTORY src/ DESTINATION include FILES_MATCHING REGEX "\.hpp$|\.h$|\.tpp$")
 install(FILES src/udf/CMakeLists.txt DESTINATION udf)
 install(DIRECTORY src/nekInterface/ DESTINATION nekInterface REGEX "\.hpp$|\.cpp$" EXCLUDE)
+install(FILES doc/parHelp.txt DESTINATION doc)
 
 # Examples will follow a different policy -- only copy if source tree is newer than install tree
 file(GLOB_RECURSE EXAMPLE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/examples/*)
 configure_file(${CMAKE_CURRENT_LIST_DIR}/config/install_examples.cmake.in
         ${CMAKE_CURRENT_BINARY_DIR}/install_examples.cmake @ONLY)
 install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/install_examples.cmake)
-
-install(FILES doc/parHelp.txt DESTINATION doc)
 
 message(NOTICE "")
 message(NOTICE "----------------- Summary -----------------")
@@ -369,7 +346,7 @@ message(NOTICE "GPU aware MPI support: ${NEKRS_GPU_MPI}")
 message(NOTICE "-------------------------------------------")
 
 #################################################################################
-# Make tarball
+# tarball
 #################################################################################
 set(DEST_DIR "nekRS-v${PROJECT_VERSION}")
 set(TAR_NAME "nekRS-v${PROJECT_VERSION}.tar.gz")

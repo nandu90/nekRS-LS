@@ -1,7 +1,3 @@
-add_executable(nekrs-bin src/main.cpp)
-target_include_directories(nekrs-bin PRIVATE src/lib)
-set_target_properties(nekrs-bin PROPERTIES LINKER_LANGUAGE CXX OUTPUT_NAME nekrs)
-
 include(config/bench.cmake)
 include(config/mesh.cmake)
 include(config/elliptic.cmake)
@@ -132,3 +128,7 @@ target_include_directories(nekrs-lib
   ${ELLIPTIC_SOURCE_DIR}/amgSolver/amgx
   ${ELLIPTIC_SOURCE_DIR}/MG
 )
+
+add_executable(nekrs-bin src/main.cpp)
+target_include_directories(nekrs-bin PRIVATE src/lib src/utils)
+set_target_properties(nekrs-bin PROPERTIES LINKER_LANGUAGE CXX OUTPUT_NAME nekrs)
