@@ -161,9 +161,6 @@ endif()
 
 ################################################################################
 
-# nek5000 dependencies
-include(config/nek5000.cmake)
-
 # occa
 include(config/occa.cmake)
 message("-- OCCA_CUDA_ENABLED: ${OCCA_CUDA_ENABLED}")
@@ -179,9 +176,6 @@ endif()
 
 # hypre
 include(config/hypre.cmake)
-
-# blas + lapack
-add_subdirectory(3rd_party/lapack)
 
 # external plugins
 file(GLOB plugins LIST_DIRECTORIES true ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/plugins/*)
@@ -229,6 +223,12 @@ if (ENABLE_CVODE)
 
   add_subdirectory(3rd_party/cvode)
 endif()
+
+# blas + lapack
+add_subdirectory(3rd_party/lapack)
+
+# nek5000 dependencies
+include(config/nek5000.cmake)
 
 # nrs
 include(config/nrs.cmake)
