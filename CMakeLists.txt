@@ -48,6 +48,16 @@ endif()
 
 __MPI_underlying_compiler("CXX" MPI_UNDERLYING_COMPILER)
 
+execute_process(
+  COMMAND git log -1 --format=%h
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_COMMIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+if ("${GIT_COMMIT_HASH}" STREQUAL "")
+  set(GIT_COMMIT_HASH "no sha")
+endif()
+
 ###############################################################################
 # Configure Options
 ###############################################################################
@@ -285,15 +295,6 @@ else(NEKRS_GPU_MPI)
   set(GPU_MPI "0")
 endif()
 
-execute_process(
-  COMMAND git log -1 --format=%h
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_COMMIT_HASH
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-if ("${GIT_COMMIT_HASH}" STREQUAL "")
-  set(GIT_COMMIT_HASH "no sha")
-endif()
 
 configure_file(
   ${CMAKE_CURRENT_LIST_DIR}/config/nekrs.conf.in
