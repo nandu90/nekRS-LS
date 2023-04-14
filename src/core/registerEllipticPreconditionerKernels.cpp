@@ -271,11 +271,13 @@ void registerMultigridLevelKernels(const std::string &section, int Nf, int N, in
   }
 
   const std::string optionsPrefix = createOptionsPrefix(section);
-#if 0
-  if (N == 1 && platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE", "TRUE")) {
-    return;
+
+  if (N == 1) {
+    if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE", "TRUE") &&
+        platform->options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "FALSE") ) { 
+      return;
+    }
   }
-#endif
 
   registerAxKernels(section, N, poissonEquation);
   registerSchwarzKernels(section, N);
