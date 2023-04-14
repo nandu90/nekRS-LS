@@ -64,13 +64,7 @@ pMGLevel::pMGLevel(elliptic_t* ellipticBase, int Nc,
   options = options_;
   degree = Nc;
 
-  if (!isCoarse) { 
-    this->setupSmoother(ellipticBase);
-  } else {
-    if(options.compareArgs("MULTIGRID COARSE SOLVE", "FALSE") ||
-       options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE"))
-      this->setupSmoother(ellipticBase);
-  }
+  this->setupSmoother(ellipticBase);
 
 }
 
@@ -105,8 +99,9 @@ pMGLevel::pMGLevel(elliptic_t* ellipticBase,   //finest level
     this->setupSmoother(ellipticBase);
   } else {
     if(options.compareArgs("MULTIGRID COARSE SOLVE", "FALSE") ||
-       options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE"))
+       options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE")) {
       this->setupSmoother(ellipticBase);
+    }
   }
 }
 
