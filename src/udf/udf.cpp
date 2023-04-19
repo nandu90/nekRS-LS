@@ -370,18 +370,26 @@ void udfBuild(const char *_udfFile, setupAide &options)
     unifdef("__okl__", udfFile.c_str(), tmpFile.c_str());
 
     std::ifstream fudf(tmpFile);
-    std::cout << ">>>\n";
-    std::cout << fudf.rdbuf();
-    std::cout << "<<<\n";
+    std::string text;
 
+    std::cout << std::endl;
+    while(!fudf.eof()) 
+    {
+      getline(fudf,text);
+      std::cout << "<<< " << text << "\n" ;
+    }
     fudf.close();
     fs::remove(tmpFile);
 
     std::ifstream foudf(oudfFileCache);
 
-    std::cout << ">>>\n";
-    std::cout << foudf.rdbuf();
-    std::cout << "<<<\n";
+    std::cout << std::endl;
+    while(!foudf.eof()) 
+    {
+      getline(foudf,text);
+      std::cout << "<<< " << text << "\n" ;
+    }
+    std::cout << std::endl;
 
     foudf.close();
   }

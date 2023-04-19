@@ -1444,9 +1444,15 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
     nrsCheck(!ptr, MPI_COMM_SELF, EXIT_FAILURE, "Cannot find setup file %s\n", setupFile.c_str());
 
     std::ifstream f(setupFile);
-    std::cout << ">>>\n";
-    std::cout << f.rdbuf();
-    std::cout << "<<<\n";
+    std::string text;
+ 
+    std::cout << std::endl;
+    while(!f.eof())
+    {
+      getline(f, text);
+      std::cout << "<<< " << text << "\n" ;
+    }
+    std::cout << std::endl;
     f.close();
   }
 
