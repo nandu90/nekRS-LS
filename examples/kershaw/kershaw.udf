@@ -2,6 +2,8 @@
 #include "udf.hpp"
 
 static dfloat P_EPS;
+static bool runBP5, runBPS5;
+static int bp5NReps, bps5NReps;
 
 #ifdef __okl__
 
@@ -13,7 +15,14 @@ void UDF_LoadKernels(occa::properties& kernelInfo)
 
 void UDF_Setup0(MPI_Comm comm, setupAide &options)
 {
-  platform->par->extract("casedata", "p_eps", P_EPS);
+  platform->par->extract("casedata", "eps", P_EPS);
+
+  platform->par->extract("casedata", "bp5", runBP5);
+  platform->par->extract("casedata", "bp5Repetitions", bp5NReps);
+
+  platform->par->extract("casedata", "bps5", runBPS5);
+  platform->par->extract("casedata", "bps5Repetitions", bps5NReps);
+
   if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
     double* const nek_cb_scnrs = (double*) nek::ptr("cb_scnrs");
     nek_cb_scnrs[0] = P_EPS;
@@ -48,19 +57,28 @@ void UDF_ExecuteStep(nrs_t *nrs, dfloat time, int tstep)
       oogs_t *oogsh_device = oogs::setup(mesh->ogs, 1, mesh->Nelements * mesh->Np, ogsPfloat, NULL, OOGS_DEVICEMPI);
   }
 #endif
-
-  for (int i = 0; i < mesh->Nlocal; i++) {
-    const dfloat lambda = 0; 
-    platform->mempool.slice0[i] = //drand48(); 
-      (3*M_PI*M_PI+lambda)*sin(M_PI*mesh->x[i])*sin(M_PI*mesh->y[i])*sin(M_PI*mesh->z[i]);
+ 
+  for (int fld=0; fld < nrs->NVfields; fld++) {
+    for (int i = 0; i < mesh->Nlocal; i++) {
+      const dfloat lambda = 0; 
+      platform->mempool.slice0[i + fld*nrs->fieldOffset] =
+        (3*M_PI*M_PI+lambda)*sin(M_PI*mesh->x[i])*sin(M_PI*mesh->y[i])*sin(M_PI*mesh->z[i]);
+    }
   }
   platform->linAlg->fillKernel(mesh->Nlocal, 1.0, nrs->o_ellipticCoeff);
-  platform->o_mempool.slice0.copyFrom(platform->mempool.slice0, mesh->Nlocal * sizeof(dfloat));
+  platform->o_mempool.slice0.copyFrom(platform->mempool.slice0, nrs->NVfields*nrs->fieldOffset * sizeof(dfloat));
 
   if(platform->comm.mpiRank == 0) 
     std::cout << "\nrunning benchmarks\n"; 
 
-  for(std::string benchmark : {"BPS5", "BP5"}){
+  std::vector<std::string> benchmarks;
+
+  if(runBPS5)
+    benchmarks.push_back("BPS5");
+  if(runBP5)
+    benchmarks.push_back("BP5");
+
+  for(auto& benchmark : benchmarks){
 
     MPI_Barrier(platform->comm.mpiComm);
     if(platform->comm.mpiRank == 0) 
@@ -68,7 +86,7 @@ void UDF_ExecuteStep(nrs_t *nrs, dfloat time, int tstep)
 
     int Nrep = 0;
     if(benchmark == "BP5"){
-      Nrep = 20;
+      Nrep = bp5NReps;
       nrs->pSolver->options.setArgs("PRECONDITIONER", "NONE");
       nrs->pSolver->options.setArgs("SOLVER", "PCG");
       nrs->pSolver->options.setArgs("MAXIMUM ITERATIONS", "500");
@@ -76,7 +94,7 @@ void UDF_ExecuteStep(nrs_t *nrs, dfloat time, int tstep)
       ellipticPreconditionerSetup(nrs->pSolver, nrs->pSolver->ogs);
     }
     if(benchmark == "BPS5"){
-      Nrep = 50;
+      Nrep = bps5NReps;
       nrs->pSolver->options.setArgs("SOLVER TOLERANCE", to_string_f(1e-8));
       nrs->pSolver->options.setArgs("LINEAR SOLVER STOPPING CRITERION", "RELATIVE");
     }
@@ -87,11 +105,11 @@ void UDF_ExecuteStep(nrs_t *nrs, dfloat time, int tstep)
     std::vector<double> crsTime;
 
     for (int i = 0; i < Nrep; i++) { 
-      platform->linAlg->fillKernel(mesh->Nlocal, 0.0, nrs->o_P);
-      platform->o_mempool.slice0.copyFrom(platform->mempool.slice0, mesh->Nlocal * sizeof(dfloat));
+      platform->linAlg->fillKernel(nrs->NVfields*nrs->fieldOffset, 0.0, nrs->o_U);
+      platform->o_mempool.slice0.copyFrom(platform->mempool.slice0, nrs->NVfields*nrs->fieldOffset * sizeof(dfloat));
  
       // warm-up
-      ellipticSolve(nrs->pSolver, platform->o_mempool.slice0, nrs->o_P);
+      ellipticSolve(nrs->pSolver, platform->o_mempool.slice0, nrs->o_U);
 
       platform->timer.reset();
       platform->flopCounter->clear();
@@ -99,7 +117,7 @@ void UDF_ExecuteStep(nrs_t *nrs, dfloat time, int tstep)
       MPI_Barrier(platform->comm.mpiComm);
       const auto tStart = MPI_Wtime();
 
-      ellipticSolve(nrs->pSolver, platform->o_mempool.slice0, nrs->o_P);
+      ellipticSolve(nrs->pSolver, platform->o_mempool.slice0, nrs->o_U);
 
       platform->device.finish();
       platform->timer.set("pressureSolve", MPI_Wtime() - tStart);
@@ -121,7 +139,7 @@ void UDF_ExecuteStep(nrs_t *nrs, dfloat time, int tstep)
     const double solveTime = eTime.at(minEntry);
     const double solveTimeMax = *std::max_element(eTime.begin(), eTime.end()); 
     const double solveTimeAvg = std::accumulate(eTime.begin(), eTime.end(), 0.0) / Nrep; 
-    const double throughput = (double)Ntotal/solveTime/platform->comm.mpiCommSize;
+    const double throughput = ((nrs->pSolver->Nfields * Ntotal)/solveTime)/platform->comm.mpiCommSize;
     const double flopsPerSecond = platform->flopCounter->get(platform->comm.mpiComm)/solveTime;
 
     if(platform->comm.mpiRank == 0) {
