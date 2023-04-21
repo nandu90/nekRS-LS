@@ -5,6 +5,12 @@ if(${CMAKE_BINARY_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
   MESSAGE(FATAL_ERROR "In-place builds are not supported. Please create a separate build directory")
 endif(${CMAKE_BINARY_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
 
+if(DEFINED ENV{NEKRS_HOME})
+  if($ENV{NEKRS_HOME} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+    MESSAGE(FATAL_ERROR "Env-var NEKRS_HOME points current source directory. In-place builds are not supported!")
+  endif(${CMAKE_BINARY_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
+
 include(CheckCCompilerFlag)
 include(CheckLinkerFlag)
 include(FortranCInterface)
