@@ -222,7 +222,8 @@ void udfBuild(const char *_udfFile, setupAide &options)
         // generate udfFileCache
         {
           std::ofstream f(udfFileCache, std::ios::trunc);
-          f << "#include \"" << udfFile << "\"" << std::endl;
+          f << "#include \"udf.hpp\"" << std::endl
+            << "#include \"" << udfFile << "\"" << std::endl;
 
           // autoload plugins
           std::map<std::string, std::string> pluginTable =
