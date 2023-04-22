@@ -56,8 +56,8 @@ viscosity = 1.0
 gsOverlap = 1
 
 bp5 = true
-bp5Repetitions = 20
+bp5Repetitions = 10
 
 bps5 = true
-bps5Repetitions = 50
+bps5Repetitions = 20
 eps = 0.3

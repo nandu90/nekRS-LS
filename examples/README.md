@@ -22,6 +22,7 @@
 | usrchk postprocessing   |  x  |     |     |     |     |     |     |     |
 | runtime averages        |  x  |     |     |     |     |     |     |     |
 | planar average          |  x  |     |     |     |     |     |     |     |
+| extract line (hpts)     |     |  x  |     |     |     |     |     |     |
 | conjugate heat transfer |     |     |     |     |     |     |     |  x  |
 | RANS (k-tau)            |     |  x  |     |     |     |     |     |     |
 | surfaceIntegral (drag)  |     |  x  |     |     |     |     |     |     |
