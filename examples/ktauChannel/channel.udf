@@ -54,11 +54,11 @@ void extractLine(nrs_t *nrs, dfloat time, int tstep)
     interpolator->find();
   }
 
-  interpolator->eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, np, o_Up);
+  const auto offset = np;
+  interpolator->eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, offset, o_Up);
 
   if (platform->comm.mpiRank == 0) {
-    std::vector<dfloat> Up;
-    Up.resize(np * nrs->NVfields);
+    std::vector<dfloat> Up(nrs->NVfields * np);
     o_Up.copyTo(Up.data());
 
     std::ofstream f("profile.dat", std::ios::app);
@@ -66,7 +66,7 @@ void extractLine(nrs_t *nrs, dfloat time, int tstep)
       f << std::scientific
         << time << " " 
         << xp[i] << " " << yp[i] << " " << zp[i] << " "
-        << Up[i + 0*nrs->fieldOffset] << " " << Up[i + 1*nrs->fieldOffset] << " " << Up[i + 2*nrs->fieldOffset] 
+        << Up[i + 0*offset] << " " << Up[i + 1*offset] << " " << Up[i + 2*offset] 
         << std::endl;
     }
     f.close();
