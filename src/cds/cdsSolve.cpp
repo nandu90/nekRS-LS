@@ -8,10 +8,8 @@ occa::memory cdsSolve(const int is, cds_t* cds, dfloat time, int stage)
 
   platform->timer.tic("scalar rhs", 1);  
   mesh_t* mesh = cds->mesh[0];
-  oogs_t* gsh = cds->gshT;
   if(is) {
     mesh = cds->meshV;
-    gsh = cds->gsh;
   }
 
   occa::memory o_Si = cds->o_S.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));

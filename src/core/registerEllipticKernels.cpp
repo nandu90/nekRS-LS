@@ -118,8 +118,6 @@ void registerEllipticKernels(std::string section, int poissonEquation)
   floatKernelInfo["defines/pfloat"] = pfloatString;
   floatKernelInfo["defines/dfloat"] = pfloatString;
 
-  constexpr int elementType{HEXAHEDRA};
-
   const std::string suffix = "Hex3D";
 
   occa::properties AxKernelInfo = dfloatKernelInfo;

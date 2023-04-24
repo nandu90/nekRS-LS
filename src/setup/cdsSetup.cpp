@@ -120,7 +120,6 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
     mesh_t *mesh;
     (is) ? mesh = cds->meshV : mesh = cds->mesh[0]; // only first scalar can be a CHT mesh
 
-    dfloat largeNumber = 1 << 20;
     cds->EToB[is] = (int *)calloc(mesh->Nelements * mesh->Nfaces, sizeof(int));
     int *EToB = cds->EToB[is];
     int cnt = 0;

@@ -258,7 +258,6 @@ void initStep(nrs_t *nrs, dfloat time, dfloat dt, int tstep)
   nrs->timePrevious = time;
   nrs->tstep = tstep;
 
-  mesh_t *mesh = nrs->meshV;
   cds_t *cds = nrs->cds;
 
   const bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
@@ -476,7 +475,6 @@ void setDt(nrs_t *nrs, double dt, int tstep)
 void makeq(nrs_t *nrs, dfloat time, int tstep, occa::memory o_FS, occa::memory o_BF)
 {
   cds_t *cds = nrs->cds;
-  mesh_t *mesh = cds->mesh[0];
 
   if (udf.sEqnSource) {
     platform->timer.tic("udfSEqnSource", 1);
@@ -747,7 +745,6 @@ void makef(
 void fluidSolve(nrs_t *nrs, dfloat time, occa::memory o_P, occa::memory o_U, int stage, int tstep)
 {
   mesh_t *mesh = nrs->meshV;
-  linAlg_t *linAlg = platform->linAlg;
 
   platform->timer.tic("pressureSolve", 1);
   nrs->setEllipticCoeffPressureKernel(mesh->Nlocal, nrs->fieldOffset, nrs->o_rho, nrs->o_ellipticCoeff);

@@ -304,7 +304,7 @@ const std::vector<std::string> &getValidKeys(const std::string &section)
     return nothing;
 }
 
-int validateKeys(const inipp::Ini::Sections &sections)
+void validateKeys(const inipp::Ini::Sections &sections)
 {
   int err = 0;
   bool generalExists = false;
@@ -365,7 +365,6 @@ int validateKeys(const inipp::Ini::Sections &sections)
       }
     }
   }
-  return err;
 }
 
 void printDeprecation(const inipp::Ini::Sections &sections)
@@ -1480,9 +1479,8 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
   par->parse(is);
   par->interpolate();
 
-  int keysInvalid = 0;
   if (rank == 0) {
-    keysInvalid = validateKeys(par->sections);
+    validateKeys(par->sections);
   }
 
   if (rank == 0) {
@@ -1659,7 +1657,6 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
       bool userSuppliesTargetCFL = false;
       options.setArgs("VARIABLE DT", "TRUE");
       options.setArgs("TARGET CFL", "0.5");
-      const double bigNumber = std::numeric_limits<double>::max();
       std::vector<std::string> entries = serializeString(dtString, '+');
       for (std::string entry : entries) {
         checkValidity(rank, validValues, entry);
@@ -2001,7 +1998,6 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
 
     // VELOCITY
     std::string vsolver;
-    int flow = 1;
 
     options.setArgs("VELOCITY ELLIPTIC COEFF FIELD", "TRUE");
     if (options.getArgs("VELOCITY STRESSFORMULATION").empty())
@@ -2311,7 +2307,7 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
     options.getArgs("NUMBER TIMESTEPS", numSteps);
 
     double endTime;
-    options.getArgs("END TIME", numSteps);
+    options.getArgs("END TIME", endTime);
 
     if (numSteps > 0 || endTime > 0) {
       if (options.compareArgs("VARIABLE DT", "FALSE")) {
