@@ -938,7 +938,7 @@ lpm_t::sendReceiveData(const std::vector<dfloat> &sendData,
   std::vector<dlong> recvCode;
   std::vector<dlong> recvElem;
 
-  constexpr int maxEntries = 100;
+  constexpr int maxEntries = 50;
   auto entries = n_tuple<int, maxEntries>{};
   tuple_for_each(entries, [&](auto T) {
     sendReceiveDataImpl<decltype(T)::value>(sendData,
