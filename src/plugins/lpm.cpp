@@ -938,8 +938,7 @@ lpm_t::sendReceiveData(const std::vector<dfloat> &sendData,
   std::vector<dlong> recvCode;
   std::vector<dlong> recvElem;
 
-  constexpr int maxEntries = 50;
-  auto entries = n_tuple<int, maxEntries>{};
+  auto entries = n_tuple<int, lpm_t::maxEntriesPerParticleMigration>{};
   tuple_for_each(entries, [&](auto T) {
     sendReceiveDataImpl<decltype(T)::value>(sendData,
                                             r,
@@ -962,6 +961,15 @@ lpm_t::sendReceiveData(const std::vector<dfloat> &sendData,
 
 void lpm_t::migrate()
 {
+
+  const int entriesPerParticle = nDOFs_ + solverOrder * nDOFs_ + nProps_ + nInterpFields_;
+  nrsCheck(entriesPerParticle > lpm_t::maxEntriesPerParticleMigration,
+           platform->comm.mpiComm,
+           EXIT_FAILURE,
+           "entriesPerParticle (%d) > lpm_t::maxEntriesPerParticleMigration (%d)!\n",
+           entriesPerParticle,
+           lpm_t::maxEntriesPerParticleMigration);
+
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic(timerName + "migrate", 1);
   }
@@ -1089,8 +1097,6 @@ void lpm_t::migrate()
       sendingData[ctr++] = interpFldSend[pid + nNonLocal * fld];
     }
   }
-
-  int entriesPerParticle = nDOFs_ + solverOrder * nDOFs_ + nProps_ + nInterpFields_;
 
   if (timerLevel != TimerLevel::None) {
     platform->timer.toc(timerName + "migrate::packSending");
