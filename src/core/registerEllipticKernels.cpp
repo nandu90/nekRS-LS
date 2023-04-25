@@ -142,6 +142,11 @@ void registerEllipticKernels(std::string section, int poissonEquation)
   bool verbose = platform->options.compareArgs("VERBOSE", "TRUE");
   const int verbosity = verbose ? 2 : 1;
 
+  if (section == "pressure" && platform->options.compareArgs("LOWMACH", "TRUE")) {
+    platform->options.setArgs(optionsPrefix + "ELLIPTIC COEFF FIELD", "TRUE");
+    platform->options.setArgs(optionsPrefix + "ELLIPTIC PRECO COEFF FIELD", "TRUE");
+  }
+
   for (auto &&coeffField : {true, false}) {
     if (platform->options.compareArgs(optionsPrefix + "ELLIPTIC COEFF FIELD", "TRUE") != coeffField)
       continue;
