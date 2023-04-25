@@ -413,7 +413,7 @@ void cvode_t::initialize(nrs_t *nrs)
     MPI_Abort(platform->comm.mpiComm, 1);
 
   // custom settings
-  int mxsteps = 10000;
+  int mxsteps = 500;
   platform->options.getArgs("CVODE MAX STEPS", mxsteps);
   retval = CVodeSetMaxNumSteps(this->cvodeMem, mxsteps);
 
