@@ -46,12 +46,14 @@ void registerEllipticKernels(std::string section, int poissonEquation)
   kernelInfo += meshKernelProperties(N);
 
   const bool blockSolver = [&section]() {
-    if (section == "velocity" && platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE"))
+    if (section == "velocity" && 
+        platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE"))
       return true;
-    if (section == "velocity" && platform->options.compareArgs("VELOCITY STRESSFORMULATION", "TRUE"))
+    if (section == "velocity" && 
+        platform->options.compareArgs("VELOCITY STRESSFORMULATION", "TRUE"))
       return true;
     if (section == "mesh" && 
-        platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE"))
+        platform->options.compareArgs("MESH BLOCK SOLVER", "TRUE"))
       return true;
 
     return false;

@@ -1024,14 +1024,12 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
 
   options.setArgs(parSectionName + "MAXIMUM ITERATIONS", "500");
 
+  options.setArgs(parSectionName + "SOLVER", "PCG");
   if (parScope == "pressure") {
     options.setArgs(parSectionName + "SOLVER", "PGMRES+FLEXIBLE");
   }
-  else {
-    options.setArgs(parSectionName + "SOLVER", "PCG");
-    if (parScope == "mesh")
-      options.setArgs(parSectionName + "SOLVER", "NONE");
-  }
+  if (parScope == "mesh")
+    options.setArgs(parSectionName + "SOLVER", "NONE");
 
   if (parScope == "velocity" || parScope == "mesh")
     options.setArgs(parSectionName + "BLOCK SOLVER", "TRUE");
@@ -1068,21 +1066,24 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
       }
     }
     options.setArgs(parSectionName + "PGMRES RESTART", n);
-    if (p_solver.find("fgmres") != std::string::npos || p_solver.find("flexible") != std::string::npos)
+    if (p_solver.find("fgmres") != std::string::npos || p_solver.find("flexible") != std::string::npos) {
       p_solver = "PGMRES+FLEXIBLE";
-    else
+    } else {
       p_solver = "PGMRES";
+    }
   }
   else if (p_solver.find("cg") != std::string::npos) {
-    if (p_solver.find("fcg") != std::string::npos || p_solver.find("flexible") != std::string::npos)
-      p_solver = "PCG+FLEXIBLE";
-    else
-      p_solver = "PCG";
-
-    if (p_solver.find("block") != std::string::npos)
+    if (p_solver.find("block") != std::string::npos) {
       options.setArgs(parSectionName + "BLOCK SOLVER", "TRUE");
-    else
+    } else {
       options.setArgs(parSectionName + "BLOCK SOLVER", "FALSE");
+    }
+
+    if (p_solver.find("fcg") != std::string::npos || p_solver.find("flexible") != std::string::npos) {
+      p_solver = "PCG+FLEXIBLE";
+    } else {
+      p_solver = "PCG";
+    }
   }
   else if (p_solver.find("user") != std::string::npos) {
     p_solver = "USER";
