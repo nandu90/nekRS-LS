@@ -212,7 +212,7 @@ void cvode_t::initialize(nrs_t *nrs)
   };
 
   // same as cvLsDQJtimes, but with scaling for sig
-  CVLsJacTimesVecFn cvodeLS =
+  CVLsJacTimesVecFn cvodeJtv =
       [](N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector fy, void *user_data, N_Vector work) {
         auto data = static_cast<userData_t *>(user_data);
         auto nrs = data->nrs;
@@ -248,8 +248,8 @@ void cvode_t::initialize(nrs_t *nrs)
           N_VLinearSum(sig, v, 1.0, y, work);
 
           /* Set Jv = f(tn, y+sig*v) */
-          // retval = cvls_mem->jt_f(t, work, Jv, user_data);
           cvode->jtvRHS(nrs, t, o_work, o_Jv);
+          retval = 0; // currently we don't do any error checking in the RHS
           if (retval == 0)
             break;
           if (retval < 0)
@@ -408,7 +408,7 @@ void cvode_t::initialize(nrs_t *nrs)
   if (check_retval(&retval, "CVodeSetJacTimesRhsFn", 1))
     MPI_Abort(platform->comm.mpiComm, 1);
 
-  retval = CVodeSetJacTimes(this->cvodeMem, NULL, cvodeLS);
+  retval = CVodeSetJacTimes(this->cvodeMem, NULL, cvodeJtv);
   if (check_retval(&retval, "CVodeSetJacTimes", 1))
     MPI_Abort(platform->comm.mpiComm, 1);
 
@@ -1447,6 +1447,8 @@ long cvode_t::numSteps() const { return 0; }
 
 long cvode_t::numRHSEvals() const { return 0; }
 
+long cvode_t::numLinRHSEvals() const { return 0; }
+
 long cvode_t::numNonlinSolveIters() const { return 0; }
 
 long cvode_t::numLinIters() const { return 0; }
@@ -1472,24 +1474,22 @@ void cvode_t::printInfo(bool printVerboseInfo) const
     scalars = ss.str();
   }
 
-  const auto nliPerNni = nni > 0 ? (dfloat)(nli) / (nni) : 0.0;
-
   if (platform->comm.mpiRank == 0 && printVerboseInfo) {
     std::ostringstream ss;
     ss << "" << scalars;
     ss << std::setfill(' ') << std::setw(lengthToColon - ss.str().length()) << " ";
 
     // pad remaining space, lengthToColon long, with spaces
-    printf("%s: nsteps %03ld  nRHS %03ld  nli/nni %.1f  nli %03ld\n",
+    printf("%s: nsteps %03ld  nRHS %03ld  nni %01ld  nli %03ld\n",
            ss.str().c_str(),
            nsteps,
            nrhs,
-           nliPerNni,
+           nni,
            nli);
   }
   else if (platform->comm.mpiRank == 0) {
     std::ostringstream ss;
     ss << "  " << scalars;
-    printf("%s: %ld %ld %.1f", ss.str().c_str(), nsteps, nrhs, nliPerNni);
+    printf("%s: %ld %ld %ld %ldf", ss.str().c_str(), nsteps, nrhs, nni, nli);
   }
 }
