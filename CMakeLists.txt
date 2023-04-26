@@ -81,7 +81,7 @@ string(COMPARE EQUAL "${CMAKE_CXX_COMPILER_ID}" "AppleClang" USING_APPLE_LLVM)
 string(COMPARE EQUAL "${CMAKE_CXX_COMPILER_ID}" "NVHPC" USING_NVHPC)
 
 if(USING_GNU OR USING_LLVM OR USING_APPLE_LLVM)
-  set(NEKRS_COMPILER_FLAGS "-O2 -mdynamic-no-pic -g -march=native -mtune=native -ftree-vectorize" CACHE STRING "compiler flags")
+  set(NEKRS_COMPILER_FLAGS "-O2 -g -march=native -mtune=native -ftree-vectorize" CACHE STRING "compiler flags")
   if (USING_GNU AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.1)
     message(FATAL_ERROR "GNU compiler version must be at least 9.1!")
   endif()
