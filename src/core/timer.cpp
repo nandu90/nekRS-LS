@@ -107,6 +107,12 @@ void timer_t::reset()
   ogsResetTime();
 }
 
+void timer_t::clear()
+{
+  m_.clear();
+  ogsResetTime();
+}
+
 void timer_t::enableSync() { enable_sync_ = 1; }
 
 void timer_t::disableSync() { enable_sync_ = 0; }

@@ -99,7 +99,18 @@ public:
 
   void defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, occa::memory o_ydot);
 
+  void printTimers(nrs_t* nrs);
+  void resetTimers();
+
+  std::string scope() const { return timerScope; }
+  void setTimerScope(std::string scope) { timerScope = scope; }
+
 private:
+
+  std::string timerName = "cvode_t::";
+  std::string timerScope;
+  std::string rhsTagName() const;
+
   // package data to pass in as user data to cvode
   struct userData_t {
 

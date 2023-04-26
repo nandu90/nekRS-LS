@@ -13,6 +13,7 @@
 #include "timeStepper.hpp"
 #include "plugins/lowMach.hpp"
 #include "bdry.hpp"
+#include "tabularPrinter.hpp"
 
 #ifdef ENABLE_CVODE
 // cvode includes
@@ -158,6 +159,7 @@ cvode_t::cvode_t(nrs_t *nrs)
   isInitialized = false;
 
   verboseCVODE = platform->options.compareArgs("CVODE VERBOSE", "TRUE");
+
 }
 
 void cvode_t::initialize(nrs_t *nrs)
@@ -773,7 +775,10 @@ void cvode_t::computeErrorWeight(occa::memory o_y, occa::memory o_ewt)
 
 void cvode_t::rhs(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_ydot)
 {
-  platform->timer.tic("scalar cvode rhs", 1);
+  const auto tag = this->rhsTagName();
+  const auto saveTimerScope = timerScope;
+  timerScope = tag;
+  platform->timer.tic(tag, 1);
   this->setIsRhsEvaluation(true);
 
   if (userRHS) {
@@ -784,12 +789,12 @@ void cvode_t::rhs(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_ydot
   }
 
   this->setIsRhsEvaluation(false);
-  platform->timer.toc("scalar cvode rhs");
+  platform->timer.toc(tag);
+  timerScope = saveTimerScope;
 }
 
 void cvode_t::jtvRHS(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_ydot)
 {
-  platform->timer.tic("scalar cvode jacobian", 1);
   this->setIsJacobianEvaluation(true);
 
   if (userJacobian) {
@@ -800,7 +805,6 @@ void cvode_t::jtvRHS(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_y
   }
 
   this->setIsJacobianEvaluation(false);
-  platform->timer.toc("scalar cvode jacobian");
 }
 
 void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, occa::memory o_ydot)
@@ -815,7 +819,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
   if (time != tprev) {
 
     if (detailedTimersEnabled) {
-      platform->timer.tic("scalar cvode extrapolate new state", 1);
+      platform->timer.tic(timerScope + "::extrapolate", 1);
     }
 
     if (platform->comm.mpiRank == 0 && verboseCVODE) {
@@ -897,24 +901,26 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
     computeUrst(nrs, true);
 
     if (detailedTimersEnabled) {
-      platform->timer.toc("scalar cvode extrapolate new state");
+      platform->timer.toc(timerScope + "::extrapolate");
     }
   }
 
   cvToNrs(nrs, o_y, cds->o_S);
 
   if (detailedTimersEnabled) {
-    platform->timer.tic("scalar cvode apply dirichlet", 1);
+    platform->timer.tic(timerScope + "::applyDirichlet", 1);
   }
 
   this->applyDirichlet(nrs, time);
 
   if (detailedTimersEnabled) {
-    platform->timer.toc("scalar cvode apply dirichlet");
+    platform->timer.toc(timerScope + "::applyDirichlet");
   }
 
   if (!(isJacobianEvaluation() && recycleProperties)) {
+    platform->timer.tic(timerScope + "::evaluateProperties", 1);
     evaluateProperties(nrs, time);
+    platform->timer.toc(timerScope + "::evaluateProperties");
   }
 
   // terms to include: user source, advection, filtering, add weak Laplacian
@@ -941,7 +947,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
   };
 
   if (detailedTimersEnabled) {
-    platform->timer.tic("scalar cvode ogs start+finish, pt. source", 1);
+    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint", 1);
   }
 
   applyOgsOperation(oogs::start);
@@ -949,10 +955,10 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
   // input and output are assumed to be L-vectors
   auto o_ptSource = cds->o_FS + cds->fieldOffsetSum * sizeof(dfloat);
   if (userLocalPointSource) {
-    platform->timer.tic("udfSEqnSourceCVODE", 1);
+    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::localPointSource", 1);
     // o_ydot is simply used as scratch space to store the L-vector source term
     userLocalPointSource(nrs, LFieldOffset, o_y, o_ydot);
-    platform->timer.toc("udfSEqnSourceCVODE");
+    platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::localPointSource");
 
     cvToNrs(nrs, o_ydot, o_ptSource);
   }
@@ -960,8 +966,8 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
   applyOgsOperation(oogs::finish);
 
   if (detailedTimersEnabled) {
-    platform->timer.toc("scalar cvode ogs start+finish, pt. source");
-    platform->timer.tic("scalar cvode add pt source", 1);
+    platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint");
+    platform->timer.tic(timerScope + "::addPointSource", 1);
   }
 
   if (chtCVODE) {
@@ -1011,8 +1017,8 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
   }
 
   if (detailedTimersEnabled) {
-    platform->timer.toc("scalar cvode add pt source");
-    platform->timer.tic("scalar cvode dp0thdt", 1);
+    platform->timer.toc(timerScope + "::addPointSource");
+    platform->timer.tic(timerScope + "::dp0thdt", 1);
   }
 
   // TODO: add dpdt term to userq?
@@ -1031,8 +1037,8 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
   }
 
   if (detailedTimersEnabled) {
-    platform->timer.toc("scalar cvode dp0thdt");
-    platform->timer.tic("scalar cvode mask dirichlet", 1);
+    platform->timer.toc(timerScope + "::dp0thdt");
+    platform->timer.tic(timerScope + "::maskDirichlet", 1);
   }
 
   // mask Dirichlet portion of RHS
@@ -1059,7 +1065,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
   }
 
   if (detailedTimersEnabled) {
-    platform->timer.toc("scalar cvode mask dirichlet");
+    platform->timer.toc(timerScope + "::maskDirichlet");
   }
 
   nrsToCv(nrs, cds->o_FS, o_ydot);
@@ -1068,8 +1074,10 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
 void cvode_t::makeq(nrs_t *nrs, dfloat time)
 {
 
+  const auto timerScopeSave = timerScope;
+  timerScope = timerScopeSave + "::makeq";
   if (detailedTimersEnabled) {
-    platform->timer.tic("scalar cvode makeq", 1);
+    platform->timer.tic(timerScope, 1);
   }
 
   auto *cds = nrs->cds;
@@ -1079,9 +1087,13 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
   auto &o_Urst = useRelativeVelocity ? cds->o_relUrst : cds->o_Urst;
 
   if (udf.sEqnSource) {
-    platform->timer.tic("udfSEqnSourceCVODE", 1);
+    const auto makeQScope = timerScope;
+    // ensure that user/application forward the correct base timer
+    timerScope = makeQScope + "::udfSEqnSource";
+    platform->timer.tic(timerScope, 1);
     udf.sEqnSource(nrs, time, cds->o_S, o_FS);
-    platform->timer.toc("udfSEqnSourceCVODE");
+    platform->timer.toc(timerScope);
+    timerScope = makeQScope;
   }
 
   auto applyTerms = [&](mesh_t *mesh, dlong scalarStart, dlong Nscalar) {
@@ -1107,7 +1119,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
     }
 
     if (detailedTimersEnabled) {
-      platform->timer.tic("scalar cvode advection", 1);
+      platform->timer.tic(timerScope + "::advection", 1);
     }
 
     if (platform->options.compareArgs("ADVECTION", "TRUE")) {
@@ -1145,8 +1157,8 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
     }
 
     if (detailedTimersEnabled) {
-      platform->timer.toc("scalar cvode advection");
-      platform->timer.tic("scalar cvode mass matrix weighting", 1);
+      platform->timer.toc(timerScope + "::advection");
+      platform->timer.tic(timerScope + "::massMatrixWeighting", 1);
     }
 
     // apply mass matrix weighting
@@ -1155,8 +1167,8 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
     platform->linAlg->axmyMany(mesh->Nlocal, Nscalar, nrs->fieldOffset, 0, 1.0, mesh->o_LMM, o_FS_start);
 
     if (detailedTimersEnabled) {
-      platform->timer.toc("scalar cvode mass matrix weighting");
-      platform->timer.tic("scalar cvode neumannBC", 1);
+      platform->timer.toc(timerScope + "::massMatrixWeighting");
+      platform->timer.tic(timerScope + "::neumannBC", 1);
     }
 
     // weak Laplacian + boundary terms
@@ -1185,8 +1197,8 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
     }
 
     if (detailedTimersEnabled) {
-      platform->timer.toc("scalar cvode neumannBC");
-      platform->timer.tic("scalar cvode weakLaplacian", 1);
+      platform->timer.toc(timerScope + "::neumannBC");
+      platform->timer.tic(timerScope + "::weakLaplacian",1);
     }
 
     weakLaplacianKernel(mesh->Nelements,
@@ -1200,7 +1212,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
                         cds->o_S,
                         o_FS);
     if (detailedTimersEnabled) {
-      platform->timer.toc("scalar cvode weakLaplacian");
+      platform->timer.toc(timerScope + "::weakLaplacian");
     }
   };
 
@@ -1225,14 +1237,16 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
   }
 
   if (detailedTimersEnabled) {
-    platform->timer.toc("scalar cvode makeq");
+    platform->timer.toc(timerScope);
   }
+
+  timerScope = timerScopeSave;
 }
 
 void cvode_t::nrsToCv(nrs_t *nrs, occa::memory o_EField, occa::memory o_LField)
 {
   if (detailedTimersEnabled) {
-    platform->timer.tic("scalar cvode nrsToCv", 1);
+    platform->timer.tic(timerScope + "::nrsToCv", 1);
   }
   nrsToCvKernel(nrs->cds->mesh[0]->Nlocal,
                 nrs->meshV->Nlocal,
@@ -1247,14 +1261,14 @@ void cvode_t::nrsToCv(nrs_t *nrs, occa::memory o_EField, occa::memory o_LField)
     userPostNrsToCv(nrs, o_LField);
   }
   if (detailedTimersEnabled) {
-    platform->timer.toc("scalar cvode nrsToCv");
+    platform->timer.toc(timerScope + "::nrsToCv");
   }
 }
 
 void cvode_t::cvToNrs(nrs_t *nrs, occa::memory o_LField, occa::memory o_EField)
 {
   if (detailedTimersEnabled) {
-    platform->timer.tic("scalar cvode cvToNrs", 1);
+    platform->timer.tic(timerScope + "::cvToNrs", 1);
   }
 
   cvToNrsKernel(nrs->cds->mesh[0]->Nlocal,
@@ -1271,14 +1285,15 @@ void cvode_t::cvToNrs(nrs_t *nrs, occa::memory o_LField, occa::memory o_EField)
   }
 
   if (detailedTimersEnabled) {
-    platform->timer.toc("scalar cvode cvToNrs");
+    platform->timer.toc(timerScope + "::cvToNrs");
   }
 }
 
 void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
 {
 #ifdef ENABLE_CVODE
-  platform->timer.tic("scalar cvode", 1);
+  platform->timer.tic(timerName + "solve", 1);
+  timerScope = timerName + "solve";
 
   // update solver statistics from previous state
   {
@@ -1343,8 +1358,10 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
 
   platform->device.finish();
 
+  const auto oldScope = timerScope;
+  timerScope = oldScope + "::cvode";
   if (detailedTimersEnabled) {
-    platform->timer.tic("scalar cvode solve", 1);
+    platform->timer.tic(timerScope, 1);
   }
   // call cvode solver
   retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
@@ -1368,13 +1385,14 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
   platform->device.finish();
 
   if (detailedTimersEnabled) {
-    platform->timer.toc("scalar cvode solve");
+    platform->timer.toc(timerScope);
   }
+  timerScope = oldScope;
 
   cvToNrs(nrs, o_cvodeY, nrs->cds->o_S);
 
   if (detailedTimersEnabled) {
-    platform->timer.tic("scalar cvode restore state", 1);
+    platform->timer.tic(timerScope + "::restore", 1);
   }
 
   // restore previous state
@@ -1404,9 +1422,9 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
   this->applyDirichlet(nrs, t1);
 
   if (detailedTimersEnabled) {
-    platform->timer.toc("scalar cvode restore state");
+    platform->timer.toc(timerScope + "::restore");
   }
-  platform->timer.toc("scalar cvode");
+  platform->timer.toc(timerScope);
 #endif
 }
 
@@ -1491,3 +1509,169 @@ void cvode_t::printInfo(bool printVerboseInfo) const
     printf("%s: %ld %ld %ld %ldf", ss.str().c_str(), nsteps, nrhs, nni, nli);
   }
 }
+
+void cvode_t::printTimers(nrs_t* nrs)
+{
+  const auto timerTags = platform->timer.tags();
+
+  // filter out tags that do not start with timerName
+  std::vector<std::string> filteredTags;
+  std::copy_if(timerTags.begin(),
+               timerTags.end(),
+               std::back_inserter(filteredTags),
+               [&](const std::string &tag) { return tag.find(timerName) == 0; });
+
+  // construct tree where parent entries are the portion of the tag left of the last '::'
+  std::map<std::string, std::vector<std::string>> tree;
+
+  for (auto &&tag : filteredTags) {
+    auto pos = tag.rfind("::");
+    if (pos == std::string::npos) {
+      tree[""].push_back(tag);
+    }
+    else {
+      auto parent = tag.substr(0, pos);
+      tree[parent].push_back(tag);
+    }
+  }
+
+  auto pos = timerName.rfind("::");
+  const auto start = timerName.substr(0, pos);
+
+  std::ios oldState(nullptr);
+  oldState.copyfmt(std::cout);
+
+  auto mesh = nrs->meshV;
+  long long int NglobalElements = mesh->Nelements;
+  MPI_Allreduce(MPI_IN_PLACE, &NglobalElements, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm);
+  double GDOF = NglobalElements * mesh->N * mesh->N * mesh->N * this->cvodeScalarIds.size();
+  GDOF /= 1e9;
+
+  // gather timer information from tree
+  std::vector<std::string> operations;
+  std::vector<std::string> timesPerCall;
+  std::vector<std::string> relPercentage;
+  std::vector<std::string> absPercentage;
+  std::vector<std::string> throughputs;
+
+  std::cout.setf(std::ios::fixed);
+  std::function<void(std::string, std::string, std::string, int)> gatherTreeStats;
+  gatherTreeStats = [&](std::string tag, std::string rootTag, std::string parentTag, int level) {
+    if (level > 0) {
+      if(level == 1) rootTag = tag; // set as root of timer tree
+      const auto tTag = platform->timer.query(tag, "DEVICE:MAX");
+      const auto nCalls = platform->timer.count(tag);
+      auto tParent = platform->timer.query(parentTag, "DEVICE:MAX");
+
+      if(tParent < 0.0)
+        tParent = tTag;
+
+      const auto tRoot = platform->timer.query(rootTag, "DEVICE:MAX");
+
+      const auto tCall = tTag / nCalls;
+
+      // trim parentTag from the current tag
+      auto pos = tag.rfind(parentTag);
+      auto trimmedTag = tag.substr(pos + parentTag.length() + 2);
+
+      if (platform->comm.mpiRank == 0) {
+        std::ostringstream ss;
+        for (int i = 0; i < level; ++i) {
+          ss << "> ";
+        }
+        ss << trimmedTag;
+        operations.push_back(ss.str());
+
+        ss.str("");
+        ss.clear();
+        ss << std::setprecision(3)
+           << std::scientific
+           << tCall;
+        timesPerCall.push_back(ss.str());
+        
+        ss.str("");
+        ss.clear();
+        ss << std::setprecision(1)
+           << std::fixed
+           << 100.0 * tTag/tParent
+           << "%";
+        relPercentage.push_back(level == 1 ? "" : ss.str());
+        
+        ss.str("");
+        ss.clear();
+        ss << std::setprecision(1)
+           << std::fixed
+           << 100.0 * tTag/tRoot
+           << "%";
+        absPercentage.push_back(ss.str());
+
+        ss.str("");
+        ss.clear();
+        ss << std::setprecision(3)
+           << std::scientific
+           << GDOF/tCall;
+        throughputs.push_back(ss.str());
+      }
+    }
+    
+    std::vector<std::string> children;
+    for (auto &&child : tree[tag]) {
+      children.push_back(child);
+    }
+
+    // sort children by max time, from largest to smallest
+    std::sort(children.begin(),
+              children.end(),
+              [&](const std::string &a, const std::string &b) {
+                const auto ta = platform->timer.query(a, "DEVICE:MAX");
+                const auto tb = platform->timer.query(b, "DEVICE:MAX");
+                return ta > tb;
+              });
+
+    for (auto &&child : children) {
+      gatherTreeStats(child, rootTag, tag, level + 1);
+    }
+  };
+
+  gatherTreeStats(start, "", "", 0);
+  
+  std::map<int, std::vector<std::string>> table;
+  table[0] = operations;
+  table[1] = timesPerCall;
+  table[2] = relPercentage;
+  table[3] = absPercentage;
+  table[4] = throughputs;
+
+  std::vector<std::string> headers = {"Operation", "Time", "rel %", "abs %", "GDOF/s"};
+
+  if(platform->comm.mpiRank == 0){
+    std::cout << "\n";
+    std::cout << "Timers for " << start << ":\n";
+    printTable(table, headers, "    ");
+    std::cout << "\n";
+  }
+
+  std::cout.copyfmt(oldState);
+}
+
+void cvode_t::resetTimers()
+{
+  const auto timerTags = platform->timer.tags();
+
+  // filter out tags that do not start with timerName
+  std::vector<std::string> filteredTags;
+  std::copy_if(timerTags.begin(),
+               timerTags.end(),
+               std::back_inserter(filteredTags),
+               [&](const std::string &tag) { return tag.find(timerName) == 0; });
+
+  for (auto &&tag : filteredTags) {
+    platform->timer.reset(tag);
+  }
+}
+
+std::string cvode_t::rhsTagName() const
+{
+  return this->isJacobianEvaluation() ? timerScope + "::jtv" : timerScope + "::rhs";
+}
+
