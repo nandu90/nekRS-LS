@@ -25,40 +25,43 @@
  */
 
 #define surfaceTerms(sk, face, i, j)                                                                         \
-  {                                                                                                          \
-    struct bcData bc;                                                                                        \
-    bc.idM = vmapM[sk];                                                                                      \
-    bc.time = time;                                                                                          \
-    bc.id = EToBM[face + p_Nfaces * e];                                                                      \
-    bc.nx = sgeo[sk * p_Nsgeo + p_NXID];                                                                     \
-    bc.ny = sgeo[sk * p_Nsgeo + p_NYID];                                                                     \
-    bc.nz = sgeo[sk * p_Nsgeo + p_NZID];                                                                     \
-    bc.t1x = sgeo[sk * p_Nsgeo + p_T1XID];                                                                   \
-    bc.t1y = sgeo[sk * p_Nsgeo + p_T1YID];                                                                   \
-    bc.t1z = sgeo[sk * p_Nsgeo + p_T1ZID];                                                                   \
-    bc.t2x = sgeo[sk * p_Nsgeo + p_T2XID];                                                                   \
-    bc.t2y = sgeo[sk * p_Nsgeo + p_T2YID];                                                                   \
-    bc.t2z = sgeo[sk * p_Nsgeo + p_T2ZID];                                                                   \
-    bc.u = U[bc.idM + 0 * offset];                                                                           \
-    bc.v = U[bc.idM + 1 * offset];                                                                           \
-    bc.w = U[bc.idM + 2 * offset];                                                                           \
-    bc.x = x[bc.idM];                                                                                        \
-    bc.y = y[bc.idM];                                                                                        \
-    bc.z = z[bc.idM];                                                                                        \
-    bc.trans = rho[bc.idM];                                                                                  \
-    bc.diff = diff[bc.idM];                                                                                  \
-    bc.fieldOffset = offset;                                                                                 \
-    bc.s = S[bc.idM];                                                                                        \
-    bc.usrwrk = W;                                                                                           \
-    const dfloat WsJ = sgeo[sk * p_Nsgeo + p_WSJID];                                                         \
-    const dlong bcType = EToB[face + p_Nfaces * e];                                                          \
-    bc.flux = 0;                                                                                             \
-    bc.scalarId = scalarId;                                                                                  \
-    if (bcType == p_bcTypeF) {                                                                               \
-      scalarNeumannConditions(&bc);                                                                          \
-    }                                                                                                        \
-    s_ndU[j][i] = -WsJ * (bc.flux);                                                                          \
-  }
+{                                                                                                            \
+const dlong bcType = EToB[face + p_Nfaces * e];                                                              \
+if (bcType == p_bcTypeF) {                                                                                   \
+struct bcData bc;                                                                                            \
+bc.idM = vmapM[sk];                                                                                          \
+bc.time = time;                                                                                              \
+bc.id = EToBM[face + p_Nfaces * e];                                                                          \
+bc.nx = sgeo[sk * p_Nsgeo + p_NXID];                                                                         \
+bc.ny = sgeo[sk * p_Nsgeo + p_NYID];                                                                         \
+bc.nz = sgeo[sk * p_Nsgeo + p_NZID];                                                                         \
+bc.t1x = sgeo[sk * p_Nsgeo + p_T1XID];                                                                       \
+bc.t1y = sgeo[sk * p_Nsgeo + p_T1YID];                                                                       \
+bc.t1z = sgeo[sk * p_Nsgeo + p_T1ZID];                                                                       \
+bc.t2x = sgeo[sk * p_Nsgeo + p_T2XID];                                                                       \
+bc.t2y = sgeo[sk * p_Nsgeo + p_T2YID];                                                                       \
+bc.t2z = sgeo[sk * p_Nsgeo + p_T2ZID];                                                                       \
+bc.u = U[bc.idM + 0 * offset];                                                                               \
+bc.v = U[bc.idM + 1 * offset];                                                                               \
+bc.w = U[bc.idM + 2 * offset];                                                                               \
+bc.x = x[bc.idM];                                                                                            \
+bc.y = y[bc.idM];                                                                                            \
+bc.z = z[bc.idM];                                                                                            \
+bc.trans = rho[bc.idM];                                                                                      \
+bc.diff = diff[bc.idM];                                                                                      \
+bc.fieldOffset = offset;                                                                                     \
+bc.s = S[bc.idM];                                                                                            \
+bc.usrwrk = W;                                                                                               \
+const dfloat WsJ = sgeo[sk * p_Nsgeo + p_WSJID];                                                             \
+bc.scalarId = scalarId;                                                                                      \
+bc.flux = 0;                                                                                                 \
+scalarNeumannConditions(&bc);                                                                                \
+s_ndU[j][i] = -WsJ * (bc.flux);                                                                              \
+}                                                                                                            \
+else {                                                                                                       \
+s_ndU[j][i] = 0;                                                                                             \
+}                                                                                                            \
+}
 
 // RHS contributions for continuous solver
 
