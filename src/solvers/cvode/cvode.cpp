@@ -1447,8 +1447,6 @@ long cvode_t::numSteps() const { return 0; }
 
 long cvode_t::numRHSEvals() const { return 0; }
 
-long cvode_t::numLinRHSEvals() const { return 0; }
-
 long cvode_t::numNonlinSolveIters() const { return 0; }
 
 long cvode_t::numLinIters() const { return 0; }
