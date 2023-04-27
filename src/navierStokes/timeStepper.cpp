@@ -246,10 +246,14 @@ void adjustDt(nrs_t* nrs, int tstep)
     }
 
     // limit dt change
+    dfloat maxAdjustDtRatio = 1;
+    dfloat minAdjustDtRatio = 1;
+    platform->options.getArgs("MAX ADJUST DT RATIO", maxAdjustDtRatio);
+    platform->options.getArgs("MIN ADJUST DT RATIO", minAdjustDtRatio);
     if (tstep > 1)
-      nrs->dt[0] = std::max(nrs->dt[0], 0.5 * nrs->dt[1]);
+      nrs->dt[0] = std::max(nrs->dt[0], minAdjustDtRatio * nrs->dt[1]);
     if (tstep > 1)
-      nrs->dt[0] = std::min(nrs->dt[0], 1.5 * nrs->dt[1]);
+      nrs->dt[0] = std::min(nrs->dt[0], maxAdjustDtRatio * nrs->dt[1]);
   }
 }
 

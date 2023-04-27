@@ -1421,6 +1421,9 @@ void setDefaultSettings(setupAide &options, std::string casename, int rank)
 
   options.setArgs("START TIME", "0.0");
 
+  options.setArgs("MIN ADJUST DT RATIO", "0.5");
+  options.setArgs("MAX ADJUST DT RATIO", "1.5");
+
   options.setArgs("MESH SOLVER", "NONE");
   options.setArgs("MOVING MESH", "FALSE");
 
