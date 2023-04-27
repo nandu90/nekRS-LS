@@ -96,6 +96,9 @@ cvode_t::cvode_t(nrs_t *nrs)
     o_xyz0 = platform->device.malloc((nrs->NVfields * sizeof(dfloat)) * nrs->fieldOffset);
   }
 
+  if (platform->options.getArgs("CVODE RECYCLE PROPERTIES").empty()) {
+    platform->options.setArgs("CVODE RECYCLE PROPERTIES", "TRUE");
+  }
   recycleProperties = platform->options.compareArgs("CVODE RECYCLE PROPERTIES", "TRUE");
 
   setupEToLMapping(nrs);
