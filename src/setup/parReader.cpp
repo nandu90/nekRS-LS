@@ -1093,6 +1093,14 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
   }
   else if (p_solver.find("none") != std::string::npos) {
     p_solver = "NONE";
+
+    // clean all options for this scalar
+    auto keyWordToDataMap = options.keyWordToDataMap;
+    for (auto [key, value] : keyWordToDataMap) {
+      if (key.find(parSectionName) != std::string::npos) {
+        options.removeArgs(key);
+      }
+    }
   }
   else {
     append_error("Invalid solver for " + parScope);
@@ -2067,6 +2075,15 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
     std::string solver;
     par->extract("temperature", "solver", solver);
     if (solver == "none") {
+
+      // clean all options for this scalar
+      auto keyWordToDataMap = options.keyWordToDataMap;
+      for (auto [key, value] : keyWordToDataMap) {
+        if (key.find("SCALAR" + sid) != std::string::npos) {
+          options.removeArgs(key);
+        }
+      }
+
       options.setArgs("SCALAR" + sid + " SOLVER", "NONE");
     }
     else {
@@ -2181,6 +2198,15 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
     std::string solver;
     par->extract(parScope, "solver", solver);
     if (solver == "none") {
+      
+      // clean all options for this scalar
+      auto keyWordToDataMap = options.keyWordToDataMap;
+      for (auto [key, value] : keyWordToDataMap) {
+        if (key.find("SCALAR" + sid) != std::string::npos) {
+          options.removeArgs(key);
+        }
+      }
+      
       options.setArgs("SCALAR" + sid + " SOLVER", "NONE");
       return;
     }
