@@ -1079,9 +1079,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
 
   const auto timerScopeSave = timerScope;
   timerScope = timerScopeSave + "::makeq";
-  if (detailedTimersEnabled) {
-    platform->timer.tic(timerScope, 1);
-  }
+  platform->timer.tic(timerScope, 1);
 
   auto *cds = nrs->cds;
   auto o_FS = nrs->cds->o_FS;
@@ -1239,10 +1237,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
     applyTerms(cds->meshV, startScalar, numScalars);
   }
 
-  if (detailedTimersEnabled) {
-    platform->timer.toc(timerScope);
-  }
-
+  platform->timer.toc(timerScope);
   timerScope = timerScopeSave;
 }
 
