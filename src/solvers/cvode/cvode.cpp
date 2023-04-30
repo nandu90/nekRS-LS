@@ -398,12 +398,25 @@ void cvode_t::initialize(nrs_t *nrs)
   if (check_retval(&retval, "CVodeWFtolerances", 1))
     MPI_Abort(platform->comm.mpiComm, 1);
 
-  int nvectorsGMR = 10;
-  platform->options.getArgs("CVODE GMR VECTORS", nvectorsGMR);
+  int nVectors = 10;
+  platform->options.getArgs("CVODE PGMRES RESTART", nVectors);
 
-  SUNLinearSolver LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nvectorsGMR, sunctx);
-  if (check_retval(&retval, "SUNLinSol_SPFGMR", 1))
-    MPI_Abort(platform->comm.mpiComm, 1);
+  std::string linearSolver = "GMRES";
+  platform->options.getArgs("CVODE SOLVER", linearSolver);
+
+  SUNLinearSolver LS;
+
+  if(linearSolver == "GMRES"){
+    LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
+    if (check_retval(&retval, "SUNLinSol_SPFGMR", 1))
+      MPI_Abort(platform->comm.mpiComm, 1);
+  } else {
+    nrsCheck(true,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "CVODE SOLVER %s not supported!\n",
+             linearSolver.c_str());
+  }
 
   retval = CVodeSetLinearSolver(this->cvodeMem, LS, NULL);
   if (check_retval(&retval, "CVodeSetLinearSolver", 1))

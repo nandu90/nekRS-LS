@@ -198,12 +198,12 @@ static std::vector<std::string> scalarKeys = {
 static std::vector<std::string> cvodeKeys = {
     {"relativetol"},
     {"absolutetol"},
-    {"nvectorsgmr"},
     {"hmaxratio"},
     {"epslin"},
     {"sigscale"},
     {"jtvrecycleproperties"},
     {"cvodeendtimeratio"},
+    {"solver"},
 };
 
 static std::vector<std::string> boomeramgKeys = {
@@ -500,8 +500,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   // default values
   double relativeTol = 1e-4;
   double absoluteTol = 1e-6;
-  int nvectorsGMR = 10;
-  int maxSteps = 10000;
+  int maxSteps = 500;
   double hmax = 3;
   double epsLin = 0.1;
   int maxOrder = 3;
@@ -519,10 +518,42 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   if (par->extract(parScope, "absolutetol", absoluteTol)) {
     options.setArgs("CVODE ABSOLUTE TOLERANCE", to_string_f(absoluteTol));
   }
+  
+  options.setArgs("CVODE GMRES RESTART", "10");
+  options.setArgs("CVODE SOLVER", "GMRES");
 
-  par->extract(parScope, "nvectorsgmr", nvectorsGMR);
-  options.setArgs("CVODE GMR VECTORS", std::to_string(nvectorsGMR));
+  // parse cvode linear solver
+  [&](){
+    std::string p_solver;
+    
+    if (!par->extract("cvode", "solver", p_solver))
+      return;
 
+    const std::vector<std::string> validValues = {
+        {"gmres"},
+        {"nvector"},
+    };
+
+    std::vector<std::string> list = serializeString(p_solver, '+');
+    for (const std::string s : list) {
+      checkValidity(rank, validValues, s);
+    }
+
+    if (p_solver.find("gmres") != std::string::npos) {
+      std::vector<std::string> list;
+      list = serializeString(p_solver, '+');
+      std::string n = "10";
+      for (std::string s : list) {
+        const auto nvectorStr = parseValueForKey(s, "nvector");
+        if (!nvectorStr.empty()) {
+          n = nvectorStr;
+        }
+      }
+      options.setArgs("CVODE GMRES RESTART", n);
+      options.setArgs("CVODE SOLVER", "GMRES");
+    }
+  }();
+  
   par->extract(parScope, "hmaxratio", hmax);
   options.setArgs("CVODE HMAX RATIO", std::to_string(hmax));
 
