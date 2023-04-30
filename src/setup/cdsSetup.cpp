@@ -89,14 +89,6 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
 
   cds->o_ellipticCoeff = nrs->o_ellipticCoeff;
 
-  cds->o_U = nrs->o_U;
-  cds->o_Ue = nrs->o_Ue;
-  cds->o_S =
-      platform->device.malloc(std::max(cds->nBDF, cds->nEXT) * cds->fieldOffsetSum * sizeof(dfloat), cds->S);
-  cds->o_Se = platform->device.malloc(cds->fieldOffsetSum, sizeof(dfloat));
-  cds->o_BF = platform->device.malloc(cds->fieldOffsetSum * sizeof(dfloat), cds->BF);
-  cds->o_FS = platform->device.malloc(cds->nEXT * cds->fieldOffsetSum * sizeof(dfloat), cds->FS);
-
   cds->o_relUrst = nrs->o_relUrst;
   cds->o_Urst = nrs->o_Urst;
 
@@ -134,6 +126,21 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
 
   cds->o_compute = platform->device.malloc(cds->NSfields * sizeof(dlong), cds->compute);
   cds->o_cvodeSolve = platform->device.malloc(cds->NSfields * sizeof(dlong), cds->cvodeSolve);
+  
+  cds->o_U = nrs->o_U;
+  cds->o_Ue = nrs->o_Ue;
+  int nFieldsAlloc = cds->anyEllipticSolver ? std::max(cds->nBDF, cds->nEXT) : 1;
+  cds->o_S =
+      platform->device.malloc(nFieldsAlloc * cds->fieldOffsetSum * sizeof(dfloat), cds->S);
+  
+  nFieldsAlloc = cds->anyEllipticSolver ? cds->nEXT : 1;
+  cds->o_FS = platform->device.malloc(nFieldsAlloc * cds->fieldOffsetSum * sizeof(dfloat), cds->FS);
+
+  if(cds->anyEllipticSolver){
+    cds->o_Se = platform->device.malloc(cds->fieldOffsetSum, sizeof(dfloat));
+    cds->o_BF = platform->device.malloc(cds->fieldOffsetSum * sizeof(dfloat), cds->BF);
+  }
+
 
   bool scalarFilteringEnabled = false;
   bool avmEnabled = false;

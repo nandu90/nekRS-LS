@@ -23,9 +23,11 @@ static void lagFields(nrs_t *nrs)
   // lag scalars
   if (nrs->Nscalar) {
     auto cds = nrs->cds;
-    for (int s = std::max(cds->nBDF, cds->nEXT); s > 1; s--) {
-      const auto Nbyte = cds->fieldOffsetSum * sizeof(dfloat);
-      cds->o_S.copyFrom(cds->o_S, Nbyte, (s - 1) * Nbyte, (s - 2) * Nbyte);
+    if(cds->anyEllipticSolver){
+      for (int s = std::max(cds->nBDF, cds->nEXT); s > 1; s--) {
+        const auto Nbyte = cds->fieldOffsetSum * sizeof(dfloat);
+        cds->o_S.copyFrom(cds->o_S, Nbyte, (s - 1) * Nbyte, (s - 2) * Nbyte);
+      }
     }
   }
 
@@ -62,15 +64,6 @@ static void extrapolate(nrs_t *nrs)
     }
   }
 
-  if (nrs->Nscalar)
-    nrs->extrapolateKernel(cds->mesh[0]->Nlocal,
-                           cds->NSfields,
-                           cds->nEXT,
-                           cds->fieldOffset[0],
-                           cds->o_coeffEXT,
-                           cds->o_S,
-                           cds->o_Se);
-
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     if (nrs->cht)
       mesh = nrs->_mesh;
@@ -82,6 +75,18 @@ static void extrapolate(nrs_t *nrs)
                            mesh->o_U,
                            mesh->o_Ue);
   }
+
+  if(nrs->Nscalar == 0) return;
+  if(!cds->o_Se.isInitialized()) return;
+  
+  nrs->extrapolateKernel(cds->mesh[0]->Nlocal,
+                         cds->NSfields,
+                         cds->nEXT,
+                         cds->fieldOffset[0],
+                         cds->o_coeffEXT,
+                         cds->o_S,
+                         cds->o_Se);
+
 }
 
 static void computeDivUErr(nrs_t *nrs, dfloat &divUErrVolAvg, dfloat &divUErrL2)

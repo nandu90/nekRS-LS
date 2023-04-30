@@ -41,10 +41,7 @@ public:
 
   void setRHS(userRHS_t _userRHS) { userRHS = _userRHS; }
   void setJacobian(userJacobian_t _userJacobian) { userJacobian = _userJacobian; }
-  void setLocalPointSource(userLocalPointSource_t _userLocalPointSource)
-  {
-    userLocalPointSource = _userLocalPointSource;
-  }
+  void setLocalPointSource(userLocalPointSource_t _userLocalPointSource);
 
   void setUserPostCvToNrs(userPostCvToNrs_t _userPostCvToNrs) { userPostCvToNrs = _userPostCvToNrs; }
   void setUserPostNrsToCv(userPostCvToNrs_t _userPostNrsToCv) { userPostNrsToCv = _userPostNrsToCv; }
@@ -105,7 +102,11 @@ public:
   std::string scope() const { return timerScope; }
   void setTimerScope(std::string scope) { timerScope = scope; }
 
+  occa::memory o_pointSource; // scratch field for point source
+
 private:
+
+  nrs_t* _nrs;
 
   std::string timerName = "cvode_t::";
   std::string timerScope;

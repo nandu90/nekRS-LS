@@ -163,6 +163,8 @@ cvode_t::cvode_t(nrs_t *nrs)
 
   verboseCVODE = platform->options.compareArgs("CVODE VERBOSE", "TRUE");
 
+  _nrs = nrs;
+
 }
 
 void cvode_t::initialize(nrs_t *nrs)
@@ -752,20 +754,17 @@ void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
 
     occa::memory o_Si =
         cds->o_S.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));
-    occa::memory o_Si_e =
-        cds->o_Se.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));
 
     auto NmaskId = Nmasked.at(cvodeScalarId);
 
     if (!NmaskId)
       continue;
 
-    cds->maskCopy2Kernel(NmaskId,
+    cds->maskCopyKernel(NmaskId,
                          0,
                          o_maskIds + cvodeScalarId * maskOffset * sizeof(dlong),
                          platform->o_mempool.slice0,
-                         o_Si,
-                         o_Si_e);
+                         o_Si);
     
     // o_maskValues must be at state t0 to be lagged by the subsequent CVODE solve call
     if(this->isRhsEvaluation())
@@ -969,14 +968,13 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
   applyOgsOperation(oogs::start);
 
   // input and output are assumed to be L-vectors
-  auto o_ptSource = cds->o_FS + cds->fieldOffsetSum * sizeof(dfloat);
   if (userLocalPointSource) {
     platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::localPointSource", 1);
     // o_ydot is simply used as scratch space to store the L-vector source term
     userLocalPointSource(nrs, LFieldOffset, o_y, o_ydot);
     platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::localPointSource");
 
-    cvToNrs(nrs, o_ydot, o_ptSource);
+    cvToNrs(nrs, o_ydot, this->o_pointSource);
   }
 
   applyOgsOperation(oogs::finish);
@@ -993,7 +991,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
 
     if (userLocalPointSource) {
       // o_FS += o_ptSource
-      platform->linAlg->axpby(cds->mesh[0]->Nlocal, 1.0, o_ptSource, 1.0, cds->o_FS);
+      platform->linAlg->axpby(cds->mesh[0]->Nlocal, 1.0, this->o_pointSource, 1.0, cds->o_FS);
     }
 
     // o_FS /= invLMM(LMM*gs(o_rho)), i.e.
@@ -1016,7 +1014,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
 
     if (userLocalPointSource) {
       // o_FS += o_ptSource
-      auto o_ptSource_start = o_ptSource + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
+      auto o_ptSource_start = this->o_pointSource + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
       platform->linAlg->axpbyMany(cds->meshV->Nlocal,
                                   numScalars,
                                   nrs->fieldOffset,
@@ -1686,3 +1684,12 @@ std::string cvode_t::rhsTagName() const
   return this->isJacobianEvaluation() ? timerScope + "::jtv" : timerScope + "::rhs";
 }
 
+
+void cvode_t::setLocalPointSource(userLocalPointSource_t _userLocalPointSource)
+{
+  userLocalPointSource = _userLocalPointSource;
+
+  if(o_pointSource.size() == 0){
+    o_pointSource = platform->device.malloc(this->Nscalar * _nrs->fieldOffset * sizeof(dfloat));
+  }
+}

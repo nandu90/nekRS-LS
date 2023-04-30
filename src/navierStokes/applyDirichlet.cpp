@@ -216,15 +216,25 @@ void applyDirichletScalars(nrs_t *nrs, double time, occa::memory& o_S, occa::mem
     }
     occa::memory o_Si =
         o_S.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));
-    occa::memory o_Si_e =
-        o_Se.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));
+    
+    if(o_Se.isInitialized()){
+      occa::memory o_Si_e =
+          o_Se.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));
 
-    if (cds->solver[is]->Nmasked)
-      cds->maskCopy2Kernel(cds->solver[is]->Nmasked,
-                          0,
-                          cds->solver[is]->o_maskIds,
-                          platform->o_mempool.slice0,
-                          o_Si, o_Si_e);
+      if (cds->solver[is]->Nmasked)
+        cds->maskCopy2Kernel(cds->solver[is]->Nmasked,
+                            0,
+                            cds->solver[is]->o_maskIds,
+                            platform->o_mempool.slice0,
+                            o_Si, o_Si_e);
+    } else {
+      if (cds->solver[is]->Nmasked)
+        cds->maskCopyKernel(cds->solver[is]->Nmasked,
+                            0,
+                            cds->solver[is]->o_maskIds,
+                            platform->o_mempool.slice0,
+                            o_Si);
+    }
   }
 }
 
