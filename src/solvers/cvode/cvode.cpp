@@ -1016,7 +1016,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
     // o_FS /= o_rho
     auto o_rho_start = cds->o_rho + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
     platform->linAlg
-        ->aydxMany(cds->meshV->Nlocal, numScalars, nrs->fieldOffset, 0, 1.0, o_rho_start, o_FS_start);
+        ->aydxMany(cds->meshV->Nlocal, numScalars, nrs->fieldOffset, 1, 1.0, o_rho_start, o_FS_start);
   }
 
   if (detailedTimersEnabled) {
