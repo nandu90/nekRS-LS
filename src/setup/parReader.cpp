@@ -202,6 +202,7 @@ static std::vector<std::string> cvodeKeys = {
     {"epslin"},
     {"sigscale"},
     {"jtvrecycleproperties"},
+    {"sharedrho"},
     {"jtvmixedprecision"},
     {"cvodeendtimeratio"},
     {"solver"},
@@ -584,6 +585,18 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
     }
   }
   
+  options.setArgs("CVODE SHARED RHO", "FALSE");
+  std::string sharedRhoStr;
+  if (par->extract(parScope, "sharedrho", sharedRhoStr)) {
+    bool sharedRho = checkForTrue(sharedRhoStr);
+    if (sharedRho) {
+      options.setArgs("CVODE SHARED RHO", "TRUE");
+    }
+    else {
+      options.setArgs("CVODE SHARED RHO", "FALSE");
+    }
+  }
+
   std::string mixedPrecisionStr;
   if (par->extract(parScope, "jtvmixedprecision", mixedPrecisionStr)) {
     mixedPrecisionJtv = checkForTrue(mixedPrecisionStr);

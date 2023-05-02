@@ -545,6 +545,8 @@ void makeq(nrs_t *nrs, dfloat time, int tstep, occa::memory o_FS, occa::memory o
         if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
           cds->strongAdvectionCubatureVolumeKernel(cds->meshV->Nelements,
                                                    1,
+                                                   0,
+                                                   mesh->o_LMM,
                                                    mesh->o_vgeo,
                                                    mesh->o_cubDiffInterpT,
                                                    mesh->o_cubInterpT,
@@ -561,6 +563,8 @@ void makeq(nrs_t *nrs, dfloat time, int tstep, occa::memory o_FS, occa::memory o
         else {
           cds->strongAdvectionVolumeKernel(cds->meshV->Nelements,
                                            1,
+                                           0,
+                                           mesh->o_LMM,
                                            mesh->o_vgeo,
                                            mesh->o_D,
                                            cds->o_compute + is * sizeof(dlong),

@@ -144,6 +144,8 @@ private:
 
   bool verboseCVODE = false;
 
+  bool sharedRho = false;
+
   int minCvodeScalarId;
   int maxCvodeScalarId;
 
@@ -211,6 +213,7 @@ private:
   occa::kernel mapToMaskedPointKernel;
   occa::kernel extrapolateDirichletKernel;
   occa::kernel errorWeightKernel;
+  occa::kernel fusedAddRhoDivKernel;
 
   dlong nEq;
 

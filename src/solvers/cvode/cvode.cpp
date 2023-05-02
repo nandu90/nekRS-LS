@@ -158,12 +158,14 @@ cvode_t::cvode_t(nrs_t *nrs)
   this->extrapolateDirichletKernel = platform->kernels.get("extrapolateDirichlet");
   this->mapToMaskedPointKernel = platform->kernels.get("mapToMaskedPoint");
   this->errorWeightKernel = platform->kernels.get("errorWeight");
+  this->fusedAddRhoDivKernel = platform->kernels.get("fusedAddRhoDiv");
 
   nEq = Nscalar * LFieldOffset;
 
   isInitialized = false;
 
   verboseCVODE = platform->options.compareArgs("CVODE VERBOSE", "TRUE");
+  sharedRho = platform->options.compareArgs("CVODE SHARED RHO", "TRUE");
   
   mixedPrecisionJtvEnabled = platform->options.compareArgs("CVODE MIXED PRECISION JTV", "TRUE");
   nrsCheck(mixedPrecisionJtvEnabled, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "CVODE MIXED PRECISION JTV = TRUE not supported yet");
@@ -994,7 +996,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
 
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint");
-    platform->timer.tic(timerScope + "::addPointSource", 1);
+    platform->timer.tic(timerScope + "::fusedAddRhoDiv", 1);
   }
 
   if (chtCVODE) {
@@ -1024,27 +1026,33 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
       numScalars--;
     }
     auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
+    auto o_rho_start = cds->o_rho + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
+    occa::memory o_ptSource_start;
 
+    int addPointSourceContrib = 0;
     if (userLocalPointSource) {
-      // o_FS += o_ptSource
-      auto o_ptSource_start = this->o_pointSource + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
-      platform->linAlg->axpbyMany(cds->meshV->Nlocal,
-                                  numScalars,
-                                  nrs->fieldOffset,
-                                  1.0,
-                                  o_ptSource_start,
-                                  1.0,
-                                  o_FS_start);
+      addPointSourceContrib = 1;
+      o_ptSource_start = this->o_pointSource + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
     }
 
-    // o_FS /= o_rho
-    auto o_rho_start = cds->o_rho + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
-    platform->linAlg
-        ->aydxMany(cds->meshV->Nlocal, numScalars, nrs->fieldOffset, 1, 1.0, o_rho_start, o_FS_start);
+    int fieldRho = 1;
+    if(sharedRho){
+      fieldRho = 0;
+    }
+    
+    this->fusedAddRhoDivKernel(mesh->Nlocal,
+                               numScalars,
+                               nrs->fieldOffset,
+                               addPointSourceContrib,
+                               fieldRho,
+                               o_rho_start,
+                               o_ptSource_start,
+                               o_FS_start);
+
   }
 
   if (detailedTimersEnabled) {
-    platform->timer.toc(timerScope + "::addPointSource");
+    platform->timer.toc(timerScope + "::fusedAddRhoDiv");
     platform->timer.tic(timerScope + "::dp0thdt", 1);
   }
 
@@ -1151,6 +1159,8 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
       if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
         cds->strongAdvectionCubatureVolumeKernel(cds->meshV->Nelements,
                                                  Nscalar,
+                                                 1,
+                                                 mesh->o_LMM,
                                                  mesh->o_vgeo,
                                                  mesh->o_cubDiffInterpT,
                                                  mesh->o_cubInterpT,
@@ -1167,6 +1177,8 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
       else {
         cds->strongAdvectionVolumeKernel(cds->meshV->Nelements,
                                          Nscalar,
+                                         1,
+                                         mesh->o_LMM,
                                          mesh->o_vgeo,
                                          mesh->o_D,
                                          cds->o_compute + scalarStart * sizeof(dlong),
@@ -1183,16 +1195,6 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
 
     if (detailedTimersEnabled) {
       platform->timer.toc(timerScope + "::advection");
-      platform->timer.tic(timerScope + "::massMatrixWeighting", 1);
-    }
-
-    // apply mass matrix weighting
-    auto o_FS_start = o_FS + cds->fieldOffsetScan[scalarStart] * sizeof(dfloat);
-    auto o_rho_start = cds->o_rho + cds->fieldOffsetScan[scalarStart] * sizeof(dfloat);
-    platform->linAlg->axmyMany(mesh->Nlocal, Nscalar, nrs->fieldOffset, 0, 1.0, mesh->o_LMM, o_FS_start);
-
-    if (detailedTimersEnabled) {
-      platform->timer.toc(timerScope + "::massMatrixWeighting");
       platform->timer.tic(timerScope + "::neumannBC", 1);
     }
 
