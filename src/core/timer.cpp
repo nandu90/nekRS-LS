@@ -469,6 +469,10 @@ void timer_t::printRunStat(int step)
   printStatEntry("        delete          ", "lpm_t::deleteParticles", "DEVICE:MAX", tlpm);
   printStatEntry("      lpm add           ", "lpm_t::addParticles", "DEVICE:MAX", tudf);
   printStatEntry("      lpm write         ", "lpm_t::write", "DEVICE:MAX", tudf);
+  
+  const double tDiv = query("udfDiv", "DEVICE:MAX");
+  printStatEntry("    udfDiv              ", "udfDiv", "DEVICE:MAX", tElapsedTimeSolve);
+  printStatEntry("      udfSEqnSource     ", "udfDiv::udfSEqnSource", "DEVICE:MAX", tDiv);
 
   const double tMakef = query("makef", "DEVICE:MAX");
   printStatEntry("    makef               ", "makef", "DEVICE:MAX", tElapsedTimeSolve);

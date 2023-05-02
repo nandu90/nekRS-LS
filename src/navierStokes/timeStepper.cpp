@@ -403,8 +403,10 @@ bool runStep(nrs_t *nrs, std::function<bool(int)> convergenceCheck, int stage)
   evaluateProperties(nrs, timeNew);
 
   if (udf.div) {
+    platform->timer.tic("udfDiv", 1);
     platform->linAlg->fill(mesh->Nlocal, 0.0, nrs->o_div);
     udf.div(nrs, timeNew, nrs->o_div);
+    platform->timer.toc("udfDiv");
   }
   
   if(udf.preFluid)
