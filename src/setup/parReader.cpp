@@ -202,6 +202,7 @@ static std::vector<std::string> cvodeKeys = {
     {"epslin"},
     {"sigscale"},
     {"jtvrecycleproperties"},
+    {"jtvmixedprecision"},
     {"cvodeendtimeratio"},
     {"solver"},
 };
@@ -506,6 +507,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   int maxOrder = 3;
   double sigScale = 1.0;
   bool recycleProps = false;
+  bool mixedPrecisionJtv = false;
 
   std::string integrator = "bdf";
 
@@ -580,6 +582,21 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
     else {
       options.setArgs("CVODE RECYCLE PROPERTIES", "FALSE");
     }
+  }
+  
+  std::string mixedPrecisionStr;
+  if (par->extract(parScope, "jtvmixedprecision", mixedPrecisionStr)) {
+    mixedPrecisionJtv = checkForTrue(mixedPrecisionStr);
+    if (mixedPrecisionJtv) {
+      options.setArgs("CVODE MIXED PRECISION JTV", "TRUE");
+    }
+    else {
+      options.setArgs("CVODE MIXED PRECISION JTV", "FALSE");
+    }
+  }
+
+  if(mixedPrecisionJtv){
+    append_error("cvode::jtvmixedprecision is not supported yet!\n");
   }
 
   // only integrate to time + dt if true

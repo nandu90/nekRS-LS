@@ -4,9 +4,11 @@
 #include "nrs.hpp"
 #include "nekInterfaceAdapter.hpp"
 #include "Urst.hpp"
+#include <cstdlib>
 #include <limits>
 #include <array>
 #include <numeric>
+#include "nrssys.hpp"
 #include "ogs.hpp"
 #include "udf.hpp"
 
@@ -162,6 +164,17 @@ cvode_t::cvode_t(nrs_t *nrs)
   isInitialized = false;
 
   verboseCVODE = platform->options.compareArgs("CVODE VERBOSE", "TRUE");
+  
+  mixedPrecisionJtvEnabled = platform->options.compareArgs("CVODE MIXED PRECISION JTV", "TRUE");
+  nrsCheck(mixedPrecisionJtvEnabled, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "CVODE MIXED PRECISION JTV = TRUE not supported yet");
+
+  if(mixedPrecisionJtvEnabled){
+    auto mesh = cds->mesh[0];
+    o_vgeoPfloat = platform->device.malloc(mesh->Nelements * mesh->Np * mesh->Nvgeo, sizeof(pfloat));
+    platform->copyDfloatToPfloatKernel(mesh->Nelements * mesh->Np * mesh->Nvgeo,
+                                       mesh->o_vgeo,
+                                       o_vgeoPfloat);
+  }
 
   _nrs = nrs;
 

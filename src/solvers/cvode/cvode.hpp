@@ -69,6 +69,8 @@ public:
   void *getCvodeMem() { return cvodeMem; }
   double sigmaScale() const { return sigScale; }
 
+  bool mixedPrecisionJtv() const { return mixedPrecisionJtvEnabled; }
+
   // returns array in E-vector layout that maps E-vector points
   // to the corresponding L-vector point (if unique),
   // else contains -1
@@ -103,6 +105,7 @@ public:
   void setTimerScope(std::string scope) { timerScope = scope; }
 
   occa::memory o_pointSource; // scratch field for point source
+  occa::memory o_vgeoPfloat;
 
 private:
 
@@ -136,6 +139,8 @@ private:
   mutable bool rhsEval = false;
 
   bool detailedTimersEnabled = false;
+
+  bool mixedPrecisionJtvEnabled = false;
 
   bool verboseCVODE = false;
 
