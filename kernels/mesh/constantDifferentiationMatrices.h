@@ -1,3 +1,4 @@
+// Differentiation matrices on cubature GL points
 #if p_cubNq==2
 const dfloat c_D[2][2] = {
 { -8.660254037844388e-01,8.660254037844388e-01},

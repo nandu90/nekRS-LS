@@ -59,7 +59,11 @@ void registerCvodeKernels(occa::properties kernelInfoBC)
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
 
   auto weakLaplacianKernelInfo = platform->kernelInfo;
+  weakLaplacianKernelInfo["includes"].asArray();
   weakLaplacianKernelInfo += meshKernelProperties(N);
+  std::string derivDataFile = std::string(getenv("NEKRS_KERNEL_DIR")) + "/mesh/constantGLLDifferentiationMatrices.h";
+
+  weakLaplacianKernelInfo["includes"] += derivDataFile.c_str();
   kernelName = "weakLaplacianHex3D";
   fileName = oklpath + kernelName + ".okl";
 

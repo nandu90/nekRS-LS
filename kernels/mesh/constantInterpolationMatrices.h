@@ -1,3 +1,4 @@
+// Interpolation matrices from GLL to cubature GL points
 #if p_Nq==2 && p_cubNq==2
 const dfloat c_I[2][2] = {
 { 7.886751345948129e-01,2.113248654051871e-01},
