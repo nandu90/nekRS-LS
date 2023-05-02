@@ -192,8 +192,12 @@ message("-- OCCA_OPENCL_ENABLED: ${OCCA_OPENCL_ENABLED}")
 set(CMAKE_CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER})
 
 # amgx
-if(OCCA_CUDA_ENABLED AND ENABLE_AMGX)
-  add_subdirectory(3rd_party/AMGX)
+if(ENABLE_AMGX)
+  if(OCCA_CUDA_ENABLED)
+    add_subdirectory(3rd_party/AMGX)
+  else()
+    message(FATAL_ERROR "ENABLE_AMGX required OCCA_CUDA_ENABLED!")
+  endif()
 endif()
 
 # hypre
