@@ -749,7 +749,7 @@ void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
                              mesh->o_z,
                              mesh->o_vmapM,
                              mesh->o_EToB,
-                             cds->o_EToB[is],
+                             cds->o_EToB + is * cds->EToBOffset * sizeof(int),
                              cds->o_Ue,
                              o_diff_i,
                              o_rho_i,
@@ -1197,29 +1197,25 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
     }
 
     // weak Laplacian + boundary terms
-    for (int s = scalarStart; s < (scalarStart + Nscalar); ++s) {
-      auto o_S_s = cds->o_S + cds->fieldOffsetScan[s] * sizeof(dfloat);
-      auto o_FS_s = o_FS + cds->fieldOffsetScan[s] * sizeof(dfloat);
-      auto o_diff_s = cds->o_diff + cds->fieldOffsetScan[s] * sizeof(dfloat);
-      auto o_rho_s = cds->o_rho + cds->fieldOffsetScan[s] * sizeof(dfloat);
-      cds->neumannBCKernel(mesh->Nelements,
-                           mesh->o_sgeo,
-                           mesh->o_vmapM,
-                           mesh->o_EToB,
-                           s,
-                           time,
-                           cds->fieldOffset[s],
-                           mesh->o_x,
-                           mesh->o_y,
-                           mesh->o_z,
-                           nrs->o_U,
-                           o_S_s,
-                           cds->o_EToB[s],
-                           o_diff_s,
-                           o_rho_s,
-                           *(cds->o_usrwrk),
-                           o_FS_s);
-    }
+    cds->neumannBCKernel(mesh->Nelements,
+                         Nscalar,
+                         mesh->o_sgeo,
+                         mesh->o_vmapM,
+                         mesh->o_EToB,
+                         scalarStart,
+                         time,
+                         nrs->fieldOffset,
+                         cds->EToBOffset,
+                         mesh->o_x,
+                         mesh->o_y,
+                         mesh->o_z,
+                         nrs->o_U,
+                         cds->o_S,
+                         cds->o_EToB,
+                         cds->o_diff,
+                         cds->o_rho,
+                         *(cds->o_usrwrk),
+                         cds->o_FS);
 
     if (detailedTimersEnabled) {
       platform->timer.toc(timerScope + "::neumannBC");

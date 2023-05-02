@@ -95,6 +95,10 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
   cds->anyCvodeSolver = false;
   cds->anyEllipticSolver = false;
 
+  cds->EToBOffset = cds->mesh[0]->Nelements * cds->mesh[0]->Nfaces;
+
+  cds->EToB = (int *) calloc(cds->EToBOffset * cds->NSfields, sizeof(int));
+
   for (int is = 0; is < cds->NSfields; is++) {
     std::string sid = scalarDigitStr(is);
 
@@ -112,17 +116,15 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
     mesh_t *mesh;
     (is) ? mesh = cds->meshV : mesh = cds->mesh[0]; // only first scalar can be a CHT mesh
 
-    cds->EToB[is] = (int *)calloc(mesh->Nelements * mesh->Nfaces, sizeof(int));
-    int *EToB = cds->EToB[is];
     int cnt = 0;
     for (int e = 0; e < mesh->Nelements; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
-        EToB[cnt] = bcMap::id(mesh->EToB[f + e * mesh->Nfaces], "scalar" + sid);
+        cds->EToB[cnt + cds->EToBOffset * is] = bcMap::id(mesh->EToB[f + e * mesh->Nfaces], "scalar" + sid);
         cnt++;
       }
     }
-    cds->o_EToB[is] = device.malloc(mesh->Nelements * mesh->Nfaces * sizeof(int), EToB);
   }
+  cds->o_EToB = device.malloc(cds->EToBOffset * cds->NSfields * sizeof(int), cds->EToB);
 
   cds->o_compute = platform->device.malloc(cds->NSfields * sizeof(dlong), cds->compute);
   cds->o_cvodeSolve = platform->device.malloc(cds->NSfields * sizeof(dlong), cds->cvodeSolve);

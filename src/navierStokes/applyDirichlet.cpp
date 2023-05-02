@@ -199,7 +199,7 @@ void applyDirichletScalars(nrs_t *nrs, double time, occa::memory& o_S, occa::mem
                              mesh->o_z,
                              mesh->o_vmapM,
                              mesh->o_EToB,
-                             cds->o_EToB[is],
+                             cds->o_EToB + is * cds->EToBOffset * sizeof(int),
                              cds->o_Ue,
                              o_diff_i,
                              o_rho_i,
