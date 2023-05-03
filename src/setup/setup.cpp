@@ -260,6 +260,10 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     wrkFields = 9 + 3 * nrs->NVfields;
   if (options.compareArgs("MOVING MESH", "TRUE"))
     wrkFields += nrs->NVfields;
+  
+  bool useCVODE = platform->options.compareArgs("CVODE", "TRUE");
+  if (useCVODE)
+    wrkFields = std::max(wrkFields, nrs->Nscalar);
 
   const int mempoolNflds = std::max(wrkFields, 2 * nrs->NVfields + ellipticWrkFields);
   platform->create_mempool(nrs->fieldOffset, mempoolNflds);

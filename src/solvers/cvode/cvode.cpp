@@ -631,70 +631,59 @@ void cvode_t::setupEToLMapping(nrs_t *nrs)
 void cvode_t::setupDirichletMask(nrs_t *nrs)
 {
   auto cds = nrs->cds;
-  std::vector<occa::memory> o_maskedPoints(Nscalar);
-  Nmasked.resize(Nscalar);
-
+  auto mesh = cds->mesh[0];
+  int NelemT = mesh->Nelements;
+  int NelemV = nrs->meshV->Nelements;
+  std::vector<dlong> EToB(Nscalar * NelemT * mesh->Nfaces, 0);
   for (int cvodeScalar = 0; cvodeScalar < Nscalar; ++cvodeScalar) {
+    const int fOffset = cvodeScalar * mesh->Nelements * mesh->Nfaces;
     const auto is = scalarIds.at(cvodeScalar);
     const auto sid = scalarDigitStr(is);
-    mesh_t *mesh;
-    (is) ? mesh = cds->meshV : mesh = cds->mesh[0]; // only first scalar can be a CHT mesh
-    std::vector<dlong> EToB(mesh->Nelements * mesh->Nfaces, 0);
-    for (dlong e = 0; e < mesh->Nelements; e++) {
+    for (dlong e = 0; e < NelemT; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
         const int bID = mesh->EToB[f + e * mesh->Nfaces];
-        EToB[f + e * mesh->Nfaces] = bcMap::ellipticType(bID, "scalar" + sid);
+        EToB[f + e * mesh->Nfaces + fOffset] = bcMap::ellipticType(bID, "scalar" + sid);
+
+        // Since EToB must include all of the faces on the T-mesh, we need to explicitly
+        // mark the faces on the V-mesh as not having a boundary
+        // This ensures that there is no effect in the resulting mask
+        if(e >= NelemV && is != 0) EToB[f + e * mesh->Nfaces + fOffset] = NO_OP;
       }
-    }
-
-    // generate mask using ellipticOgs call
-    dlong NmaskedLocal = 0;
-    dlong NmaskedGlobal = 0;
-
-    occa::memory o_maskIdsLocal;
-    occa::memory o_maskIdsGlobal;
-    ellipticOgs(mesh,
-                mesh->Nlocal,
-                1,
-                nrs->fieldOffset,
-                EToB.data(),
-                Nmasked.at(cvodeScalar),
-                o_maskedPoints.at(cvodeScalar),
-                NmaskedLocal,
-                o_maskIdsLocal,
-                NmaskedGlobal,
-                o_maskIdsGlobal,
-                &(mesh->ogs));
-
-    if (o_maskIdsLocal.size()) {
-      o_maskIdsLocal.free();
-    }
-    if (o_maskIdsGlobal.size()) {
-      o_maskIdsGlobal.free();
     }
   }
 
-  const auto maxNmasked = *std::max_element(Nmasked.begin(), Nmasked.end());
-  maskOffset = maxNmasked;
+  // generate mask using ellipticOgs call
+  dlong NmaskedLocal = 0;
+  dlong NmaskedGlobal = 0;
+
+  occa::memory o_maskIdsLocal;
+  occa::memory o_maskIdsGlobal;
+  ellipticOgs(mesh,
+              mesh->Nlocal,
+              this->Nscalar,
+              nrs->fieldOffset,
+              EToB.data(),
+              this->Nmasked,
+              this->o_maskIds,
+              NmaskedLocal,
+              o_maskIdsLocal,
+              NmaskedGlobal,
+              o_maskIdsGlobal,
+              &(mesh->ogs));
+
+  if (o_maskIdsLocal.size()) {
+    o_maskIdsLocal.free();
+  }
+  if (o_maskIdsGlobal.size()) {
+    o_maskIdsGlobal.free();
+  }
+
+  maskOffset = Nmasked;
   const int pageW = ALIGN_SIZE / sizeof(dfloat);
   if (maskOffset % pageW)
     maskOffset = (maskOffset / pageW + 1) * pageW;
 
-  o_maskValues = platform->device.malloc(nrs->nEXT * maskOffset * Nscalar * sizeof(dfloat));
-  o_maskIds = platform->device.malloc(maskOffset * this->Nscalar * sizeof(dlong));
-  o_Nmasked = platform->device.malloc(this->Nscalar * sizeof(dlong), Nmasked.data());
-
-  for (int cvodeScalar = 0; cvodeScalar < Nscalar; ++cvodeScalar) {
-    if (Nmasked.at(cvodeScalar) == 0)
-      continue;
-
-    // copy from o_maskedPoints to o_maskValues
-    const auto Nbyte = Nmasked.at(cvodeScalar) * sizeof(dlong);
-    const auto destOffset = cvodeScalar * maskOffset * sizeof(dlong);
-    o_maskIds.copyFrom(o_maskedPoints.at(cvodeScalar), Nbyte, destOffset, 0);
-
-    o_maskedPoints.at(cvodeScalar).free();
-  }
+  o_maskValues = platform->device.malloc(nrs->nEXT * maskOffset * sizeof(dfloat));
 }
 
 void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
@@ -703,13 +692,14 @@ void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
   // NOTE: this can only be applied after the extrapolation order is reached
   // to avoid introducing CVODE convergence issues in the first few time steps
   if(this->isRhsEvaluation() && (this->externalTStep > nrs->nEXT)){
+    
+    if(this->Nmasked == 0) return;
+
     auto cds = nrs->cds;
     const int extOrder = std::min(this->externalTStep, nrs->nEXT);
-    this->extrapolateDirichletKernel(this->maskOffset,
-                                     nrs->fieldOffset,
-                                     this->Nscalar,
+    this->extrapolateDirichletKernel(this->Nmasked,
+                                     this->maskOffset,
                                      extOrder,
-                                     this->o_Nmasked,
                                      this->o_maskIds,
                                      o_coeffExt,
                                      this->o_maskValues,
@@ -720,13 +710,14 @@ void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
   // lower than any other possible Dirichlet value
   static constexpr dfloat TINY = -1e30;
   cds_t *cds = nrs->cds;
+  
+  auto o_S_start = platform->o_mempool.slice0 + cds->fieldOffsetScan[minCvodeScalarId] * sizeof(dfloat);
+
   for (int is = 0; is < cds->NSfields; is++) {
     if (!cds->compute[is])
       continue;
     if (!cds->cvodeSolve[is])
       continue;
-
-    const auto cvodeScalarId = cvodeScalarIds.at(is);
 
     mesh_t *mesh = cds->mesh[0];
     oogs_t *gsh = cds->gshT;
@@ -737,10 +728,11 @@ void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
 
     auto o_diff_i = cds->o_diff + cds->fieldOffsetScan[is] * sizeof(dfloat);
     auto o_rho_i = cds->o_rho + cds->fieldOffsetScan[is] * sizeof(dfloat);
+    auto o_Si = platform->o_mempool.slice0 + cds->fieldOffsetScan[is] * sizeof(dfloat);
 
-    platform->linAlg->fill(cds->fieldOffset[is], TINY, platform->o_mempool.slice0);
-
-    for (int sweep = 0; sweep < 2; sweep++) {
+    platform->linAlg->fill(cds->fieldOffset[is], TINY, o_Si);
+    
+    for(int sweep = 0; sweep < 2; sweep++){
       cds->dirichletBCKernel(mesh->Nelements,
                              cds->fieldOffset[is],
                              is,
@@ -759,37 +751,30 @@ void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
                              cds->neknek ? cds->neknek->o_U : o_NULL,
                              cds->neknek ? cds->neknek->o_S : o_NULL,
                              *(cds->o_usrwrk),
-                             platform->o_mempool.slice0);
-
+                             o_Si);
       if (sweep == 0)
-        oogs::startFinish(platform->o_mempool.slice0, 1, cds->fieldOffset[is], ogsDfloat, ogsMax, gsh);
+        oogs::startFinish(o_Si, 1, cds->fieldOffset[is], ogsDfloat, ogsMax, gsh);
       if (sweep == 1)
-        oogs::startFinish(platform->o_mempool.slice0, 1, cds->fieldOffset[is], ogsDfloat, ogsMin, gsh);
+        oogs::startFinish(o_Si, 1, cds->fieldOffset[is], ogsDfloat, ogsMin, gsh);
     }
-
-    occa::memory o_Si =
-        cds->o_S.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));
-
-    auto NmaskId = Nmasked.at(cvodeScalarId);
-
-    if (!NmaskId)
-      continue;
-
-    cds->maskCopyKernel(NmaskId,
-                         0,
-                         o_maskIds + cvodeScalarId * maskOffset * sizeof(dlong),
-                         platform->o_mempool.slice0,
-                         o_Si);
-    
-    // o_maskValues must be at state t0 to be lagged by the subsequent CVODE solve call
-    if(this->isRhsEvaluation())
-      continue;
-
-    this->mapToMaskedPointKernel(NmaskId,
-                                 o_maskIds + cvodeScalarId * maskOffset * sizeof(dlong),
-                                 o_Si,
-                                 o_maskValues + cvodeScalarId * maskOffset * sizeof(dfloat));
   }
+
+  if(this->Nmasked == 0) return;
+
+  cds->maskCopyKernel(this->Nmasked,
+                      cds->fieldOffsetScan[minCvodeScalarId],
+                      o_maskIds,
+                      platform->o_mempool.slice0,
+                      cds->o_S);
+  
+  // o_maskValues must be at state t0 to be lagged by the subsequent CVODE solve call
+  if(this->isRhsEvaluation())
+    return;
+
+  this->mapToMaskedPointKernel(this->Nmasked,
+                               o_maskIds,
+                               o_S_start,
+                               o_maskValues);
 }
 
 void cvode_t::computeErrorWeight(occa::memory o_y, occa::memory o_ewt)
@@ -1076,27 +1061,9 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
     platform->timer.tic(timerScope + "::maskDirichlet", 1);
   }
 
-  // mask Dirichlet portion of RHS
-  auto o_zero = platform->o_mempool.slice0;
-  platform->linAlg->fill(cds->mesh[0]->Nlocal, 0.0, o_zero);
-
-  for (int is = 0; is < cds->NSfields; is++) {
-    if (!cds->compute[is])
-      continue;
-    if (!cds->cvodeSolve[is])
-      continue;
-    occa::memory o_FSi =
-        cds->o_FS.slice(cds->fieldOffsetScan[is] * sizeof(dfloat), cds->fieldOffset[is] * sizeof(dfloat));
-
-    const auto cvodeScalarId = this->cvodeScalarIds.at(is);
-    const auto Nmask = Nmasked.at(cvodeScalarId);
-    if (Nmask) {
-      cds->maskCopyKernel(Nmask,
-                          0,
-                          this->o_maskIds + cvodeScalarId * maskOffset * sizeof(dlong),
-                          o_zero,
-                          o_FSi);
-    }
+  auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[minCvodeScalarId] * sizeof(dfloat);
+  if(this->Nmasked > 0){
+    nrs->maskKernel(this->Nmasked, this->o_maskIds, o_FS_start);
   }
 
   if (detailedTimersEnabled) {
@@ -1433,7 +1400,7 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
   nrs->p0the = p0theSave;
 
   for (int s = nrs->nEXT; s > 1; s--) {
-    const auto NbyteMasked = (Nscalar * sizeof(dfloat)) * maskOffset;
+    const auto NbyteMasked = maskOffset * sizeof(dfloat);
     if (NbyteMasked)
       o_maskValues.copyFrom(o_maskValues, NbyteMasked, (s - 1) * NbyteMasked, (s - 2) * NbyteMasked);
   }

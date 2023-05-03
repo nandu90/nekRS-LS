@@ -203,8 +203,7 @@ private:
 
   // Dirichlet values, extrapolated to the current time
   occa::memory o_maskIds;
-  occa::memory o_Nmasked;
-  std::vector<dlong> Nmasked; // host shadow
+  dlong Nmasked;
   dlong maskOffset;           // page-aligned offset for indexing into o_maskValues
 
   occa::kernel weakLaplacianKernel;
