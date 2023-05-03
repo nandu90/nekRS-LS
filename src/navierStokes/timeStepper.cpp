@@ -506,9 +506,11 @@ void makeq(nrs_t *nrs, dfloat time, int tstep, occa::memory o_FS, occa::memory o
     if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPFRT")) {
       cds->filterRTKernel(cds->meshV->Nelements,
                           is,
+                          1,
+                          nrs->fieldOffset,
+                          cds->o_applyFilterRT,
                           cds->o_filterMT,
-                          cds->filterS[is],
-                          isOffset,
+                          cds->o_filterS,
                           cds->o_rho,
                           cds->o_S,
                           o_FS);

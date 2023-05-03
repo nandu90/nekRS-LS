@@ -160,9 +160,14 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
     }
   }
 
+  cds->applyFilter = 0;
+
   if (scalarFilteringEnabled) {
+
+    std::vector<dlong> applyFilterRT(cds->NSfields, 0);
     const dlong Nmodes = cds->mesh[0]->N + 1;
     cds->o_filterMT = platform->device.malloc(cds->NSfields * Nmodes * Nmodes, sizeof(dfloat));
+    cds->o_filterS = platform->device.malloc(cds->NSfields, sizeof(dfloat));
     for (int is = 0; is < cds->NSfields; is++) {
       std::string sid = scalarDigitStr(is);
 
@@ -183,10 +188,16 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
  
         const dlong Nmodes = cds->mesh[is]->N + 1;
         cds->o_filterMT.copyFrom(A, Nmodes * Nmodes * sizeof(dfloat), is * Nmodes * Nmodes * sizeof(dfloat));
+
+        applyFilterRT[is] = 1;
+        cds->applyFilter = 1;
  
         free(A);
       }
     }
+
+    cds->o_filterS.copyFrom(cds->filterS, cds->NSfields * sizeof(dfloat));
+    cds->o_applyFilterRT.copyFrom(applyFilterRT.data(), cds->NSfields * sizeof(dlong));
 
     if (avmEnabled)
       avm::setup(cds);

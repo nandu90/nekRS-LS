@@ -1097,26 +1097,24 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
   }
 
   auto applyTerms = [&](mesh_t *mesh, dlong scalarStart, dlong Nscalar) {
-    const auto Nq = mesh->Nq;
-    for (int s = scalarStart; s < (scalarStart + Nscalar); ++s) {
-      const auto sid = scalarDigitStr(s);
-      if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPFRT")) {
-        const dlong isOffset = cds->fieldOffsetScan[s];
-        cds->filterRTKernel(cds->meshV->Nelements,
-                            s,
-                            cds->o_filterMT,
-                            cds->filterS[s],
-                            isOffset,
-                            cds->o_rho,
-                            cds->o_S,
-                            o_FS);
 
-        double flops = 6 * mesh->Np * mesh->Nq + 4 * mesh->Np;
-        flops *= static_cast<double>(mesh->Nelements);
-        flops *= Nscalar;
-        platform->flopCounter->add("scalarFilterRT", flops);
-      }
+    if(cds->applyFilter){
+      cds->filterRTKernel(cds->meshV->Nelements,
+                          scalarStart,
+                          Nscalar,
+                          nrs->fieldOffset,
+                          cds->o_applyFilterRT,
+                          cds->o_filterMT,
+                          cds->o_filterS,
+                          cds->o_rho,
+                          cds->o_S,
+                          o_FS);
     }
+
+    double flops = 6 * mesh->Np * mesh->Nq + 4 * mesh->Np;
+    flops *= static_cast<double>(mesh->Nelements);
+    flops *= Nscalar;
+    platform->flopCounter->add("scalarFilterRT", flops);
 
     if (detailedTimersEnabled) {
       platform->timer.tic(timerScope + "::advection", 1);

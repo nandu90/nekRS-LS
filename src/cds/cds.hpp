@@ -57,7 +57,10 @@ struct cds_t
   int filterNc;
   dfloat filterS[NSCALAR_MAX];
   dfloat* filterM;
+  occa::memory o_applyFilterRT;
+  occa::memory o_filterS;
   occa::memory o_filterMT;
+  int applyFilter;
 
   //RK Subcycle Data
   int nRK;
