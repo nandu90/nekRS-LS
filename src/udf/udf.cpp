@@ -434,19 +434,6 @@ void udfLoad()
 
 occa::kernel oudfBuildKernel(occa::properties kernelInfo, const char *function)
 {
-  std::string installDir;
-  installDir.assign(getenv("NEKRS_HOME"));
-  const std::string bcDataFile = installDir + "/include/bdry/bcData.h";
-  kernelInfo["includes"] += bcDataFile.c_str();
-
-  // provide some common kernel args
-  int N;
-  platform->options.getArgs("POLYNOMIAL DEGREE", N);
-  const int Nq = N + 1;
-  const int Np = Nq * Nq * Nq;
-  kernelInfo["defines/p_Nq"] = Nq;
-  kernelInfo["defines/p_Np"] = Np;
-
   std::string oudfCache;
   platform->options.getArgs("OKL FILE CACHE", oudfCache);
 
