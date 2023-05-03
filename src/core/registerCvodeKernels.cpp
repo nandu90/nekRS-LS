@@ -54,10 +54,18 @@ void registerCvodeKernels(occa::properties kernelInfoBC)
   kernelName = "cvToNrs";
   fileName = oklpath + kernelName + ".okl";
   platform->kernels.add(kernelName, fileName, platform->kernelInfo);
-  
-  kernelName = "fusedAddRhoDiv";
-  fileName = oklpath + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, platform->kernelInfo);
+
+  {
+    auto prop = platform->kernelInfo;
+    kernelName = "fusedAddRhoDiv";
+    fileName = oklpath + kernelName + ".okl";
+ 
+    prop["defines/p_addPointSource"] = 0; 
+    platform->kernels.add("rhoDiv", fileName, prop);
+ 
+    prop["defines/p_addPointSource"] = 1; 
+    platform->kernels.add(kernelName, fileName, prop);
+  }
 
   int N;
   platform->options.getArgs("POLYNOMIAL DEGREE", N);

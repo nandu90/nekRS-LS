@@ -158,7 +158,7 @@ cvode_t::cvode_t(nrs_t *nrs)
   this->extrapolateDirichletKernel = platform->kernels.get("extrapolateDirichlet");
   this->mapToMaskedPointKernel = platform->kernels.get("mapToMaskedPoint");
   this->errorWeightKernel = platform->kernels.get("errorWeight");
-  this->fusedAddRhoDivKernel = platform->kernels.get("fusedAddRhoDiv");
+  this->fusedAddRhoDivKernel = platform->kernels.get("rhoDiv");
 
   nEq = Nscalar * LFieldOffset;
 
@@ -166,7 +166,8 @@ cvode_t::cvode_t(nrs_t *nrs)
 
   verboseCVODE = platform->options.compareArgs("CVODE VERBOSE", "TRUE");
   sharedRho = platform->options.compareArgs("CVODE SHARED RHO", "TRUE");
-  
+  if(scalarIds.size() < 2) sharedRho = false;
+ 
   mixedPrecisionJtvEnabled = platform->options.compareArgs("CVODE MIXED PRECISION JTV", "TRUE");
   nrsCheck(mixedPrecisionJtvEnabled, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "CVODE MIXED PRECISION JTV = TRUE not supported yet");
 
@@ -1019,17 +1020,11 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
       addPointSourceContrib = 1;
       o_ptSource_start = this->o_pointSource + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
     }
-
-    int fieldRho = 1;
-    if(sharedRho){
-      fieldRho = 0;
-    }
     
     this->fusedAddRhoDivKernel(mesh->Nlocal,
                                numScalars,
                                nrs->fieldOffset,
-                               addPointSourceContrib,
-                               fieldRho,
+                               (int) !sharedRho, // fieldRho
                                o_rho_start,
                                o_ptSource_start,
                                o_FS_start);
@@ -1668,4 +1663,6 @@ void cvode_t::setLocalPointSource(userLocalPointSource_t _userLocalPointSource)
   if(o_pointSource.size() == 0){
     o_pointSource = platform->device.malloc(this->Nscalar * _nrs->fieldOffset * sizeof(dfloat));
   }
+
+  this->fusedAddRhoDivKernel = platform->kernels.get("fusedAddRhoDiv");
 }

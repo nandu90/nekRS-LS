@@ -1,28 +1,44 @@
-// FS += ptSource
-// FS /= RHO
 @kernel void fusedAddRhoDiv(const dlong N,
                       const dlong Nfields,
                       const dlong fieldOffset,
-                      const dlong addPointSource,
                       const dlong fieldRho,
                       @ restrict const dfloat *RHO,
                       @ restrict const dfloat *ptSource,
                       @ restrict dfloat *FS)
 {
-  for (dlong n = 0; n < N; ++n; @tile(p_blockSize, @outer, @inner)) {
-    dfloat value = FS[n];
-    if(addPointSource){
-      value += ptSource[n];
-    }
-    FS[n] = value/RHO[n];
+  if(fieldRho) {
 
-    for (int fld = 1; fld < Nfields; ++fld) {
-      const dfloat invRho = 1 / RHO[n + fieldOffset * (1 + fieldRho * (fld-1))];
-      value = FS[n + fld * fieldOffset];
-      if(addPointSource){
-        value += ptSource[n + fld * fieldOffset];
+    for (dlong n = 0; n < N; ++n; @tile(p_blockSize, @outer, @inner)) {
+      for (int fld = 0; fld < Nfields; ++fld) {
+        const dlong id = n + fld*fieldOffset;
+        const dfloat invRho = RHO[id];
+        dfloat value = FS[id];
+#if p_addPointSource
+          value += ptSource[id];
+#endif
+        FS[id] = value*invRho;
       }
-      FS[n + fld * fieldOffset] = value*invRho;
+    }
+
+  } else {
+
+    for (dlong n = 0; n < N; ++n; @tile(p_blockSize, @outer, @inner)) {
+      dfloat value = FS[n];
+#if p_addPointSource
+        value += ptSource[n];
+#endif
+      FS[n] = value/RHO[n];
+
+      // cache for reuse
+      const dfloat invRho = RHO[n + fieldOffset];
+
+      for (int fld = 1; fld < Nfields; ++fld) {
+        dfloat value = FS[n + fld * fieldOffset];
+#if p_addPointSource
+          value += ptSource[n + fld * fieldOffset];
+#endif
+        FS[n + fld * fieldOffset] = value*invRho;
+      }
     }
   }
 }
