@@ -30,7 +30,7 @@
       FS[n] = value/RHO[n];
 
       // cache for reuse
-      const dfloat invRho = RHO[n + fieldOffset];
+      const dfloat invRho = 1/RHO[n + fieldOffset];
 
       for (int fld = 1; fld < Nfields; ++fld) {
         dfloat value = FS[n + fld * fieldOffset];
