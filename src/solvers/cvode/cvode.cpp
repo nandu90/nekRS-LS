@@ -181,6 +181,11 @@ cvode_t::cvode_t(nrs_t *nrs)
 
   _nrs = nrs;
 
+  const auto NbyteCvode = (this->Nscalar + 1) * nrs->fieldOffset * sizeof(dfloat);
+  if(NbyteCvode > platform->o_mempool.bytesAllocated){
+    platform->create_mempool(nrs->fieldOffset, this->Nscalar + 1);
+  }
+
 }
 
 void cvode_t::initialize(nrs_t *nrs)
@@ -712,7 +717,7 @@ void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
   static constexpr dfloat TINY = -1e30;
   cds_t *cds = nrs->cds;
   
-  auto o_S_start = platform->o_mempool.slice0 + cds->fieldOffsetScan[minCvodeScalarId] * sizeof(dfloat);
+  auto o_S_start = platform->o_mempool.slice0;
 
   for (int is = 0; is < cds->NSfields; is++) {
     if (!cds->compute[is])
@@ -727,9 +732,11 @@ void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
       gsh = cds->gsh;
     }
 
+    const auto cvodeScalarId = cvodeScalarIds[is];
+
     auto o_diff_i = cds->o_diff + cds->fieldOffsetScan[is] * sizeof(dfloat);
     auto o_rho_i = cds->o_rho + cds->fieldOffsetScan[is] * sizeof(dfloat);
-    auto o_Si = platform->o_mempool.slice0 + cds->fieldOffsetScan[is] * sizeof(dfloat);
+    auto o_Si = o_S_start + cds->fieldOffsetScan[cvodeScalarId] * sizeof(dfloat);
 
     platform->linAlg->fill(cds->fieldOffset[is], TINY, o_Si);
     
@@ -763,9 +770,10 @@ void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
   if(this->Nmasked == 0) return;
 
   cds->maskCopyKernel(this->Nmasked,
+                      0,
                       cds->fieldOffsetScan[minCvodeScalarId],
                       o_maskIds,
-                      platform->o_mempool.slice0,
+                      o_S_start,
                       cds->o_S);
   
   // o_maskValues must be at state t0 to be lagged by the subsequent CVODE solve call
