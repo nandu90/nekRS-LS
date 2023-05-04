@@ -1498,7 +1498,7 @@ void cvode_t::printInfo(bool printVerboseInfo) const
   }
 }
 
-void cvode_t::printTimers(nrs_t* nrs)
+void cvode_t::printTimers()
 {
   const auto timerTags = platform->timer.tags();
 
@@ -1529,7 +1529,7 @@ void cvode_t::printTimers(nrs_t* nrs)
   std::ios oldState(nullptr);
   oldState.copyfmt(std::cout);
 
-  auto mesh = nrs->meshV;
+  auto mesh = _nrs->meshV;
   long long int NglobalElements = mesh->Nelements;
   MPI_Allreduce(MPI_IN_PLACE, &NglobalElements, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm);
   double GDOF = NglobalElements * mesh->N * mesh->N * mesh->N * this->cvodeScalarIds.size();

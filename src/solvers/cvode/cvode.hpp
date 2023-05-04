@@ -98,7 +98,7 @@ public:
 
   void defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, occa::memory o_ydot);
 
-  void printTimers(nrs_t* nrs);
+  void printTimers();
   void resetTimers();
 
   std::string scope() const { return timerScope; }
