@@ -53,10 +53,10 @@ provides an early preview of the next upcoming release (do not use in a producti
 To build and install the code run:
 
 ```sh
-./nrsconfig
+CC=mpicc CXX=mpic++ FC=mpif77 ./nrsconfig [-DCMAKE_INSTALL_PREFIX=$HOME/.local/nekrs]
 ```
-Please delete your old build and $NEKRS_HOME directory in case of a previous installation. 
 Build settings can be customized through CMake options passed to `nrsconfig`. 
+Please remove the previous build and installation directory in case of an update. 
 
 ## Setting the Enviroment
 
