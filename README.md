@@ -56,7 +56,7 @@ To build and install the code run:
 CC=mpicc CXX=mpic++ FC=mpif77 ./nrsconfig [-DCMAKE_INSTALL_PREFIX=$HOME/.local/nekrs]
 ```
 Build settings can be customized through CMake options passed to `nrsconfig`. 
-Please remove the previous build and installation directory in case of an update. 
+Please remove the previous build and installation directory in case of an update including `<casedir>/.cache` if you want to rerun it. 
 
 ## Setting the Enviroment
 
@@ -71,7 +71,7 @@ then type `source $HOME/.bash_profile` in the current terminal window.
 
 ## Run the Code
 
-We try hard not to break userland but the code is evolving quickly so things might change from one version to another without being backward compatible. Please consult `RELEASE.md` before using the code. 
+We try hard not to break userland but the code is evolving quickly so things might change from one version to another without being backward compatible. Please consult `RELEASE.md` *before* using the code. 
 
 ```sh
 cd $NEKRS_HOME/examples/turbPipePeriodic
