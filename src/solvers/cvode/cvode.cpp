@@ -54,31 +54,29 @@ sunrealtype *__N_VGetDeviceArrayPointer(N_Vector u)
 }
 #endif
 
-int check_retval(void *returnvalue, const char *funcname, int opt)
+void check_retval(void *returnvalue, const char *funcname, int opt)
 {
   int *retval;
 
   /* Check if SUNDIALS function returned NULL pointer - no memory allocated */
 
   if (opt == 0 && returnvalue == NULL) {
-    fprintf(stderr, "\nSUNDIALS_ERROR: %s() failed - returned NULL pointer\n\n", funcname);
-    MPI_Abort(MPI_COMM_WORLD, 1);
+    nrsAbort(MPI_COMM_SELF, EXIT_FAILURE, 
+             "\nSUNDIALS_ERROR: %s() failed - returned NULL pointer\n\n", funcname);
   }
   /* Check if retval < 0 */
   else if (opt == 1) {
     retval = (int *)returnvalue;
     if (*retval < 0) {
-      fprintf(stderr, "\nSUNDIALS_ERROR: %s() failed with retval = %d\n\n", funcname, *retval);
-      MPI_Abort(MPI_COMM_WORLD, 1);
+      nrsAbort(MPI_COMM_SELF, EXIT_FAILURE, 
+      "\nSUNDIALS_ERROR: %s() failed with retval = %d\n\n", funcname, *retval);
     }
   }
   /* Check if function returned NULL pointer - no memory allocated */
   else if (opt == 2 && returnvalue == NULL) {
-    fprintf(stderr, "\nMEMORY_ERROR: %s() failed - returned NULL pointer\n\n", funcname);
-    MPI_Abort(MPI_COMM_WORLD, 1);
+    nrsAbort(MPI_COMM_SELF, EXIT_FAILURE, 
+             "\nMEMORY_ERROR: %s() failed - returned NULL pointer\n\n", funcname);
   }
-
-  return 0;
 }
 
 } // namespace
@@ -298,8 +296,7 @@ void cvode_t::initialize(nrs_t *nrs)
 
   SUNContext sunctx = nullptr;
   retval = SUNContext_Create((void *)&platform->comm.mpiComm, &sunctx);
-  if (check_retval(&retval, "SUNContext_Create", 1))
-    MPI_Abort(platform->comm.mpiComm, 1);
+  check_retval(&retval, "SUNContext_Create", 1);
 
   int blockSize = BLOCKSIZE;
 
@@ -311,12 +308,10 @@ void cvode_t::initialize(nrs_t *nrs)
       SUNCudaBlockReduceExecPolicy reduce_exec_policy(blockSize, 0);
 
       this->y = N_VNew_Cuda(this->nEq, sunctx);
-      if (check_retval((void *)this->y, "N_VNew_Cuda", 0))
-        MPI_Abort(platform->comm.mpiComm, 1);
+      check_retval((void *)this->y, "N_VNew_Cuda", 0);
 
       retval = N_VSetKernelExecPolicy_Cuda(this->y, &stream_exec_policy, &reduce_exec_policy);
-      if (check_retval(&retval, "N_VSetKernelExecPolicy_Cuda", 0))
-        MPI_Abort(platform->comm.mpiComm, 1);
+      check_retval(&retval, "N_VSetKernelExecPolicy_Cuda", 0);
 #else
       nrsCheck(true,
                platform->comm.mpiComm,
@@ -327,8 +322,7 @@ void cvode_t::initialize(nrs_t *nrs)
     else if (platform->device.mode() == "HIP") {
 #ifdef ENABLE_HIP
       this->y = N_VNew_Hip(data->nEq, sunctx);
-      if (check_retval((void *)this->y, "N_VNew_Hip", 0))
-        MPI_Abort(platform->comm.mpiComm, 1);
+      check_retval((void *)this->y, "N_VNew_Hip", 0);
 #else
       nrsCheck(true,
                platform->comm.mpiComm,
@@ -338,8 +332,7 @@ void cvode_t::initialize(nrs_t *nrs)
     }
     else if (platform->device.mode() == "Serial") {
       this->y = N_VNew_Serial(this->nEq, sunctx);
-      if (check_retval((void *)this->y, "N_VNew_Serial", 0))
-        MPI_Abort(platform->comm.mpiComm, 1);
+      check_retval((void *)this->y, "N_VNew_Serial", 0);
     }
     this->cvodeY = N_VMake_MPIPlusX(platform->comm.mpiComm, this->y, sunctx);
     this->nEqTotal = N_VGetLength(this->cvodeY);
@@ -389,11 +382,9 @@ void cvode_t::initialize(nrs_t *nrs)
   this->sigScale = 1.0;
   platform->options.getArgs("CVODE SIGMA SCALE", this->sigScale);
 
-  if (check_retval((void *)this->cvodeMem, "CVodeCreate", 0))
-    MPI_Abort(platform->comm.mpiComm, 1);
+  check_retval((void *)this->cvodeMem, "CVodeCreate", 0);
   retval = CVodeInit(this->cvodeMem, cvodeRHS, T0, this->cvodeY);
-  if (check_retval(&retval, "CVodeInit", 1))
-    MPI_Abort(platform->comm.mpiComm, 1);
+  check_retval(&retval, "CVodeInit", 1);
 
   // provide function to compute weights to account for multiplicity
   // same as cvEwtSetSV, but with scaling for multiplicity
@@ -416,8 +407,7 @@ void cvode_t::initialize(nrs_t *nrs)
   };
 
   retval = CVodeWFtolerances(this->cvodeMem, cvodeErrorWt);
-  if (check_retval(&retval, "CVodeWFtolerances", 1))
-    MPI_Abort(platform->comm.mpiComm, 1);
+  check_retval(&retval, "CVodeWFtolerances", 1);
 
   int nVectors = 10;
   platform->options.getArgs("CVODE PGMRES RESTART", nVectors);
@@ -429,8 +419,7 @@ void cvode_t::initialize(nrs_t *nrs)
 
   if(linearSolver == "GMRES"){
     LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
-    if (check_retval(&retval, "SUNLinSol_SPFGMR", 1))
-      MPI_Abort(platform->comm.mpiComm, 1);
+    check_retval(&retval, "SUNLinSol_SPFGMR", 1);
   } else {
     nrsCheck(true,
              platform->comm.mpiComm,
@@ -440,16 +429,13 @@ void cvode_t::initialize(nrs_t *nrs)
   }
 
   retval = CVodeSetLinearSolver(this->cvodeMem, LS, NULL);
-  if (check_retval(&retval, "CVodeSetLinearSolver", 1))
-    MPI_Abort(platform->comm.mpiComm, 1);
+  check_retval(&retval, "CVodeSetLinearSolver", 1);
 
   retval = CVodeSetJacTimesRhsFn(this->cvodeMem, cvodeJtvRHS);
-  if (check_retval(&retval, "CVodeSetJacTimesRhsFn", 1))
-    MPI_Abort(platform->comm.mpiComm, 1);
+  check_retval(&retval, "CVodeSetJacTimesRhsFn", 1);
 
   retval = CVodeSetJacTimes(this->cvodeMem, NULL, cvodeJtv);
-  if (check_retval(&retval, "CVodeSetJacTimes", 1))
-    MPI_Abort(platform->comm.mpiComm, 1);
+  check_retval(&retval, "CVodeSetJacTimes", 1);
 
   // custom settings
   int mxsteps = 500;
@@ -468,8 +454,7 @@ void cvode_t::initialize(nrs_t *nrs)
 
   // set user data as
   retval = CVodeSetUserData(this->cvodeMem, userdata.get());
-  if (check_retval(&retval, "CVodeSetUserData", 1))
-    MPI_Abort(platform->comm.mpiComm, 1);
+  check_retval(&retval, "CVodeSetUserData", 1);
 
 #else
   nrsCheck(true, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "No cvode installation found");
@@ -1209,7 +1194,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
     }
   };
 
-  bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
+  const bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
   if (chtCVODE) {
     applyTerms(cds->mesh[0], 0, 1, true);
   }
