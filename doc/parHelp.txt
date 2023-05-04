@@ -79,6 +79,7 @@ COMMON field settings:
 
 solver                      none                                       linear solver
                             user
+                            cvode
                             PCG [D]
                               +block [D for VELOCITY]
                               +flexible
@@ -204,3 +205,21 @@ chebyshevRelaxOrder         <int>
 [AMGX]
 
 configFile                  <string>                                   AmgX JSON configuration file
+----------------------------------------------------------------------------------------------------------------------
+[CVODE]
+solver                      GMRES                                      linear solver
+                              +nVector=<int>                           dimension of Krylov space
+relativeTol                 <float>                                    relative tolerance
+                            1e-4 [D]
+absoluteTol                 <float>                                    absolute tolerance
+                            1e-6 [D]
+hmaxRatio                   <float>                                    maximum multiple of dt for CVODE timestepper
+                            3 [D]
+epslin                      <float>                                    ratio between linear and nonlinear tolerances
+                            0.1 [D]
+sigScale                    <float>                                    multiplier for Jacobian matrix-vector product
+                            1.0 [D]
+sharedRho                   true, false [D]                            use same density for all but the first scalar
+jtvrecycleproperties        true [D], false                            recycle property evaluation for Jacobian
+                                                                       matrix-vector product
+cvodeendtimeratio           true [D], false                            whether CVODE should progress past nekRS time
