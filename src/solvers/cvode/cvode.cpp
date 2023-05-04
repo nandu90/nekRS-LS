@@ -150,13 +150,13 @@ cvode_t::cvode_t(nrs_t *nrs)
 
   setupDirichletMask(nrs);
 
-  this->weakLaplacianKernel = platform->kernels.get("weakLaplacianHex3D");
-  this->nrsToCvKernel = platform->kernels.get("nrsToCv");
-  this->cvToNrsKernel = platform->kernels.get("cvToNrs");
-  this->extrapolateDirichletKernel = platform->kernels.get("extrapolateDirichlet");
-  this->mapToMaskedPointKernel = platform->kernels.get("mapToMaskedPoint");
-  this->errorWeightKernel = platform->kernels.get("errorWeight");
-  this->fusedAddRhoDivKernel = platform->kernels.get("rhoDiv");
+  this->weakLaplacianKernel = platform->kernels.get("cvode_t::weakLaplacianHex3D");
+  this->nrsToCvKernel = platform->kernels.get("cvode_t::nrsToCv");
+  this->cvToNrsKernel = platform->kernels.get("cvode_t::cvToNrs");
+  this->extrapolateDirichletKernel = platform->kernels.get("cvode_t::extrapolateDirichlet");
+  this->mapToMaskedPointKernel = platform->kernels.get("cvode_t::mapToMaskedPoint");
+  this->errorWeightKernel = platform->kernels.get("cvode_t::errorWeight");
+  this->fusedAddRhoDivKernel = platform->kernels.get("cvode_t::rhoDiv");
 
   nEq = Nscalar * LFieldOffset;
 
@@ -1683,5 +1683,5 @@ void cvode_t::setLocalPointSource(userLocalPointSource_t _userLocalPointSource)
     o_pointSource = platform->device.malloc(this->Nscalar * _nrs->fieldOffset * sizeof(dfloat));
   }
 
-  this->fusedAddRhoDivKernel = platform->kernels.get("fusedAddRhoDiv");
+  this->fusedAddRhoDivKernel = platform->kernels.get("cvode_t::fusedAddRhoDiv");
 }

@@ -26,34 +26,35 @@ void registerCvodeKernels(occa::properties kernelInfoBC)
   std::string fileName;
   
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/cvode/");
+  const std::string prefix = "cvode_t::";
 
   kernelName = "errorWeight";
   fileName = oklpath + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, platform->kernelInfo);
+  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "mapToMaskedPoint";
   fileName = oklpath + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, platform->kernelInfo);
+  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "extrapolateDirichlet";
   fileName = oklpath + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, platform->kernelInfo);
+  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "cvToNrs";
   fileName = oklpath + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, platform->kernelInfo);
+  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "nrsToCv";
   fileName = oklpath + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, platform->kernelInfo);
+  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "nrsToCv";
   fileName = oklpath + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, platform->kernelInfo);
+  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "cvToNrs";
   fileName = oklpath + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, platform->kernelInfo);
+  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   {
     auto prop = platform->kernelInfo;
@@ -61,10 +62,10 @@ void registerCvodeKernels(occa::properties kernelInfoBC)
     fileName = oklpath + kernelName + ".okl";
  
     prop["defines/p_addPointSource"] = 0; 
-    platform->kernels.add("rhoDiv", fileName, prop);
+    platform->kernels.add(prefix + "rhoDiv", fileName, prop);
  
     prop["defines/p_addPointSource"] = 1; 
-    platform->kernels.add(kernelName, fileName, prop);
+    platform->kernels.add(prefix + kernelName, fileName, prop);
   }
 
   int N;
@@ -79,5 +80,5 @@ void registerCvodeKernels(occa::properties kernelInfoBC)
   kernelName = "weakLaplacianHex3D";
   fileName = oklpath + kernelName + ".okl";
 
-  platform->kernels.add(kernelName, fileName, weakLaplacianKernelInfo);
+  platform->kernels.add(prefix + kernelName, fileName, weakLaplacianKernelInfo);
 }
