@@ -1521,8 +1521,8 @@ void cvode_t::printTimers()
   auto mesh = _nrs->meshV;
   long long int NglobalElements = mesh->Nelements;
   MPI_Allreduce(MPI_IN_PLACE, &NglobalElements, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm);
-  double GDOF = NglobalElements * mesh->N * mesh->N * mesh->N * this->cvodeScalarIds.size();
-  GDOF /= 1e9;
+  const double GDOF = (NglobalElements * mesh->N * mesh->N * mesh->N * this->cvodeScalarIds.size())
+                      / (1e9 * platform->comm.mpiCommSize);
 
   // gather timer information from tree
   std::vector<std::string> operations;
@@ -1619,7 +1619,7 @@ void cvode_t::printTimers()
   table[3] = absPercentage;
   table[4] = throughputs;
 
-  std::vector<std::string> headers = {"Operation", "Time", "rel %", "abs %", "GDOF/s"};
+  std::vector<std::string> headers = {"Operation", "time/call", "rel %", "abs %", "GDOF/s/rank"};
 
   if(platform->comm.mpiRank == 0){
     std::cout << "\n";
