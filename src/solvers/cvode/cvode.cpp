@@ -456,15 +456,6 @@ void cvode_t::initialize(nrs_t *nrs)
   platform->options.getArgs("CVODE MAX STEPS", mxsteps);
   retval = CVodeSetMaxNumSteps(this->cvodeMem, mxsteps);
 
-  double dt0;
-  platform->options.getArgs("DT", dt0);
-
-  double hmax = 3;
-  platform->options.getArgs("CVODE HMAX RATIO", hmax);
-
-  hmax *= dt0;
-  retval = CVodeSetMaxStep(this->cvodeMem, hmax);
-
   int maxOrder = 3;
   platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER", maxOrder);
   retval = CVodeSetMaxOrd(this->cvodeMem, maxOrder);
@@ -481,7 +472,7 @@ void cvode_t::initialize(nrs_t *nrs)
     MPI_Abort(platform->comm.mpiComm, 1);
 
 #else
-  nrsCheck(true, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "No cvode installation found. Bailing...");
+  nrsCheck(true, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "No cvode installation found");
 
 #endif
 }
@@ -1346,14 +1337,16 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
   // integrate only to time t1
   if (platform->options.compareArgs("CVODE STOP TIME", "TRUE")) {
     retval = CVodeSetStopTime(cvodeMem, t1);
-    nrsCheck(retval < 0, platform->comm.mpiComm, EXIT_FAILURE, "%s", "Error calling CVodeSetStopTime\n");
+    nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "Error calling CVodeSetStopTime\n");
   }
 
-  double hmax = 3.0;
-  platform->options.getArgs("CVODE HMAX RATIO", hmax);
-  hmax *= nrs->dt[0];
-  retval = CVodeSetMaxStep(cvodeMem, hmax);
-  nrsCheck(retval < 0, platform->comm.mpiComm, EXIT_FAILURE, "%s", "Error calling CVodeSetMaxStep\n");
+  if(!platform->options.getArgs("CVODE HMAX RATIO").empty()) {
+    double hmax;
+    platform->options.getArgs("CVODE HMAX RATIO", hmax);
+    hmax *= nrs->dt[0];
+    retval = CVodeSetMaxStep(cvodeMem, hmax);
+    nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "Error calling CVodeSetMaxStep\n");
+  }
 
   platform->device.finish();
 
@@ -1378,7 +1371,7 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
   }
 
   nrsCheck(retval < 0,
-           platform->comm.mpiComm,
+           MPI_COMM_SELF,
            EXIT_FAILURE,
            "%s", "CVODE failed after restart. Ending simulation.\n");
   platform->device.finish();

@@ -57,7 +57,7 @@ udf                         "<string>"                                 name of .
 
 oudf                        "<string>"                                 name of .oudf file
 
-usr                i        "<string>"                                 name of .usr file
+usr                         "<string>"                                 name of .usr file
 
 nScalars                    <int>                                      number of non-temperature scalars
                                                                        by default, the scalars will have the settings
@@ -213,13 +213,11 @@ relativeTol                 <float>                                    relative 
                             1e-4 [D]
 absoluteTol                 <float>                                    absolute tolerance
                             1e-6 [D]
-hmaxRatio                   <float>                                    maximum multiple of dt for CVODE timestepper
+hmaxRatio                   <float>                                    max CVODE stepsize ratio relative to outer dt
                             3 [D]
 epslin                      <float>                                    ratio between linear and nonlinear tolerances
                             0.1 [D]
-sigScale                    <float>                                    multiplier for Jacobian matrix-vector product
+sigScale                    <float>                                    multiplier for Jv difference quotient 
                             1.0 [D]
 sharedRho                   true, false [D]                            use same density for all but the first scalar
-jtvrecycleproperties        true [D], false                            recycle property evaluation for Jacobian
-                                                                       matrix-vector product
-cvodeendtimeratio           true [D], false                            whether CVODE should progress past nekRS time
+jtvRecycleProperties        true [D], false                            recycle property (freeze) evaluation for Jv

@@ -556,9 +556,13 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
       options.setArgs("CVODE SOLVER", "GMRES");
     }
   }();
-  
-  par->extract(parScope, "hmaxratio", hmax);
-  options.setArgs("CVODE HMAX RATIO", std::to_string(hmax));
+ 
+  options.setArgs("CVODE STOP TIME", "TRUE");
+ 
+  if(par->extract(parScope, "hmaxratio", hmax)) {
+    options.setArgs("CVODE HMAX RATIO", std::to_string(hmax));
+    options.setArgs("CVODE STOP TIME", "FALSE");
+  }
 
   par->extract(parScope, "epslin", epsLin);
   options.setArgs("CVODE EPS LIN", std::to_string(epsLin));
@@ -612,8 +616,6 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
     append_error("cvode::jtvmixedprecision is not supported yet!\n");
   }
 
-  // only integrate to time + dt if true
-  options.setArgs("CVODE STOP TIME", "TRUE");
 }
 
 void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *par, std::string parScope)
