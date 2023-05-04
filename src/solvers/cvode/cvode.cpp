@@ -1027,7 +1027,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
       o_ptSource_start = this->o_pointSource + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
     }
     
-    this->fusedAddRhoDivKernel(mesh->Nlocal,
+    this->fusedAddRhoDivKernel(cds->meshV->Nlocal,
                                numScalars,
                                nrs->fieldOffset,
                                (int) !sharedRho, // fieldRho
@@ -1097,7 +1097,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
     timerScope = makeQScope;
   }
 
-  auto applyTerms = [&](mesh_t *mesh, dlong scalarStart, dlong Nscalar) {
+  auto applyTerms = [&](mesh_t *mesh, dlong scalarStart, dlong Nscalar, bool chtPass) {
 
     if(cds->applyFilter){
       cds->filterRTKernel(cds->meshV->Nelements,
@@ -1117,6 +1117,11 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
     flops *= Nscalar;
     platform->flopCounter->add("scalarFilterRT", flops);
 
+    int applyLMM = 1;
+    if(chtPass){
+      applyLMM = 0;
+    }
+
     if (detailedTimersEnabled) {
       platform->timer.tic(timerScope + "::advection", 1);
     }
@@ -1125,7 +1130,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
       if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
         cds->strongAdvectionCubatureVolumeKernel(cds->meshV->Nelements,
                                                  Nscalar,
-                                                 1,
+                                                 applyLMM,
                                                  mesh->o_LMM,
                                                  mesh->o_vgeo,
                                                  mesh->o_cubDiffInterpT,
@@ -1143,7 +1148,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
       else {
         cds->strongAdvectionVolumeKernel(cds->meshV->Nelements,
                                          Nscalar,
-                                         1,
+                                         applyLMM,
                                          mesh->o_LMM,
                                          mesh->o_vgeo,
                                          mesh->o_D,
@@ -1154,6 +1159,14 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
                                          o_Urst,
                                          cds->o_rho,
                                          o_FS);
+      }
+
+      // During a CHT pass, the LMM term is not applied in the advection kernels as
+      // the advection term is only defined in the V-mesh portion.
+      // Therefore, apply the LMM term here over the entire T-mesh.
+      if(chtPass){
+        auto o_FS_start = o_FS + cds->fieldOffsetScan[scalarStart] * sizeof(dfloat);
+        platform->linAlg->axmyMany(mesh->Nlocal, Nscalar, nrs->fieldOffset, 0, 1.0, mesh->o_LMM, o_FS_start);
       }
 
       timeStepper::advectionFlops(cds->mesh[scalarStart], Nscalar);
@@ -1207,7 +1220,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
 
   bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
   if (chtCVODE) {
-    applyTerms(cds->mesh[0], 0, 1);
+    applyTerms(cds->mesh[0], 0, 1, true);
   }
 
   if (!chtCVODE || (chtCVODE && this->Nscalar > 1)) {
@@ -1222,7 +1235,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
       startScalar++;
       numScalars--;
     }
-    applyTerms(cds->meshV, startScalar, numScalars);
+    applyTerms(cds->meshV, startScalar, numScalars, false);
   }
 
   platform->timer.toc(timerScope);
