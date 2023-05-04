@@ -220,9 +220,6 @@
 {
   // (phi, U.grad Ud)
   for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
-    @shared dfloat s_cubD[p_cubNq][p_cubNq];
-    @shared dfloat s_cubInterpT[p_Nq][p_cubNq];
-
     @exclusive dfloat r_S[p_cubNq], r_Sd[p_cubNq];
 
     @shared dfloat s_tmp[p_cubNq][p_cubNq][p_cubNq];
@@ -232,11 +229,6 @@
 
     for (int j = 0; j < p_cubNq; ++j; @inner(1)) {
       for (int i = 0; i < p_cubNq; ++i; @inner(0)) {
-        const int id = i + j * p_cubNq;
-        if (id < p_Nq * p_cubNq) {
-          s_cubInterpT[j][i] = cubInterpT[id];
-        }
-        s_cubD[j][i] = cubD[id];
 #pragma unroll p_cubNq
         for (int k = 0; k < p_cubNq; ++k) {
           const dlong id = e * p_cubNp + k * p_cubNq * p_cubNq + j * p_cubNq + i;
@@ -288,8 +280,7 @@
                 dfloat ucba = s_tmp[c][b][a];
 #pragma unroll p_cubNq
                 for (int i = 0; i < p_cubNq; ++i) {
-                  //r_S[i] += c_I[i][a] * ucba;
-                  r_S[i] += s_cubInterpT[a][i] * ucba;
+                  r_S[i] += c_I[i][a] * ucba;
                 }
               }
 #pragma unroll p_cubNq
@@ -313,8 +304,7 @@
                 dfloat ucbi = s_tmp[c][b][i];
 #pragma unroll p_cubNq
                 for (int j = 0; j < p_cubNq; ++j) {
-                  //r_S[j] += c_I[j][b] * ucbi;
-                  r_S[j] += s_cubInterpT[b][j] * ucbi;
+                  r_S[j] += c_I[j][b] * ucbi;
                 }
               }
 #pragma unroll p_cubNq
@@ -337,8 +327,7 @@
               dfloat ucji = s_tmp[c][j][i];
 #pragma unroll p_cubNq
               for (int k = 0; k < p_cubNq; ++k) {
-                //r_S[k] += c_I[k][c] * ucji;
-                r_S[k] += s_cubInterpT[c][k] * ucji;
+                r_S[k] += c_I[k][c] * ucji;
               }
             }
 #pragma unroll p_cubNq
@@ -374,7 +363,7 @@
               r_Sd[k] = 0;
             }
             for (int n = 0; n < p_cubNq; ++n) {
-              dfloat D = s_cubD[j][n];
+              dfloat D = c_D[j][n];
 #pragma unroll p_cubNq
               for (int k = 0; k < p_cubNq; ++k) {
                 r_Sd[k] += D * s_tmp[k][n][i];
@@ -394,7 +383,7 @@
               dfloat t = s_tmp[n][j][i];
 #pragma unroll p_cubNq
               for (int k = 0; k < p_cubNq; ++k) {
-                r_Sd[k] += s_cubD[k][n] * t;
+                r_Sd[k] += c_D[k][n] * t;
               }
             }
 #pragma unroll p_cubNq
@@ -416,8 +405,7 @@
               dfloat sk = r_S[k];
 #pragma unroll p_Nq
               for (int c = 0; c < p_Nq; ++c) {
-                //r_Sd[c] += c_I[k][c] * sk;
-                r_Sd[c] += s_cubInterpT[c][k] * sk;
+                r_Sd[c] += c_I[k][c] * sk;
               }
             }
 #pragma unroll p_Nq
@@ -440,8 +428,7 @@
                 dfloat scji = s_tmp[c][j][i];
 #pragma unroll p_Nq
                 for (int b = 0; b < p_Nq; ++b) {
-                  //r_S[b] += c_I[j][b] * scji;
-                  r_S[b] += s_cubInterpT[b][j] * scji;
+                  r_S[b] += c_I[j][b] * scji;
                 }
               }
 #pragma unroll p_Nq
@@ -465,7 +452,7 @@
                 dfloat scbi = s_tmp[c][b][i];
 #pragma unroll p_Nq
                 for (int a = 0; a < p_Nq; ++a) {
-                  r_S[a] += s_cubInterpT[a][i] * scbi;
+                  r_S[a] += c_I[i][a] * scbi;
                 }
               }
 #pragma unroll p_Nq
