@@ -85,8 +85,6 @@ int check_retval(void *returnvalue, const char *funcname, int opt)
 
 cvode_t::cvode_t(nrs_t *nrs)
 {
-  // assumption: nEXT >= 2, since o_FS lagged state is needed
-  nrsCheck(nrs->nEXT < 2, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "CVODE requires nEXT >= 2");
   auto cds = nrs->cds;
 
   o_coeffExt = platform->device.malloc(maxTimestepperOrder * sizeof(dfloat));
