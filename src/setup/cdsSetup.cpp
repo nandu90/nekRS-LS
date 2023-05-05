@@ -168,6 +168,7 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
     const dlong Nmodes = cds->mesh[0]->N + 1;
     cds->o_filterMT = platform->device.malloc(cds->NSfields * Nmodes * Nmodes, sizeof(dfloat));
     cds->o_filterS = platform->device.malloc(cds->NSfields, sizeof(dfloat));
+    cds->o_applyFilterRT = platform->device.malloc(cds->NSfields, sizeof(dlong));
     for (int is = 0; is < cds->NSfields; is++) {
       std::string sid = scalarDigitStr(is);
 
