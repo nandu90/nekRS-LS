@@ -367,7 +367,8 @@ void udfBuild(const char *_udfFile, setupAide &options)
 
   nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "see above and cmake.log for more details");
 
-  if(platform->comm.mpiRank == 0) {
+  const bool buildOnly = platform->options.compareArgs("BUILD ONLY", "TRUE");
+  if(platform->comm.mpiRank == 0 && !buildOnly) {
     const auto tmpFile = udfFile + ".unifdef";
     unifdef("__okl__", udfFile.c_str(), tmpFile.c_str());
 

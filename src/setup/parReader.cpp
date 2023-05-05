@@ -1519,15 +1519,18 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
 
     std::ifstream f(setupFile);
     std::string text;
- 
-    std::cout << std::endl;
-    while(!f.eof())
-    {
-      getline(f, text);
-      std::cout << "<<< " << text << "\n" ;
+
+    const bool buildOnly = options.compareArgs("BUILD ONLY", "TRUE");
+    if(!buildOnly) {
+      std::cout << std::endl;
+      while(!f.eof())
+      {
+        getline(f, text);
+        std::cout << "<<< " << text << "\n" ;
+      }
+      std::cout << std::endl;
+      f.close();
     }
-    std::cout << std::endl;
-    f.close();
   }
 
   const std::string casename = setupFile.substr(0, setupFile.find(".par"));
