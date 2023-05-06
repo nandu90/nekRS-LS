@@ -1517,6 +1517,9 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
   int rank;
   MPI_Comm_rank(comm, &rank);
 
+  const std::string casename = setupFile.substr(0, setupFile.find(".par"));
+  setDefaultSettings(options, casename, rank);
+
   if (rank == 0) {
     const char *ptr = realpath(setupFile.c_str(), NULL);
     nrsCheck(!ptr, MPI_COMM_SELF, EXIT_FAILURE, "Cannot find setup file %s\n", setupFile.c_str());
@@ -1536,9 +1539,6 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
       f.close();
     }
   }
-
-  const std::string casename = setupFile.substr(0, setupFile.find(".par"));
-  setDefaultSettings(options, casename, rank);
 
   char *rbuf;
   long fsize;
