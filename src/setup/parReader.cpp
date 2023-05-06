@@ -1480,7 +1480,11 @@ void setDefaultSettings(setupAide &options, std::string casename, int rank)
 
   options.setArgs("DEVICE NUMBER", "LOCAL-RANK");
   options.setArgs("PLATFORM NUMBER", "0");
+
   options.setArgs("VERBOSE", "FALSE");
+
+  options.setArgs("STDOUT PAR", "TRUE");
+  options.setArgs("STDOUT UDF", "TRUE");
 
   options.setArgs("ADVECTION", "TRUE");
   options.setArgs("ADVECTION TYPE", "CUBATURE+CONVECTIVE");
@@ -1521,7 +1525,7 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
     std::string text;
 
     const bool buildOnly = options.compareArgs("BUILD ONLY", "TRUE");
-    if(!buildOnly) {
+    if(!buildOnly && options.compareArgs("STDOUT PAR", "TRUE")) {
       std::cout << std::endl;
       while(!f.eof())
       {
@@ -2119,8 +2123,6 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
     options.setArgs("VELOCITY SOLVER", "NONE");
   }
 
-  // MESH
-
   // SCALARS
   int nscal = optionalNscalar ? optionalNscalar.value() : 0;
   int isStart = 0;
@@ -2151,6 +2153,7 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
       }
 
       options.setArgs("SCALAR" + sid + " SOLVER", "NONE");
+      options.setArgs("SCALAR" + sid + " IS TEMPERATURE", "TRUE");
     }
     else {
 
