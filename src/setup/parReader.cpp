@@ -2402,10 +2402,10 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
 
   // check if dt is provided if numSteps or endTime > 0
   {
-    int numSteps;
+    int numSteps = 0;
     options.getArgs("NUMBER TIMESTEPS", numSteps);
 
-    double endTime;
+    double endTime = 0;
     options.getArgs("END TIME", endTime);
 
     if (numSteps > 0 || endTime > 0) {
