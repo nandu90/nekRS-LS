@@ -7,6 +7,7 @@
 #include <vector>
 #include <limits>
 #include <optional>
+#include <filesystem>
 
 #include "inipp.hpp"
 #include "tinyexpr.h"
@@ -22,6 +23,7 @@
 namespace {
 static std::ostringstream errorLogger;
 static std::ostringstream valueErrorLogger;
+std::string setupFile;
 int bcInPar = 1;
 int nscal = 0;
 bool cvodeRequested = false;
@@ -2395,31 +2397,18 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *par)
   }
 }
 
-void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &options)
+void parRead(inipp::Ini *par, const std::string& _setupFile, MPI_Comm comm, setupAide &options)
 {
   int rank;
   MPI_Comm_rank(comm, &rank);
 
+  setupFile = _setupFile;
   const std::string casename = setupFile.substr(0, setupFile.find(".par"));
   setDefaultSettings(options, casename, rank);
 
   if (rank == 0) {
-    const char *ptr = realpath(setupFile.c_str(), NULL);
-    nrsCheck(!ptr, MPI_COMM_SELF, EXIT_FAILURE, "Cannot find setup file %s\n", setupFile.c_str());
-
-    std::ifstream f(setupFile);
-    std::string text;
-
-    const bool buildOnly = options.compareArgs("BUILD ONLY", "TRUE");
-    if (!buildOnly && options.compareArgs("STDOUT PAR", "TRUE")) {
-      std::cout << std::endl;
-      while (!f.eof()) {
-        getline(f, text);
-        std::cout << "<<< " << text << "\n";
-      }
-      std::cout << std::endl;
-      f.close();
-    }
+    nrsCheck(!std::filesystem::exists(setupFile), MPI_COMM_SELF, 
+             EXIT_FAILURE, "Cannot find setup file %s\n", setupFile.c_str());
   }
 
   char *rbuf;
@@ -2509,4 +2498,17 @@ void parRead(inipp::Ini *par, std::string setupFile, MPI_Comm comm, setupAide &o
     std::cout << "====================\n";
   }
 #endif
+}
+
+void parEcho()
+{
+  std::ifstream f(setupFile);
+  std::string text;
+  std::cout << std::endl;
+  while (!f.eof()) {
+    getline(f, text);
+    std::cout << "<<< " << text << "\n";
+  }
+  std::cout << std::endl;
+  f.close();
 }
