@@ -2368,6 +2368,7 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *par)
                                               "INITIAL GUESS",
                                               "REGULARIZATION",
                                               "MAXIMUM ITERATIONS",
+                                              "BLOCK SOLVER",
                                               "PRECONDITIONER",
                                               "ELLIPTIC",
                                               "TOLERANCE",
