@@ -81,8 +81,9 @@ void check_retval(void *returnvalue, const char *funcname, int opt)
 
 } // namespace
 
-cvode_t::cvode_t(nrs_t *nrs)
+cvode_t::cvode_t(nrs_t *_nrs)
 {
+  this->nrs = _nrs;
   auto cds = nrs->cds;
 
   o_coeffExt = platform->device.malloc(maxTimestepperOrder * sizeof(dfloat));
@@ -99,7 +100,7 @@ cvode_t::cvode_t(nrs_t *nrs)
   }
   recycleProperties = platform->options.compareArgs("CVODE RECYCLE PROPERTIES", "TRUE");
 
-  setupEToLMapping(nrs);
+  setupEToLMapping();
 
   this->scalarIds = std::vector<dlong>();
   this->cvodeScalarIds = std::vector<dlong>(cds->NSfields, -1);
@@ -146,7 +147,7 @@ cvode_t::cvode_t(nrs_t *nrs)
   o_scalarIds = platform->device.malloc(scalarIds.size() * sizeof(dlong), scalarIds.data());
   o_cvodeScalarIds = platform->device.malloc(cvodeScalarIds.size() * sizeof(dlong), cvodeScalarIds.data());
 
-  setupDirichletMask(nrs);
+  setupDirichletMask();
 
   this->weakLaplacianKernel = platform->kernels.get("cvode_t::weakLaplacianHex3D");
   this->nrsToCvKernel = platform->kernels.get("cvode_t::nrsToCv");
@@ -175,8 +176,6 @@ cvode_t::cvode_t(nrs_t *nrs)
                                        o_vgeoPfloat);
   }
 
-  _nrs = nrs;
-
   const auto NbyteCvode = (this->Nscalar + 1) * nrs->fieldOffset * sizeof(dfloat);
   if(NbyteCvode > platform->o_mempool.bytesAllocated){
     platform->create_mempool(nrs->fieldOffset, this->Nscalar + 1);
@@ -184,7 +183,7 @@ cvode_t::cvode_t(nrs_t *nrs)
 
 }
 
-void cvode_t::initialize(nrs_t *nrs)
+void cvode_t::initialize()
 {
 
   if (isInitialized)
@@ -211,7 +210,7 @@ void cvode_t::initialize(nrs_t *nrs)
         __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Ydot)),
         cvode->numEquations());
 
-    cvode->rhs(nrs, time, o_y, o_ydot);
+    cvode->rhs(time, o_y, o_ydot);
 
     return 0;
   };
@@ -230,7 +229,7 @@ void cvode_t::initialize(nrs_t *nrs)
         __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Ydot)),
         cvode->numEquations());
 
-    cvode->jtvRHS(nrs, time, o_y, o_ydot);
+    cvode->jtvRHS(time, o_y, o_ydot);
 
     return 0;
   };
@@ -272,7 +271,7 @@ void cvode_t::initialize(nrs_t *nrs)
           N_VLinearSum(sig, v, 1.0, y, work);
 
           /* Set Jv = f(tn, y+sig*v) */
-          cvode->jtvRHS(nrs, t, o_work, o_Jv);
+          cvode->jtvRHS(t, o_work, o_Jv);
           retval = 0; // currently we don't do any error checking in the RHS
           if (retval == 0)
             break;
@@ -343,7 +342,7 @@ void cvode_t::initialize(nrs_t *nrs)
       this->numEquations());
 
   // set initial condition
-  nrsToCv(nrs, nrs->cds->o_S, o_cvodeY);
+  nrsToCv(nrs->cds->o_S, o_cvodeY);
 
   auto integrator = CV_BDF;
   if (platform->options.compareArgs("CVODE INTEGRATOR", "ADAMS")) {
@@ -511,7 +510,7 @@ cvode_t::~cvode_t()
 #endif
 }
 
-void cvode_t::setupEToLMapping(nrs_t *nrs)
+void cvode_t::setupEToLMapping()
 {
   auto *mesh = nrs->meshV;
   if (nrs->cht)
@@ -608,7 +607,7 @@ void cvode_t::setupEToLMapping(nrs_t *nrs)
 #endif
 }
 
-void cvode_t::setupDirichletMask(nrs_t *nrs)
+void cvode_t::setupDirichletMask()
 {
   auto cds = nrs->cds;
   auto mesh = cds->mesh[0];
@@ -666,7 +665,7 @@ void cvode_t::setupDirichletMask(nrs_t *nrs)
   o_maskValues = platform->device.malloc(nrs->nEXT * maskOffset * sizeof(dfloat));
 }
 
-void cvode_t::applyDirichlet(nrs_t *nrs, dfloat time)
+void cvode_t::applyDirichlet(dfloat time)
 {
   // extrapolate masked Dirichlet values to current time state
   // NOTE: this can only be applied after the extrapolation order is reached
@@ -771,7 +770,7 @@ void cvode_t::computeErrorWeight(occa::memory o_y, occa::memory o_ewt)
                           o_ewt);
 }
 
-void cvode_t::rhs(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_ydot)
+void cvode_t::rhs(dfloat time, occa::memory o_y, occa::memory o_ydot)
 {
   const auto tag = this->rhsTagName();
   const auto saveTimerScope = timerScope;
@@ -783,7 +782,7 @@ void cvode_t::rhs(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_ydot
     userRHS(nrs, time, tnekRS, o_y, o_ydot);
   }
   else {
-    defaultRHS(nrs, time, tnekRS, o_y, o_ydot);
+    defaultRHS(time, tnekRS, o_y, o_ydot);
   }
 
   this->setIsRhsEvaluation(false);
@@ -791,7 +790,7 @@ void cvode_t::rhs(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_ydot
   timerScope = saveTimerScope;
 }
 
-void cvode_t::jtvRHS(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_ydot)
+void cvode_t::jtvRHS(dfloat time, occa::memory o_y, occa::memory o_ydot)
 {
   this->setIsJacobianEvaluation(true);
 
@@ -799,13 +798,13 @@ void cvode_t::jtvRHS(nrs_t *nrs, dfloat time, occa::memory o_y, occa::memory o_y
     userJacobian(nrs, time, tnekRS, o_y, o_ydot);
   }
   else {
-    this->rhs(nrs, time, o_y, o_ydot);
+    this->rhs(time, o_y, o_ydot);
   }
 
   this->setIsJacobianEvaluation(false);
 }
 
-void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, occa::memory o_ydot)
+void cvode_t::defaultRHS(dfloat time, dfloat t0, occa::memory o_y, occa::memory o_ydot)
 {
   const bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
   mesh_t *mesh = nrs->meshV;
@@ -903,13 +902,13 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
     }
   }
 
-  cvToNrs(nrs, o_y, cds->o_S);
+  cvToNrs(o_y, cds->o_S);
 
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::applyDirichlet", 1);
   }
 
-  this->applyDirichlet(nrs, time);
+  this->applyDirichlet(time);
 
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope + "::applyDirichlet");
@@ -923,7 +922,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
 
   // terms to include: user source, advection, filtering, add weak Laplacian
   platform->linAlg->fillKernel(cds->fieldOffsetSum, 0.0, cds->o_FS);
-  makeq(nrs, time);
+  makeq(time);
 
   bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
 
@@ -957,7 +956,7 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
     userLocalPointSource(nrs, LFieldOffset, o_y, o_ydot);
     platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::localPointSource");
 
-    cvToNrs(nrs, o_ydot, this->o_pointSource);
+    cvToNrs(o_ydot, this->o_pointSource);
   }
 
   applyOgsOperation(oogs::finish);
@@ -1047,10 +1046,10 @@ void cvode_t::defaultRHS(nrs_t *nrs, dfloat time, dfloat t0, occa::memory o_y, o
     platform->timer.toc(timerScope + "::maskDirichlet");
   }
 
-  nrsToCv(nrs, cds->o_FS, o_ydot);
+  nrsToCv(cds->o_FS, o_ydot);
 }
 
-void cvode_t::makeq(nrs_t *nrs, dfloat time)
+void cvode_t::makeq(dfloat time)
 {
 
   const auto timerScopeSave = timerScope;
@@ -1218,7 +1217,7 @@ void cvode_t::makeq(nrs_t *nrs, dfloat time)
   timerScope = timerScopeSave;
 }
 
-void cvode_t::nrsToCv(nrs_t *nrs, occa::memory o_EField, occa::memory o_LField)
+void cvode_t::nrsToCv(occa::memory o_EField, occa::memory o_LField)
 {
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::nrsToCv", 1);
@@ -1240,7 +1239,7 @@ void cvode_t::nrsToCv(nrs_t *nrs, occa::memory o_EField, occa::memory o_LField)
   }
 }
 
-void cvode_t::cvToNrs(nrs_t *nrs, occa::memory o_LField, occa::memory o_EField)
+void cvode_t::cvToNrs(occa::memory o_LField, occa::memory o_EField)
 {
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::cvToNrs", 1);
@@ -1264,7 +1263,7 @@ void cvode_t::cvToNrs(nrs_t *nrs, occa::memory o_LField, occa::memory o_EField)
   }
 }
 
-void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
+void cvode_t::solve(double t0, double t1, int tstep)
 {
 #ifdef ENABLE_CVODE
   platform->timer.tic(timerName + "solve", 1);
@@ -1311,7 +1310,7 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
     o_xyz0.copyFrom(mesh->o_z, mesh->Nlocal * sizeof(dfloat), (2 * sizeof(dfloat)) * nrs->fieldOffset, 0);
   }
 
-  nrsToCv(nrs, nrs->cds->o_S, o_cvodeY);
+  nrsToCv(nrs->cds->o_S, o_cvodeY);
 
   this->tnekRS = t0;
   this->externalTStep = tstep;
@@ -1346,7 +1345,7 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
     if (platform->comm.mpiRank == 0) {
       std::cout << "... Restarting CVODE integrator\n";
     }
-    nrsToCv(nrs, nrs->cds->o_S, o_cvodeY);
+    nrsToCv(nrs->cds->o_S, o_cvodeY);
     retval = CVodeReInit(cvodeMem, t0, cvodeY);
     check_retval(&retval, "CVodeReInit", 1);
     this->tprev = std::numeric_limits<dfloat>::max();
@@ -1366,7 +1365,7 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
   }
   timerScope = oldScope;
 
-  cvToNrs(nrs, o_cvodeY, nrs->cds->o_S);
+  cvToNrs(o_cvodeY, nrs->cds->o_S);
 
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::restore", 1);
@@ -1396,7 +1395,7 @@ void cvode_t::solve(nrs_t *nrs, double t0, double t1, int tstep)
   }
 
   // compute scalar boundary condition at time t1
-  this->applyDirichlet(nrs, t1);
+  this->applyDirichlet(t1);
 
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope + "::restore");
@@ -1518,7 +1517,7 @@ void cvode_t::printTimers()
   std::ios oldState(nullptr);
   oldState.copyfmt(std::cout);
 
-  auto mesh = _nrs->meshV;
+  auto mesh = nrs->meshV;
   long long int NglobalElements = mesh->Nelements;
   MPI_Allreduce(MPI_IN_PLACE, &NglobalElements, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm);
   const double GDOF = (NglobalElements * mesh->N * mesh->N * mesh->N * this->cvodeScalarIds.size())
@@ -1658,7 +1657,7 @@ void cvode_t::setLocalPointSource(userLocalPointSource_t _userLocalPointSource)
   userLocalPointSource = _userLocalPointSource;
 
   if(o_pointSource.size() == 0){
-    o_pointSource = platform->device.malloc(this->Nscalar * _nrs->fieldOffset * sizeof(dfloat));
+    o_pointSource = platform->device.malloc(this->Nscalar * nrs->fieldOffset * sizeof(dfloat));
   }
 
   this->fusedAddRhoDivKernel = platform->kernels.get("cvode_t::fusedAddRhoDiv");
