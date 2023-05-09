@@ -42,7 +42,7 @@ jobs:
 
     - name: nrsconfig and build
       run: |
-        CC=mpicc CXX=mpic++ FC=mpif77 ./nrsconfig -DENABLE_CVODE=ON
+        CC=mpicc CXX=mpic++ FC=mpif77 ./nrsconfig -DENABLE_CVODE=ON -DCMAKE_INSTALL_PREFIX=${{ env.NEKRS_HOME }}
         cmake --build build --target install -j 2
 
     - name: Upload install dir
