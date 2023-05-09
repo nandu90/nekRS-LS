@@ -124,6 +124,10 @@ void Ini::parse(std::stringstream & is, bool lowerValue)
           section = line.substr(1, length - 2);
           transform(section.begin(), section.end(), section.begin(),
                     [](int c){return std::tolower(c);});
+          if(sections.count(section) != 0)
+          {
+            errors.push_back("Duplicate section: " + section);
+          }
         } else {
           errors.push_back(line);
         }

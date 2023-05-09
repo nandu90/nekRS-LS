@@ -2476,6 +2476,10 @@ void parRead(inipp::Ini *par, const std::string& _setupFile, MPI_Comm comm, setu
   is.write(rbuf, fsize);
 
   par->parse(is);
+  for(auto & error : par->errors) {
+    append_error(error);
+  }
+
   par->interpolate();
   if (rank == 0)
     validateKeys(par->sections);
