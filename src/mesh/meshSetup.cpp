@@ -183,9 +183,14 @@ mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &k
 
   mesh->cht = cht;
 
-  if (platform->comm.mpiRank == 0)
-    printf("generating mesh ...\n");
-
+  if (platform->comm.mpiRank == 0) {
+    if(mesh->cht) {
+      printf("generating t-mesh ...\n");
+    } else {
+      printf("generating mesh ...\n");
+    }
+  }
+   
   // get mesh from nek
   meshNekReaderHex3D(N, mesh);
 
