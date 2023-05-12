@@ -13,7 +13,9 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("END TIME", std::string("2"));
   options.setArgs("DT", std::string("2e-2"));
   options.setArgs("SUBCYCLING STEPS", std::string("0"));
-  if (ciMode == 2) options.setArgs("SUBCYCLING STEPS", std::string("1"));
+  if (ciMode == 2) {
+    options.setArgs("SUBCYCLING STEPS", std::string("1"));
+  }
   options.setArgs("BDF ORDER", "2");
   options.setArgs("ADVECTION TYPE", "CONVECTIVE+CUBATURE");
   options.setArgs("VELOCITY SOLVER TOLERANCE", std::string("1e-06"));
@@ -22,7 +24,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("VARIABLEPROPERTIES", "TRUE");
 
   // set up CVODE solver details
-  if(ciMode == 3){
+  if (ciMode == 3) {
     options.setArgs("CVODE", "TRUE");
     options.setArgs("CVODE INTEGRATOR", "BDF");
     options.setArgs("CVODE MAX TIMESTEPPER ORDER", "3");
@@ -40,7 +42,6 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("CVODE GMR VECTORS", "20");
 
     options.setArgs("SCALAR00 SOLVER", "CVODE");
-
   }
 }
 
@@ -108,13 +109,15 @@ void ciTestErrors(nrs_t *nrs, dfloat time, int tstep)
   nek::ocopyToNek(time, tstep);
   nek::userchk();
 
-  double *err = (double *) nek::scPtr(1);
+  double *err = (double *)nek::scPtr(1);
   double vxErr, sErr;
+
   vxErr = abs((err[0] - 2.06559)/err[0]);
   sErr  = abs((err[1] - 5.16746)/err[1]);
 
-  if (rank == 0)
+  if (rank == 0) {
     printf("relative error to target: vx=%g s=%g\n", vxErr, sErr);
+  }
 
-  (vxErr < EPS && sErr < EPS) ? (CIPASS) : (CIFAIL); 
+  (vxErr < EPS && sErr < EPS) ? (CIPASS) : (CIFAIL);
 }
