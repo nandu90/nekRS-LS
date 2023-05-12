@@ -27,19 +27,18 @@ flops/rank: 4.53206e+11
 ### NVIDIA A100
 ```
 BPS5
-solve time: 0.203705s
-  preconditioner 0.16497s
-    smoother 0.0986557s
-    smoother 0.0204492s
-    coarse grid 0.0276985s
-iterations: 32
-throughput: 4.31055e+08 (DOF x iter)/s/rank
-throughput: 1.34705e+07 DOF/s/rank
-flops/rank: 8.90483e+11
+solve time: 0.196772s
+  preconditioner 0.147807s
+    smoother 0.0987781s
+    coarse grid 0.0321823s
+iterations: 28
+throughput: 3.90e+08 (DOF x iter)/s/rank
+throughput: 1.39e+07 DOF/s/rank
+flops/rank: 8.436e+11 
 
 BP5
-throughput: 3.93566e+09 (DOF x iter)/s/rank
-flops/rank: 7.52687e+11
+throughput: 3.87e+09 (DOF x iter)/s/rank
+flops/rank: 7.34419e+11 
 ```
 
 ### AMD MI250X/1
