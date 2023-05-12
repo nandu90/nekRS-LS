@@ -14,7 +14,6 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("CUBATURE POLYNOMIAL DEGREE", std::string("10"));
   options.setArgs("CONSTANT FLOW RATE", "TRUE");
   options.setArgs("CONSTANT FLOW DIRECTION", "X");
-  options.setArgs("RESTART FROM FILE", "TRUE");
   options.setArgs("RESTART FILE NAME", std::string("r.fld+time=0"));
   options.setArgs("SOLUTION OUTPUT INTERVAL", "-1");
   options.setArgs("VISCOSITY", std::to_string(1.0 / 43500.0));

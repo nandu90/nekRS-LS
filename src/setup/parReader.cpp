@@ -1640,7 +1640,6 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
 
   std::string startFrom;
   if (par->extract("general", "startfrom", startFrom)) {
-    options.setArgs("RESTART FROM FILE", "TRUE");
     options.setArgs("RESTART FILE NAME", startFrom);
   }
 

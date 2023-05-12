@@ -42,7 +42,7 @@ void useric(nrs_t *nrs)
   dfloat mue;
   platform->options.getArgs("VISCOSITY", mue);
 
-  if(platform->options.compareArgs("RESTART FROM FILE", "FALSE")) {
+  if(platform->options.getArgs("RESTART FILE NAME").empty()) {
     for(int i = 1; i < mesh->Nlocal; i++) {
       const auto x = mesh->x[i];
       const auto y = mesh->y[i];
