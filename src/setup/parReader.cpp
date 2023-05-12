@@ -1492,7 +1492,7 @@ void setDefaultSettings(setupAide &options, std::string casename, int rank)
   options.setArgs("ADVECTION", "TRUE");
   options.setArgs("ADVECTION TYPE", "CUBATURE+CONVECTIVE");
 
-  options.setArgs("RESTART FROM FILE", "0");
+  options.setArgs("RESTART FROM FILE", "FALSE");
   options.setArgs("SOLUTION OUTPUT INTERVAL", "-1");
   options.setArgs("SOLUTION OUTPUT CONTROL", "STEPS");
   options.setArgs("REGULARIZATION METHOD", "NONE");
@@ -1640,7 +1640,7 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
 
   std::string startFrom;
   if (par->extract("general", "startfrom", startFrom)) {
-    options.setArgs("RESTART FROM FILE", "1");
+    options.setArgs("RESTART FROM FILE", "TRUE");
     options.setArgs("RESTART FILE NAME", startFrom);
   }
 
@@ -2352,6 +2352,15 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
 
 void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *par)
 {
+  {
+    int subSteps = 0;
+    options.getArgs("SUBCYCLING STEPS", subSteps);
+    if(!subSteps) {
+      options.removeArgs("SUBCYCLING TIME ORDER");
+      options.removeArgs("SUBCYCLING TIME STAGE NUMBER");
+    }
+  }
+
   std::vector<std::string> sections = {"MESH", "PRESSURE", "VELOCITY", "SCALAR DEFAULT"};
   for (int i = 0; i < nscal; i++)
     sections.push_back("SCALAR" + scalarDigitStr(i));

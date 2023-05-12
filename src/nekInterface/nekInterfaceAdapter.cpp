@@ -185,10 +185,7 @@ void finalize() { (*nek_end_ptr)(); }
 
 void setic(void)
 {
-  int readRestartFile;
-  options->getArgs("RESTART FROM FILE", readRestartFile);
-
-  if (readRestartFile) {
+  if (options->compareArgs("RESTART FROM FILE", "TRUE")) {
     std::string str1;
     options->getArgs("RESTART FILE NAME", str1);
     std::string str2(str1.size(), '\0');
