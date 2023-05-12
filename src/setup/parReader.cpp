@@ -2352,15 +2352,6 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
 
 void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *par)
 {
-  {
-    int subSteps = 0;
-    options.getArgs("SUBCYCLING STEPS", subSteps);
-    if(!subSteps) {
-      options.removeArgs("SUBCYCLING TIME ORDER");
-      options.removeArgs("SUBCYCLING TIME STAGE NUMBER");
-    }
-  }
-
   std::vector<std::string> sections = {"MESH", "PRESSURE", "VELOCITY", "SCALAR DEFAULT"};
   for (int i = 0; i < nscal; i++)
     sections.push_back("SCALAR" + scalarDigitStr(i));
