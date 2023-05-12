@@ -143,7 +143,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
   int gsOverlap = 1;
   platform->par->extract("casedata", "gsoverlap", gsOverlap);
   if (!gsOverlap)
-    platform->options.setArgs("GS COMM OVERLAP", "FALSE");
+    platform->options.setArgs("ENABLE GS COMM OVERLAP", "FALSE");
 }
 
 void UDF_Setup(nrs_t *nrs)

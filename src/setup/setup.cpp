@@ -109,14 +109,14 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
   {
 #if 1
     if (platform->device.mode() == "Serial")
-      platform->options.setArgs("GS COMM OVERLAP", "FALSE");
+      platform->options.setArgs("ENABLE GS COMM OVERLAP", "FALSE");
 #endif
 
     if (platform->comm.mpiCommSize == 1)
-      platform->options.setArgs("GS COMM OVERLAP", "FALSE");
+      platform->options.setArgs("ENABLE GS COMM OVERLAP", "FALSE");
 
-    if (platform->comm.mpiRank == 0 && platform->options.compareArgs("GS COMM OVERLAP", "FALSE"))
-      std::cout << "gs comm overlap disabled\n\n";
+    if (platform->comm.mpiRank == 0 && platform->options.compareArgs("ENABLE GS COMM OVERLAP", "FALSE"))
+      std::cout << "ENABLE GS COMM OVERLAP disabled\n\n";
   }
 
   nrs->flow = 1;
@@ -176,13 +176,16 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
   mesh_t *mesh = nrs->meshV;
 
   {
-    std::vector<mesh_t*> meshList;
+    std::vector<mesh_t *> meshList;
     meshList.push_back(nrs->_mesh);
-    if(nrs->cht) meshList.push_back(nrs->meshV);
-    for(const auto& msh : meshList) {
-      if(bcMap::size(msh->cht) > 0) {
-        nrsCheck(msh->Nbid != bcMap::size(msh->cht), 
-                 platform->comm.mpiComm, EXIT_FAILURE, "%s\n",
+    if (nrs->cht)
+      meshList.push_back(nrs->meshV);
+    for (const auto &msh : meshList) {
+      if (bcMap::size(msh->cht) > 0) {
+        nrsCheck(msh->Nbid != bcMap::size(msh->cht),
+                 platform->comm.mpiComm,
+                 EXIT_FAILURE,
+                 "%s\n",
                  "Number of boundary IDs in mesh does not match boundaryTypeMap "
                  "in par or BCs imported from nek5000");
       }
