@@ -87,7 +87,7 @@ void UDF_Setup(nrs_t *nrs)
     std::cout << "eta: " << std::setprecision(4) << eta << std::endl;
   }
 
-  if(platform->options.compareArgs("RESTART FROM FILE", "0")) {
+  if(platform->options.compareArgs("RESTART FROM FILE", "FALSE")) {
     const auto U0 = 1.0;
   
     const auto A = -eta*eta / (1 - eta*eta);

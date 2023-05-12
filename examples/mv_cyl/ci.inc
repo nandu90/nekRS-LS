@@ -8,7 +8,6 @@ static int ciMode = 0;
 void ciSetup(MPI_Comm comm, setupAide &options)
 {
   options.setArgs("POLYNOMIAL DEGREE", std::string("7"));
-  options.setArgs("RESTART FROM FILE", std::string("0"));
   options.setArgs("SOLUTION OUTPUT INTERVAL", "0");
   options.setArgs("NUMBER OF SCALARS", std::string("1"));
   options.setArgs("END TIME", std::string("0.1"));

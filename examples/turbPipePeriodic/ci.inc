@@ -10,7 +10,6 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("POLYNOMIAL DEGREE", std::string("7"));
   options.setArgs("CUBATURE POLYNOMIAL DEGREE", std::string("10"));
   options.setArgs("CONSTANT FLOW RATE", "FALSE");
-  options.setArgs("RESTART FROM FILE", std::string("0"));
   options.setArgs("SOLUTION OUTPUT INTERVAL", "-1");
   options.setArgs("VISCOSITY", std::to_string(1.0 / 19000.0));
   options.setArgs("DENSITY", std::string("1.0"));
