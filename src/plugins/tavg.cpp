@@ -123,11 +123,7 @@ void tavg::run(dfloat time)
     int cnt = 0;
     for(auto& entry : userFieldList) {
       auto o_avg = o_AVG.slice(cnt*nrs->fieldOffset*sizeof(dfloat), nrs->fieldOffset*sizeof(dfloat));
-
-      dlong N = nrs->fieldOffset;
-      for(auto& entry_i : entry) {
-        N = std::min(static_cast<dlong>(entry_i.size()/sizeof(dfloat)), N);
-      }
+      const auto N = nrs->fieldOffset;
 
       if(entry.size() == 1) 
       {
@@ -185,8 +181,15 @@ void tavg::setup(nrs_t *nrs_, const fields& flds)
   userFieldList = flds;
 
   for(auto& entry : userFieldList) {
-    nrsCheck(entry.size() < 1 || entry.size() > 4, platform->comm.mpiComm, EXIT_FAILURE,
-             "%s\n", "tavg::setup() invalid number of vectors!");
+    nrsCheck(entry.size() < 1 || entry.size() > 4, 
+             platform->comm.mpiComm, EXIT_FAILURE,
+             "%s\n", "invalid number of fields in one of the user list entries!");
+
+    for(auto& entry_i : entry) {
+      nrsCheck(entry_i.size() < (nrs_->fieldOffset*sizeof(dfloat)), 
+               platform->comm.mpiComm, EXIT_FAILURE,
+               "%s\n", "field size in one of the user list entries smaller than nrs_t::fieldOffset");
+    }
   }
  
   setup(nrs_);
