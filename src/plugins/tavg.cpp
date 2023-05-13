@@ -183,12 +183,12 @@ void tavg::setup(nrs_t *nrs_, const fields& flds)
   for(auto& entry : userFieldList) {
     nrsCheck(entry.size() < 1 || entry.size() > 4, 
              platform->comm.mpiComm, EXIT_FAILURE,
-             "%s\n", "invalid number of fields in one of the user list entries!");
+             "%s\n", "invalid number of vectors in one of the user list entries!");
 
     for(auto& entry_i : entry) {
       nrsCheck(entry_i.size() < (nrs_->fieldOffset*sizeof(dfloat)), 
                platform->comm.mpiComm, EXIT_FAILURE,
-               "%s\n", "field size in one of the user list entries smaller than nrs_t::fieldOffset");
+               "%s\n", "vector size in one of the user list entries smaller than nrs_t::fieldOffset");
     }
   }
  
