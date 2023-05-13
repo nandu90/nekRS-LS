@@ -17,6 +17,7 @@ static dfloat rho, mueLam;
 void extractLine(nrs_t *nrs, dfloat time, int tstep)
 {
   const auto np = (platform->comm.mpiRank == 0) ? 200 : 0;
+  const auto offset = np;
 
   static pointInterpolation_t *interpolator = nullptr;
   static std::vector<dfloat> xp, yp, zp;
@@ -46,7 +47,7 @@ void extractLine(nrs_t *nrs, dfloat time, int tstep)
       xp.push_back(x0);
       yp.push_back(yMax);
       zp.push_back(z0);
-      o_Up = platform->device.malloc(nrs->NVfields * np * sizeof(dfloat));
+      o_Up = platform->device.malloc(nrs->NVfields * offset * sizeof(dfloat));
     }
 
     interpolator = new pointInterpolation_t(nrs);
@@ -54,7 +55,6 @@ void extractLine(nrs_t *nrs, dfloat time, int tstep)
     interpolator->find();
   }
 
-  const auto offset = np;
   interpolator->eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, offset, o_Up);
 
   if (platform->comm.mpiRank == 0) {

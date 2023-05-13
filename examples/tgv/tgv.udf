@@ -95,10 +95,10 @@ void UDF_Setup(nrs_t *nrs)
   platform->par->extract("casedata", "W0", W0);
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
-    for (int n = 0; n < mesh->Np * mesh->Nelements; n++) {
-      dfloat x = mesh->x[n];
-      dfloat y = mesh->y[n];
-      dfloat z = mesh->z[n];
+    for (int n = 0; n < mesh->Nlocal; n++) {
+      const auto x = mesh->x[n];
+      const auto y = mesh->y[n];
+      const auto z = mesh->z[n];
       nrs->U[n + 0 * nrs->fieldOffset] = sin(x) * cos(y) * cos(z) + U0;
       nrs->U[n + 1 * nrs->fieldOffset] = -cos(x) * sin(y) * cos(z) + V0;
       nrs->U[n + 2 * nrs->fieldOffset] = W0;
