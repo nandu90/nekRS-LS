@@ -101,16 +101,10 @@ void outfld(const char *filename,
             void *o_ss,
             int NSfields)
 {
-
-  mesh_t *mesh = nrs->meshV;
-  dlong Nlocal = mesh->Nelements * mesh->Np;
-
   double time = t;
 
-  if (NSfields > nekData.ldimt) {
-    const char *errTxt = "NSfields > ldimt in nek_outfld";
-    check_error(errTxt);
-  }
+  nrsCheck(NSfields > nekData.ldimt, platform->comm.mpiComm, EXIT_FAILURE,
+           "Adjust ldimt in SIZE to %d and larger\n", NSfields);
 
   occa::memory o_u, o_p, o_s;
   if (o_uu)
@@ -132,10 +126,15 @@ void outfld(const char *filename,
 
   platform->timer.tic("checkpointing", 1);
 
+  // nek5000 writes all fields using nelt
+  // note, nrs->fieldOffset >= nelt*nxyz
+  auto mesh = nrs->_mesh; 
+  dlong Nlocal = mesh->Nelements * mesh->Np;
+
+  // nek5000 uses lelv = lelt
+  const dlong nekFieldOffset = nekData.lelt * mesh->Np;
+
   if (coords) {
-    mesh_t *mesh = nrs->meshV;
-    if (nrs->cht)
-      mesh = nrs->cds->mesh[0];
     mesh->o_x.copyTo(nekData.xm1, Nlocal * sizeof(dfloat));
     mesh->o_y.copyTo(nekData.ym1, Nlocal * sizeof(dfloat));
     mesh->o_z.copyTo(nekData.zm1, Nlocal * sizeof(dfloat));
@@ -155,12 +154,7 @@ void outfld(const char *filename,
     po = 1;
   }
   if (o_s.ptr()) {
-    const dlong nekFieldOffset = nekData.lelt * mesh->Np;
     for (int is = 0; is < NSfields; is++) {
-      mesh_t *mesh = nrs->meshV;
-      if (nrs->cds)
-        (is) ? mesh = nrs->meshV : mesh = nrs->cds->mesh[0];
-      const dlong Nlocal = mesh->Nelements * mesh->Np;
       dfloat *Ti = nekData.t + is * nekFieldOffset;
       occa::memory o_Si = o_s + (is * sizeof(dfloat)) * nrs->fieldOffset;
       o_Si.copyTo(Ti, Nlocal * sizeof(dfloat));
