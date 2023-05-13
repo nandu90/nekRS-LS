@@ -144,8 +144,7 @@ void tavg::run(dfloat time)
       cnt++;
     }
   } else {
-    mesh_t *mesh = nrs->meshV;
-    const dlong N = mesh->Nelements * mesh->Np;
+    const auto N = nrs->fieldOffset;
 
     // velocity
     EX(N, a, b, nrs->NVfields, nrs->o_U, o_Uavg);
@@ -167,7 +166,6 @@ void tavg::run(dfloat time)
     // scalars
     if (nrs->Nscalar) {
       cds_t *cds = nrs->cds;
-      const dlong N = cds->mesh[0]->Nelements * cds->mesh[0]->Np;
       EX(N, a, b, cds->NSfields, cds->o_S, o_Savg);
       EXY(N, a, b, cds->NSfields, cds->o_S, cds->o_S, o_Srms);
     }
