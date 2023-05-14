@@ -872,11 +872,26 @@ int setup(nrs_t *nrs_in)
   return 0;
 }
 
+static void updateMesh()
+{
+  auto mesh = nrs->_mesh;
+  const auto Nlocal = mesh->Nelements * mesh->Np;
+
+  memcpy(nekData.xm1, mesh->x, sizeof(dfloat) * Nlocal);
+  memcpy(nekData.ym1, mesh->y, sizeof(dfloat) * Nlocal);
+  memcpy(nekData.zm1, mesh->z, sizeof(dfloat) * Nlocal);
+  recomputeGeometry();
+}
+
 void copyToNek(dfloat time)
 {
   if (rank == 0) {
     printf("copying solution to nek\n");
     fflush(stdout);
+  }
+
+  if (*(nekData.istep) == 0) {
+    updateMesh();
   }
 
   mesh_t *mesh = nrs->meshV;
@@ -901,10 +916,7 @@ void copyToNek(dfloat time)
     memcpy(nekData.wx, wx, sizeof(dfloat) * Nlocal);
     memcpy(nekData.wy, wy, sizeof(dfloat) * Nlocal);
     memcpy(nekData.wz, wz, sizeof(dfloat) * Nlocal);
-    memcpy(nekData.xm1, mesh->x, sizeof(dfloat) * Nlocal);
-    memcpy(nekData.ym1, mesh->y, sizeof(dfloat) * Nlocal);
-    memcpy(nekData.zm1, mesh->z, sizeof(dfloat) * Nlocal);
-    recomputeGeometry();
+    updateMesh();
   }
 
   memcpy(nekData.vx, vx, sizeof(dfloat) * Nlocal);
@@ -948,6 +960,13 @@ void ocopyToNek(void)
 
 void ocopyToNek(dfloat time, int tstep)
 {
+  if (tstep == 0) {
+    auto mesh = nrs->_mesh;
+    mesh->o_x.copyTo(mesh->x);
+    mesh->o_y.copyTo(mesh->y);
+    mesh->o_z.copyTo(mesh->z);
+  }
+
   nrs->o_U.copyTo(nrs->U);
   nrs->o_P.copyTo(nrs->P);
   if (nrs->Nscalar) {
