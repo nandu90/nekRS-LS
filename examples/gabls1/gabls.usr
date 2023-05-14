@@ -25,21 +25,6 @@ c-----------------------------------------------------------------------
       include 'SIZE'
       include 'TOTAL'
      
-      common /scnrs/ sc_nrs(3)
-      real           sc_nrs
-
-      real xlen, ylen, zlen
-
-      xlen = sc_nrs(1)
-      ylen = sc_nrs(2)
-      zlen = sc_nrs(3)
-
-      write(6,*) xlen, ylen, zlen
-
-      call rescale_x(xm1, 0.0, XLEN)
-      call rescale_x(ym1, 0.0, YLEN)
-      call rescale_x(zm1, 0.0, ZLEN)
-
       do iel=1,nelt
       do ifc=1,2*ndim
          if (cbc(ifc,iel,1) .eq. 'W  ') boundaryID(ifc,iel) = 2
