@@ -1,7 +1,7 @@
 #include "udf.hpp"
 #include "plugins/tavg.hpp"
 
-static occa::memory o_avg;
+static occa::memory o_work;
 static occa::memory o_divTau;
 
 /* latitude north */
@@ -140,26 +140,26 @@ void planarAverage(nrs_t *nrs)
   const auto fieldOffsetByte = nrs->fieldOffset * sizeof(dfloat);
 
   // <u>(y)
-  auto o_uAvg = o_avg.slice(0 * fieldOffsetByte, fieldOffsetByte);
+  auto o_uAvg = o_work.slice(0 * fieldOffsetByte, fieldOffsetByte);
   auto o_ux = nrs->o_U.slice(0 * fieldOffsetByte, fieldOffsetByte);
   o_uAvg.copyFrom(o_ux, fieldOffsetByte);
 
   // <w>(y)
-  auto o_wAvg = o_avg.slice(1 * fieldOffsetByte, fieldOffsetByte);
+  auto o_wAvg = o_work.slice(1 * fieldOffsetByte, fieldOffsetByte);
   auto o_uz = nrs->o_U.slice(2 * fieldOffsetByte, fieldOffsetByte);
   o_wAvg.copyFrom(o_uz, fieldOffsetByte);
 
   // <temp>(y)
-  auto o_tempAvg = o_avg.slice(2 * fieldOffsetByte, fieldOffsetByte);
+  auto o_tempAvg = o_work.slice(2 * fieldOffsetByte, fieldOffsetByte);
   auto o_temp = nrs->cds->o_S.slice(0 * fieldOffsetByte, fieldOffsetByte);
   o_tempAvg.copyFrom(o_temp, fieldOffsetByte);
 
   // d<u,w,temp>/dy(y)
-  auto o_ddyAvg = o_avg.slice(3 * fieldOffsetByte, 3 * fieldOffsetByte);
-  gradY(mesh->Nelements, mesh->o_vgeo, mesh->o_D, nrs->fieldOffset, mesh->o_invLMM, o_avg, o_ddyAvg);
+  auto o_ddyAvg = o_work.slice(3 * fieldOffsetByte, 3 * fieldOffsetByte);
+  gradY(mesh->Nelements, mesh->o_vgeo, mesh->o_D, nrs->fieldOffset, mesh->o_invLMM, o_work, o_ddyAvg);
   oogs::startFinish(o_ddyAvg, 3, nrs->fieldOffset, ogsDfloat, ogsAdd, nrs->gsh);
 
-  postProcessing::planarAvg(nrs, "xz", NUMBER_ELEMENTS_X, NUMBER_ELEMENTS_Y, NUMBER_ELEMENTS_Z, 6, o_avg);
+  postProcessing::planarAvg(nrs, "xz", NUMBER_ELEMENTS_X, NUMBER_ELEMENTS_Y, NUMBER_ELEMENTS_Z, 6, o_work);
 }
 
 void userf(nrs_t *nrs, dfloat time, occa::memory o_U, occa::memory o_FU)
@@ -220,7 +220,7 @@ void writeStatistics(nrs_t *nrs, dfloat time, int tstep, const std::string& fnam
   
   const auto fieldOffsetBytes = nrs->fieldOffset * sizeof(dfloat);
 
-  platform->o_mempool.slice0.copyFrom(tavg::o_avg(), 3 * fieldOffsetBytes);
+  o_work.copyFrom(tavg::o_avg(), 3 * fieldOffsetBytes);
 
   gradY(mesh->Nelements, 
         mesh->o_vgeo, 
@@ -228,11 +228,11 @@ void writeStatistics(nrs_t *nrs, dfloat time, int tstep, const std::string& fnam
         nrs->fieldOffset, 
         mesh->o_invLMM, 
         tavg::o_avg(), 
-        platform->o_mempool.slice3);
+        o_work + 3 * fieldOffsetBytes);
 
-  platform->o_mempool.slice6.copyFrom(tavg::o_avg() + 3 * fieldOffsetBytes, 
-                                      3 * fieldOffsetBytes);
-
+  o_work.copyFrom(tavg::o_avg() + 3 * fieldOffsetBytes, 
+                  3 * fieldOffsetBytes,
+                  6 * fieldOffsetBytes);
 
   postProcessing::planarAvg(nrs, 
                             "xz", 
@@ -240,12 +240,11 @@ void writeStatistics(nrs_t *nrs, dfloat time, int tstep, const std::string& fnam
                             NUMBER_ELEMENTS_Y, 
                             NUMBER_ELEMENTS_Z, 
                             Nfields, 
-                            platform->o_mempool.slice0);
-
+                            o_work);
 
   interpolator->eval(Nfields, 
                      nrs->fieldOffset, 
-                     platform->o_mempool.slice0, 
+                     o_work, 
                      offset, 
                      o_fields1D);
 
@@ -338,8 +337,12 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 void UDF_Setup(nrs_t *nrs)
 {
   o_divTau = platform->device.malloc(3 * nrs->fieldOffset * sizeof(dfloat));
-  o_avg = platform->device.malloc(6 * nrs->fieldOffset * sizeof(dfloat));
+
+  // scratch space
+  o_work = platform->device.malloc(9 * nrs->fieldOffset * sizeof(dfloat));
+
   nrs->o_usrwrk = platform->device.malloc(5 * sizeof(dfloat));
+
   udf.uEqnSource = &userf;
   udf.sEqnSource = &userq;
 
@@ -430,7 +433,7 @@ void UDF_ExecuteStep(nrs_t *nrs, dfloat time, int tstep)
 
   const int bIdWall = 2;
   dfloat avgWallValues[3];
-  avgBoundaryValue(nrs, bIdWall, 3, o_avg, avgWallValues);
+  avgBoundaryValue(nrs, bIdWall, 3, o_work, avgWallValues);
 
   dfloat wallData[5];
   const dfloat thts = wallData[0] = T0S + SCOOLRATE * time;
@@ -447,7 +450,7 @@ void UDF_ExecuteStep(nrs_t *nrs, dfloat time, int tstep)
 
   const auto factru = (1. + BETAM * ZWALL * rLength) / KAPPA / ZWALL;
   const auto scale = 1. / (factru * factru);
-  auto o_ddyAvg = o_avg.slice(3 * fieldOffsetByte, 3 * fieldOffsetByte);
+  auto o_ddyAvg = o_work.slice(3 * fieldOffsetByte, 3 * fieldOffsetByte);
   visMF(mesh->Nlocal, nrs->fieldOffset, scale, o_ddyAvg, platform->o_mempool.slice0);
 
 #if 0
