@@ -308,10 +308,18 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     mesh->o_LMM.free();
     mesh->o_LMM = platform->device.malloc(nrs->fieldOffset * nBDF, sizeof(dfloat));
     mesh->o_LMM.copyFrom(platform->o_mempool.slice0, mesh->Nlocal * sizeof(dfloat));
+    free(mesh->LMM);
+    mesh->LMM = (dfloat*) std::malloc(mesh->o_LMM.size());
+    mesh->o_LMM.copyTo(mesh->LMM);
+
     platform->o_mempool.slice0.copyFrom(mesh->o_invLMM, mesh->Nlocal * sizeof(dfloat));
     mesh->o_invLMM.free();
     mesh->o_invLMM = platform->device.malloc(nrs->fieldOffset * nBDF, sizeof(dfloat));
     mesh->o_invLMM.copyFrom(platform->o_mempool.slice0, mesh->Nlocal * sizeof(dfloat));
+    free(mesh->invLMM);
+    mesh->invLMM = (dfloat*) std::malloc(mesh->o_invLMM.size());
+    mesh->o_invLMM.copyTo(mesh->invLMM);
+
 
     const int nAB = std::max(nrs->nEXT, mesh->nAB);
     mesh->U = (dfloat *)calloc(nrs->NVfields * nrs->fieldOffset * nAB, sizeof(dfloat));
@@ -596,6 +604,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
   nrs->_mesh->o_x.copyFrom(nrs->_mesh->x);
   nrs->_mesh->o_y.copyFrom(nrs->_mesh->y);
   nrs->_mesh->o_z.copyFrom(nrs->_mesh->z);
+  if(nrs->cht) nrs->meshV->update(true);
   nrs->_mesh->update(true);
 
   // in case the user sets IC in udf.setup

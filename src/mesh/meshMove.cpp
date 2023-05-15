@@ -69,10 +69,16 @@ void mesh_t::update(bool updateHost)
     o_x.copyTo(x);
     o_y.copyTo(y);
     o_z.copyTo(z);
-    o_invLMM.copyTo(invLMM);
+
     o_LMM.copyTo(LMM);
+
     o_vgeo.copyTo(vgeo);
+    o_ggeo.copyTo(ggeo);
+
     o_cubvgeo.copyTo(cubvgeo);
+
+    o_invLMM.copyTo(invLMM);
+
     o_sgeo.copyTo(sgeo);
   }
 }
