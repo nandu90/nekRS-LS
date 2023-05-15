@@ -341,7 +341,7 @@ postfix(s) = noop_func;                                                         
 if (verbose)                                                                                                 \
 printf("Setting function " #s " to noop_func.\n");                                                           \
 }                                                                                                            \
-else if (verbose) {                                                                                          \
+else if (verbose && rank == 0) {                                                                             \
 printf("Loading " #s"\n");                                                                                   \
 }                                                                                                            \
 } while (0)
