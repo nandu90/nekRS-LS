@@ -470,13 +470,13 @@ int ellipticType(int bid, std::string field)
         bcType = NO_OP;
     }
 
-    nrsCheck(bcType == -1, platform->comm.mpiComm, EXIT_FAILURE,
+    nrsCheck(bcType == -1, MPI_COMM_SELF, EXIT_FAILURE,
              "ellipticType lookup of bid %d field %s failed!\n", bid, field.c_str());
 
     return bcType;
   }
   catch (const std::out_of_range &oor) {
-    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE,
+    nrsAbort(MPI_COMM_SELF, EXIT_FAILURE,
              "ellipticType lookup of bid %d field %s failed!\n", bid, field.c_str());
   }
 
