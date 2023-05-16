@@ -126,7 +126,6 @@ void udfAutoKernels(const std::string& udfFileCache, const std::string& postOklS
   {
     std::regex_token_iterator<std::string::iterator> rend; // default constructor = end-of-sequence:
     std::regex_token_iterator<std::string::iterator> token (buffer.begin(), buffer.end(), exp, 1);
-    std::vector<std::string> kernelNameList;
  
     while (token != rend) { 
       const auto kernelName = *token++;
