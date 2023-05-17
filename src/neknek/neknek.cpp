@@ -339,9 +339,8 @@ void neknekSetup(nrs_t *nrs)
 
 } // namespace
 
-bool checkCoupled(nrs_t *nrs)
+bool neknekCoupled(nrs_t *nrs)
 {
-
   // determine if sessions are coupled
   auto numInterpPoints = computeNumInterpPoints(nrs);
 
