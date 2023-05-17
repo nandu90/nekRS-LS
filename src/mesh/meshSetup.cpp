@@ -23,7 +23,7 @@ static void checkEToB(mesh_t *mesh)
     MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
     err += (found ? 0 : 1);
     if (err && platform->comm.mpiRank == 0)
-      printf("Cannot find boundary ID %d in mesh!\n", id);
+      printf("Cannot find boundary ID %d in EToB!\n", id);
   }
   nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "");
 
@@ -34,7 +34,7 @@ static void checkEToB(mesh_t *mesh)
     }
   }
   MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-  nrsCheck(found, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Mesh has unmapped boundary IDs!");
+  nrsCheck(found, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "EToB has invalid entries!");
 }
 
 static void meshVOccaSetup3D(mesh_t *mesh, occa::properties &kernelInfo);

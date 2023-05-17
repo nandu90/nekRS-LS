@@ -90,14 +90,14 @@ void checkValidBoundaryConditions(nrs_t *nrs)
   for (int s = 0; s < neknek->Nscalar; ++s) {
     bool invalid = missingInterpBound[s];
     if (platform->comm.mpiRank == 0 && invalid) {
-      std::cout << "Error: scalar " << s
+      std::cout << "Scalar " << s
                 << " has a non-interpolating boundary condition where the fluid does!\n";
     }
     issueError |= invalid;
 
     invalid = extraInterpBound[s];
     if (platform->comm.mpiRank == 0 && invalid) {
-      std::cout << "Error: scalar " << s
+      std::cout << "Scalar " << s
                 << " has an interpolating boundary condition where the fluid does not!\n";
     }
     issueError |= invalid;

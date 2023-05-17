@@ -150,6 +150,12 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     const std::string meshFile = options.getArgs("MESH FILE");
     re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm);
 
+    nrsCheck(nelgt != nelgv && platform->options.compareArgs("MOVING MESH", "TRUE"),
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "Conjugate heat transfer not supported in a moving mesh!");
+
     nrsCheck(nelgt != nelgv && !platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE"),
              platform->comm.mpiComm,
              EXIT_FAILURE,
@@ -181,7 +187,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     if ((NelementsT > NelementsV) && nrs->Nscalar)
       nrs->cht = 1;
 
-    nrsCheck(nrs->cht && NelementsT <= NelementsV,
+    nrsCheck(nrs->cht && (NelementsT <= NelementsV),
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "%s\n",
@@ -192,20 +198,39 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
   nrs->meshV = (mesh_t *)nrs->_mesh->fluid;
   mesh_t *mesh = nrs->meshV;
 
+  // verify boundary conditions
   {
+    std::vector<std::string> fields; 
+
+    if (!options.compareArgs("MESH SOLVER", "NONE"))
+      fields.push_back("mesh");
+
+    if (!options.compareArgs("VELOCITY SOLVER", "NONE"))
+      fields.push_back("velocity");
+
+    for (int i = 0; i < nrs->Nscalar; i++) {
+      const auto sid = scalarDigitStr(i);
+      if (!options.compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
+        fields.push_back("scalar" + sid);
+      }
+    }
+
+    for (const auto &field : fields) {
+      auto msh = (nrs->cht && (field == "scalar00" || field == "mesh")) ? 
+                 nrs->_mesh : mesh;
+      nrsCheck(msh->Nbid != bcMap::size(field),
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "Size of %s boundaryTypeMap does not match number of boundary IDs in mesh!\n",
+               field.c_str());
+    }
+
     std::vector<mesh_t *> meshList;
     meshList.push_back(nrs->_mesh);
-    if (nrs->cht)
+    if (nrs->meshV != nrs->_mesh)
       meshList.push_back(nrs->meshV);
+
     for (const auto &msh : meshList) {
-      if (bcMap::size(msh->cht) > 0) {
-        nrsCheck(msh->Nbid != bcMap::size(msh->cht),
-                 platform->comm.mpiComm,
-                 EXIT_FAILURE,
-                 "%s\n",
-                 "Number of boundary IDs in mesh does not match boundaryTypeMap "
-                 "in par or BCs imported from nek5000");
-      }
       bcMap::checkBoundaryAlignment(msh);
       bcMap::remapUnalignedBoundaries(msh);
     }
@@ -319,7 +344,6 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     free(mesh->invLMM);
     mesh->invLMM = (dfloat*) std::malloc(mesh->o_invLMM.size());
     mesh->o_invLMM.copyTo(mesh->invLMM);
-
 
     const int nAB = std::max(nrs->nEXT, mesh->nAB);
     mesh->U = (dfloat *)calloc(nrs->NVfields * nrs->fieldOffset * nAB, sizeof(dfloat));
@@ -604,7 +628,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
   nrs->_mesh->o_x.copyFrom(nrs->_mesh->x);
   nrs->_mesh->o_y.copyFrom(nrs->_mesh->y);
   nrs->_mesh->o_z.copyFrom(nrs->_mesh->z);
-  if(nrs->cht) nrs->meshV->update(true);
+  if(nrs->meshV != nrs->_mesh) nrs->meshV->update(true);
   nrs->_mesh->update(true);
 
   // in case the user sets IC in udf.setup
@@ -662,9 +686,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
       if (platform->comm.mpiRank == 0)
         std::cout << "================= " << solverName << " SETUP SCALAR" << sid << " ===============\n";
 
-      int nbrBIDs = bcMap::size(0);
-      if (nrs->cht && is == 0)
-        nbrBIDs = bcMap::size(1);
+      const int nbrBIDs = bcMap::size("scalar" + sid);
       for (int bID = 1; bID <= nbrBIDs; bID++) {
         std::string bcTypeText(bcMap::text(bID, "scalar" + sid));
         if (platform->comm.mpiRank == 0 && bcTypeText.size())
@@ -724,7 +746,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     if (platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE"))
       nrs->uvwSolver = new elliptic_t();
 
-    for (int bID = 1; bID <= bcMap::size(0); bID++) {
+    for (int bID = 1; bID <= bcMap::size("velocity"); bID++) {
       std::string bcTypeText(bcMap::text(bID, "velocity"));
       if (platform->comm.mpiRank == 0 && bcTypeText.size())
         printf("bID %d -> bcType %s\n", bID, bcTypeText.c_str());
@@ -886,10 +908,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     if (platform->comm.mpiRank == 0)
       printf("================ ELLIPTIC SETUP MESH ================\n");
 
-    int nbrBIDs = bcMap::size(0);
-    if (nrs->cht)
-      nbrBIDs = bcMap::size(1);
-
+    const int nbrBIDs = bcMap::size("mesh");
     for (int bID = 1; bID <= nbrBIDs; bID++) {
       std::string bcTypeText(bcMap::text(bID, "mesh"));
       if (platform->comm.mpiRank == 0 && bcTypeText.size())

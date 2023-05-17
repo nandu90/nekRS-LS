@@ -52,7 +52,6 @@ static bool meshConditionsDerived = false;
 static std::set<std::string> fields;
 // stores for every (field, boundaryID) pair a bcID
 static std::map<std::pair<std::string, int>, int> bToBc;
-static int nbid[] = {-1, -1};
 static bool importFromNek = true;
 
 static std::map<std::string, int> vBcTextToID = {
@@ -265,17 +264,15 @@ void setupField(std::vector<std::string> slist, std::string field)
 
   fields.insert(field);
 
-  if (field.compare(0, 8, "scalar00") == 0) /* tmesh */ 
-    nbid[1] = slist.size();
-  else 
-    nbid[0] = slist.size();
-
   if (field.compare("velocity") == 0)
     v_setup(field, slist);
   else if (field.compare("mesh") == 0)
     v_setup(field, slist);
   else if (field.compare(0, 6, "scalar") == 0)
     s_setup(field, slist);
+  else
+    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "unknown field %s\n", field.c_str());
+
 }
 
 
@@ -521,12 +518,19 @@ std::string text(int bid, std::string field)
   return 0;
 }
 
-int size(int isTmesh)
+int size(const std::string& _field)
 {
-  if(nbid[1] > -1)
-    return isTmesh ? nbid[1] : nbid[0];
-  else
-    return nbid[0];
+  std::string field = _field;
+  lowerCase(field);
+
+  int cnt = 0;
+  for(auto& entry : bToBc) {
+    if(entry.first.first == field) {
+      cnt ++;
+    }
+  }
+
+  return cnt;
 }
 
 bool useDerivedMeshBoundaryConditions()
@@ -543,11 +547,6 @@ bool useDerivedMeshBoundaryConditions()
 
 void setBcMap(std::string field, int* map, int nIDs)
 {
-  if (field.compare(0, 8, "scalar00") == 0)
-    nbid[1] = nIDs;
-  else
-    nbid[0] = nIDs;
-
   fields.insert(field);
   for (int i = 0; i < nIDs; i++)
     bToBc[make_pair(field, i)] = map[i];
@@ -555,14 +554,12 @@ void setBcMap(std::string field, int* map, int nIDs)
 
 void checkBoundaryAlignment(mesh_t *mesh)
 {
-  int nid = nbid[0];
-  if (mesh->cht)
-    nid = nbid[1];
-
   bool bail = false;
   for (auto &&field : fields) {
     if (field != std::string("velocity") && field != std::string("mesh"))
       continue;
+
+    const int nid = size(field);
 
     std::map<int, boundaryAlignment_t> expectedAlignmentInvalidBIDs;
     std::map<int, std::set<boundaryAlignment_t>> actualAlignmentsInvalidBIDs;
@@ -685,9 +682,7 @@ void remapUnalignedBoundaries(mesh_t *mesh)
     std::map<int, bool> remapBID;
     std::map<int, boundaryAlignment_t> alignmentBID;
 
-    int nid = nbid[0];
-    if (mesh->cht)
-      nid = nbid[1];
+    const int nid = size(field);
 
     for (int bid = 1; bid <= nid; ++bid) {
       int bcType = id(bid, field);
@@ -757,12 +752,10 @@ void remapUnalignedBoundaries(mesh_t *mesh)
 
 bool unalignedMixedBoundary(std::string field)
 {
-  int nid = nbid[0];
-  if (field.compare("mesh") == 0)
-    nid = (nbid[1] > -1) ? nbid[1] : nbid[0]; 
+  const auto nid = size(field);
 
   for (int bid = 1; bid <= nid; bid++) {
-    int bcType = id(bid, field);
+    const auto bcType = id(bid, field);
     if (bcType == bcTypeSYM)
       return true;
     if (bcType == bcTypeSHL)

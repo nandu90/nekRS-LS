@@ -67,7 +67,7 @@ void setup();
 int id(int bid, std::string field);
 int ellipticType(int bid, std::string field);
 std::string text(int bid, std::string field);
-int size(int isTmesh);
+int size(const std::string& field);
 void check(mesh_t* mesh);
 void setBcMap(std::string field, int* map, int nbid);
 void checkBoundaryAlignment(mesh_t *mesh);
