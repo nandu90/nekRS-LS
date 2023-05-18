@@ -8,7 +8,6 @@ timeStepper = tombo3
 writeInterval = 50
 
 usr = "mv_cyl.usr"
-oudf = "mv_cyl_derived_bc.oudf"
 udf = "mv_cyl.udf"
 
 [MESH]
