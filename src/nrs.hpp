@@ -12,6 +12,8 @@
 #include "cvode.hpp"
 #include "fldFile.hpp"
 
+std::vector<std::string> fieldsToSolve(setupAide& options);
+
 struct nrs_t {
 
   static constexpr double targetTimeBenchmark {0.2};

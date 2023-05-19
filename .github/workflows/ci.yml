@@ -385,6 +385,10 @@ jobs:
     - name: 'eddyNekNekMv'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/eddyNekNek
       run: ${{ env.NEKRS_HOME }}/bin/nrsmpi eddyNekNekMv.sess 2 --cimode 2
+    
+    - name: 'eddyNekNek, velocity:solver = none'
+      working-directory: ${{ env.NEKRS_EXAMPLES }}/eddyNekNek
+      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi eddyNekNek.sess 2 --cimode 3
 
   ktauChannel:
     needs: install

@@ -10,6 +10,28 @@
 
 #include "cdsSetup.cpp"
 
+std::vector<std::string> fieldsToSolve(setupAide& options)
+{
+  int Nscalar = 0;
+  options.getArgs("NUMBER OF SCALARS", Nscalar);
+
+  std::vector<std::string> fields; 
+
+  if (!options.compareArgs("MESH SOLVER", "NONE"))
+    fields.push_back("mesh");
+
+  if (!options.compareArgs("VELOCITY SOLVER", "NONE"))
+    fields.push_back("velocity");
+
+  for (int i = 0; i < Nscalar; i++) {
+    const auto sid = scalarDigitStr(i);
+    if (!options.compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
+      fields.push_back("scalar" + sid);
+    }
+  }
+  return fields;
+}
+
 void printICMinMax(nrs_t *nrs)
 {
   if (platform->comm.mpiRank == 0)
@@ -161,6 +183,14 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
              EXIT_FAILURE,
              "%s\n",
              "Conjugate heat transfer requires a temperature field!");
+    
+    bool coupled = neknekCoupled();
+    nrsCheck(nelgt != nelgv && coupled,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "Conjugate heat transfer + neknek not supported!");
+    
   }
 
   // init nek
@@ -201,20 +231,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
   // verify boundary conditions
   {
-    std::vector<std::string> fields; 
-
-    if (!options.compareArgs("MESH SOLVER", "NONE"))
-      fields.push_back("mesh");
-
-    if (!options.compareArgs("VELOCITY SOLVER", "NONE"))
-      fields.push_back("velocity");
-
-    for (int i = 0; i < nrs->Nscalar; i++) {
-      const auto sid = scalarDigitStr(i);
-      if (!options.compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
-        fields.push_back("scalar" + sid);
-      }
-    }
+    auto fields = fieldsToSolve(options);
 
     for (const auto &field : fields) {
       auto msh = (nrs->cht && (field == "scalar00" || field == "mesh")) ? 

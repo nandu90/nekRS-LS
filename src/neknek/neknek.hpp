@@ -10,7 +10,7 @@
 
 struct nrs_t;
 
-bool neknekCoupled(nrs_t *nrs);
+bool neknekCoupled();
 
 class neknek_t {
 public:
