@@ -23,11 +23,15 @@ boundaryAlignment_t computeAlignment(mesh_t *mesh, dlong element, dlong face)
   dfloat nyDiff = 0.0;
   dfloat nzDiff = 0.0;
 
+  std::vector<dfloat> sgeo;
+  sgeo.reserve(mesh->o_sgeo.size()/sizeof(dfloat));
+  mesh->o_sgeo.copyTo(sgeo.data());
+
   for (int fp = 0; fp < mesh->Nfp; ++fp) {
     const dlong sid = mesh->Nsgeo * (mesh->Nfaces * mesh->Nfp * element + mesh->Nfp * face + fp);
-    const dfloat nx = mesh->sgeo[sid + NXID];
-    const dfloat ny = mesh->sgeo[sid + NYID];
-    const dfloat nz = mesh->sgeo[sid + NZID];
+    const dfloat nx = sgeo[sid + NXID];
+    const dfloat ny = sgeo[sid + NYID];
+    const dfloat nz = sgeo[sid + NZID];
     nxDiff += std::abs(std::abs(nx) - 1.0);
     nyDiff += std::abs(std::abs(ny) - 1.0);
     nzDiff += std::abs(std::abs(nz) - 1.0);
@@ -258,6 +262,7 @@ void setupField(std::vector<std::string> slist, std::string field)
     return;
 
   importFromNek = false;
+  lowerCase(field);
 
   if (slist[0].compare("none") == 0)
     return;
@@ -304,9 +309,13 @@ void setup()
 
         if (option.first.find("BOUNDARY TYPE MAP") != std::string::npos) {
           count++;
-          auto value = section;
-          lowerCase(value);
-          setupField(serializeString(option.second, ','), value);
+
+          if (section == "MESH" &&
+              option.first.find("DERIVED") != std::string::npos)
+            deriveMeshBoundaryConditions(serializeString(option.second, ','));
+          else
+            setupField(serializeString(option.second, ','), section);
+
           staleOptions.push_back(option.first);
         }
 
