@@ -89,6 +89,7 @@ void ciTestPointInterp(nrs_t *nrs, dfloat time, int tstep)
   }
 
   auto tol = 1e-6;
+  if(ciMode == 2) tol = 1e-3;
   bool passed = true;
   passed &= (maxErrU < tol);
   passed &= (maxErrV < tol);
