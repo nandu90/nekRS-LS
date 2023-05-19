@@ -127,7 +127,10 @@ void lowMach::qThermalSingleComponent(dfloat time, occa::memory& o_div)
 
   double surfaceFlops = 0.0;
 
-  if (nrs->pSolver->allNeumann) {
+  if (nrs->pSolver) {
+    const bool closedVolume = nrs->pSolver->allNeumann;
+    if(!closedVolume)
+     return;
 
     const dlong Nlocal = mesh->Nlocal;
 
