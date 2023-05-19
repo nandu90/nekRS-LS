@@ -198,6 +198,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
   nrs->meshV = (mesh_t *)nrs->_mesh->fluid;
   mesh_t *mesh = nrs->meshV;
 
+
   // verify boundary conditions
   {
     std::vector<std::string> fields; 
@@ -236,8 +237,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     }
   }
 
-  nrs->NVfields = 3;
-  mesh->Nfields = 1;
+  nrs->NVfields = nrs->dim;
 
   platform->options.getArgs("SUBCYCLING STEPS", nrs->Nsubsteps);
   platform->options.getArgs("DT", nrs->dt[0]);
@@ -324,6 +324,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
   if (options.compareArgs("MOVING MESH", "TRUE"))
     wrkFields += nrs->NVfields;
 
+
   const int mempoolNflds = std::max(wrkFields, 2 * nrs->NVfields + ellipticWrkFields);
   platform->create_mempool(nrs->fieldOffset, mempoolNflds);
 
@@ -333,17 +334,11 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     mesh->o_LMM.free();
     mesh->o_LMM = platform->device.malloc(nrs->fieldOffset * nBDF, sizeof(dfloat));
     mesh->o_LMM.copyFrom(platform->o_mempool.slice0, mesh->Nlocal * sizeof(dfloat));
-    free(mesh->LMM);
-    mesh->LMM = (dfloat*) std::malloc(mesh->o_LMM.size());
-    mesh->o_LMM.copyTo(mesh->LMM);
 
     platform->o_mempool.slice0.copyFrom(mesh->o_invLMM, mesh->Nlocal * sizeof(dfloat));
     mesh->o_invLMM.free();
     mesh->o_invLMM = platform->device.malloc(nrs->fieldOffset * nBDF, sizeof(dfloat));
     mesh->o_invLMM.copyFrom(platform->o_mempool.slice0, mesh->Nlocal * sizeof(dfloat));
-    free(mesh->invLMM);
-    mesh->invLMM = (dfloat*) std::malloc(mesh->o_invLMM.size());
-    mesh->o_invLMM.copyTo(mesh->invLMM);
 
     const int nAB = std::max(nrs->nEXT, mesh->nAB);
     mesh->U = (dfloat *)calloc(nrs->NVfields * nrs->fieldOffset * nAB, sizeof(dfloat));
@@ -468,6 +463,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
     free(A);
   }
+
 
   // build kernels
   std::string kernelName;
@@ -628,8 +624,8 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
   nrs->_mesh->o_x.copyFrom(nrs->_mesh->x);
   nrs->_mesh->o_y.copyFrom(nrs->_mesh->y);
   nrs->_mesh->o_z.copyFrom(nrs->_mesh->z);
-  if(nrs->meshV != nrs->_mesh) nrs->meshV->update(true);
-  nrs->_mesh->update(true);
+  if(nrs->meshV != nrs->_mesh) nrs->meshV->update();
+  nrs->_mesh->update();
 
   // in case the user sets IC in udf.setup
   nrs->o_U.copyFrom(nrs->U);

@@ -267,12 +267,11 @@ void deviceMemPool_t::allocate(memPool_t &hostMemory, const dlong offset, const 
 
 void platform_t::create_mempool(const dlong offset, const dlong fields)
 {
-  mempool.allocate(offset, fields);
-  o_mempool.allocate(mempool, offset, fields);
+  mempool.allocate(offset, std::max(6,fields));
+  o_mempool.allocate(mempool, offset, std::max(6,fields));
 
   // offset mempool available for elliptic because also used it for ellipticSolve input/output
   auto const o_mempoolElliptic =
       platform->o_mempool.o_ptr.slice((6 * sizeof(dfloat)) * offset);
   elliptic_t::o_wrk = o_mempoolElliptic;
-
 }
