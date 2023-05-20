@@ -1,6 +1,3 @@
-// * eliminate sgeo, ggeo, vgeo, cubvgeo, LMM, invLMM 
-// * setup geometricFactor kernel to MG level
-
 #include "nrs.hpp"
 #include "nekInterfaceAdapter.hpp"
 #include "meshNekReader.hpp"

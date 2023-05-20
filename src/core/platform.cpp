@@ -197,46 +197,14 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   fileName = oklpath + "/core/" + kernelName + extension;
   this->kernels.add(kernelName, fileName, this->kernelInfo);
 }
-void memPool_t::allocate(const dlong offset, const dlong fields)
-{
-  if (ptr)
-    free(ptr);
 
-  ptr = (dfloat *)calloc(offset * fields, sizeof(dfloat));
-  if (fields > 0)
-    slice0 = ptr + 0 * offset;
-  if (fields > 1)
-    slice1 = ptr + 1 * offset;
-  if (fields > 2)
-    slice2 = ptr + 2 * offset;
-  if (fields > 3)
-    slice3 = ptr + 3 * offset;
-  if (fields > 4)
-    slice4 = ptr + 4 * offset;
-  if (fields > 5)
-    slice5 = ptr + 5 * offset;
-  if (fields > 6)
-    slice6 = ptr + 6 * offset;
-  if (fields > 7)
-    slice7 = ptr + 7 * offset;
-  if (fields > 9)
-    slice9 = ptr + 9 * offset;
-  if (fields > 12)
-    slice12 = ptr + 12 * offset;
-  if (fields > 15)
-    slice15 = ptr + 15 * offset;
-  if (fields > 18)
-    slice18 = ptr + 18 * offset;
-  if (fields > 19)
-    slice19 = ptr + 19 * offset;
-}
-void deviceMemPool_t::allocate(memPool_t &hostMemory, const dlong offset, const dlong fields)
+void deviceMemPool_t::allocate(const dlong offset, const dlong fields)
 {
   if (o_ptr.size())
     o_ptr.free();
 
   bytesAllocated = (fields * sizeof(dfloat)) * offset;
-  o_ptr = platform->device.malloc(bytesAllocated, hostMemory.slice0);
+  o_ptr = platform->device.malloc(bytesAllocated);
   if (fields > 0)
     slice0 = o_ptr.slice((0 * sizeof(dfloat)) * offset);
   if (fields > 1)
@@ -267,8 +235,7 @@ void deviceMemPool_t::allocate(memPool_t &hostMemory, const dlong offset, const 
 
 void platform_t::create_mempool(const dlong offset, const dlong fields)
 {
-  mempool.allocate(offset, std::max(6,fields));
-  o_mempool.allocate(mempool, offset, std::max(6,fields));
+  o_mempool.allocate(offset, std::max(6,fields));
 
   // offset mempool available for elliptic because also used it for ellipticSolve input/output
   auto const o_mempoolElliptic =

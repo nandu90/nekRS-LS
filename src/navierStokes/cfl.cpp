@@ -3,10 +3,12 @@
 #include "linAlg.hpp"
 
 static int firstTime = 1;
+static occa::memory h_scratch;
 
 void setup(nrs_t *nrs)
 {
   mesh_t *mesh = nrs->meshV;
+  h_scratch = platform->device.mallocHost(mesh->Nelements * sizeof(dfloat));
 
   dfloat *dH;
   if (nrs->elementType == QUADRILATERALS || nrs->elementType == HEXAHEDRA) {
@@ -46,15 +48,15 @@ dfloat computeCFL(nrs_t *nrs)
                  mesh->o_U,
                  platform->o_mempool.slice0);
 
-  // find the local maximum of CFL number
-  platform->o_mempool.slice0.copyTo(platform->mempool.slice0, mesh->Nelements * sizeof(dfloat));
+  platform->o_mempool.slice0.copyTo(h_scratch.ptr(), mesh->Nelements * sizeof(dfloat));
+  auto scratch = (dfloat *) h_scratch.ptr();
 
-  // finish reduction
-  dfloat cfl = 0.f;
-  for (dlong n = 0; n < mesh->Nelements; ++n)
-    cfl = std::max(cfl, platform->mempool.slice0[n]);
+  dfloat cfl = 0;
+  for (dlong n = 0; n < mesh->Nelements; ++n) {
+    cfl = std::max(cfl, scratch[n]);
+  }
 
-  dfloat gcfl = 0.f;
+  dfloat gcfl = 0;
   MPI_Allreduce(&cfl, &gcfl, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm);
 
   return gcfl;
