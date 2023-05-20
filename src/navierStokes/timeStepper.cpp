@@ -55,10 +55,12 @@ static void extrapolate(nrs_t *nrs)
                            nrs->o_U,
                            nrs->o_Ue);
 
-    if (nrs->pSolver->allNeumann && platform->options.compareArgs("LOWMACH", "TRUE")) {
-      nrs->p0the = 0.0;
-      for (int ext = 0; ext < nrs->nEXT; ++ext) {
-        nrs->p0the += nrs->coeffEXT[ext] * nrs->p0th[ext];
+    if (nrs->flow && platform->options.compareArgs("LOWMACH", "TRUE")) {
+      if (nrs->pSolver->allNeumann) {
+        nrs->p0the = 0.0;
+        for (int ext = 0; ext < nrs->nEXT; ++ext) {
+          nrs->p0the += nrs->coeffEXT[ext] * nrs->p0th[ext];
+        }
       }
     }
   }
