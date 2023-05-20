@@ -656,20 +656,12 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
   // in case the user sets IC in udf.setup
   nrs->o_U.copyFrom(nrs->U);
-  if(nrs->o_Ue.isInitialized())
-    nrs->o_Ue.copyFrom(nrs->U, nrs->NVfields * nrs->fieldOffset * sizeof(dfloat));
   nrs->o_P.copyFrom(nrs->P);
   if (nrs->Nscalar) {
     nrs->cds->o_S.copyFrom(nrs->cds->S);
-    if(nrs->cds->o_Se.isInitialized()) {
-      nrs->cds->o_Se.copyFrom(nrs->cds->S, nrs->cds->fieldOffsetSum * sizeof(dfloat));
-    }
   }
   if (options.compareArgs("MOVING MESH", "TRUE")) {
     mesh->o_U.copyFrom(mesh->U);
-    if(mesh->o_Ue.isInitialized()) {
-      mesh->o_Ue.copyFrom(mesh->U, nrs->NVfields * nrs->fieldOffset * sizeof(dfloat));
-    }
   }
 
   // ensure both codes see the same mesh + IC

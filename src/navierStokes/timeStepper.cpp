@@ -45,9 +45,8 @@ static void lagFields(nrs_t *nrs)
 static void extrapolate(nrs_t *nrs)
 {
   mesh_t *mesh = nrs->meshV;
-  cds_t *cds = nrs->cds;
 
-  if (nrs->flow) {
+  {
     nrs->extrapolateKernel(mesh->Nlocal,
                            nrs->NVfields,
                            nrs->nEXT,
@@ -76,17 +75,17 @@ static void extrapolate(nrs_t *nrs)
                            mesh->o_Ue);
   }
 
-  if(nrs->Nscalar == 0) return;
-  if(!cds->o_Se.isInitialized()) return;
-  
-  nrs->extrapolateKernel(cds->mesh[0]->Nlocal,
-                         cds->NSfields,
-                         cds->nEXT,
-                         cds->fieldOffset[0],
-                         cds->o_coeffEXT,
-                         cds->o_S,
-                         cds->o_Se);
-
+  if(nrs->Nscalar > 0) {
+    auto cds = nrs->cds;
+    if(!cds->o_Se.isInitialized()) return;
+    nrs->extrapolateKernel(cds->mesh[0]->Nlocal,
+                           cds->NSfields,
+                           cds->nEXT,
+                           cds->fieldOffset[0],
+                           cds->o_coeffEXT,
+                           cds->o_S,
+                           cds->o_Se);
+  }
 }
 
 static void computeDivUErr(nrs_t *nrs, dfloat &divUErrVolAvg, dfloat &divUErrL2)
