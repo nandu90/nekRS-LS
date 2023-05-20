@@ -190,7 +190,9 @@ void adjustDt(nrs_t* nrs, int tstep)
         const double maxFUy = platform->linAlg->max(nrs->meshV->Nlocal, o_FUy, platform->comm.mpiComm);
         const double maxFUz = platform->linAlg->max(nrs->meshV->Nlocal, o_FUz, platform->comm.mpiComm);
         const double maxFU = std::max({maxFUx, maxFUy, maxFUz});
-        const double maxU = maxFU / nrs->prop[nrs->fieldOffset];
+
+        const double minRho = platform->linAlg->min(nrs->meshV->Nlocal, nrs->o_rho, platform->comm.mpiComm);
+        const double maxU = maxFU / minRho;
         const double *x = nrs->meshV->x;
         const double *y = nrs->meshV->y;
         const double *z = nrs->meshV->z;
