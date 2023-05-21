@@ -238,7 +238,9 @@ void deviceMemPool_t::allocate(const dlong offset, const dlong fields)
 
 void platform_t::create_mempool(const dlong offset, const dlong fields)
 {
-  const auto minFields = 6; // required for ellipticSolve input/output
+  const auto minFields = 6;
   o_mempool.allocate(offset, std::max(minFields, fields));
+
+  // first minFields cannot be used as we may use the mempool for rhs and x going into ellipticSolve 
   elliptic_t::o_wrk = platform->o_mempool.o_ptr.slice((minFields * sizeof(dfloat)) * offset);
 }

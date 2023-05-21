@@ -346,7 +346,8 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
   // setup mempool
   int ellipticMaxFields = 1;
-  if (platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE")) {
+  if (platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE") ||
+      !platform->options.compareArgs("MESH SOLVER", "NONE")) {
     ellipticMaxFields = nrs->NVfields;
   }
   const int ellipticWrkFields = elliptic_t::NScratchFields * ellipticMaxFields;
