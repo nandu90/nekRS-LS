@@ -2,17 +2,19 @@
 #include "platform.hpp"
 #include "linAlg.hpp"
 
-static int firstTime = 1;
-static occa::memory h_scratch;
+namespace
+{
+int firstTime = 1;
+occa::memory h_scratch;
+}
 
 void setup(nrs_t *nrs)
 {
   mesh_t *mesh = nrs->meshV;
   h_scratch = platform->device.mallocHost(mesh->Nelements * sizeof(dfloat));
 
-  dfloat *dH;
   if (nrs->elementType == QUADRILATERALS || nrs->elementType == HEXAHEDRA) {
-    dH = (dfloat *)calloc((mesh->N + 1), sizeof(dfloat));
+    auto dH = (dfloat *) calloc((mesh->N + 1), sizeof(dfloat));
 
     for (int n = 0; n < (mesh->N + 1); n++) {
       if (n == 0)
@@ -38,7 +40,6 @@ dfloat computeCFL(nrs_t *nrs)
   if (firstTime)
     setup(nrs);
 
-  // Compute cfl factors i.e. dt* U / h
   nrs->cflKernel(mesh->Nelements,
                  nrs->dt[0],
                  mesh->o_vgeo,
@@ -48,8 +49,8 @@ dfloat computeCFL(nrs_t *nrs)
                  mesh->o_U,
                  platform->o_mempool.slice0);
 
-  platform->o_mempool.slice0.copyTo(h_scratch.ptr(), mesh->Nelements * sizeof(dfloat));
   auto scratch = (dfloat *) h_scratch.ptr();
+  platform->o_mempool.slice0.copyTo(scratch, mesh->Nelements * sizeof(dfloat));
 
   dfloat cfl = 0;
   for (dlong n = 0; n < mesh->Nelements; ++n) {

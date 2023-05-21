@@ -25,7 +25,7 @@ occa::memory h_scratch;
 occa::kernel qtlKernel;
 occa::kernel p0thHelperKernel;
 occa::kernel surfaceFluxKernel;
-} // namespace
+}
 
 void lowMach::buildKernel(occa::properties kernelInfo)
 {

@@ -183,7 +183,7 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
 
         cds->o_filterMT.copyFrom(hpfSetup(cds->mesh[is], filterNc),
                                  Nmodes * Nmodes * sizeof(dfloat),
-                                 Nmodes * Nmodes * sizeof(dfloat));
+                                 is * Nmodes * Nmodes * sizeof(dfloat));
 
         applyFilterRT[is] = 1;
         cds->applyFilter = 1;
