@@ -106,11 +106,7 @@ void printICMinMax(nrs_t *nrs)
 
     int cnt = 0;
     for (int is = 0; is < cds->NSfields; is++) {
-      if (!cds->compute[is]) {
-        continue;
-      } else {
-        cnt++;
-      }
+      cnt++;
 
       mesh_t *mesh;
       (is) ? mesh = cds->meshV : mesh = cds->mesh[0]; // only first scalar can be a CHT mesh
