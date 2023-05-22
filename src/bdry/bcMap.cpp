@@ -277,7 +277,6 @@ void setupField(std::vector<std::string> slist, std::string field)
     s_setup(field, slist);
   else
     nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "unknown field %s\n", field.c_str());
-
 }
 
 
@@ -371,6 +370,32 @@ void deriveMeshBoundaryConditions(std::vector<std::string> velocityBCs)
              "Invalid bcType (%s)\n", key.c_str());
 
     bToBc[make_pair(field, bid)] = vBcTextToID.at(key);
+  }
+}
+
+void verifyOudf()
+{
+  for (auto& [key, value] :  bToBc) {
+    auto field = key.first;
+    const int bcID = value; // bToBc.at({field, bid - 1});
+ 
+    if (field.compare("velocity") == 0 && (bcID == bcTypeV || bcID == bcTypeINT))
+      oudfFindDirichlet(field);
+    if (field.compare("mesh") == 0 && bcID == bcTypeV)
+      oudfFindDirichlet(field);
+    if (field.compare("pressure") == 0 &&
+        (bcID == bcTypeONX || bcID == bcTypeONY || bcID == bcTypeONZ || bcID == bcTypeON || bcID == bcTypeO))
+      oudfFindDirichlet(field);
+    if (field.compare(0, 6, "scalar") == 0 && (bcID == bcTypeS || bcID == bcTypeINTS))
+      oudfFindDirichlet(field);
+ 
+    if (field.compare("velocity") == 0 &&
+        (bcID == bcTypeSHLX || bcID == bcTypeSHLY || bcID == bcTypeSHLZ || bcID == bcTypeSHL))
+      oudfFindNeumann(field);
+    if (field.compare("mesh") == 0 && bcID == bcTypeSHL)
+      oudfFindNeumann(field);
+    if (field.compare(0, 6, "scalar") == 0 && bcID == bcTypeF)
+      oudfFindNeumann(field);
   }
 }
 
@@ -489,6 +514,7 @@ int ellipticType(int bid, std::string field)
   return 0;
 }
 
+
 std::string text(int bid, std::string field)
 {
   if (bid < 1) return std::string();
@@ -497,24 +523,6 @@ std::string text(int bid, std::string field)
 
   if (bcID == bcTypeNone) 
     return std::string("");
-
-  if (field.compare("velocity") == 0 && (bcID == bcTypeV || bcID == bcTypeINT))
-    oudfFindDirichlet(field);
-  if (field.compare("mesh") == 0 && bcID == bcTypeV)
-    oudfFindDirichlet(field);
-  if (field.compare("pressure") == 0 &&
-      (bcID == bcTypeONX || bcID == bcTypeONY || bcID == bcTypeONZ || bcID == bcTypeON || bcID == bcTypeO))
-    oudfFindDirichlet(field);
-  if (field.compare(0, 6, "scalar") == 0 && (bcID == bcTypeS || bcID == bcTypeINTS))
-    oudfFindDirichlet(field);
-
-  if (field.compare("velocity") == 0 &&
-      (bcID == bcTypeSHLX || bcID == bcTypeSHLY || bcID == bcTypeSHLZ || bcID == bcTypeSHL))
-    oudfFindNeumann(field);
-  if (field.compare("mesh") == 0 && bcID == bcTypeSHL)
-    oudfFindNeumann(field);
-  if (field.compare(0, 6, "scalar") == 0 && bcID == bcTypeF)
-    oudfFindNeumann(field);
 
   if (field.compare("velocity") == 0 || field.compare("mesh") == 0)
     return vBcIDToText.at(bcID);

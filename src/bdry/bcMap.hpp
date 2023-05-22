@@ -68,7 +68,7 @@ int id(int bid, std::string field);
 int ellipticType(int bid, std::string field);
 std::string text(int bid, std::string field);
 int size(const std::string& field);
-void check(mesh_t* mesh);
+void verifyOudf();
 void setBcMap(std::string field, int* map, int nbid);
 void checkBoundaryAlignment(mesh_t *mesh);
 void remapUnalignedBoundaries(mesh_t *mesh);
