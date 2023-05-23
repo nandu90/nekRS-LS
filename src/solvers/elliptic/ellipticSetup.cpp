@@ -141,13 +141,6 @@ void ellipticSolveSetup(elliptic_t *elliptic)
 
   setupAide &options = elliptic->options;
   const int verbose = platform->options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
-  const size_t offsetBytes = elliptic->fieldOffset * elliptic->Nfields * sizeof(dfloat);
-
-  nrsCheck(elliptic->o_wrk.size() < elliptic_t::NScratchFields * offsetBytes,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s\n",
-           "mempool assigned for elliptic too small!");
 
   mesh_t *mesh = elliptic->mesh;
   const dlong Nlocal = mesh->Np * mesh->Nelements;
@@ -155,6 +148,8 @@ void ellipticSolveSetup(elliptic_t *elliptic)
   const dlong Nblocks = (Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
   elliptic->type = strdup(dfloatString);
+
+  ellupticUpdateWorkspace(elliptic);
 
   hlong NelementsLocal = mesh->Nelements;
   hlong NelementsGlobal = 0;
@@ -177,13 +172,6 @@ void ellipticSolveSetup(elliptic_t *elliptic)
 
   mesh->maskKernel = platform->kernels.get("mask");
   mesh->maskPfloatKernel = platform->kernels.get("maskPfloat");
-
-  elliptic->o_p = elliptic->o_wrk + 0 * offsetBytes;
-  elliptic->o_z = elliptic->o_wrk + 1 * offsetBytes;
-  elliptic->o_Ap = elliptic->o_wrk + 2 * offsetBytes;
-  elliptic->o_x0 = elliptic->o_wrk + 3 * offsetBytes;
-  elliptic->o_rPfloat = elliptic->o_wrk + 4 * offsetBytes;
-  elliptic->o_zPfloat = elliptic->o_wrk + 5 * offsetBytes;
 
   elliptic->tmpNormr = (dfloat *)calloc(Nblocks, sizeof(dfloat));
   elliptic->o_tmpNormr = platform->device.malloc(Nblocks * sizeof(dfloat), elliptic->tmpNormr);

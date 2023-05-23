@@ -236,4 +236,23 @@ void ellipticOgs(mesh_t *mesh,
                  dlong &NmaskedGlobal,
                  occa::memory &o_maskIdsGlobal,
                  ogs_t **ogs);
+
+static void ellupticUpdateWorkspace(elliptic_t* elliptic)
+{
+  const size_t offsetBytes = elliptic->fieldOffset * (elliptic->Nfields * sizeof(dfloat));
+
+  nrsCheck(elliptic->o_wrk.size() < elliptic_t::NScratchFields * offsetBytes,
+           MPI_COMM_SELF,
+           EXIT_FAILURE,
+           "%s\n",
+           "mempool assigned for elliptic too small!");
+
+  elliptic->o_p = elliptic->o_wrk + 0 * offsetBytes;
+  elliptic->o_z = elliptic->o_wrk + 1 * offsetBytes;
+  elliptic->o_Ap = elliptic->o_wrk + 2 * offsetBytes;
+  elliptic->o_x0 = elliptic->o_wrk + 3 * offsetBytes;
+  elliptic->o_rPfloat = elliptic->o_wrk + 4 * offsetBytes;
+  elliptic->o_zPfloat = elliptic->o_wrk + 5 * offsetBytes;
+}
+ 
 #endif

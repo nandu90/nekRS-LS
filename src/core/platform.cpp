@@ -200,10 +200,9 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 
 void deviceMemPool_t::allocate(const dlong offset, const dlong fields)
 {
-  elliptic_t::o_wrk.free();
-  o_ptr.free();
-
   bytesAllocated = (fields * sizeof(dfloat)) * offset;
+
+  o_ptr.free();
   o_ptr = platform->device.malloc(bytesAllocated);
   if (fields > 0)
     slice0 = o_ptr.slice((0 * sizeof(dfloat)) * offset);
@@ -243,5 +242,5 @@ void platform_t::create_mempool(const dlong offset, const dlong fields)
   o_mempool.allocate(offset, std::max(minFields, fields));
 
   // first minFields cannot be used as we may use the mempool for rhs and x going into ellipticSolve 
-  elliptic_t::o_wrk = platform->o_mempool.o_ptr.slice((minFields * sizeof(dfloat)) * offset);
+  elliptic_t::o_wrk = o_mempool.o_ptr.slice((minFields * sizeof(dfloat)) * offset);
 }
