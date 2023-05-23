@@ -2,7 +2,6 @@
 #include <filesystem>
 #include <functional>
 #include "nrs.hpp"
-#include "meshSetup.hpp"
 #include "setup.hpp"
 #include "nekInterfaceAdapter.hpp"
 #include "printHeader.hpp"

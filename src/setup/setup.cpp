@@ -1,5 +1,4 @@
 #include "nrs.hpp"
-#include "meshSetup.hpp"
 #include "bdry.hpp"
 #include "bcMap.hpp"
 #include "nekInterfaceAdapter.hpp"
