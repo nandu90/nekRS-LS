@@ -241,11 +241,14 @@ static void ellupticUpdateWorkspace(elliptic_t* elliptic)
 {
   const size_t offsetBytes = elliptic->fieldOffset * (elliptic->Nfields * sizeof(dfloat));
 
-  nrsCheck(elliptic->o_wrk.size() < elliptic_t::NScratchFields * offsetBytes,
+  nrsCheck(platform->o_mempool.o_ptr.size() < (2 + elliptic_t::NScratchFields) * offsetBytes,
            MPI_COMM_SELF,
            EXIT_FAILURE,
-           "%s\n",
-           "mempool assigned for elliptic too small!");
+           "platform mempool too small! (required %lld out of %lld bytes)\n", 
+           (2 + elliptic_t::NScratchFields) * offsetBytes, platform->o_mempool.o_ptr.size());
+
+  elliptic_t::o_wrk = 
+    platform->o_mempool.o_ptr.slice((2 * offsetBytes));
 
   elliptic->o_p = elliptic->o_wrk + 0 * offsetBytes;
   elliptic->o_z = elliptic->o_wrk + 1 * offsetBytes;

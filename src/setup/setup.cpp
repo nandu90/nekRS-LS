@@ -682,7 +682,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
   printICMinMax(nrs);
 
-  // setup elliptic solvers
+  // setup elliptic solver
 
   if (nrs->Nscalar) {
     cds_t *cds = nrs->cds;

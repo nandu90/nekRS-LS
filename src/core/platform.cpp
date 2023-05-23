@@ -202,6 +202,9 @@ void deviceMemPool_t::allocate(const dlong offset, const dlong fields)
 {
   bytesAllocated = (fields * sizeof(dfloat)) * offset;
 
+  if (platform->comm.mpiRank == 0 && platform->verbose)
+    printf("deviceMemPool_t::allocate %lld bytes\n", bytesAllocated);
+
   o_ptr.free();
   o_ptr = platform->device.malloc(bytesAllocated);
   if (fields > 0)
@@ -234,13 +237,6 @@ void deviceMemPool_t::allocate(const dlong offset, const dlong fields)
 
 void platform_t::create_mempool(const dlong offset, const dlong fields)
 {
-  const auto minFields = 6;
-
-  if (platform->o_mempool.o_ptr.size() > (std::max(minFields, fields) * sizeof(dfloat)) * offset)
-    return;
-
-  o_mempool.allocate(offset, std::max(minFields, fields));
-
-  // first minFields cannot be used as we may use the mempool for rhs and x going into ellipticSolve 
-  elliptic_t::o_wrk = o_mempool.o_ptr.slice((minFields * sizeof(dfloat)) * offset);
+  if (platform->o_mempool.o_ptr.size() < ((fields * sizeof(dfloat)) * offset))
+    o_mempool.allocate(offset, fields);
 }
