@@ -8,8 +8,10 @@ void registerMeshKernels(occa::properties kernelInfoBC)
   platform->options.getArgs("POLYNOMIAL DEGREE", p);
   platform->options.getArgs("CUBATURE POLYNOMIAL DEGREE", pCub);
 
-  // the user can create a mesh of any order, restricting it to N <= p
-  for(int N = 2; N <= p; N++) {
+  std::vector<int> Nlist = {p};
+  if (p != 2) Nlist.push_back(2);
+
+  for(auto& N : Nlist) {
     const int Nq = N + 1;
     const int cubNq = (N == p) ? pCub + 1 : 1;
     const int Np = Nq * Nq * Nq;

@@ -203,7 +203,7 @@ void deviceMemPool_t::allocate(const dlong offset, const dlong fields)
   bytesAllocated = (fields * sizeof(dfloat)) * offset;
 
   if (platform->comm.mpiRank == 0 && platform->verbose)
-    printf("deviceMemPool_t::allocate %lld bytes\n", bytesAllocated);
+    printf("deviceMemPool_t::allocate %ld bytes\n", bytesAllocated);
 
   o_ptr.free();
   o_ptr = platform->device.malloc(bytesAllocated);

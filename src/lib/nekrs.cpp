@@ -34,6 +34,7 @@ static dfloat lastOutputTime = 0;
 static int firstOutfld = 1;
 static int enforceLastStep = 0;
 static int enforceOutputStep = 0;
+static bool initialized = false;
 
 namespace nekrs {
 
@@ -64,6 +65,8 @@ void setup(MPI_Comm commg_in,
            int sessionID,
            int debug)
 {
+  nrsCheck(initialized, comm_in, EXIT_FAILURE, "%s\n", "Calling setup twice is erroneous!");
+
   commg = commg_in;
   comm = comm_in;
 
@@ -214,6 +217,8 @@ void setup(MPI_Comm commg_in,
     }
   }
 #endif
+
+  initialized = true;
 }
 
 void copyFromNek(double time, int tstep) { nek::ocopyToNek(time, tstep); }

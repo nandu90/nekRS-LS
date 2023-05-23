@@ -29,6 +29,8 @@
 #include "platform.hpp"
 #include "linAlg.hpp"
 
+occa::memory elliptic_t::o_wrk = occa::memory();
+
 void checkConfig(elliptic_t *elliptic)
 {
   mesh_t *mesh = elliptic->mesh;
@@ -73,6 +75,12 @@ void checkConfig(elliptic_t *elliptic)
   if (elliptic->mesh->ogs == NULL) {
     if (platform->comm.mpiRank == 0)
       printf("mesh->ogs == NULL!");
+    err++;
+  }
+
+  if (elliptic->Nfields < 1 || elliptic->Nfields > 3) {
+    if (platform->comm.mpiRank == 0)
+      printf("Invalid Nfields = %d!", elliptic->Nfields);
     err++;
   }
 
@@ -149,8 +157,6 @@ void ellipticSolveSetup(elliptic_t *elliptic)
 
   elliptic->type = strdup(dfloatString);
 
-  ellupticUpdateWorkspace(elliptic);
-
   hlong NelementsLocal = mesh->Nelements;
   hlong NelementsGlobal = 0;
   MPI_Allreduce(&NelementsLocal, &NelementsGlobal, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
@@ -172,6 +178,8 @@ void ellipticSolveSetup(elliptic_t *elliptic)
 
   mesh->maskKernel = platform->kernels.get("mask");
   mesh->maskPfloatKernel = platform->kernels.get("maskPfloat");
+ 
+  ellipticUpdateWorkspace(elliptic);
 
   elliptic->tmpNormr = (dfloat *)calloc(Nblocks, sizeof(dfloat));
   elliptic->o_tmpNormr = platform->device.malloc(Nblocks * sizeof(dfloat), elliptic->tmpNormr);

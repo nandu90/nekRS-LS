@@ -208,13 +208,11 @@ mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &k
   // load reference (r,s,t) element nodes
   meshLoadReferenceNodesHex3D(mesh, N, cubN);
   if (platform->comm.mpiRank == 0) {
-    printf("polynomial order N: %d, Nq: %d", mesh->N, mesh->Nq);
+    printf("polynomial order N: %d", mesh->N);
     if (cubN)
-      printf(", over-integration order cubNq: %d", mesh->cubNq);
+      printf(", over-integration order cubN: %d", mesh->cubNq-1);
     printf("\n");
   }
-
-  platform->create_mempool(alignStride<dfloat>(mesh->Nlocal), 3);
 
   loadKernels(mesh);
 

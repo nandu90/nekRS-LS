@@ -73,7 +73,7 @@ struct GmresData{
 struct elliptic_t
 {
   static constexpr double targetTimeBenchmark {0.2};
-  static constexpr int NScratchFields {6};
+  static constexpr int NWorkspaceFields {6};
 
   int elementType = 12;      // number of edges (3=tri, 4=quad, 6=tet, 12=hex)
   int blockSolver = 0;
@@ -237,18 +237,21 @@ void ellipticOgs(mesh_t *mesh,
                  occa::memory &o_maskIdsGlobal,
                  ogs_t **ogs);
 
-static void ellupticUpdateWorkspace(elliptic_t* elliptic)
+static void ellipticUpdateWorkspace(elliptic_t* elliptic)
 {
-  const size_t offsetBytes = elliptic->fieldOffset * (elliptic->Nfields * sizeof(dfloat));
+  const auto Nfields = 6; // first 6 slices are reserved as input to ellipticSolve
+  const auto offsetBytesWrk = elliptic->fieldOffset * (Nfields * sizeof(dfloat));
+  const auto offsetBytes = elliptic->fieldOffset * (elliptic->Nfields * sizeof(dfloat));
 
-  nrsCheck(platform->o_mempool.o_ptr.size() < (2 + elliptic_t::NScratchFields) * offsetBytes,
+  const auto requiredBytes = offsetBytesWrk + elliptic_t::NWorkspaceFields * offsetBytes;
+  nrsCheck(platform->o_mempool.o_ptr.size() < requiredBytes,
            MPI_COMM_SELF,
            EXIT_FAILURE,
-           "platform mempool too small! (required %lld out of %lld bytes)\n", 
-           (2 + elliptic_t::NScratchFields) * offsetBytes, platform->o_mempool.o_ptr.size());
+           "platform mempool too small! (required %ld out of %ld bytes)\n", 
+           requiredBytes, platform->o_mempool.o_ptr.size());
 
   elliptic_t::o_wrk = 
-    platform->o_mempool.o_ptr.slice((2 * offsetBytes));
+    platform->o_mempool.o_ptr.slice(offsetBytesWrk);
 
   elliptic->o_p = elliptic->o_wrk + 0 * offsetBytes;
   elliptic->o_z = elliptic->o_wrk + 1 * offsetBytes;

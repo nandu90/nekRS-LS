@@ -128,8 +128,6 @@ void printICMinMax(nrs_t *nrs)
   }
 }
 
-occa::memory elliptic_t::o_wrk = occa::memory();
-
 void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 {
   platform_t *platform = platform_t::getInstance();
@@ -298,13 +296,8 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     nrs->fieldOffset = mesh->Np * (mesh->Nelements + mesh->totalHaloPairs);
     mesh_t *meshT = nrs->_mesh;
     nrs->fieldOffset = std::max(nrs->fieldOffset, meshT->Np * (meshT->Nelements + meshT->totalHaloPairs));
-
-    const int pageW = ALIGN_SIZE / sizeof(dfloat);
-    if (nrs->fieldOffset % pageW) {
-      nrs->fieldOffset = (nrs->fieldOffset / pageW + 1) * pageW;
-    }
+    nrs->fieldOffset = alignStride<dfloat>(nrs->fieldOffset);
   }
-
   nrs->_mesh->fieldOffset = nrs->fieldOffset;
 
   { // setup cubatureOffset
@@ -313,10 +306,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     } else {
       nrs->cubatureOffset = nrs->fieldOffset;
     }
-    const int pageW = ALIGN_SIZE / sizeof(dfloat);
-    if (nrs->cubatureOffset % pageW) {
-      nrs->cubatureOffset = (nrs->cubatureOffset / pageW + 1) * pageW;
-    }
+    nrs->cubatureOffset = alignStride<dfloat>(nrs->cubatureOffset);
   }
 
   if (nrs->Nsubsteps) {
@@ -345,7 +335,6 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
       !platform->options.compareArgs("MESH SOLVER", "NONE")) {
     ellipticMaxFields = nrs->NVfields;
   }
-  const int ellipticWrkFields = elliptic_t::NScratchFields * ellipticMaxFields;
 
   int wrkFields = 10;
   if (nrs->Nsubsteps) {
@@ -355,7 +344,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     wrkFields += nrs->NVfields;
   }
 
-  const int mempoolNflds = std::max(wrkFields, 2 * nrs->NVfields + ellipticWrkFields);
+  const int mempoolNflds = std::max(wrkFields, 2 * nrs->NVfields + elliptic_t::NWorkspaceFields * ellipticMaxFields);
   platform->create_mempool(nrs->fieldOffset, mempoolNflds);
 
   if (options.compareArgs("MOVING MESH", "TRUE")) {
