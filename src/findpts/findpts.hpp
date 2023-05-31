@@ -50,7 +50,7 @@ struct data_t {
     dist2_base = dist2.data();
 
     for (dlong i = 0; i < npt; ++i) {
-      dist2_base[i] = std::numeric_limits<dfloat>::max();
+      dist2_base[i] = 1e30;
       code_base[i] = CODE_NOT_FOUND;
     }
   }
