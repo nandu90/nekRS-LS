@@ -184,6 +184,14 @@ void upperCase(std::string& s)
   std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::toupper(c); });
 }
 
+double setPrecision(double val, int n)
+{
+  std::stringstream tmp;
+  tmp << std::setprecision(n) << std::scientific << val;
+  return std::stod(tmp.str());
+}
+
+
 }
 
 #endif

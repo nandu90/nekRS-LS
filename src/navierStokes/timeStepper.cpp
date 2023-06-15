@@ -263,6 +263,8 @@ void adjustDt(nrs_t* nrs, int tstep)
     if (tstep > 1)
       nrs->dt[0] = std::min(nrs->dt[0], maxAdjustDtRatio * nrs->dt[1]);
   }
+
+  nrs->dt[0] = setPrecision(nrs->dt[0], 4); // to avoid accumulation of roundoff errors
 }
 
 void initStep(nrs_t *nrs, dfloat time, dfloat dt, int tstep)
