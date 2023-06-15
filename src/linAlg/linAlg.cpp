@@ -27,6 +27,7 @@ SOFTWARE.
 #include "linAlg.hpp"
 #include "platform.hpp"
 #include "re2Reader.hpp"
+#include <numeric>
 
 linAlg_t *linAlg_t::singleton = nullptr;
 
@@ -52,18 +53,27 @@ void linAlg_t::runTimers()
     // warm-up
     weightedInnerProdMany(Nlocal, fields, 1, o_weight, o_r, o_z, platform->comm.mpiComm);
 
-    platform->device.finish();
-    MPI_Barrier(platform->comm.mpiComm);
-    const auto tStart = MPI_Wtime();
+    std::vector<double> elapsed;
     for (int i = 0; i < Nrep; i++) {
+      MPI_Barrier(platform->comm.mpiComm);
+      const auto tStart = MPI_Wtime();
+
       weightedInnerProdMany(Nlocal, fields, 1, o_weight, o_r, o_z, platform->comm.mpiComm);
+
+      elapsed.push_back((MPI_Wtime() - tStart));
     }
-    platform->device.finish();
-    const auto elapsed = (MPI_Wtime() - tStart) / Nrep;
-    auto elapsedMax = 0.0;
-    MPI_Allreduce(&elapsed, &elapsedMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0)
-      printf("wdotp: %.3es  ", elapsedMax);
+
+    double elapsedMax = *std::max_element(elapsed.begin(), elapsed.end());
+    double elapsedMin = *std::min_element(elapsed.begin(), elapsed.end());
+    double elapsedAvg = std::accumulate(elapsed.begin(), elapsed.end(), 0.0); 
+
+    MPI_Allreduce(MPI_IN_PLACE, &elapsedMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &elapsedMin, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &elapsedAvg, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
+    if (platform->comm.mpiRank == 0) {
+      printf("wdotp min/avg/max: %.3es %.3es %.3es  ", 
+             elapsedMin, elapsedAvg/Nrep, elapsedMax);
+    }
   }
 
   if (platform->comm.mpiCommSize > 1) {
@@ -78,7 +88,7 @@ void linAlg_t::runTimers()
     auto elapsedMax = 0.0;
     MPI_Allreduce(&elapsed, &elapsedMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
     if (platform->comm.mpiRank == 0)
-      printf("(local: %.3es)\n", elapsedMax);
+      printf("(avg local: %.3es)\n", elapsedMax);
   }
   else {
     if (platform->comm.mpiRank == 0)
