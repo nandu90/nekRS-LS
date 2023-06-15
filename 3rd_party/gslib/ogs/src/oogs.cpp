@@ -583,8 +583,8 @@ oogs_t *oogs::setup(ogs_t *ogs,
         }
         printf("\nused config: %s ", configStr.c_str());
         if (tavg/size > MPI_Wtick())
-          printf("(MPI min/max/avg: %.2es %.2es %.2es / avg bi-bw: %.1fGB/s/rank)\n",
-                 tmin, tmax, tavg/size,
+          printf("(MPI min/max/avg: %.2es %.2es %.2es / bi-bw: %.1fGB/s/rank)\n",
+                 tmin, tmax, tmax/size,
                  nBytesExchange / tavg / 1e9);
         else
           printf("\n");
