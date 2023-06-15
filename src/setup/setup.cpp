@@ -250,16 +250,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
                field.c_str());
     }
 
-    std::vector<mesh_t *> meshList;
-    meshList.push_back(nrs->_mesh);
-    if (nrs->meshV != nrs->_mesh) {
-      meshList.push_back(nrs->meshV);
-    }
-
-    for (const auto &msh : meshList) {
-      bcMap::checkBoundaryAlignment(msh);
-      bcMap::remapUnalignedBoundaries(msh);
-    }
+    bcMap::checkBoundaryAlignment(nrs->meshV);
   }
 
   nrs->NVfields = nrs->dim;

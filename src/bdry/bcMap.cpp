@@ -551,8 +551,9 @@ void checkBoundaryAlignment(mesh_t *mesh)
 {
   bool bail = false;
   for (auto &&field : fields) {
-    if (field != std::string("velocity") && field != std::string("mesh"))
+    if (field != std::string("velocity") && field != std::string("mesh")) {
       continue;
+    }
 
     const int nid = size(field);
 
