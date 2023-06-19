@@ -11,8 +11,6 @@ nrs_t *nrs;
 occa::memory o_wrk;
 
 occa::kernel setBCVectorValueKernel;
-occa::kernel getBCFluxKernel;
-occa::kernel sumReductionKernel;
 occa::kernel maskCopyKernel;
 
 bool buildKernelCalled = 0;
@@ -64,14 +62,6 @@ void velRecycling::buildKernel(occa::properties kernelInfo)
     kernelName = "setBCVectorValue";
     fileName = path + kernelName + extension;
     setBCVectorValueKernel = platform->device.buildKernel(fileName, kernelInfo, true);
-
-    kernelName = "getBCFlux";
-    fileName = path + kernelName + extension;
-    getBCFluxKernel = platform->device.buildKernel(fileName, kernelInfo, true);
-
-    kernelName = "sumReduction";
-    fileName = path + kernelName + extension;
-    sumReductionKernel = platform->device.buildKernel(fileName, kernelInfo, true);
 
     kernelName = "velRecyclingMaskCopy";
     fileName = path + kernelName + extension;

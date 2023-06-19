@@ -191,6 +191,17 @@ double setPrecision(double val, int n)
   return std::stod(tmp.str());
 }
 
+template<typename T = dfloat>
+void print(const occa::memory& o_u, const std::string& txt = "")
+{
+  std::vector<T> u(o_u.size()/sizeof(T));
+  o_u.copyTo(u.data());
+  std::cerr << txt << " ";
+  for (const auto& i: u) {
+    std::cerr << i << ", ";
+  }
+  std::cerr << std::endl;
+}
 
 }
 
