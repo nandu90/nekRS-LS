@@ -25,8 +25,12 @@ void UDF_Setup(nrs_t *nrs)
   const dfloat wbar = 1.0;
   const int bID = 1;
   dfloat zRecycLayer = 0.25 * ZLENGTH;
+#if 0
   const hlong offset = NELSLAB * round(NSLABS * zRecycLayer / ZLENGTH);
   velRecycling::setup(nrs, nrs->o_usrwrk, offset, bID, wbar);
+#else
+  velRecycling::setup(nrs, nrs->o_usrwrk, 0.0, 0.0, zRecycLayer, bID, wbar);
+#endif
 
   tavg::setup(nrs);
 }

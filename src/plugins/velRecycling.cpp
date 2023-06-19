@@ -1,11 +1,3 @@
-/*
-   copy velocity data of a given slab (slabIdSrc) to another slab
-   (slideIdDst) also known as recycling
-
-   Note: This implementation relies on a special global element
-         numbering which is only true for extruded meshes in z from nek!
- */
-
 #include "nrs.hpp"
 #include "platform.hpp"
 #include "nekInterfaceAdapter.hpp"
@@ -13,29 +5,54 @@
 
 // private members
 namespace {
-static oogs_t *ogs;
-static nrs_t *nrs;
+oogs_t *ogs;
+nrs_t *nrs;
 
-static occa::memory o_wrk;
+occa::memory o_wrk;
 
-static dfloat *flux, *area;
-static occa::memory o_flux, o_area;
+occa::kernel setBCVectorValueKernel;
+occa::kernel getBCFluxKernel;
+occa::kernel sumReductionKernel;
+occa::kernel maskCopyKernel;
 
-static dfloat *tmp1, *tmp2;
-static occa::memory o_tmp1, o_tmp2;
+bool buildKernelCalled = 0;
+bool setupCalled = 0;
 
-static occa::kernel setBCVectorValueKernel;
-static occa::kernel getBCFluxKernel;
-static occa::kernel sumReductionKernel;
+pointInterpolation_t *interp;
+occa::memory o_Uint;
+occa::memory o_maskIds;
 
-static bool buildKernelCalled = 0;
-static bool setupCalled = 0;
+int bID;
+occa::memory o_bID;
+dfloat wbar;
+dfloat area;
 
-static int bID;
-static dfloat wbar;
-
-static int Nblock;
+int Nblock;
 } // namespace
+
+
+static void setup(nrs_t *nrs_, occa::memory& o_wrk_,  const int bID_, const dfloat wbar_)
+{
+  nrs = nrs_;
+  o_wrk = o_wrk_;
+  bID = bID_;
+  wbar = wbar_;
+
+  mesh_t *mesh = nrs->meshV;
+
+  nrsCheck(o_wrk.size() < (nrs->NVfields * sizeof(dfloat) * nrs->fieldOffset),
+           platform->comm.mpiComm, EXIT_FAILURE, "%s\n",
+           "o_wrk too small!\n");
+
+  {
+    std::vector<int> tmp {bID};
+    o_bID = platform->device.malloc(tmp.size() * sizeof(int));
+    o_bID.copyFrom(tmp.data());
+  }
+
+  platform->linAlg->fill(mesh->Nlocal, 1.0, platform->o_mempool.slice0);
+  area = mesh->surfaceIntegral(o_bID.size()/sizeof(int), o_bID, platform->o_mempool.slice0).at(0);
+}
 
 void velRecycling::buildKernel(occa::properties kernelInfo)
 {
@@ -55,6 +72,10 @@ void velRecycling::buildKernel(occa::properties kernelInfo)
     kernelName = "sumReduction";
     fileName = path + kernelName + extension;
     sumReductionKernel = platform->device.buildKernel(fileName, kernelInfo, true);
+
+    kernelName = "velRecyclingMaskCopy";
+    fileName = path + kernelName + extension;
+    maskCopyKernel = platform->device.buildKernel(fileName, kernelInfo, true);
   }
 }
 
@@ -62,39 +83,20 @@ void velRecycling::copy()
 {
   mesh_t *mesh = nrs->meshV;
 
-  const dfloat zero = 0.0;
-
-  // copy recycling plane in interior to inlet
-  o_wrk.copyFrom(nrs->o_U, nrs->NVfields * nrs->fieldOffset * sizeof(dfloat));
-  setBCVectorValueKernel(mesh->Nelements, zero, bID, nrs->fieldOffset, o_wrk, mesh->o_vmapM, mesh->o_EToB);
-
-  oogs::startFinish(o_wrk, nrs->NVfields, nrs->fieldOffset, ogsDfloat, ogsAdd, ogs);
-
-  // rescale
-  getBCFluxKernel(mesh->Nelements,
-                  bID,
-                  nrs->fieldOffset,
-                  o_wrk,
-                  mesh->o_vmapM,
-                  mesh->o_EToB,
-                  mesh->o_sgeo,
-                  o_area,
-                  o_flux);
-
-  const int NfpTotal = mesh->Nelements * mesh->Nfaces * mesh->Nfp;
-  sumReductionKernel(NfpTotal, o_area, o_flux, o_tmp1, o_tmp2);
-
-  o_tmp1.copyTo(tmp1);
-  o_tmp2.copyTo(tmp2);
-  dfloat sbuf[2] = {0, 0};
-  for (int n = 0; n < Nblock; n++) {
-    sbuf[0] += tmp1[n];
-    sbuf[1] += tmp2[n];
+  if (interp) {
+    const dlong offset = o_Uint.size()/(nrs->NVfields * sizeof(dfloat)); 
+    interp->eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, offset, o_Uint);
+    maskCopyKernel(interp->numPoints(), offset, nrs->fieldOffset, o_maskIds, o_Uint, o_wrk);
+  } else {
+    o_wrk.copyFrom(nrs->o_U, nrs->NVfields * nrs->fieldOffset * sizeof(dfloat));
+    const dfloat zero = 0.0;
+    setBCVectorValueKernel(mesh->Nelements, zero, bID, nrs->fieldOffset, o_wrk, mesh->o_vmapM, mesh->o_EToB);
+    oogs::startFinish(o_wrk, nrs->NVfields, nrs->fieldOffset, ogsDfloat, ogsAdd, ogs);
   }
-  MPI_Allreduce(MPI_IN_PLACE, sbuf, 2, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
 
-  const dfloat scale = -wbar * sbuf[0] / sbuf[1];
-  // printf("rescaling inflow: %f\n", scale);
+  auto flux = mesh->surfaceIntegralVector(nrs->fieldOffset, o_bID.size()/sizeof(int), o_bID, o_wrk);
+
+  const dfloat scale = -wbar * area / flux[0];
   platform->linAlg->scale(nrs->NVfields * nrs->fieldOffset, scale, o_wrk);
 }
 
@@ -104,18 +106,16 @@ void velRecycling::setup(nrs_t *nrs_,
                          const int bID_,
                          const dfloat wbar_)
 {
-  nrs = nrs_;
-  o_wrk = o_wrk_;
-  bID = bID_;
-  wbar = wbar_;
+  setup(nrs_, o_wrk_, bID_, wbar_);
 
   mesh_t *mesh = nrs->meshV;
 
   const dlong Ntotal = mesh->Np * mesh->Nelements;
-  hlong *ids = (hlong *)calloc(Ntotal, sizeof(hlong));
 
+  // establish a unique numbering
+  // relies on a special global element numbering (extruded mesh)
+  auto ids = (hlong *)calloc(Ntotal, sizeof(hlong));
   for (int e = 0; e < mesh->Nelements; e++) {
-    // establish a unique numbering
     const hlong eg = nek::lglel(e); // 0-based
 
     for (int n = 0; n < mesh->Np; n++)
@@ -124,8 +124,9 @@ void velRecycling::setup(nrs_t *nrs_,
     for (int n = 0; n < mesh->Nfp * mesh->Nfaces; n++) {
       const int f = n / mesh->Nfp;
       const int idM = mesh->vmapM[e * mesh->Nfp * mesh->Nfaces + n];
-      if (mesh->EToB[f + e * mesh->Nfaces] == bID)
+      if (mesh->EToB[f + e * mesh->Nfaces] == bID) {
         ids[idM] += eOffset * mesh->Np;
+      }
     }
   }
 
@@ -141,18 +142,62 @@ void velRecycling::setup(nrs_t *nrs_,
                     OOGS_AUTO);
 
   free(ids);
+}
 
-  const int NfpTotal = mesh->Nelements * mesh->Nfaces * mesh->Nfp;
+void velRecycling::setup(nrs_t *nrs_,
+                         occa::memory o_wrk_,
+                         const dfloat xOffset,
+                         const dfloat yOffset,
+                         const dfloat zOffset,
+                         const int bID_,
+                         const dfloat wbar_)
+{
+  setup(nrs_, o_wrk_, bID_, wbar_);
 
-  Nblock = (NfpTotal + BLOCKSIZE - 1) / BLOCKSIZE;
-  tmp1 = (dfloat *)calloc(Nblock, sizeof(dfloat));
-  tmp2 = (dfloat *)calloc(Nblock, sizeof(dfloat));
+  mesh_t *mesh = nrs->meshV;
 
-  o_tmp1 = platform->device.malloc(Nblock * sizeof(dfloat), tmp1);
-  o_tmp2 = platform->device.malloc(Nblock * sizeof(dfloat), tmp2);
+  int cnt = 0;
+  for (int e = 0; e < mesh->Nelements; e++) {
+     for (int n = 0; n < mesh->Nfp * mesh->Nfaces; n++) {
+      const int f = n / mesh->Nfp;
+      if (mesh->EToB[f + e * mesh->Nfaces] == bID) {
+        cnt++;
+      }
+    }
+  }
+  
+  const auto nPoints = cnt;
 
-  flux = (dfloat *)calloc(NfpTotal, sizeof(dfloat));
-  area = (dfloat *)calloc(NfpTotal, sizeof(dfloat));
-  o_flux = platform->device.malloc(NfpTotal * sizeof(dfloat), flux);
-  o_area = platform->device.malloc(NfpTotal * sizeof(dfloat), area);
+  o_Uint = platform->device.malloc(nrs->NVfields * alignStride<dfloat>(nPoints) * sizeof(dfloat));
+  o_maskIds = platform->device.malloc(nPoints * sizeof(dlong));
+  auto maskIds = (dlong *)calloc(nPoints, sizeof(dlong));
+
+  auto xBid = (dfloat *)calloc(nPoints, sizeof(dfloat));
+  auto yBid = (dfloat *)calloc(nPoints, sizeof(dfloat));
+  auto zBid = (dfloat *)calloc(nPoints, sizeof(dfloat));
+
+  cnt = 0;
+  for (int e = 0; e < mesh->Nelements; e++) {
+     for (int n = 0; n < mesh->Nfp * mesh->Nfaces; n++) {
+      const int f = n / mesh->Nfp;
+      const int idM = mesh->vmapM[e * mesh->Nfp * mesh->Nfaces + n];
+      if (mesh->EToB[f + e * mesh->Nfaces] == bID) {
+        maskIds[cnt] = idM; 
+        xBid[cnt] = mesh->x[idM] + xOffset;
+        yBid[cnt] = mesh->y[idM] + yOffset;
+        zBid[cnt] = mesh->z[idM] + zOffset;
+        cnt++;
+      }
+    }
+  }
+  o_maskIds.copyFrom(maskIds);
+  free(maskIds);
+
+  interp = new pointInterpolation_t(nrs);
+  interp->setPoints(nPoints, xBid, yBid, zBid);
+  free(xBid);
+  free(yBid);
+  free(zBid);
+  const auto verbosity = pointInterpolation_t::VerbosityLevel::Basic;
+  interp->find(verbosity);
 }

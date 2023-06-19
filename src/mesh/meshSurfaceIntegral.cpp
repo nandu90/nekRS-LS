@@ -8,15 +8,10 @@ namespace {
   occa::memory h_sumFace;
 }
 
-std::vector<dfloat> mesh_t::surfaceIntegral(int nbID, const occa::memory& o_bID, const occa::memory& o_fld)
+static std::vector<dfloat> integral(mesh_t *mesh, int Nfields, dlong fieldOffset, bool vector, int nbID,
+                                    const occa::memory& o_bID, const occa::memory& o_fld)
 {
-  return surfaceIntegral(1, 0, nbID, o_bID, o_fld);
-}
-
-std::vector<dfloat> mesh_t::surfaceIntegral(int Nfields, int fieldOffset, int nbID,
-                                            const occa::memory o_bID, const occa::memory& o_fld)
-{
-  const auto Nbytes = (Nfields * sizeof(dfloat)) * Nelements;
+  const auto Nbytes = (Nfields * sizeof(dfloat)) * mesh->Nelements;
 
   if (o_sumFace.size() < Nbytes) {
     if (o_sumFace.size()) o_sumFace.free();
@@ -30,23 +25,35 @@ std::vector<dfloat> mesh_t::surfaceIntegral(int Nfields, int fieldOffset, int nb
     sum = (dfloat *) std::malloc(Nbytes);
   }
 
-  surfaceIntegralKernel(Nelements, 
-                        Nfields,
-                        fieldOffset, 
-                        nbID,
-                        o_bID,
-                        o_sgeo, 
-                        o_vmapM, 
-                        o_EToB,  
-                        o_fld,
-                        o_sumFace);
+  if (vector)
+    mesh->surfaceIntegralVectorKernel(mesh->Nelements, 
+                                Nfields,
+                                fieldOffset, 
+                                nbID,
+                                o_bID,
+                                mesh->o_sgeo, 
+                                mesh->o_vmapM, 
+                                mesh->o_EToB,  
+                                o_fld,
+                                o_sumFace);
+  else 
+    mesh->surfaceIntegralKernel(mesh->Nelements, 
+                          Nfields,
+                          fieldOffset, 
+                          nbID,
+                          o_bID,
+                          mesh->o_sgeo, 
+                          mesh->o_vmapM, 
+                          mesh->o_EToB,  
+                          o_fld,
+                          o_sumFace);
 
   o_sumFace.copyTo(sumFace, Nbytes);
 
   for (int j = 0; j < Nfields + 1; ++j) {
     sum[j] = 0;
-    for (int i = 0; i < Nelements; ++i) {
-      sum[j] += sumFace[i + j * Nelements];
+    for (int i = 0; i < mesh->Nelements; ++i) {
+      sum[j] += sumFace[i + j * mesh->Nelements];
     }
   }
   MPI_Allreduce(MPI_IN_PLACE, sum, Nfields, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
@@ -56,4 +63,20 @@ std::vector<dfloat> mesh_t::surfaceIntegral(int Nfields, int fieldOffset, int nb
     out.push_back(sum[i]);
   
   return out;
+}
+
+std::vector<dfloat> mesh_t::surfaceIntegral(int nbID, const occa::memory& o_bID, const occa::memory& o_fld)
+{
+  return integral(this, 1, static_cast<dlong>(0), false, nbID, o_bID, o_fld);
+}
+
+std::vector<dfloat> mesh_t::surfaceIntegralVector(dlong fieldOffset, int nbID, const occa::memory& o_bID, const occa::memory& o_fld)
+{
+  return integral(this, 1, fieldOffset, true, nbID, o_bID, o_fld);
+}
+
+std::vector<dfloat> mesh_t::surfaceIntegralMany(int Nfields, dlong fieldOffset, int nbID,
+                                                const occa::memory& o_bID, const occa::memory& o_fld)
+{
+  return integral(this, Nfields, fieldOffset, false, nbID, o_bID, o_fld);
 }

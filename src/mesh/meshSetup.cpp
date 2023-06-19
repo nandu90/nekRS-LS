@@ -168,6 +168,7 @@ static void loadKernels(mesh_t *mesh)
   const std::string orderSuffix = "_" + std::to_string(mesh->N);
 
   mesh->surfaceIntegralKernel = platform->kernels.get(meshPrefix + "surfaceIntegral" + orderSuffix);
+  mesh->surfaceIntegralVectorKernel = platform->kernels.get(meshPrefix + "surfaceIntegralVector" + orderSuffix);
   mesh->geometricFactorsKernel = platform->kernels.get(meshPrefix + "geometricFactorsHex3D" + orderSuffix);
   mesh->surfaceGeometricFactorsKernel = platform->kernels.get(meshPrefix + "surfaceGeometricFactorsHex3D" + orderSuffix);
   mesh->cubatureGeometricFactorsKernel = platform->kernels.get(meshPrefix + "cubatureGeometricFactorsHex3D" + orderSuffix);

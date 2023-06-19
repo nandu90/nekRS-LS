@@ -65,8 +65,7 @@ void ciTestErrors(nrs_t *nrs, dfloat time, int tstep)
   const auto drag = postProcessing::viscousDrag(nrs, bidWall.size(), o_bidWall, o_Sij);
 
   platform->linAlg->fill(mesh->Nlocal, 1.0, platform->o_mempool.slice0);
-  const auto areaWall =
-      mesh->surfaceIntegral(1, nrs->fieldOffset, bidWall.size(), o_bidWall, platform->o_mempool.slice0);
+  const auto areaWall = mesh->surfaceIntegral(bidWall.size(), o_bidWall, platform->o_mempool.slice0);
 
   // https://turbulence.oden.utexas.edu/channel2015/data/LM_Channel_2000_mean_prof.dat
   const auto utauRef = 4.58794e-02;

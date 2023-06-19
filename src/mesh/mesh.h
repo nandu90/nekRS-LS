@@ -41,9 +41,10 @@ struct nrs_t;
 struct mesh_t
 {
   std::vector<dfloat> surfaceIntegral(int nbID, const occa::memory& o_bID, const occa::memory& o_fld);
+  std::vector<dfloat> surfaceIntegralVector(dlong offsetFld, int nbID, const occa::memory& o_bID, const occa::memory& o_fld);
 
-  std::vector<dfloat> surfaceIntegral(int Nfields, int offsetFld, int nbID,
-                                      const occa::memory o_bID, const occa::memory& o_fld);
+  std::vector<dfloat> surfaceIntegralMany(int Nfields, dlong offsetFld, int nbID,
+                                          const occa::memory& o_bID, const occa::memory& o_fld);
 
   void move();
   void update(bool updateHost = false);
@@ -229,6 +230,7 @@ struct mesh_t
   occa::kernel velocityDirichletKernel;
 
   occa::kernel surfaceIntegralKernel;
+  occa::kernel surfaceIntegralVectorKernel;
 };
 
 mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &kernelInfo);
