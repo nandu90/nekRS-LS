@@ -196,11 +196,12 @@ void print(const occa::memory& o_u, const std::string& txt = "")
 {
   std::vector<T> u(o_u.size()/sizeof(T));
   o_u.copyTo(u.data());
-  std::cerr << txt << " ";
+  std::stringstream msg;
+  msg << txt << " ";
   for (const auto& i: u) {
-    std::cerr << i << ", ";
+    msg << i << ", ";
   }
-  std::cerr << std::endl;
+  std::cerr << msg.str() << std::endl;
 }
 
 }
