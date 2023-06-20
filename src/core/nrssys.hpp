@@ -71,6 +71,7 @@ using dlong = long long int;
 #include <vector>
 #include <map>
 #include <algorithm>
+#include <numeric>
 #include <functional>
 #include <cstdio>
 #include <cstdlib>

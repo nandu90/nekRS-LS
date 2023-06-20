@@ -20,11 +20,10 @@ dfloat alpha0 = 1.0;
 occa::memory o_beta;
 occa::memory o_kappa;
 
-occa::memory h_scratch;
+occa::memory o_bID;
 
 occa::kernel qtlKernel;
 occa::kernel p0thHelperKernel;
-occa::kernel surfaceFluxKernel;
 }
 
 void lowMach::buildKernel(occa::properties kernelInfo)
@@ -41,10 +40,6 @@ void lowMach::buildKernel(occa::properties kernelInfo)
     kernelName = "p0thHelper";
     fileName = path + kernelName + extension;
     p0thHelperKernel = platform->device.buildKernel(fileName, kernelInfo, true);
-
-    kernelName = "surfaceFlux";
-    fileName = path + kernelName + extension;
-    surfaceFluxKernel = platform->device.buildKernel(fileName, kernelInfo, true);
   }
 
   platform->options.setArgs("LOWMACH", "TRUE");
@@ -68,7 +63,17 @@ void lowMach::setup(nrs_t *nrs, dfloat alpha_, occa::memory& o_beta_, occa::memo
   nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE,
            "%s\n", "requires solving for temperature!");
 
-  h_scratch = platform->device.mallocHost(mesh->Nelements * sizeof(dfloat));
+  std::vector<int> bID;
+  for (auto& [key, bcID] :  bcMap::map()) {
+    const auto field = key.first;
+    if (field == "velocity") {
+      if (bcID == bcMap::bcTypeV || bcID == bcMap::bcTypeINT) {
+        bID.push_back(key.second + 1);
+      }
+    }
+  }
+  o_bID = platform->device.malloc<int>(bID.size());
+  o_bID.copyFrom(bID.data()); 
 }
 
 void lowMach::qThermalSingleComponent(double time, occa::memory& o_div)
@@ -146,29 +151,6 @@ void lowMach::qThermalSingleComponent(double time, occa::memory& o_div)
       return linAlg->sum(mesh->Nlocal, o_tmp, platform->comm.mpiComm);
     }();
 
-
-    auto o_flux = platform->o_memPool.reserve<dfloat>(mesh->Nelements);
-    surfaceFluxKernel(mesh->Nelements,
-                      mesh->o_sgeo,
-                      mesh->o_vmapM,
-                      nrs->o_EToB,
-                      nrs->fieldOffset,
-                      rhsCVODE ? nrs->o_U : nrs->o_Ue,
-                      o_flux);
-
-    double surfaceFluxFlops = 13 * mesh->Nq * mesh->Nq;
-    surfaceFluxFlops *= static_cast<double>(mesh->Nelements);
-
-    o_flux.copyTo(h_scratch.ptr());
-    auto scratch = (dfloat *) h_scratch.ptr();
-    o_flux.free();
-
-    dfloat termV = 0.0;
-    for (int i = 0; i < mesh->Nelements; ++i) {
-      termV += scratch[i];
-    }
-    MPI_Allreduce(MPI_IN_PLACE, &termV, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
-
     auto o_tmp1 = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
     auto o_tmp2 = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
     p0thHelperKernel(mesh->Nlocal,
@@ -182,6 +164,15 @@ void lowMach::qThermalSingleComponent(double time, occa::memory& o_div)
                      o_tmp2);
 
     double p0thHelperFlops = 4 * mesh->Nlocal;
+
+    const auto flux = mesh->surfaceIntegralVector(nrs->fieldOffset, 
+                                                   o_bID.length(), 
+                                                   o_bID, 
+                                                   rhsCVODE ? nrs->o_U : nrs->o_Ue);
+    const auto termV = std::accumulate(flux.begin(), flux.end(), 0.0); 
+
+    double surfaceFluxFlops = 13 * mesh->Nq * mesh->Nq;
+    surfaceFluxFlops *= static_cast<double>(mesh->Nelements);
 
     const auto prhs = (termQ - termV) / linAlg->sum(mesh->Nlocal, o_tmp1, platform->comm.mpiComm);
     linAlg->axpby(mesh->Nlocal, -prhs, o_tmp2, 1.0, o_div);
