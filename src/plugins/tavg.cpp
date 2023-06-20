@@ -246,7 +246,7 @@ void tavg::outfld(int _outXYZ, int FP64)
   occa::memory o_Tavg, o_Trms;
 
   if(userFieldList.size()) {
-    writeFld("ust", atime, outfldCounter, outXYZ, FP64, &o_NULL, &o_NULL, &o_AVG, userFieldList.size());
+    writeFld("ust", atime, outfldCounter, outXYZ, FP64, o_NULL, o_NULL, o_AVG, userFieldList.size());
   } else {
     const int Nscalar = nrs->Nscalar;
     if (nrs->Nscalar) {
@@ -254,11 +254,11 @@ void tavg::outfld(int _outXYZ, int FP64)
       o_Trms = o_Srms;
     }
  
-    writeFld("avg", atime, outfldCounter, outXYZ, FP64, &o_Uavg, &o_Pavg, &o_Tavg, Nscalar);
+    writeFld("avg", atime, outfldCounter, outXYZ, FP64, o_Uavg, o_Pavg, o_Tavg, Nscalar);
  
-    writeFld("rms", atime, outfldCounter, outXYZ, FP64, &o_Urms, &o_Prms, &o_Trms, Nscalar);
+    writeFld("rms", atime, outfldCounter, outXYZ, FP64, o_Urms, o_Prms, o_Trms, Nscalar);
  
-    writeFld("rm2", atime, outfldCounter, outXYZ, FP64, &o_Urm2, &o_NULL, &o_NULL, 0);
+    writeFld("rm2", atime, outfldCounter, outXYZ, FP64, o_Urm2, o_NULL, o_NULL, 0);
   }
 
   atime = 0;

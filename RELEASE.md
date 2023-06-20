@@ -5,12 +5,13 @@
 * Various bug fixes
 
 ## Good to know
+* [reproducibility] time step controller restricts dt to 5 significant digits
 
 ## Breaking Changes
-* platform's mempool API has changed
+* mempool API has changed (o_mempool.slice0 etc. was removed)
 * [udf] API argument `time` is `double` instead of `dfloat` 
-* occa::memory objects are dtype aware (use words instead of bytes for slice and copyFrom/To)  
-* [reproducibility] time step controller restricts dt to 5 significant digits
+* occa::memory objects are typed (use words instead of bytes for malloc, slice, copyFrom/To)  
+* writeFld takes `const occa::memory&` instead of `const void*`
 
 ## Known Bugs / Restrictions
 

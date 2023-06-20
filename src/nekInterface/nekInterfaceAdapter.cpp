@@ -107,23 +107,23 @@ void outfld(const char *filename,
             int step,
             int coords,
             int FP64,
-            void *o_uu,
-            void *o_pp,
-            void *o_ss,
+            const occa::memory& o_uu,
+            const occa::memory& o_pp,
+            const occa::memory& o_ss,
             int NSfields)
 {
   nrsCheck(NSfields > nekData.ldimt, platform->comm.mpiComm, EXIT_FAILURE,
            "Adjust ldimt in SIZE to %d and larger\n", NSfields);
 
   occa::memory o_u, o_p, o_s;
-  if (o_uu) {
-    o_u = static_cast<occa::memory *>(o_uu)->cast(occa::dtype::byte);
+  if (o_uu.isInitialized()) {
+    o_u = o_uu.cast(occa::dtype::byte);
   }
-  if (o_pp) {
-    o_p = static_cast<occa::memory *>(o_pp)->cast(occa::dtype::byte);
+  if (o_pp.isInitialized()) {
+    o_p = o_pp.cast(occa::dtype::byte);
   }
-  if (o_ss && NSfields) {
-    o_s = static_cast<occa::memory *>(o_ss)->cast(occa::dtype::byte);
+  if (o_ss.isInitialized() && NSfields) {
+    o_s = o_ss.cast(occa::dtype::byte);
   }
 
   int xo = 0;

@@ -112,9 +112,9 @@ void outfld(const char *filename,
             int step,
             int coords,
             int FP64,
-            void *o_u,
-            void *o_p,
-            void *o_s,
+            const occa::memory& o_u,
+            const occa::memory& o_p,
+            const occa::memory& o_s,
             int NSfields);
 void uic(int ifield);
 void finalize(void);

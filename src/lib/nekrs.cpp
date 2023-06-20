@@ -200,6 +200,8 @@ void setup(MPI_Comm commg_in,
   const double setupTime = platform->timer.query("setup", "DEVICE:MAX");
   if (rank == 0) {
     std::cout << "\nsettings:\n" << std::endl << options << std::endl;
+
+    std::cout << "memoryPool size: " << platform->o_memPool.size() / 1e9 << " GB" << std::endl;
     std::cout << "occa memory usage: " << platform->device.occaDevice().memoryAllocated() / 1e9 << " GB"
               << std::endl;
   }
