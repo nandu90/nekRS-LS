@@ -2,7 +2,7 @@
 #define nekrs_nrssys_hpp_
 
 //float data type
-#if 0
+#ifdef NEKRS_USE_DFLOAT_FLOAT 
 using dfloat = float;
 #define DFLOAT_SINGLE
 #define MPI_DFLOAT MPI_FLOAT
@@ -74,6 +74,7 @@ using dlong = long long int;
 #include <functional>
 #include <cstdio>
 #include <cstdlib>
+#include <cstddef>
 #include <unistd.h>
 #include <getopt.h>
 #include <sys/stat.h>
@@ -205,5 +206,4 @@ void print(const occa::memory& o_u, const std::string& txt = "")
 }
 
 }
-
 #endif

@@ -185,11 +185,9 @@ struct mesh_t
   dfloat* U; // host shadow of mesh velocity
 
   occa::memory o_D;
-  occa::memory o_DPfloat;
 
   occa::memory o_DW; // tensor product differentiation matrix (for Hexes)
   occa::memory o_DT;
-  occa::memory o_DTPfloat;
 
   occa::memory o_vgeo, o_sgeo;
   occa::memory o_vmapM, o_vmapP, o_mapP;
@@ -211,7 +209,6 @@ struct mesh_t
   occa::memory o_haloPutNodeIds;
 
   occa::memory o_ggeo; // second order geometric factors
-  occa::memory o_ggeoPfloat; // second order geometric factors
 
   occa::memory o_gllz;
   occa::memory o_gllw;
@@ -247,7 +244,7 @@ void parallelSort(int size, int rank, MPI_Comm comm,
                   void (* match)(void*, void*)
                   );
 
-void meshSolve(nrs_t* nrs, dfloat time, occa::memory o_U, int stage);
+occa::memory meshSolve(nrs_t* nrs, double time, int stage);
 
 /* dimension independent mesh operations */
 void meshConnect(mesh_t* mesh);
@@ -313,9 +310,9 @@ void dgesv_ ( int* N, int* NRHS, double* A,
 //             const int *LDB, double *BETA, double *C, const int *LDC);
 
 void dgemm_ (char*, char*, int*, int*, int*,
-             const dfloat*, const dfloat* __restrict, int*,
-             const dfloat* __restrict, int*,
-             const dfloat*, dfloat* __restrict, int*);
+             const double*, const double* __restrict, int*,
+             const double* __restrict, int*,
+             const double*, double* __restrict, int*);
 
 void sgesv_(int* N, int* NRHS,float* A, int* LDA, int* IPIV, float* B, int* LDB,int* INFO);
 

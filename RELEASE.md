@@ -1,3 +1,30 @@
+# Release v23.1
+
+## What is new? 
+
+* Various bug fixes
+
+## Good to know
+
+## Breaking Changes
+* platform's mempool API has changed
+* [udf] API argument `time` is `double` instead of `dfloat` 
+* occa::memory objects are dtype aware (use words instead of bytes for slice and copyFrom/To)  
+* [reproducibility] time step controller restricts dt to 5 significant digits
+
+## Known Bugs / Restrictions
+
+* Code is not fully optimized on CPUs in general and Intel GPUs
+* [485](https://github.com/Nek5000/Nek5000/issues/485)
+* [729](https://github.com/Nek5000/Nek5000/issues/759)
+* [258](https://github.com/Nek5000/nekRS/issues/258)
+
+## Thanks to our Contributors
+
+We are grateful to all who added new features, filed issues or helped resolve them, 
+asked and answered questions, and were part of inspiring discussions.
+
+
 # Release v23.0
 
 ## What is new? 

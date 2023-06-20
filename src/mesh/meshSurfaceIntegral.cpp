@@ -8,21 +8,18 @@ namespace {
   occa::memory h_sumFace;
 }
 
-static std::vector<dfloat> integral(mesh_t *mesh, int Nfields, dlong fieldOffset, bool vector, int nbID,
-                                    const occa::memory& o_bID, const occa::memory& o_fld)
+std::vector<dfloat> integral(mesh_t *mesh, int Nfields, int fieldOffset, bool vector, int nbID,
+                             const occa::memory o_bID, const occa::memory& o_fld)
 {
-  const auto Nbytes = (Nfields * sizeof(dfloat)) * mesh->Nelements;
-
-  if (o_sumFace.size() < Nbytes) {
+  if (o_sumFace.length() < Nfields * mesh->Nelements) {
     if (o_sumFace.size()) o_sumFace.free();
-    o_sumFace = platform->device.malloc(Nbytes);
-
-    if (h_sumFace.size()) h_sumFace.free();
-    h_sumFace = platform->device.mallocHost(Nbytes);
+    o_sumFace = platform->device.malloc<dfloat>(Nfields * mesh->Nelements);
+    if (h_sumFace.length()) h_sumFace.free();
+    h_sumFace = platform->device.mallocHost<dfloat>(Nfields * mesh->Nelements);
     sumFace = (dfloat *) h_sumFace.ptr();
 
     if (sum) free(sum);
-    sum = (dfloat *) std::malloc(Nbytes);
+    sum = (dfloat *) calloc(Nfields * mesh->Nelements, sizeof(dfloat));
   }
 
   if (vector)
@@ -48,7 +45,7 @@ static std::vector<dfloat> integral(mesh_t *mesh, int Nfields, dlong fieldOffset
                           o_fld,
                           o_sumFace);
 
-  o_sumFace.copyTo(sumFace, Nbytes);
+  o_sumFace.copyTo(sumFace, Nfields * mesh->Nelements);
 
   for (int j = 0; j < Nfields + 1; ++j) {
     sum[j] = 0;

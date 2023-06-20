@@ -38,18 +38,19 @@ static void setup(nrs_t *nrs_, occa::memory& o_wrk_,  const int bID_, const dflo
 
   mesh_t *mesh = nrs->meshV;
 
-  nrsCheck(o_wrk.size() < (nrs->NVfields * sizeof(dfloat) * nrs->fieldOffset),
+  nrsCheck(o_wrk.length() < nrs->NVfields * nrs->fieldOffset,
            platform->comm.mpiComm, EXIT_FAILURE, "%s\n",
            "o_wrk too small!\n");
 
   {
     std::vector<int> tmp {bID};
-    o_bID = platform->device.malloc(tmp.size() * sizeof(int));
+    o_bID = platform->device.malloc<int>(tmp.size());
     o_bID.copyFrom(tmp.data());
   }
 
-  platform->linAlg->fill(mesh->Nlocal, 1.0, platform->o_mempool.slice0);
-  area = mesh->surfaceIntegral(o_bID.size()/sizeof(int), o_bID, platform->o_mempool.slice0).at(0);
+  auto o_tmp = platform->device.malloc<dfloat>(mesh->Nlocal);
+  platform->linAlg->fill(mesh->Nlocal, 1.0, o_tmp);
+  area = mesh->surfaceIntegral(o_bID.length(), o_bID, o_tmp).at(0);
 }
 
 void velRecycling::buildKernel(occa::properties kernelInfo)
@@ -74,17 +75,17 @@ void velRecycling::copy()
   mesh_t *mesh = nrs->meshV;
 
   if (interp) {
-    const dlong offset = o_Uint.size()/(nrs->NVfields * sizeof(dfloat)); 
+    const dlong offset = o_Uint.length() / nrs->NVfields; 
     interp->eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, offset, o_Uint);
     maskCopyKernel(interp->numPoints(), offset, nrs->fieldOffset, o_maskIds, o_Uint, o_wrk);
   } else {
-    o_wrk.copyFrom(nrs->o_U, nrs->NVfields * nrs->fieldOffset * sizeof(dfloat));
+    o_wrk.copyFrom(nrs->o_U, nrs->NVfields * nrs->fieldOffset);
     const dfloat zero = 0.0;
     setBCVectorValueKernel(mesh->Nelements, zero, bID, nrs->fieldOffset, o_wrk, mesh->o_vmapM, mesh->o_EToB);
     oogs::startFinish(o_wrk, nrs->NVfields, nrs->fieldOffset, ogsDfloat, ogsAdd, ogs);
   }
 
-  auto flux = mesh->surfaceIntegralVector(nrs->fieldOffset, o_bID.size()/sizeof(int), o_bID, o_wrk);
+  auto flux = mesh->surfaceIntegralVector(nrs->fieldOffset, o_bID.length(), o_bID, o_wrk);
 
   const dfloat scale = -wbar * area / flux[0];
   platform->linAlg->scale(nrs->NVfields * nrs->fieldOffset, scale, o_wrk);
@@ -158,8 +159,8 @@ void velRecycling::setup(nrs_t *nrs_,
   
   const auto nPoints = cnt;
 
-  o_Uint = platform->device.malloc(nrs->NVfields * alignStride<dfloat>(nPoints) * sizeof(dfloat));
-  o_maskIds = platform->device.malloc(nPoints * sizeof(dlong));
+  o_Uint = platform->device.malloc<dfloat>(nrs->NVfields * alignStride<dfloat>(nPoints));
+  o_maskIds = platform->device.malloc<dlong>(nPoints);
   auto maskIds = (dlong *)calloc(nPoints, sizeof(dlong));
 
   auto xBid = (dfloat *)calloc(nPoints, sizeof(dfloat));

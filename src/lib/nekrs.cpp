@@ -30,7 +30,7 @@ static setupAide options;
 static int rank, size;
 static MPI_Comm commg, comm;
 
-static dfloat lastOutputTime = 0;
+static double lastOutputTime = 0;
 static int firstOutfld = 1;
 static int enforceLastStep = 0;
 static int enforceOutputStep = 0;
@@ -75,6 +75,8 @@ void setup(MPI_Comm commg_in,
 
   if (rank == 0) {
     printHeader();
+    if (sizeof(dfloat) == sizeof(float)) 
+      std::cout << "FP precision: 32-bit" << std::endl;
     std::cout << "MPI tasks: " << size << std::endl << std::endl;
   }
 
@@ -252,10 +254,9 @@ double dt(int tstep)
         return nrs->dt[0];
       }
     }
-    const double dtOld = nrs->dt[0];
     timeStepper::adjustDt(nrs, tstep);
 
-    double maxDt = 0;
+    dfloat maxDt = 0;
     platform->options.getArgs("MAX DT", maxDt);
     if (maxDt > 0)
       nrs->dt[0] = std::min(nrs->dt[0], maxDt);
@@ -515,7 +516,7 @@ bool runStep(int corrector)
 double finishStep()
 {
   timeStepper::finishStep(nrs);
-  return nrs->timePrevious + nrs->dt[0];
+  return nrs->timePrevious + setPrecision(nrs->dt[0], std::numeric_limits<decltype(nrs->dt[0])>::digits10 + 1);
 }
 
 bool stepConverged() { return nrs->timeStepConverged; }

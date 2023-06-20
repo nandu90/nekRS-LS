@@ -86,13 +86,13 @@ cvode_t::cvode_t(nrs_t *_nrs)
   this->nrs = _nrs;
   auto cds = nrs->cds;
 
-  o_coeffExt = platform->device.malloc(maxTimestepperOrder * sizeof(dfloat));
+  o_coeffExt = platform->device.malloc<dfloat>(maxTimestepperOrder);
 
-  o_U = platform->device.malloc((nrs->nEXT * nrs->NVfields * sizeof(dfloat)) * nrs->fieldOffset);
+  o_U = platform->device.malloc<dfloat>(nrs->nEXT * nrs->NVfields * nrs->fieldOffset);
 
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
-    o_meshU = platform->device.malloc((nrs->nEXT * nrs->NVfields * sizeof(dfloat)) * nrs->fieldOffset);
-    o_xyz0 = platform->device.malloc((nrs->NVfields * sizeof(dfloat)) * nrs->fieldOffset);
+    o_meshU = platform->device.malloc<dfloat>(nrs->nEXT * nrs->NVfields * nrs->fieldOffset);
+    o_xyz0 = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset);
   }
 
   if (platform->options.getArgs("CVODE RECYCLE PROPERTIES").empty()) {
@@ -144,8 +144,8 @@ cvode_t::cvode_t(nrs_t *_nrs)
     Nscalar++;
   }
 
-  o_scalarIds = platform->device.malloc(scalarIds.size() * sizeof(dlong), scalarIds.data());
-  o_cvodeScalarIds = platform->device.malloc(cvodeScalarIds.size() * sizeof(dlong), cvodeScalarIds.data());
+  o_scalarIds = platform->device.malloc<dlong>(scalarIds.size(), scalarIds.data());
+  o_cvodeScalarIds = platform->device.malloc<dlong>(cvodeScalarIds.size(), cvodeScalarIds.data());
 
   setupDirichletMask();
 
@@ -170,17 +170,11 @@ cvode_t::cvode_t(nrs_t *_nrs)
 
   if(mixedPrecisionJtvEnabled){
     auto mesh = cds->mesh[0];
-    o_vgeoPfloat = platform->device.malloc(mesh->Nelements * mesh->Np * mesh->Nvgeo, sizeof(pfloat));
+    o_vgeoPfloat = platform->device.malloc<pfloat>(mesh->Nelements * mesh->Np * mesh->Nvgeo);
     platform->copyDfloatToPfloatKernel(mesh->Nelements * mesh->Np * mesh->Nvgeo,
                                        mesh->o_vgeo,
                                        o_vgeoPfloat);
   }
-
-  const auto NbyteCvode = (this->Nscalar + 1) * nrs->fieldOffset * sizeof(dfloat);
-  if(NbyteCvode > platform->o_mempool.bytesAllocated){
-    platform->create_mempool(nrs->fieldOffset, this->Nscalar + 1);
-  }
-
 }
 
 void cvode_t::initialize()
@@ -376,7 +370,7 @@ void cvode_t::initialize()
     absTols[is] = absTolScalar;
   }
 
-  this->o_absTol = platform->device.malloc(this->Nscalar * sizeof(dfloat), absTols.data());
+  this->o_absTol = platform->device.malloc<dfloat>(this->Nscalar, absTols.data());
 
   this->sigScale = 1.0;
   platform->options.getArgs("CVODE SIGMA SCALE", this->sigScale);
@@ -519,15 +513,15 @@ void cvode_t::setupEToLMapping()
 #ifdef USE_E_VECTOR_LAYOUT
   std::vector<dlong> Eids(mesh->Nlocal);
   std::iota(Eids.begin(), Eids.end(), 0);
-  this->o_EToL = platform->device.malloc(mesh->Nlocal * sizeof(dlong), Eids.data());
-  this->o_EToLUnique = platform->device.malloc(mesh->Nlocal * sizeof(dlong), Eids.data());
+  this->o_EToL = platform->device.malloc<dlong>(mesh->Nlocal, Eids.data());
+  this->o_EToLUnique = platform->device.malloc<dlong>(mesh->Nlocal, Eids.data());
   this->LFieldOffset = mesh->Nlocal;
 #else
 
-  auto o_Lids = platform->device.malloc(mesh->Nlocal * sizeof(dlong));
+  auto o_Lids = platform->device.malloc<dlong>(mesh->Nlocal);
   std::vector<dlong> Eids(mesh->Nlocal);
   std::iota(Eids.begin(), Eids.end(), 0);
-  o_Lids.copyFrom(Eids.data(), mesh->Nlocal * sizeof(dlong));
+  o_Lids.copyFrom(Eids.data(), mesh->Nlocal);
 
   {
     const auto saveNhaloGather = mesh->ogs->NhaloGather;
@@ -537,7 +531,7 @@ void cvode_t::setupEToLMapping()
   }
 
   std::vector<dlong> Lids(mesh->Nlocal);
-  o_Lids.copyTo(Lids.data(), mesh->Nlocal * sizeof(dlong));
+  o_Lids.copyTo(Lids.data(), mesh->Nlocal);
 
   std::set<dlong> uniqueIds;
   for (auto &&id : Lids) {
@@ -554,7 +548,7 @@ void cvode_t::setupEToLMapping()
     EToLUnique[uniqueEid] = ctr;
     ctr++;
   }
-  this->o_EToL = platform->device.malloc(mesh->Nlocal * sizeof(dlong), EToLUnique.data());
+  this->o_EToL = platform->device.malloc<dlong>(mesh->Nlocal, EToLUnique.data());
   {
     const auto saveNhaloGather = mesh->ogs->NhaloGather;
     mesh->ogs->NhaloGather = 0;
@@ -562,7 +556,7 @@ void cvode_t::setupEToLMapping()
     mesh->ogs->NhaloGather = saveNhaloGather;
   }
 
-  this->o_EToLUnique = platform->device.malloc(mesh->Nlocal * sizeof(dlong), EToLUnique.data());
+  this->o_EToLUnique = platform->device.malloc<dlong>(mesh->Nlocal, EToLUnique.data());
 
   // construct L-vector version of inv degree, based on duplicated points in L-vector
   {
@@ -590,13 +584,13 @@ void cvode_t::setupEToLMapping()
       }
     }
 
-    this->o_invDegree = platform->device.malloc(LFieldOffset * sizeof(dfloat), invDegreeL.data());
+    this->o_invDegree = platform->device.malloc<dfloat>(LFieldOffset, invDegreeL.data());
   }
 
   // a few sanity checks:
   // EToL has non-negative values
   std::vector<dlong> EToL(mesh->Nlocal);
-  this->o_EToL.copyTo(EToL.data(), mesh->Nlocal * sizeof(dlong));
+  this->o_EToL.copyTo(EToL.data(), mesh->Nlocal);
   bool allNonNegative = std::all_of(EToL.begin(), EToL.end(), [](auto &&val) { return val >= 0; });
   int err = allNonNegative ? 0 : 1;
   MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
@@ -657,15 +651,11 @@ void cvode_t::setupDirichletMask()
     o_maskIdsGlobal.free();
   }
 
-  maskOffset = Nmasked;
-  const int pageW = ALIGN_SIZE / sizeof(dfloat);
-  if (maskOffset % pageW)
-    maskOffset = (maskOffset / pageW + 1) * pageW;
-
-  o_maskValues = platform->device.malloc(nrs->nEXT * maskOffset * sizeof(dfloat));
+  maskOffset = alignStride<dfloat>(Nmasked);
+  o_maskValues = platform->device.malloc<dfloat>(nrs->nEXT * maskOffset);
 }
 
-void cvode_t::applyDirichlet(dfloat time)
+void cvode_t::applyDirichlet(double time)
 {
   // extrapolate masked Dirichlet values to current time state
   // NOTE: this can only be applied after the extrapolation order is reached
@@ -682,7 +672,7 @@ void cvode_t::applyDirichlet(dfloat time)
                                      this->o_maskIds,
                                      o_coeffExt,
                                      this->o_maskValues,
-                                     cds->o_S + this->minCvodeScalarId * nrs->fieldOffset * sizeof(dfloat));
+                                     cds->o_S + this->minCvodeScalarId * nrs->fieldOffset);
     return;
   }
 
@@ -690,7 +680,7 @@ void cvode_t::applyDirichlet(dfloat time)
   static constexpr dfloat TINY = -1e30;
   cds_t *cds = nrs->cds;
   
-  auto o_S_start = platform->o_mempool.slice0;
+  auto o_S_start = platform->o_memPool.reserve<dfloat>(cds->fieldOffsetSum); 
 
   for (int is = 0; is < cds->NSfields; is++) {
     if (!cds->compute[is])
@@ -707,9 +697,9 @@ void cvode_t::applyDirichlet(dfloat time)
 
     const auto cvodeScalarId = cvodeScalarIds[is];
 
-    auto o_diff_i = cds->o_diff + cds->fieldOffsetScan[is] * sizeof(dfloat);
-    auto o_rho_i = cds->o_rho + cds->fieldOffsetScan[is] * sizeof(dfloat);
-    auto o_Si = o_S_start + cds->fieldOffsetScan[cvodeScalarId] * sizeof(dfloat);
+    auto o_diff_i = cds->o_diff + cds->fieldOffsetScan[is];
+    auto o_rho_i = cds->o_rho + cds->fieldOffsetScan[is];
+    auto o_Si = o_S_start + cds->fieldOffsetScan[cvodeScalarId];
 
     platform->linAlg->fill(cds->fieldOffset[is], TINY, o_Si);
     
@@ -724,7 +714,7 @@ void cvode_t::applyDirichlet(dfloat time)
                              mesh->o_z,
                              mesh->o_vmapM,
                              mesh->o_EToB,
-                             cds->o_EToB + is * cds->EToBOffset * sizeof(int),
+                             cds->o_EToB + is * cds->EToBOffset,
                              cds->o_Ue,
                              o_diff_i,
                              o_rho_i,
@@ -770,7 +760,7 @@ void cvode_t::computeErrorWeight(occa::memory o_y, occa::memory o_ewt)
                           o_ewt);
 }
 
-void cvode_t::rhs(dfloat time, occa::memory o_y, occa::memory o_ydot)
+void cvode_t::rhs(double time, occa::memory o_y, occa::memory o_ydot)
 {
   const auto tag = this->rhsTagName();
   const auto saveTimerScope = timerScope;
@@ -779,10 +769,10 @@ void cvode_t::rhs(dfloat time, occa::memory o_y, occa::memory o_ydot)
   this->setIsRhsEvaluation(true);
 
   if (userRHS) {
-    userRHS(nrs, time, tnekRS, o_y, o_ydot);
+    userRHS(nrs, time, tExternal, o_y, o_ydot);
   }
   else {
-    defaultRHS(time, tnekRS, o_y, o_ydot);
+    defaultRHS(time, tExternal, o_y, o_ydot);
   }
 
   this->setIsRhsEvaluation(false);
@@ -790,12 +780,12 @@ void cvode_t::rhs(dfloat time, occa::memory o_y, occa::memory o_ydot)
   timerScope = saveTimerScope;
 }
 
-void cvode_t::jtvRHS(dfloat time, occa::memory o_y, occa::memory o_ydot)
+void cvode_t::jtvRHS(double time, occa::memory o_y, occa::memory o_ydot)
 {
   this->setIsJacobianEvaluation(true);
 
   if (userJacobian) {
-    userJacobian(nrs, time, tnekRS, o_y, o_ydot);
+    userJacobian(nrs, time, tExternal, o_y, o_ydot);
   }
   else {
     this->rhs(time, o_y, o_ydot);
@@ -804,7 +794,7 @@ void cvode_t::jtvRHS(dfloat time, occa::memory o_y, occa::memory o_ydot)
   this->setIsJacobianEvaluation(false);
 }
 
-void cvode_t::defaultRHS(dfloat time, dfloat t0, occa::memory o_y, occa::memory o_ydot)
+void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory o_ydot)
 {
   const bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
   mesh_t *mesh = nrs->meshV;
@@ -823,7 +813,7 @@ void cvode_t::defaultRHS(dfloat time, dfloat t0, occa::memory o_y, occa::memory 
       std::cout << "t = " << time << ", stepsize = " << time - tprev << std::endl;
     }
 
-    const auto cvodeDt = time - t0;
+    const dfloat cvodeDt = time - t0;
     tprev = time;
 
     dtCvode[0] = cvodeDt;
@@ -848,7 +838,7 @@ void cvode_t::defaultRHS(dfloat time, dfloat t0, occa::memory o_y, occa::memory 
       }
     }
 
-    o_coeffExt.copyFrom(_coeffEXT.data(), maxTimestepperOrder * sizeof(dfloat));
+    o_coeffExt.copyFrom(_coeffEXT.data(), maxTimestepperOrder);
 
     nrs->extrapolateKernel(nrs->meshV->Nlocal,
                            nrs->NVfields,
@@ -866,22 +856,22 @@ void cvode_t::defaultRHS(dfloat time, dfloat t0, occa::memory o_y, occa::memory 
         mesh->coeffAB[i] *= dtCvode[0];
       for (int i = mesh->nAB; i > meshOrder; i--)
         mesh->coeffAB[i - 1] = 0.0;
-      mesh->o_coeffAB.copyFrom(mesh->coeffAB, mesh->nAB * sizeof(dfloat));
+      mesh->o_coeffAB.copyFrom(mesh->coeffAB, mesh->nAB);
 
       // restore mesh coordinates prior to integration
       {
         mesh->o_x.copyFrom(this->o_xyz0,
-                           mesh->Nlocal * sizeof(dfloat),
+                           mesh->Nlocal,
                            0,
-                           (0 * sizeof(dfloat)) * nrs->fieldOffset);
+                           0 * nrs->fieldOffset);
         mesh->o_y.copyFrom(this->o_xyz0,
-                           mesh->Nlocal * sizeof(dfloat),
+                           mesh->Nlocal,
                            0,
-                           (1 * sizeof(dfloat)) * nrs->fieldOffset);
+                           1 * nrs->fieldOffset);
         mesh->o_z.copyFrom(this->o_xyz0,
-                           mesh->Nlocal * sizeof(dfloat),
+                           mesh->Nlocal,
                            0,
-                           (2 * sizeof(dfloat)) * nrs->fieldOffset);
+                           2 * nrs->fieldOffset);
       }
 
       mesh->move();
@@ -938,7 +928,7 @@ void cvode_t::defaultRHS(dfloat time, dfloat t0, occa::memory o_y, occa::memory 
         startScalar++;
         numScalars--;
       }
-      auto o_fld = cds->o_FS + nrs->cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
+      auto o_fld = cds->o_FS + nrs->cds->fieldOffsetScan[startScalar];
       ogsFunc(o_fld, numScalars, cds->fieldOffset[startScalar], ogsDfloat, ogsAdd, cds->gsh);
     }
   };
@@ -978,12 +968,13 @@ void cvode_t::defaultRHS(dfloat time, dfloat t0, occa::memory o_y, occa::memory 
 
     // o_FS /= invLMM(LMM*gs(o_rho)), i.e.
     // average interface values for o_rho on the boundary between the CHT/non-CHT regions
-    platform->o_mempool.slice0.copyFrom(cds->o_rho, cds->fieldOffset[0] * sizeof(dfloat));
-    platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, platform->o_mempool.slice0);
-    oogs::startFinish(platform->o_mempool.slice0, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, gsh);
-    platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, platform->o_mempool.slice0);
+    auto o_tmp = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[0]);
+    o_tmp.copyFrom(cds->o_rho);
+    platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_tmp);
+    oogs::startFinish(o_tmp, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, gsh);
+    platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_tmp);
 
-    platform->linAlg->aydx(mesh->Nlocal, 1.0, platform->o_mempool.slice0, cds->o_FS);
+    platform->linAlg->aydx(mesh->Nlocal, 1.0, o_tmp, cds->o_FS);
   }
   if (!chtCVODE || (chtCVODE && this->Nscalar > 1)) {
     dlong startScalar = minCvodeScalarId;
@@ -992,14 +983,14 @@ void cvode_t::defaultRHS(dfloat time, dfloat t0, occa::memory o_y, occa::memory 
       startScalar++;
       numScalars--;
     }
-    auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
-    auto o_rho_start = cds->o_rho + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
+    auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[startScalar];
+    auto o_rho_start = cds->o_rho + cds->fieldOffsetScan[startScalar];
     occa::memory o_ptSource_start;
 
     int addPointSourceContrib = 0;
     if (userLocalPointSource) {
       addPointSourceContrib = 1;
-      o_ptSource_start = this->o_pointSource + cds->fieldOffsetScan[startScalar] * sizeof(dfloat);
+      o_ptSource_start = this->o_pointSource + cds->fieldOffsetScan[startScalar];
     }
     
     this->fusedAddRhoDivKernel(cds->meshV->Nlocal,
@@ -1027,9 +1018,10 @@ void cvode_t::defaultRHS(dfloat time, dfloat t0, occa::memory o_y, occa::memory 
     // RHS += 1/vtrans * dp0thdt * alpha0
     // for ideal gas, alpha = (gamma-1)/gamma
     const auto alpha0 = nrs->alpha0Ref;
-    platform->o_mempool.slice0.copyFrom(cds->o_rho, mesh->Nlocal * sizeof(dfloat));
-    platform->linAlg->ady(mesh->Nlocal, nrs->dp0thdt * alpha0, platform->o_mempool.slice0);
-    platform->linAlg->axpby(mesh->Nlocal, 1.0, platform->o_mempool.slice0, 1.0, cds->o_FS);
+    auto o_tmp = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+    o_tmp.copyFrom(cds->o_rho);
+    platform->linAlg->ady(mesh->Nlocal, nrs->dp0thdt * alpha0, o_tmp);
+    platform->linAlg->axpby(mesh->Nlocal, 1.0, o_tmp, 1.0, cds->o_FS);
   }
 
   if (detailedTimersEnabled) {
@@ -1037,7 +1029,7 @@ void cvode_t::defaultRHS(dfloat time, dfloat t0, occa::memory o_y, occa::memory 
     platform->timer.tic(timerScope + "::maskDirichlet", 1);
   }
 
-  auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[minCvodeScalarId] * sizeof(dfloat);
+  auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[minCvodeScalarId];
   if(this->Nmasked > 0){
     nrs->maskKernel(this->Nmasked, this->o_maskIds, o_FS_start);
   }
@@ -1049,7 +1041,7 @@ void cvode_t::defaultRHS(dfloat time, dfloat t0, occa::memory o_y, occa::memory 
   nrsToCv(cds->o_FS, o_ydot);
 }
 
-void cvode_t::makeq(dfloat time)
+void cvode_t::makeq(double time)
 {
 
   const auto timerScopeSave = timerScope;
@@ -1111,8 +1103,8 @@ void cvode_t::makeq(dfloat time)
                                                  mesh->o_cubDiffInterpT,
                                                  mesh->o_cubInterpT,
                                                  mesh->o_cubProjectT,
-                                                 cds->o_compute + scalarStart * sizeof(dlong),
-                                                 cds->o_fieldOffsetScan + scalarStart * sizeof(dlong),
+                                                 cds->o_compute + scalarStart,
+                                                 cds->o_fieldOffsetScan + scalarStart,
                                                  cds->vFieldOffset,
                                                  cds->vCubatureOffset,
                                                  cds->o_S,
@@ -1127,8 +1119,8 @@ void cvode_t::makeq(dfloat time)
                                          mesh->o_LMM,
                                          mesh->o_vgeo,
                                          mesh->o_D,
-                                         cds->o_compute + scalarStart * sizeof(dlong),
-                                         cds->o_fieldOffsetScan + scalarStart * sizeof(dlong),
+                                         cds->o_compute + scalarStart,
+                                         cds->o_fieldOffsetScan + scalarStart,
                                          cds->vFieldOffset,
                                          cds->o_S,
                                          o_Urst,
@@ -1140,7 +1132,7 @@ void cvode_t::makeq(dfloat time)
       // the advection term is only defined in the V-mesh portion.
       // Therefore, apply the LMM term here over the entire T-mesh.
       if(chtPass){
-        auto o_FS_start = o_FS + cds->fieldOffsetScan[scalarStart] * sizeof(dfloat);
+        auto o_FS_start = o_FS + cds->fieldOffsetScan[scalarStart];
         platform->linAlg->axmyMany(mesh->Nlocal, Nscalar, nrs->fieldOffset, 0, 1.0, mesh->o_LMM, o_FS_start);
       }
 
@@ -1180,8 +1172,8 @@ void cvode_t::makeq(dfloat time)
 
     weakLaplacianKernel(mesh->Nelements,
                         Nscalar,
-                        cds->o_cvodeSolve + scalarStart * sizeof(dlong),
-                        cds->o_fieldOffsetScan + scalarStart * sizeof(dlong),
+                        cds->o_cvodeSolve + scalarStart,
+                        cds->o_fieldOffsetScan + scalarStart,
                         mesh->o_ggeo,
                         mesh->o_invLMM,
                         mesh->o_D,
@@ -1290,29 +1282,29 @@ void cvode_t::solve(double t0, double t1, int tstep)
 
   // lag solution state and update current state
   for (int s = nrs->nEXT; s > 1; s--) {
-    const auto Nbyte = (nrs->NVfields * sizeof(dfloat)) * nrs->fieldOffset;
-    o_U.copyFrom(o_U, Nbyte, (s - 1) * Nbyte, (s - 2) * Nbyte);
+    const auto N = nrs->NVfields * nrs->fieldOffset;
+    o_U.copyFrom(o_U, N, (s - 1) * N, (s - 2) * N);
   }
-  o_U.copyFrom(nrs->o_U, nrs->NVfields * nrs->fieldOffset * sizeof(dfloat));
+  o_U.copyFrom(nrs->o_U, nrs->NVfields * nrs->fieldOffset);
 
   const auto p0theSave = nrs->p0the;
 
   if (movingMesh) {
 
     for (int s = nrs->nEXT; s > 1; s--) {
-      const auto Nbyte = (nrs->NVfields * sizeof(dfloat)) * nrs->fieldOffset;
-      o_meshU.copyFrom(o_meshU, Nbyte, (s - 1) * Nbyte, (s - 2) * Nbyte);
+      const auto N = nrs->NVfields * nrs->fieldOffset;
+      o_meshU.copyFrom(o_meshU, N, (s - 1) * N, (s - 2) * N);
     }
-    o_meshU.copyFrom(mesh->o_U, nrs->NVfields * nrs->fieldOffset * sizeof(dfloat));
+    o_meshU.copyFrom(mesh->o_U, nrs->NVfields * nrs->fieldOffset);
 
-    o_xyz0.copyFrom(mesh->o_x, mesh->Nlocal * sizeof(dfloat), (0 * sizeof(dfloat)) * nrs->fieldOffset, 0);
-    o_xyz0.copyFrom(mesh->o_y, mesh->Nlocal * sizeof(dfloat), (1 * sizeof(dfloat)) * nrs->fieldOffset, 0);
-    o_xyz0.copyFrom(mesh->o_z, mesh->Nlocal * sizeof(dfloat), (2 * sizeof(dfloat)) * nrs->fieldOffset, 0);
+    o_xyz0.copyFrom(mesh->o_x, mesh->Nlocal, 0 * nrs->fieldOffset, 0);
+    o_xyz0.copyFrom(mesh->o_y, mesh->Nlocal, 1 * nrs->fieldOffset, 0);
+    o_xyz0.copyFrom(mesh->o_z, mesh->Nlocal, 2 * nrs->fieldOffset, 0);
   }
 
   nrsToCv(nrs->cds->o_S, o_cvodeY);
 
-  this->tnekRS = t0;
+  this->tExternal = t0;
   this->externalTStep = tstep;
 
   double t;
@@ -1348,7 +1340,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
     nrsToCv(nrs->cds->o_S, o_cvodeY);
     retval = CVodeReInit(cvodeMem, t0, cvodeY);
     check_retval(&retval, "CVodeReInit", 1);
-    this->tprev = std::numeric_limits<dfloat>::max();
+    this->tprev = std::numeric_limits<double>::max();
 
     platform->device.finish();
     retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
@@ -1372,14 +1364,14 @@ void cvode_t::solve(double t0, double t1, int tstep)
   }
 
   // restore previous state
-  nrs->o_U.copyFrom(this->o_U, (nrs->NVfields * sizeof(dfloat)) * nrs->fieldOffset);
+  nrs->o_U.copyFrom(this->o_U, nrs->NVfields * nrs->fieldOffset);
 
   if (movingMesh) {
-    mesh->o_x.copyFrom(o_xyz0, mesh->Nlocal * sizeof(dfloat), 0, (0 * sizeof(dfloat)) * nrs->fieldOffset);
-    mesh->o_y.copyFrom(o_xyz0, mesh->Nlocal * sizeof(dfloat), 0, (1 * sizeof(dfloat)) * nrs->fieldOffset);
-    mesh->o_z.copyFrom(o_xyz0, mesh->Nlocal * sizeof(dfloat), 0, (2 * sizeof(dfloat)) * nrs->fieldOffset);
+    mesh->o_x.copyFrom(o_xyz0, mesh->Nlocal, 0, 0 * nrs->fieldOffset);
+    mesh->o_y.copyFrom(o_xyz0, mesh->Nlocal, 0, 1 * nrs->fieldOffset);
+    mesh->o_z.copyFrom(o_xyz0, mesh->Nlocal, 0, 2 * nrs->fieldOffset);
 
-    mesh->o_U.copyFrom(this->o_meshU, (nrs->NVfields * sizeof(dfloat)) * nrs->fieldOffset);
+    mesh->o_U.copyFrom(this->o_meshU, nrs->NVfields * nrs->fieldOffset);
 
     mesh->update();
   }
@@ -1389,9 +1381,8 @@ void cvode_t::solve(double t0, double t1, int tstep)
   nrs->p0the = p0theSave;
 
   for (int s = nrs->nEXT; s > 1; s--) {
-    const auto NbyteMasked = maskOffset * sizeof(dfloat);
-    if (NbyteMasked)
-      o_maskValues.copyFrom(o_maskValues, NbyteMasked, (s - 1) * NbyteMasked, (s - 2) * NbyteMasked);
+    if (maskOffset)
+      o_maskValues.copyFrom(o_maskValues, maskOffset, (s - 1) * maskOffset, (s - 2) * maskOffset);
   }
 
   // compute scalar boundary condition at time t1
@@ -1657,7 +1648,7 @@ void cvode_t::setLocalPointSource(userLocalPointSource_t _userLocalPointSource)
   userLocalPointSource = _userLocalPointSource;
 
   if(o_pointSource.size() == 0){
-    o_pointSource = platform->device.malloc(this->Nscalar * nrs->fieldOffset * sizeof(dfloat));
+    o_pointSource = platform->device.malloc<dfloat>(this->Nscalar * nrs->fieldOffset);
   }
 
   this->fusedAddRhoDivKernel = platform->kernels.get("cvode_t::fusedAddRhoDiv");
