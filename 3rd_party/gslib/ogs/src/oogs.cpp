@@ -449,6 +449,7 @@ oogs_t *oogs::setup(ogs_t *ogs,
     oogs_modeExchange_list.push_back(OOGS_EX_NBC);
   }
 
+
   if (gsMode == OOGS_AUTO) {
     if (gs->rank == 0)
       printf("timing gs: ");
@@ -462,7 +463,6 @@ oogs_t *oogs::setup(ogs_t *ogs,
     occa::memory o_q = device.malloc(std::max(stride, ogs->N) * nVec * Nbytes, q);
     free(q);
  
-
     for (auto const &mode : oogs_mode_list) {
       gs->mode = mode;
 
@@ -508,9 +508,25 @@ oogs_t *oogs::setup(ogs_t *ogs,
           }
           MPI_Allreduce(MPI_IN_PLACE, &elapsedTest, 1, MPI_DOUBLE, MPI_MAX, gs->comm);
 
+          if (gs->mode == OOGS_LOCAL && gs->rank == 0) {
+            printf("local ");
+          }
+
           if (gs->rank == 0)
             printf("%.2es ", elapsedTest);
           fflush(stdout);
+
+          if (gs->mode == OOGS_LOCAL) {
+            double localGsBw = 0;
+            for (dlong i=0;i<ogs->NlocalGather;i++) {
+              const dlong rowSize = ogs->localGatherOffsets[i+1]-ogs->localGatherOffsets[i];
+              localGsBw += rowSize; 
+            }
+            localGsBw *= (2 * nVec * Nbytes) / elapsedTest; 
+            MPI_Allreduce(MPI_IN_PLACE, &localGsBw, 1, MPI_DOUBLE, MPI_MIN, gs->comm);
+
+            if (gs->rank == 0) printf("(%.1fGB/s) - ", localGsBw/1e9);
+          }
 
           if (elapsedTest < elapsedMin) {
             if (gs->mode != OOGS_LOCAL) {
@@ -540,6 +556,7 @@ oogs_t *oogs::setup(ogs_t *ogs,
 #ifdef DISABLE_OOGS
   gs->mode = OOGS_DEFAULT;
 #endif
+
 
   double elapsedMinMPI = std::numeric_limits<double>::max();
   {
@@ -597,9 +614,6 @@ oogs_t *oogs::setup(ogs_t *ogs,
                  nBytesExchange / tavg / 1e9);
         else
           printf("\n");
-      }
-      else {
-        printf("\nused config: local\n");
       }
     }
     fflush(stdout);
