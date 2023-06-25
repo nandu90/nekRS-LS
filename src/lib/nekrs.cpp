@@ -282,7 +282,7 @@ double writeInterval(void)
 {
   double val = -1;
   platform->options.getArgs("SOLUTION OUTPUT INTERVAL", val);
-  return val;
+  return (val > 0) ? val : -1;
 }
 
 int writeControlRunTime(void)
