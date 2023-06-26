@@ -360,7 +360,9 @@ int lastStep(double time, int tstep, double elapsedTime)
   }
   else if (endTime() >= 0) {
     const double eps = 1e-12;
-    nrs->lastStep = fabs((time + nrs->dt[0]) - endTime()) < eps || (time + nrs->dt[0]) > endTime();
+    const double timeNew = time +
+                           setPrecision(nrs->dt[0], std::numeric_limits<decltype(nrs->dt[0])>::digits10 + 1);
+    nrs->lastStep = fabs(timeNew - endTime()) < eps || timeNew > endTime();
   }
   else {
     nrs->lastStep = (tstep == numSteps());
