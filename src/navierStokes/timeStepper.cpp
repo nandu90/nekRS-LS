@@ -154,7 +154,7 @@ void advectionFlops(mesh_t *mesh, int Nfields)
 
 void adjustDt(nrs_t* nrs, int tstep)
 {
-  const double TOLToZero = 1e-12;
+  const double TOLToZero = (sizeof(dfloat) == sizeof(double)) ? 1e-8 : 1e-5;
   auto initialTimeStepProvided = true;
   if (nrs->dt[0] < TOLToZero && tstep == 1) {
     nrs->dt[0] = 1.0; // startup without any initial timestep guess
@@ -200,12 +200,17 @@ void adjustDt(nrs_t* nrs, int tstep)
         const auto x = nrs->meshV->x;
         const auto y = nrs->meshV->y;
         const auto z = nrs->meshV->z;
-        double lengthScale = sqrt((x[0] - x[1]) * (x[0] - x[1]) + (y[0] - y[1]) * (y[0] - y[1]) +
-                             (z[0] - z[1]) * (z[0] - z[1]));
+ 
+        auto minLengthScale = 10*std::numeric_limits<double>::max();
+        for(int i = 0; nrs->meshV->Nlocal; i++) {
+          const double lengthScale = sqrt((x[0] - x[1]) * (x[0] - x[1]) + (y[0] - y[1]) * (y[0] - y[1]) +
+                                          (z[0] - z[1]) * (z[0] - z[1]));
+          minLengthScale = std::min(lengthScale, minLengthScale);
+        }
 
-        MPI_Allreduce(MPI_IN_PLACE, &lengthScale, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm);
+        MPI_Allreduce(MPI_IN_PLACE, &minLengthScale, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm);
         if (maxU > TOLToZero) {
-          nrs->dt[0] = sqrt(targetCFL * lengthScale / maxU);
+          nrs->dt[0] = sqrt(targetCFL * minLengthScale / maxU);
         }
         else {
           nrsAbort(platform->comm.mpiComm,
