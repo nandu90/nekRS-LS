@@ -911,7 +911,7 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
   }
 
   // terms to include: user source, advection, filtering, add weak Laplacian
-  platform->linAlg->fillKernel(cds->fieldOffsetSum, 0.0, cds->o_FS);
+  platform->linAlg->fill(cds->fieldOffsetSum, 0.0, cds->o_FS);
   makeq(time);
 
   bool chtCVODE = nrs->cht && cds->cvodeSolve[0];

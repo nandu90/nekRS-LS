@@ -177,7 +177,7 @@ void adjustDt(nrs_t* nrs, int tstep)
     else {
       // estimate from userf
       if (udf.uEqnSource) {
-        platform->linAlg->fillKernel(nrs->fieldOffset * nrs->NVfields, 0.0, nrs->o_FU);
+        platform->linAlg->fill(nrs->fieldOffset * nrs->NVfields, 0.0, nrs->o_FU);
         platform->timer.tic("udfUEqnSource", 1);
         double startTime;
         platform->options.getArgs("START TIME", startTime);
@@ -319,7 +319,7 @@ void initStep(nrs_t *nrs, double time, dfloat dt, int tstep)
   if (nrs->Nscalar) {
     if(cds->anyEllipticSolver) {
       platform->timer.tic("makeq", 1);
-      platform->linAlg->fillKernel(cds->fieldOffsetSum, 0.0, cds->o_FS);
+      platform->linAlg->fill(cds->fieldOffsetSum, 0.0, cds->o_FS);
       makeq(nrs, time, tstep, cds->o_FS, cds->o_BF);
       platform->timer.toc("makeq");
     }
@@ -327,7 +327,7 @@ void initStep(nrs_t *nrs, double time, dfloat dt, int tstep)
 
   if (nrs->flow) {
     platform->timer.tic("makef", 1);
-    platform->linAlg->fillKernel(nrs->fieldOffset * nrs->NVfields, 0.0, nrs->o_FU);
+    platform->linAlg->fill(nrs->fieldOffset * nrs->NVfields, 0.0, nrs->o_FU);
     makef(nrs, time, tstep, nrs->o_FU, nrs->o_BF);
     platform->timer.toc("makef");
   }
