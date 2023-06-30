@@ -221,6 +221,7 @@ static std::vector<std::string> boomeramgKeys = {
     {"nonGalerkinTol"},
     {"aggressiveCoarseningLevels"},
     {"chebyshevRelaxOrder"},
+    {"chebyshevFraction"},
 };
 
 static std::vector<std::string> amgxKeys = {
