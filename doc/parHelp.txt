@@ -201,6 +201,7 @@ strongThreshold             <float>
 nonGalerkinTol              <float>                                    set 0 to classical Galerkin sparsification
 aggressiveCoarseningLevels  <int>
 chebyshevRelaxOrder         <int>
+chebyshevFraction           <float>
 ----------------------------------------------------------------------------------------------------------------------
 [AMGX]
 

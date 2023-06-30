@@ -138,7 +138,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_, precon_t *precon_)
         elliptic->oogsAx = elliptic->oogs;
 
       if (platform->comm.mpiRank == 0) {
-        printf("autotuning overlap in ellipticOperator: %.2es %.2es ", nonOverlappedTime, overlappedTime);
+        printf("testing overlap in ellipticOperator: %.2es %.2es ", nonOverlappedTime, overlappedTime);
         if (elliptic->oogsAx != elliptic->oogs)
           printf("(overlap enabled)");
 

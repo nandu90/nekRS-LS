@@ -1544,6 +1544,9 @@ void parseBoomerAmgSection(const int rank, setupAide &options, inipp::Ini *par)
     int chebyRelaxOrder;
     if (par->extract("boomeramg", "chebyshevrelaxorder", chebyRelaxOrder))
       options.setArgs("BOOMERAMG CHEBYSHEV RELAX ORDER", std::to_string(chebyRelaxOrder));
+    double chebyFraction;
+    if (par->extract("boomeramg", "chebyshevfraction", chebyFraction))
+      options.setArgs("BOOMERAMG CHEBYSHEV FRACTION", std::to_string(chebyFraction));
   }
 }
 
