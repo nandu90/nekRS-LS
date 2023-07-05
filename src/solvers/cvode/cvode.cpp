@@ -143,6 +143,8 @@ cvode_t::cvode_t(nrs_t *_nrs)
 
     Nscalar++;
   }
+  std::cout << "CVODE Nscalar: " << Nscalar << std::endl;
+
 
   o_scalarIds = platform->device.malloc<dlong>(scalarIds.size(), scalarIds.data());
   o_cvodeScalarIds = platform->device.malloc<dlong>(cvodeScalarIds.size(), cvodeScalarIds.data());
@@ -403,7 +405,7 @@ void cvode_t::initialize()
   check_retval(&retval, "CVodeWFtolerances", 1);
 
   int nVectors = 10;
-  platform->options.getArgs("CVODE PGMRES RESTART", nVectors);
+  platform->options.getArgs("CVODE GMRES RESTART", nVectors);
 
   std::string linearSolver = "GMRES";
   platform->options.getArgs("CVODE SOLVER", linearSolver);
@@ -413,6 +415,8 @@ void cvode_t::initialize()
   if(linearSolver == "GMRES"){
     LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
     check_retval(&retval, "SUNLinSol_SPFGMR", 1);
+
+    // SUNLinSol_SPGMRSetGSType(LS, SUN_MODIFIED_GS);
   } else {
     nrsCheck(true,
              platform->comm.mpiComm,
