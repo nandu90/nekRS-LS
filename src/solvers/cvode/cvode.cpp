@@ -143,8 +143,14 @@ cvode_t::cvode_t(nrs_t *_nrs)
 
     Nscalar++;
   }
-  std::cout << "CVODE Nscalar: " << Nscalar << std::endl;
-
+  
+#if 0
+  if(platform->comm.mpiRank == 0){
+    std::cout << "CVODE Nscalar: " << Nscalar << std::endl;
+    std::cout << "E-vector length: " << nrs->meshV->Nlocal << std::endl;
+    std::cout << "L-vector length: " << this->LFieldOffset << std::endl;
+  }
+#endif
 
   o_scalarIds = platform->device.malloc<dlong>(scalarIds.size(), scalarIds.data());
   o_cvodeScalarIds = platform->device.malloc<dlong>(cvodeScalarIds.size(), cvodeScalarIds.data());
@@ -521,7 +527,6 @@ void cvode_t::setupEToLMapping()
   this->o_EToLUnique = platform->device.malloc<dlong>(mesh->Nlocal, Eids.data());
   this->LFieldOffset = mesh->Nlocal;
 #else
-
   auto o_Lids = platform->device.malloc<dlong>(mesh->Nlocal);
   std::vector<dlong> Eids(mesh->Nlocal);
   std::iota(Eids.begin(), Eids.end(), 0);
@@ -530,7 +535,7 @@ void cvode_t::setupEToLMapping()
   {
     const auto saveNhaloGather = mesh->ogs->NhaloGather;
     mesh->ogs->NhaloGather = 0;
-    ogsGatherScatter(o_Lids, "int", "ogsMin", mesh->ogs);
+    ogsGatherScatter(o_Lids, ogsInt, ogsMin, mesh->ogs);
     mesh->ogs->NhaloGather = saveNhaloGather;
   }
 
@@ -552,15 +557,15 @@ void cvode_t::setupEToLMapping()
     EToLUnique[uniqueEid] = ctr;
     ctr++;
   }
-  this->o_EToL = platform->device.malloc<dlong>(mesh->Nlocal, EToLUnique.data());
-  {
-    const auto saveNhaloGather = mesh->ogs->NhaloGather;
-    mesh->ogs->NhaloGather = 0;
-    ogsGatherScatter(o_Lids, "int", "ogsMin", mesh->ogs);
-    mesh->ogs->NhaloGather = saveNhaloGather;
-  }
-
   this->o_EToLUnique = platform->device.malloc<dlong>(mesh->Nlocal, EToLUnique.data());
+
+  // setup non-unique version mapping an E-vector point to its corresponding L-vector point
+  std::vector<dlong> EToL(mesh->Nlocal, -1);
+  for (int n = 0; n < mesh->Nlocal; ++n) {
+    const auto lid = Lids[n];
+    EToL[n] = EToLUnique[lid];
+  }
+  this->o_EToL = platform->device.malloc<dlong>(mesh->Nlocal, EToL.data());
 
   // construct L-vector version of inv degree, based on duplicated points in L-vector
   {
@@ -573,11 +578,11 @@ void cvode_t::setupEToLMapping()
     for (int n = 0; n < mesh->Nlocal; ++n) {
       const auto lid = EToLUnique[n];
       if (lid > -1) {
-        degree[lid] = 1.0;
+        degree[n] = 1.0;
       }
     }
 
-    ogsGatherScatter(degree.data(), dfloatString, "ogsSum", mesh->ogs);
+    ogsGatherScatter(degree.data(), dfloatString, ogsAdd, mesh->ogs);
 
     std::vector<dfloat> invDegreeL(LFieldOffset, 1.0);
     
@@ -588,18 +593,46 @@ void cvode_t::setupEToLMapping()
       }
     }
 
+    // sanity check:
+    // entries in invDegreeL are on (0,1]
+    bool allPositive = std::all_of(invDegreeL.begin(), invDegreeL.end(), [](auto &&val) { return val > 0.0 && val <= 1.0; });
+    int err = allPositive ? 0 : 1;
+    MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+    nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Encountered invDegreeL value outside of (0,1]");
+
+    // on a single processor, T-vector and L-vector are the same --> invDegreeL is unity everywhere
+    if(platform->comm.mpiCommSize == 1){
+      const auto tol = 1e4 * std::numeric_limits<dfloat>::epsilon();
+      bool allUnity = std::all_of(invDegreeL.begin(), invDegreeL.end(), [tol](auto &&val) { return std::abs(val - 1.0) < tol; });
+      int err = allUnity ? 0 : 1;
+      MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+      nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Encountered non-unity invDegreeL when P=1");
+    }
+
     this->o_invDegree = platform->device.malloc<dfloat>(LFieldOffset, invDegreeL.data());
   }
 
   // a few sanity checks:
-  // EToL has non-negative values
-  std::vector<dlong> EToL(mesh->Nlocal);
-  this->o_EToL.copyTo(EToL.data(), mesh->Nlocal);
+  // EToL has only non-negative values
   bool allNonNegative = std::all_of(EToL.begin(), EToL.end(), [](auto &&val) { return val >= 0; });
   int err = allNonNegative ? 0 : 1;
   MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-
   nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Encountered negative value in EToL mapping");
+
+  // range of EToL is [0, LFieldOffset)
+  auto minmax = std::minmax_element(EToL.begin(), EToL.end());
+  err = (*minmax.first == 0 && *minmax.second == LFieldOffset - 1) ? 0 : 1;
+  MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+  nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "EToL mapping is not in range [0, LFieldOffset)");
+
+  // every value in [0,LFieldOffset) is covered in the range of EToL
+  std::set<dlong> uniqueOutputs;
+  for (auto &&val : EToL) {
+    uniqueOutputs.insert(val);
+  }
+  err = (uniqueOutputs.size() == LFieldOffset) ? 0 : 1;
+  MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+  nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "EToL mapping is not surjective");
 
   o_Lids.free();
 #endif
