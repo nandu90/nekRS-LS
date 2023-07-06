@@ -338,7 +338,7 @@ void cvode_t::initialize()
       this->numEquations());
 
   // set initial condition
-  nrsToCv(nrs->cds->o_S, o_cvodeY);
+  nrsToCv(nrs->cds->o_S, o_cvodeY, false);
 
   auto integrator = CV_BDF;
   if (platform->options.compareArgs("CVODE INTEGRATOR", "ADAMS")) {
@@ -896,7 +896,7 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     }
   }
 
-  cvToNrs(o_y, cds->o_S);
+  cvToNrs(o_y, cds->o_S, false);
 
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::applyDirichlet", 1);
@@ -950,7 +950,7 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     userLocalPointSource(nrs, LFieldOffset, o_y, o_ydot);
     platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::localPointSource");
 
-    cvToNrs(o_ydot, this->o_pointSource);
+    cvToNrs(o_ydot, this->o_pointSource, true);
   }
 
   applyOgsOperation(oogs::finish);
@@ -1042,7 +1042,7 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     platform->timer.toc(timerScope + "::maskDirichlet");
   }
 
-  nrsToCv(cds->o_FS, o_ydot);
+  nrsToCv(cds->o_FS, o_ydot, true);
 }
 
 void cvode_t::makeq(double time)
@@ -1213,7 +1213,7 @@ void cvode_t::makeq(double time)
   timerScope = timerScopeSave;
 }
 
-void cvode_t::nrsToCv(occa::memory o_EField, occa::memory o_LField)
+void cvode_t::nrsToCv(occa::memory o_EField, occa::memory o_LField, bool isYdot)
 {
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::nrsToCv", 1);
@@ -1228,14 +1228,14 @@ void cvode_t::nrsToCv(occa::memory o_EField, occa::memory o_LField)
                 o_EField,
                 o_LField);
   if (userPostNrsToCv) {
-    userPostNrsToCv(nrs, o_LField);
+    userPostNrsToCv(nrs, o_LField, isYdot);
   }
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope + "::nrsToCv");
   }
 }
 
-void cvode_t::cvToNrs(occa::memory o_LField, occa::memory o_EField)
+void cvode_t::cvToNrs(occa::memory o_LField, occa::memory o_EField, bool isYdot)
 {
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::cvToNrs", 1);
@@ -1251,7 +1251,7 @@ void cvode_t::cvToNrs(occa::memory o_LField, occa::memory o_EField)
                 o_LField,
                 o_EField);
   if (userPostCvToNrs) {
-    userPostCvToNrs(nrs, o_EField);
+    userPostCvToNrs(nrs, o_EField, isYdot);
   }
 
   if (detailedTimersEnabled) {
@@ -1306,7 +1306,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
     o_xyz0.copyFrom(mesh->o_z, mesh->Nlocal, 2 * nrs->fieldOffset, 0);
   }
 
-  nrsToCv(nrs->cds->o_S, o_cvodeY);
+  nrsToCv(nrs->cds->o_S, o_cvodeY, false);
 
   this->tExternal = t0;
   this->externalTStep = tstep;
@@ -1341,7 +1341,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
     if (platform->comm.mpiRank == 0) {
       std::cout << "... Restarting CVODE integrator\n";
     }
-    nrsToCv(nrs->cds->o_S, o_cvodeY);
+    nrsToCv(nrs->cds->o_S, o_cvodeY, false);
     retval = CVodeReInit(cvodeMem, t0, cvodeY);
     check_retval(&retval, "CVodeReInit", 1);
     this->tprev = std::numeric_limits<double>::max();
@@ -1361,7 +1361,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
   }
   timerScope = oldScope;
 
-  cvToNrs(o_cvodeY, nrs->cds->o_S);
+  cvToNrs(o_cvodeY, nrs->cds->o_S, false);
 
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::restore", 1);

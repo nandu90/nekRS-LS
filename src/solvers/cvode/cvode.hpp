@@ -30,8 +30,8 @@ public:
       void(nrs_t *nrs, double time, double t0, occa::memory o_y, occa::memory o_ydot)>;
   using userLocalPointSource_t =
       std::function<void(nrs_t *nrs, dlong LFieldOffset, occa::memory o_y, occa::memory o_ydot)>;
-  using userPostNrsToCv_t = std::function<void(nrs_t *nrs, occa::memory o_LField)>;
-  using userPostCvToNrs_t = std::function<void(nrs_t *nrs, occa::memory o_EField)>;
+  using userPostNrsToCv_t = std::function<void(nrs_t *nrs, occa::memory o_LField, bool isYdot)>;
+  using userPostCvToNrs_t = std::function<void(nrs_t *nrs, occa::memory o_EField, bool isYdot)>;
 
   cvode_t(nrs_t *nrs);
   ~cvode_t();
@@ -91,10 +91,10 @@ public:
   long numLinIters() const;
 
   // hand nekRS-style E-vector to CVODE, which uses an L-vector
-  void nrsToCv(occa::memory o_EFeild, occa::memory o_LField);
+  void nrsToCv(occa::memory o_EFeild, occa::memory o_LField, bool isYdot);
 
   // unpack CVODE L-vector into nekRS-style E-vector
-  void cvToNrs(occa::memory o_LField, occa::memory o_EField);
+  void cvToNrs(occa::memory o_LField, occa::memory o_EField, bool isYdot);
 
   void defaultRHS(double time, double t0, occa::memory o_y, occa::memory o_ydot);
 
