@@ -247,7 +247,6 @@ void cvode_t::initialize()
 
         void *cvode_mem = cvode->getCvodeMem();
 
-        realtype sig, siginv;
         int iter, retval;
 
         retval = CVodeGetErrWeights(cvode_mem, work);
@@ -255,8 +254,8 @@ void cvode_t::initialize()
           return (retval);
 
         /* Initialize perturbation to 1/||v|| */
-        sig = sigScale / N_VWrmsNorm(v, work);
-
+        realtype sig = 1 / N_VWrmsNorm_MPIManyVector(v, work);
+        sig *= sigScale;
         constexpr int maxDQIters{3};
 
         occa::memory o_work = platform->device.occaDevice().wrapMemory<sunrealtype>(
@@ -289,7 +288,7 @@ void cvode_t::initialize()
           return (+1);
 
         /* Replace Jv by (Jv - fy)/sig */
-        siginv = 1.0 / sig;
+        const realtype siginv = 1.0 / sig;
         N_VLinearSum(siginv, Jv, -siginv, fy, Jv);
 
         return (0);
@@ -1045,7 +1044,6 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     platform->timer.tic(timerScope + "::dp0thdt", 1);
   }
 
-  // TODO: add dpdt term to userq?
   if (platform->options.compareArgs("LOWMACH", "TRUE") && nrs->pSolver->allNeumann) {
 
     // call is only used to evaluate dp0thdt, not divergence
@@ -1401,7 +1399,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
   }
 
   // restore previous state
-  nrs->o_U.copyFrom(this->o_U, nrs->NVfields * nrs->fieldOffset);
+  nrs->o_U.copyFrom(o_U, nrs->NVfields * nrs->fieldOffset);
 
   if (movingMesh) {
     mesh->o_x.copyFrom(o_xyz0, mesh->Nlocal, 0, 0 * nrs->fieldOffset);
