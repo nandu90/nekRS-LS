@@ -421,7 +421,9 @@ void cvode_t::initialize()
     LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
     check_retval(&retval, "SUNLinSol_SPFGMR", 1);
 
-    // SUNLinSol_SPGMRSetGSType(LS, SUN_MODIFIED_GS);
+    SUNLinSol_SPGMRSetGSType(LS, SUN_MODIFIED_GS);
+    check_retval(&retval, "SUNLinSol_SPGMRSetGSType", 1);
+
   } else {
     nrsCheck(true,
              platform->comm.mpiComm,
@@ -433,24 +435,29 @@ void cvode_t::initialize()
   retval = CVodeSetLinearSolver(this->cvodeMem, LS, NULL);
   check_retval(&retval, "CVodeSetLinearSolver", 1);
 
+  // custom settings
+#if 1
+
   retval = CVodeSetJacTimesRhsFn(this->cvodeMem, cvodeJtvRHS);
   check_retval(&retval, "CVodeSetJacTimesRhsFn", 1);
 
   retval = CVodeSetJacTimes(this->cvodeMem, NULL, cvodeJtv);
   check_retval(&retval, "CVodeSetJacTimes", 1);
 
-  // custom settings
   int mxsteps = 500;
   platform->options.getArgs("CVODE MAX STEPS", mxsteps);
   retval = CVodeSetMaxNumSteps(this->cvodeMem, mxsteps);
 
+#if 0
   int maxOrder = 3;
   platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER", maxOrder);
   retval = CVodeSetMaxOrd(this->cvodeMem, maxOrder);
+#endif
 
   double epsLin = 0.1;
   platform->options.getArgs("CVODE EPS LIN", epsLin);
   retval = CVodeSetEpsLin(this->cvodeMem, epsLin);
+#endif
 
   userdata = std::make_shared<userData_t>(platform, nrs, this);
 
@@ -845,8 +852,8 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
       platform->timer.tic(timerScope + "::extrapolate", 1);
     }
 
-    if (platform->comm.mpiRank == 0 && verboseCVODE) {
-      std::cout << "t = " << time << ", stepsize = " << time - tprev << std::endl;
+    if (platform->comm.mpiRank == 0 && time - tprev > 0 && verboseCVODE) {
+      std::cout << "tCv= " << time << ", dt= " << time - tprev << std::endl;
     }
 
     const dfloat cvodeDt = time - t0;
@@ -940,17 +947,28 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     platform->timer.toc(timerScope + "::applyDirichlet");
   }
 
+  const bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
+
+  auto o_rhoCpAvg = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[0]);
   if (!(isJacobianEvaluation() && recycleProperties)) {
     platform->timer.tic(timerScope + "::evaluateProperties", 1);
+
     evaluateProperties(nrs, time);
+
+    if (chtCVODE) {
+      auto mesh = cds->mesh[0];
+      auto gsh = cds->mesh[0]->oogs;
+      o_rhoCpAvg.copyFrom(cds->o_rho);
+      platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_rhoCpAvg);
+      oogs::startFinish(o_rhoCpAvg, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, gsh);
+      platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_rhoCpAvg);
+    }
+
     platform->timer.toc(timerScope + "::evaluateProperties");
   }
 
-  // terms to include: user source, advection, filtering, add weak Laplacian
   platform->linAlg->fill(cds->fieldOffsetSum, 0.0, cds->o_FS);
   makeq(time);
-
-  bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
 
   auto applyOgsOperation = [&](auto ogsFunc) {
     if (chtCVODE) {
@@ -975,10 +993,9 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
 
   applyOgsOperation(oogs::start);
 
-  // input and output are assumed to be L-vectors
   if (userLocalPointSource) {
     platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::localPointSource", 1);
-    // o_ydot is simply used as scratch space to store the L-vector source term
+    // o_ydot is used as scratch space to store the L-vector source term
     userLocalPointSource(nrs, LFieldOffset, o_y, o_ydot);
     platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::localPointSource");
 
@@ -992,25 +1009,12 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     platform->timer.tic(timerScope + "::fusedAddRhoDiv", 1);
   }
 
+   // (o_FS + userLocalPointSource) / rho
   if (chtCVODE) {
-
-    auto mesh = cds->mesh[0];
-    auto gsh = cds->mesh[0]->oogs;
-
     if (userLocalPointSource) {
-      // o_FS += o_ptSource
       platform->linAlg->axpby(cds->mesh[0]->Nlocal, 1.0, this->o_pointSource, 1.0, cds->o_FS);
     }
-
-    // o_FS /= invLMM(LMM*gs(o_rho)), i.e.
-    // average interface values for o_rho on the boundary between the CHT/non-CHT regions
-    auto o_tmp = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[0]);
-    o_tmp.copyFrom(cds->o_rho);
-    platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_tmp);
-    oogs::startFinish(o_tmp, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, gsh);
-    platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_tmp);
-
-    platform->linAlg->aydx(mesh->Nlocal, 1.0, o_tmp, cds->o_FS);
+    platform->linAlg->aydx(cds->mesh[0]->Nlocal, 1.0, o_rhoCpAvg, cds->o_FS);
   }
   if (!chtCVODE || (chtCVODE && this->Nscalar > 1)) {
     dlong startScalar = minCvodeScalarId;
@@ -1023,16 +1027,15 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     auto o_rho_start = cds->o_rho + cds->fieldOffsetScan[startScalar];
     occa::memory o_ptSource_start;
 
-    int addPointSourceContrib = 0;
     if (userLocalPointSource) {
-      addPointSourceContrib = 1;
       o_ptSource_start = this->o_pointSource + cds->fieldOffsetScan[startScalar];
     }
-    
+  
+    const int useFieldRho = !sharedRho; 
     this->fusedAddRhoDivKernel(cds->meshV->Nlocal,
                                numScalars,
                                nrs->fieldOffset,
-                               (int) !sharedRho, // fieldRho
+                               useFieldRho,
                                o_rho_start,
                                o_ptSource_start,
                                o_FS_start);
@@ -1044,18 +1047,17 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     platform->timer.tic(timerScope + "::dp0thdt", 1);
   }
 
+  // add dpdt term to temperature eqn
   if (platform->options.compareArgs("LOWMACH", "TRUE") && nrs->pSolver->allNeumann) {
-
-    // call is only used to evaluate dp0thdt, not divergence
     platform->linAlg->fill(mesh->Nlocal, 0.0, nrs->o_div);
+
+    // evaluate dp0thdt (not divergence)
     udf.div(nrs, time, nrs->o_div);
 
     // RHS += 1/vtrans * dp0thdt * alpha0
-    // for ideal gas, alpha = (gamma-1)/gamma
-    const auto alpha0 = nrs->alpha0Ref;
     auto o_tmp = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
     o_tmp.copyFrom(cds->o_rho);
-    platform->linAlg->ady(mesh->Nlocal, nrs->dp0thdt * alpha0, o_tmp);
+    platform->linAlg->ady(mesh->Nlocal, nrs->dp0thdt * nrs->alpha0Ref, o_tmp);
     platform->linAlg->axpby(mesh->Nlocal, 1.0, o_tmp, 1.0, cds->o_FS);
   }
 
@@ -1215,6 +1217,7 @@ void cvode_t::makeq(double time)
                         cds->o_diff,
                         cds->o_S,
                         o_FS);
+
     if (detailedTimersEnabled) {
       platform->timer.toc(timerScope + "::weakLaplacian");
     }
@@ -1366,6 +1369,9 @@ void cvode_t::solve(double t0, double t1, int tstep)
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope, 1);
   }
+
+  //this->tprev = std::numeric_limits<double>::max();
+
   // call cvode solver
   retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
   if (retval < 0) {
@@ -1411,7 +1417,9 @@ void cvode_t::solve(double t0, double t1, int tstep)
     mesh->update();
   }
 
-  computeUrst(nrs, false);
+  if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+    computeUrst(nrs, false);
+  }
 
   nrs->p0the = p0theSave;
 

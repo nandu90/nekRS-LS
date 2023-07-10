@@ -566,6 +566,10 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
     }
   }();
 
+ 
+  if (options.compareArgs("VERBOSE", "TRUE"))
+    options.setArgs("CVODE VERBOSE", "TRUE");
+
   options.setArgs("CVODE STOP TIME", "TRUE");
 
   if (par->extract(parScope, "hmaxratio", hmax)) {
