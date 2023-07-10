@@ -949,7 +949,6 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
 
   const bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
 
-  auto o_rhoCpAvg = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[0]);
   if (!(isJacobianEvaluation() && recycleProperties)) {
     platform->timer.tic(timerScope + "::evaluateProperties", 1);
 
@@ -1370,7 +1369,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
     platform->timer.tic(timerScope, 1);
   }
 
-  //this->tprev = std::numeric_limits<double>::max();
+  o_rhoCpAvg = platform->o_memPool.reserve<dfloat>(nrs->cds->fieldOffset[0]);
 
   // call cvode solver
   retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
@@ -1386,6 +1385,8 @@ void cvode_t::solve(double t0, double t1, int tstep)
     platform->device.finish();
     retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
   }
+
+  o_rhoCpAvg.free();
 
   nrsCheck(retval < 0,
            MPI_COMM_SELF,

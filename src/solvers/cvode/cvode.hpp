@@ -188,6 +188,8 @@ private:
 
   dlong Nscalar;
 
+  occa::memory o_rhoCpAvg;
+
   occa::memory o_coeffExt;
   occa::memory o_EToLUnique;
   occa::memory o_EToL;
