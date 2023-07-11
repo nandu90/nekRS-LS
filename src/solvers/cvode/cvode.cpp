@@ -1563,7 +1563,8 @@ void cvode_t::printTimers()
 
   // gather timer information from tree
   std::vector<std::string> operations;
-  std::vector<std::string> timesPerCall;
+  std::vector<std::string> times;
+  std::vector<std::string> calls;
   std::vector<std::string> relPercentage;
   std::vector<std::string> absPercentage;
   std::vector<std::string> throughputs;
@@ -1600,8 +1601,14 @@ void cvode_t::printTimers()
         ss.clear();
         ss << std::setprecision(3)
            << std::scientific
-           << tCall;
-        timesPerCall.push_back(ss.str());
+           << tTag;
+        times.push_back(ss.str());
+        
+        ss.str("");
+        ss.clear();
+        ss << std::setw(6)
+           << nCalls;
+        calls.push_back(ss.str());
         
         ss.str("");
         ss.clear();
@@ -1651,12 +1658,13 @@ void cvode_t::printTimers()
   
   std::map<int, std::vector<std::string>> table;
   table[0] = operations;
-  table[1] = timesPerCall;
-  table[2] = relPercentage;
-  table[3] = absPercentage;
-  table[4] = throughputs;
+  table[1] = times;
+  table[2] = calls;
+  table[3] = relPercentage;
+  table[4] = absPercentage;
+  table[5] = throughputs;
 
-  std::vector<std::string> headers = {"Operation", "time/call", "rel %", "abs %", "GDOF/s/rank"};
+  std::vector<std::string> headers = {"Operation", "time", "calls", "rel %", "abs %", "GDOF/s/rank"};
 
   if(platform->comm.mpiRank == 0){
     std::cout << "\n";
