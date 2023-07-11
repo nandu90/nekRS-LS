@@ -553,6 +553,13 @@ void timer_t::printRunStat(int step)
   };
   auto [tSEqnSourceCvode, nSEqnSourceCvode] = sumAllMatchingTags(cvodeUdfSEqnSourcePredicate, "DEVICE:MAX");
   
+  auto cvodeLocalPointSourcePredicate = [](const std::string &tag) {
+    bool match = tag.find("cvode_t::") != std::string::npos && tag.find("localPointSource") != std::string::npos;
+    // ensure children of the timer aren't doubly counted
+    return match;
+  };
+  auto [tLocalPointSource, nLocalPointSource] = sumAllMatchingTags(cvodeLocalPointSourcePredicate, "DEVICE:MAX");
+  
   auto cvodePropertiesPredicate = [](const std::string &tag) {
     bool match = tag.find("cvode_t::") != std::string::npos && tag.find("evaluateProperties") != std::string::npos;
     // ensure children of the timer aren't doubly counted
@@ -562,6 +569,7 @@ void timer_t::printRunStat(int step)
   printStatEntry("    scalarSolveCvode    ", "cvode_t::solve", "DEVICE:MAX", tElapsedTimeSolve);
   printStatEntry("      makeq             ", tMakeqCvode, nMakeqCvode, tScalarCvode);
   printStatEntry("        udfSEqnSource   ", tSEqnSourceCvode, nSEqnSourceCvode, tMakeqCvode);
+  printStatEntry("      local pt src      ", tLocalPointSource, nLocalPointSource, tScalarCvode);
   printStatEntry("      udfProperties     ", tPropCvode, nPropCvode, tScalarCvode);
 
   auto precoTimeScalars = 0.0;
