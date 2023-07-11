@@ -248,8 +248,10 @@ c-----------------------------------------------------------------------
       endif
 
       call bcastParam
-
       call chkParam
+
+      call usrdat0
+
       call mapelpr 
       call read_re2_data(ifbswap, .true., .true., .true.)
 
@@ -997,7 +999,6 @@ c
           bID = boundaryID(ifc,iel)
           if(bID.gt.0) then
             cb = cbc(ifc,iel,ifld) 
-            write(6,*) cb
             if(cb.eq.'t  ') then
               bcID = p_bcTypeS 
             else if(cb.eq.'int') then
