@@ -204,8 +204,10 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
     kernelName = "strongAdvectionVolume" + suffix;
     cds->strongAdvectionVolumeKernel = platform->kernels.get(section + kernelName);
 
-    kernelName = "strongAdvectionCubatureVolume" + suffix;
-    cds->strongAdvectionCubatureVolumeKernel = platform->kernels.get(section + kernelName);
+    if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+      kernelName = "strongAdvectionCubatureVolume" + suffix;
+      cds->strongAdvectionCubatureVolumeKernel = platform->kernels.get(section + kernelName);
+    }
 
     kernelName = "advectMeshVelocity" + suffix;
     cds->advectMeshVelocityKernel = platform->kernels.get(section + kernelName);

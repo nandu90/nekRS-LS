@@ -464,8 +464,11 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     {
       kernelName = "strongAdvectionVolume" + suffix;
       nrs->strongAdvectionVolumeKernel = platform->kernels.get(section + kernelName);
-      kernelName = "strongAdvectionCubatureVolume" + suffix;
-      nrs->strongAdvectionCubatureVolumeKernel = platform->kernels.get(section + kernelName);
+
+      if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+        kernelName = "strongAdvectionCubatureVolume" + suffix;
+        nrs->strongAdvectionCubatureVolumeKernel = platform->kernels.get(section + kernelName);
+      }
     }
 
     kernelName = "curl" + suffix;
@@ -874,6 +877,10 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
     nrs->setEllipticCoeffPressureKernel(mesh->Nlocal, nrs->fieldOffset, nrs->o_rho, nrs->o_ellipticCoeff);
 
     nrs->pSolver->o_lambda0 = nrs->o_ellipticCoeff.slice(0 * nrs->fieldOffset);
+    nrs->pSolver->lambda0Avg = platform->linAlg->innerProd(mesh->Nlocal, 
+                                                           mesh->o_LMM, 
+                                                           nrs->pSolver->o_lambda0, 
+                                                           platform->comm.mpiComm) / mesh->volume;
     nrs->pSolver->o_lambda1 = nrs->o_ellipticCoeff.slice(1 * nrs->fieldOffset);
 
     nrs->pSolver->EToB = (int *)calloc(mesh->Nelements * mesh->Nfaces, sizeof(int));
