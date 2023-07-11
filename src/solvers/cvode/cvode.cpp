@@ -1050,7 +1050,11 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     platform->linAlg->fill(mesh->Nlocal, 0.0, nrs->o_div);
 
     // evaluate dp0thdt (not divergence)
+    platform->timer.tic(timerScope + "::dp0thdt::udfDiv", 1);
+    cds->cvode->setTimerScope(timerScope + "::dp0thdt::udfDiv");
     udf.div(nrs, time, nrs->o_div);
+    cds->cvode->setTimerScope(timerScope);
+    platform->timer.toc(timerScope + "::dp0thdt::udfDiv");
 
     // RHS += 1/vtrans * dp0thdt * alpha0
     auto o_tmp = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
