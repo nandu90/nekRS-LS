@@ -2362,19 +2362,7 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *par)
   for (int i = 0; i < nscal; i++)
     sections.push_back("SCALAR" + scalarDigitStr(i));
 
-  const std::vector<std::string> staleKeys = {"RESIDUAL PROJECTION",
-                                              "INITIAL GUESS",
-                                              "REGULARIZATION",
-                                              "BOUNDARY TYPE MAP",
-                                              "MAXIMUM ITERATIONS",
-                                              "BLOCK SOLVER",
-                                              "PRECONDITIONER",
-                                              "ELLIPTIC",
-                                              "TOLERANCE",
-                                              "MULTIGRID",
-                                              "MGSOLVER"};
-
-  auto cleanSection = [&](const std::string &section) {
+  auto cleanSection = [&](const std::string& section, const std::vector<std::string>& staleKeys) {
     std::vector<std::string> staleOptions;
     for (auto const &option : options) {
       if (option.first.find(section) == 0) {
@@ -2390,9 +2378,34 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *par)
     }
   };
 
+  const std::vector<std::string> staleKeys = {"RESIDUAL PROJECTION",
+                                              "INITIAL GUESS",
+                                              "REGULARIZATION",
+                                              "BOUNDARY TYPE MAP",
+                                              "MAXIMUM ITERATIONS",
+                                              "BLOCK SOLVER",
+                                              "PRECONDITIONER",
+                                              "ELLIPTIC",
+                                              "CVODE",
+                                              "TOLERANCE",
+                                              "MULTIGRID",
+                                              "MGSOLVER"};
+
+  const std::vector<std::string> invalidKeysCvode = {"RESIDUAL PROJECTION",
+                                                    "INITIAL GUESS",
+                                                    "MAXIMUM ITERATIONS",
+                                                    "PRECONDITIONER",
+                                                    "ELLIPTIC",
+                                                    "MULTIGRID",
+                                                    "MGSOLVER"};
+
   for (const auto &section : sections) {
     if (options.compareArgs(section + " SOLVER", "NONE")) {
-      cleanSection(section);
+      cleanSection(section, staleKeys);
+    }
+
+    if (options.compareArgs(section + " SOLVER", "CVODE")) {
+      cleanSection(section, invalidKeysCvode);
     }
   }
 
