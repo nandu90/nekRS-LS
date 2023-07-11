@@ -437,7 +437,6 @@ void cvode_t::initialize()
 
   // custom settings
 #if 1
-
   retval = CVodeSetJacTimesRhsFn(this->cvodeMem, cvodeJtvRHS);
   check_retval(&retval, "CVodeSetJacTimesRhsFn", 1);
 
@@ -448,11 +447,11 @@ void cvode_t::initialize()
   platform->options.getArgs("CVODE MAX STEPS", mxsteps);
   retval = CVodeSetMaxNumSteps(this->cvodeMem, mxsteps);
 
-#if 0
-  int maxOrder = 3;
-  platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER", maxOrder);
-  retval = CVodeSetMaxOrd(this->cvodeMem, maxOrder);
-#endif
+  if(!platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER").empty()) {
+    int maxOrder;
+    platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER", maxOrder);
+    retval = CVodeSetMaxOrd(this->cvodeMem, maxOrder);
+  }
 
   double epsLin = 0.1;
   platform->options.getArgs("CVODE EPS LIN", epsLin);

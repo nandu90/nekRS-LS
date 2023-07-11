@@ -582,7 +582,9 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
 
   options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
 
-  options.setArgs("CVODE MAX TIMESTEPPER ORDER", std::to_string(maxOrder));
+  if (par->extract(parScope, "maxOrder", maxOrder)) {
+    options.setArgs("CVODE MAX TIMESTEPPER ORDER", std::to_string(maxOrder));
+  }
 
   upperCase(integrator);
   options.setArgs("CVODE INTEGRATOR", integrator);
