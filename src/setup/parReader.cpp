@@ -201,13 +201,12 @@ static std::vector<std::string> scalarKeys = {
 static std::vector<std::string> cvodeKeys = {
     {"relativetol"},
     {"absolutetol"},
-    {"hmaxratio"},
     {"epslin"},
     {"sigscale"},
     {"jtvrecycleproperties"},
     {"sharedrho"},
+    {"dealiasing"},
     {"jtvmixedprecision"},
-    {"cvodeendtimeratio"},
     {"solver"},
 };
 
@@ -592,6 +591,13 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   if (par->extract(parScope, "sigscale", sigScale)) {
     options.setArgs("CVODE SIGMA SCALE", to_string_f(sigScale));
   }
+
+  bool dealiasing = options.compareArgs("ADVECTION TYPE", "CUBATURE") ? true : false;
+  par->extract(parScope, "dealiasing", dealiasing);
+  if (dealiasing)
+    options.setArgs("CVODE ADVECTION TYPE", "CUBATURE+CONVECTIVE");
+  else
+    options.setArgs("CVODE ADVECTION TYPE", "CONVECTIVE");
 
   std::string recyclePropsStr;
   if (par->extract(parScope, "jtvrecycleproperties", recyclePropsStr)) {

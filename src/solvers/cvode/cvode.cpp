@@ -1133,7 +1133,7 @@ void cvode_t::makeq(double time)
     }
 
     if (platform->options.compareArgs("ADVECTION", "TRUE")) {
-      if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+      if (platform->options.compareArgs("CVODE ADVECTION TYPE", "CUBATURE")) {
         cds->strongAdvectionCubatureVolumeKernel(cds->meshV->Nelements,
                                                  Nscalar,
                                                  applyLMM,
@@ -1421,7 +1421,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
     mesh->update();
   }
 
-  if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+  if (platform->options.compareArgs("CVODE ADVECTION TYPE", "CUBATURE")) {
     computeUrst(nrs, false);
   }
 
