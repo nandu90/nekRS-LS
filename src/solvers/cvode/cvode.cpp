@@ -236,6 +236,14 @@ void cvode_t::initialize()
     return 0;
   };
 
+  auto linearSolve = [](SUNLinearSolver S, SUNMatrix A, N_Vector x, N_Vector b, realtype tol) {
+    const std::string timerName = "cvode_t::";
+    platform->timer.tic(timerName + "solve::cvode::linearSolve", 1);
+    auto retVal = SUNLinSolSolve_SPGMR(S, NULL, x, b, tol);
+    platform->timer.toc(timerName + "solve::cvode::linearSolve");
+    return retVal;
+  };
+
   // same as cvLsDQJtimes, but with scaling for sig
   CVLsJacTimesVecFn cvodeJtv =
       [](N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector fy, void *user_data, N_Vector work) {
@@ -420,6 +428,7 @@ void cvode_t::initialize()
   if(linearSolver == "GMRES"){
     LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
     check_retval(&retval, "SUNLinSol_SPFGMR", 1);
+    LS->ops->solve = linearSolve;
 
     SUNLinSol_SPGMRSetGSType(LS, SUN_MODIFIED_GS);
     check_retval(&retval, "SUNLinSol_SPGMRSetGSType", 1);
@@ -442,6 +451,10 @@ void cvode_t::initialize()
 
   retval = CVodeSetJacTimes(this->cvodeMem, NULL, cvodeJtv);
   check_retval(&retval, "CVodeSetJacTimes", 1);
+
+  retval = CVodeSetJacTimes(this->cvodeMem, NULL, cvodeJtv);
+  check_retval(&retval, "CVodeSetJacTimes", 1);
+
 
   int mxsteps = 500;
   platform->options.getArgs("CVODE MAX STEPS", mxsteps);
@@ -1702,7 +1715,7 @@ void cvode_t::resetTimers()
 
 std::string cvode_t::rhsTagName() const
 {
-  return this->isJacobianEvaluation() ? timerScope + "::jtv" : timerScope + "::rhs";
+  return this->isJacobianEvaluation() ? timerScope + "::linearSolve::jtv" : timerScope + "::rhs";
 }
 
 
