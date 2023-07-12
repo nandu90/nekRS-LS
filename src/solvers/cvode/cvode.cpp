@@ -1042,11 +1042,14 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
 
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope + "::fusedAddRhoDiv");
-    platform->timer.tic(timerScope + "::dp0thdt", 1);
   }
 
   // add dpdt term to temperature eqn
   if (platform->options.compareArgs("LOWMACH", "TRUE") && nrs->pSolver->allNeumann) {
+    if (detailedTimersEnabled) {
+      platform->timer.tic(timerScope + "::dp0thdt", 1);
+    }
+
     platform->linAlg->fill(mesh->Nlocal, 0.0, nrs->o_div);
 
     // evaluate dp0thdt (not divergence)
@@ -1061,10 +1064,13 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     o_tmp.copyFrom(cds->o_rho);
     platform->linAlg->ady(mesh->Nlocal, nrs->dp0thdt * nrs->alpha0Ref, o_tmp);
     platform->linAlg->axpby(mesh->Nlocal, 1.0, o_tmp, 1.0, cds->o_FS);
+
+    if (detailedTimersEnabled) {
+      platform->timer.toc(timerScope + "::dp0thdt");
+    }
   }
 
   if (detailedTimersEnabled) {
-    platform->timer.toc(timerScope + "::dp0thdt");
     platform->timer.tic(timerScope + "::maskDirichlet", 1);
   }
 
