@@ -1510,12 +1510,14 @@ void cvode_t::printInfo(bool printVerboseInfo) const
     ss << std::setfill(' ') << std::setw(lengthToColon - ss.str().length()) << " ";
 
     // pad remaining space, lengthToColon long, with spaces
-    printf("%s: nsteps %03ld  nRHS %03ld  nni %01ld  nli %03ld\n",
+    printf("%s: nsteps %03ld  nRHS %03ld  nni %01ld  nni/nsteps %.1f  nli %03ld  nli/nni %.1f\n",
            ss.str().c_str(),
            nsteps,
            nrhs,
            nni,
-           nli);
+           static_cast<float>(nni)/nsteps,
+           nli,
+           static_cast<float>(nli)/nni);
   }
   else if (platform->comm.mpiRank == 0) {
     std::ostringstream ss;
