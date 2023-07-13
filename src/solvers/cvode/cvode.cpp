@@ -1635,16 +1635,14 @@ void cvode_t::printTimers()
         ss.clear();
         ss << std::setprecision(1)
            << std::fixed
-           << 100.0 * tTag/tParent
-           << "%";
+           << 100.0 * tTag/tParent;
         relPercentage.push_back(level == 1 ? "" : ss.str());
         
         ss.str("");
         ss.clear();
         ss << std::setprecision(1)
            << std::fixed
-           << 100.0 * tTag/tRoot
-           << "%";
+           << 100.0 * tTag/tRoot;
         absPercentage.push_back(ss.str());
 
         ss.str("");
