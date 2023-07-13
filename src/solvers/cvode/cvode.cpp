@@ -1440,9 +1440,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
     mesh->update();
   }
 
-  if (platform->options.compareArgs("CVODE ADVECTION TYPE", "CUBATURE")) {
-    computeUrst(nrs, false);
-  }
+  computeUrst(nrs, false);
 
   nrs->p0the = p0theSave;
 
