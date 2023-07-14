@@ -1595,6 +1595,9 @@ void cvode_t::printTimers()
       if(level == 1) rootTag = tag; // set as root of timer tree
       const auto tTag = platform->timer.query(tag, "DEVICE:MAX");
       const auto nCalls = platform->timer.count(tag);
+
+      if(nCalls == 0) return; // nothing to print
+
       auto tParent = platform->timer.query(parentTag, "DEVICE:MAX");
 
       if(tParent < 0.0)
