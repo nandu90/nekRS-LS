@@ -33,9 +33,10 @@
 #endif
 #endif
 
-//#define USE_E_VECTOR_LAYOUT 1
+// #define USE_E_VECTOR_LAYOUT 1
 
-namespace {
+namespace
+{
 
 #ifdef ENABLE_CVODE
 sunrealtype *__N_VGetDeviceArrayPointer(N_Vector u)
@@ -47,8 +48,7 @@ sunrealtype *__N_VGetDeviceArrayPointer(N_Vector u)
 
   if (useDevice) {
     return N_VGetDeviceArrayPointer(u);
-  }
-  else {
+  } else {
     return N_VGetArrayPointer_Serial(u);
   }
 }
@@ -61,21 +61,28 @@ void check_retval(void *returnvalue, const char *funcname, int opt)
   /* Check if SUNDIALS function returned NULL pointer - no memory allocated */
 
   if (opt == 0 && returnvalue == NULL) {
-    nrsAbort(MPI_COMM_SELF, EXIT_FAILURE, 
-             "\nSUNDIALS_ERROR: %s() failed - returned NULL pointer\n\n", funcname);
+    nrsAbort(MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "\nSUNDIALS_ERROR: %s() failed - returned NULL pointer\n\n",
+             funcname);
   }
   /* Check if retval < 0 */
   else if (opt == 1) {
     retval = (int *)returnvalue;
     if (*retval < 0) {
-      nrsAbort(MPI_COMM_SELF, EXIT_FAILURE, 
-      "\nSUNDIALS_ERROR: %s() failed with retval = %d\n\n", funcname, *retval);
+      nrsAbort(MPI_COMM_SELF,
+               EXIT_FAILURE,
+               "\nSUNDIALS_ERROR: %s() failed with retval = %d\n\n",
+               funcname,
+               *retval);
     }
   }
   /* Check if function returned NULL pointer - no memory allocated */
   else if (opt == 2 && returnvalue == NULL) {
-    nrsAbort(MPI_COMM_SELF, EXIT_FAILURE, 
-             "\nMEMORY_ERROR: %s() failed - returned NULL pointer\n\n", funcname);
+    nrsAbort(MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "\nMEMORY_ERROR: %s() failed - returned NULL pointer\n\n",
+             funcname);
   }
 }
 
@@ -143,7 +150,7 @@ cvode_t::cvode_t(nrs_t *_nrs)
 
     Nscalar++;
   }
-  
+
 #if 0
   if(platform->comm.mpiRank == 0){
     std::cout << "CVODE Nscalar: " << Nscalar << std::endl;
@@ -171,25 +178,30 @@ cvode_t::cvode_t(nrs_t *_nrs)
 
   verboseCVODE = platform->options.compareArgs("CVODE VERBOSE", "TRUE");
   sharedRho = platform->options.compareArgs("CVODE SHARED RHO", "TRUE");
-  if(scalarIds.size() < 2) sharedRho = false;
- 
-  mixedPrecisionJtvEnabled = platform->options.compareArgs("CVODE MIXED PRECISION JTV", "TRUE");
-  nrsCheck(mixedPrecisionJtvEnabled, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "CVODE MIXED PRECISION JTV = TRUE not supported yet");
+  if (scalarIds.size() < 2) {
+    sharedRho = false;
+  }
 
-  if(mixedPrecisionJtvEnabled){
+  mixedPrecisionJtvEnabled = platform->options.compareArgs("CVODE MIXED PRECISION JTV", "TRUE");
+  nrsCheck(mixedPrecisionJtvEnabled,
+           platform->comm.mpiComm,
+           EXIT_FAILURE,
+           "%s\n",
+           "CVODE MIXED PRECISION JTV = TRUE not supported yet");
+
+  if (mixedPrecisionJtvEnabled) {
     auto mesh = cds->mesh[0];
     o_vgeoPfloat = platform->device.malloc<pfloat>(mesh->Nelements * mesh->Np * mesh->Nvgeo);
-    platform->copyDfloatToPfloatKernel(mesh->Nelements * mesh->Np * mesh->Nvgeo,
-                                       mesh->o_vgeo,
-                                       o_vgeoPfloat);
+    platform->copyDfloatToPfloatKernel(mesh->Nelements * mesh->Np * mesh->Nvgeo, mesh->o_vgeo, o_vgeoPfloat);
   }
 }
 
 void cvode_t::initialize()
 {
 
-  if (isInitialized)
+  if (isInitialized) {
     return;
+  }
   isInitialized = true;
 
   auto *cds = nrs->cds;
@@ -258,8 +270,9 @@ void cvode_t::initialize()
         int iter, retval;
 
         retval = CVodeGetErrWeights(cvode_mem, work);
-        if (retval != CV_SUCCESS)
+        if (retval != CV_SUCCESS) {
           return (retval);
+        }
 
         /* Initialize perturbation to 1/||v|| */
         realtype sig = 1 / N_VWrmsNorm_MPIManyVector(v, work);
@@ -282,18 +295,21 @@ void cvode_t::initialize()
           /* Set Jv = f(tn, y+sig*v) */
           cvode->jtvRHS(t, o_work, o_Jv);
           retval = 0; // currently we don't do any error checking in the RHS
-          if (retval == 0)
+          if (retval == 0) {
             break;
-          if (retval < 0)
+          }
+          if (retval < 0) {
             return (-1);
+          }
 
           /* If f failed recoverably, shrink sig and retry */
           sig *= 0.25;
         }
 
         /* If retval still isn't 0, return with a recoverable failure */
-        if (retval > 0)
+        if (retval > 0) {
           return (+1);
+        }
 
         /* Replace Jv by (Jv - fy)/sig */
         const realtype siginv = 1.0 / sig;
@@ -324,10 +340,10 @@ void cvode_t::initialize()
       nrsCheck(true,
                platform->comm.mpiComm,
                EXIT_FAILURE,
-               "%s", "CVODE ENABLE_CUDA not enabled, despite mode being CUDA!\n");
+               "%s",
+               "CVODE ENABLE_CUDA not enabled, despite mode being CUDA!\n");
 #endif
-    }
-    else if (platform->device.mode() == "HIP") {
+    } else if (platform->device.mode() == "HIP") {
 #ifdef ENABLE_HIP
       this->y = N_VNew_Hip(data->nEq, sunctx);
       check_retval((void *)this->y, "N_VNew_Hip", 0);
@@ -335,10 +351,10 @@ void cvode_t::initialize()
       nrsCheck(true,
                platform->comm.mpiComm,
                EXIT_FAILURE,
-               "%s", "CVODE ENABLE_HIP not enabled, despite mode being HIP!\n");
+               "%s",
+               "CVODE ENABLE_HIP not enabled, despite mode being HIP!\n");
 #endif
-    }
-    else if (platform->device.mode() == "Serial") {
+    } else if (platform->device.mode() == "Serial") {
       this->y = N_VNew_Serial(this->nEq, sunctx);
       check_retval((void *)this->y, "N_VNew_Serial", 0);
     }
@@ -425,7 +441,7 @@ void cvode_t::initialize()
 
   SUNLinearSolver LS;
 
-  if(linearSolver == "GMRES"){
+  if (linearSolver == "GMRES") {
     LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
     check_retval(&retval, "SUNLinSol_SPFGMR", 1);
     LS->ops->solve = linearSolve;
@@ -455,12 +471,11 @@ void cvode_t::initialize()
   retval = CVodeSetJacTimes(this->cvodeMem, NULL, cvodeJtv);
   check_retval(&retval, "CVodeSetJacTimes", 1);
 
-
   int mxsteps = 500;
   platform->options.getArgs("CVODE MAX STEPS", mxsteps);
   retval = CVodeSetMaxNumSteps(this->cvodeMem, mxsteps);
 
-  if(!platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER").empty()) {
+  if (!platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER").empty()) {
     int maxOrder;
     platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER", maxOrder);
     retval = CVodeSetMaxOrd(this->cvodeMem, maxOrder);
@@ -518,13 +533,11 @@ cvode_t::~cvode_t()
 #ifdef ENABLE_CUDA
     N_VDestroy_Cuda(y);
 #endif
-  }
-  else if (platform->device.mode() == "HIP") {
+  } else if (platform->device.mode() == "HIP") {
 #ifdef ENABLE_HIP
     N_VDestroy_HIP(y);
 #endif
-  }
-  else if (platform->device.mode() == "Serial") {
+  } else if (platform->device.mode() == "Serial") {
     N_VDestroy_Serial(y);
   }
 
@@ -535,8 +548,9 @@ cvode_t::~cvode_t()
 void cvode_t::setupEToLMapping()
 {
   auto *mesh = nrs->meshV;
-  if (nrs->cht)
+  if (nrs->cht) {
     mesh = nrs->cds->mesh[0];
+  }
 
 #ifdef USE_E_VECTOR_LAYOUT
   std::vector<dlong> Eids(mesh->Nlocal);
@@ -588,8 +602,9 @@ void cvode_t::setupEToLMapping()
   // construct L-vector version of inv degree, based on duplicated points in L-vector
   {
     auto *mesh = nrs->meshV;
-    if (nrs->cht)
+    if (nrs->cht) {
       mesh = nrs->cds->mesh[0];
+    }
 
     std::vector<dfloat> degree(mesh->Nlocal, 0.0);
 
@@ -603,7 +618,7 @@ void cvode_t::setupEToLMapping()
     ogsGatherScatter(degree.data(), dfloatString, ogsAdd, mesh->ogs);
 
     std::vector<dfloat> invDegreeL(LFieldOffset, 1.0);
-    
+
     for (int n = 0; n < mesh->Nlocal; ++n) {
       const auto lid = EToLUnique[n];
       if (lid > -1) {
@@ -613,18 +628,29 @@ void cvode_t::setupEToLMapping()
 
     // sanity check:
     // entries in invDegreeL are on (0,1]
-    bool allPositive = std::all_of(invDegreeL.begin(), invDegreeL.end(), [](auto &&val) { return val > 0.0 && val <= 1.0; });
+    bool allPositive =
+        std::all_of(invDegreeL.begin(), invDegreeL.end(), [](auto &&val) { return val > 0.0 && val <= 1.0; });
     int err = allPositive ? 0 : 1;
     MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-    nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Encountered invDegreeL value outside of (0,1]");
+    nrsCheck(err,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "Encountered invDegreeL value outside of (0,1]");
 
     // on a single processor, T-vector and L-vector are the same --> invDegreeL is unity everywhere
-    if(platform->comm.mpiCommSize == 1){
+    if (platform->comm.mpiCommSize == 1) {
       const auto tol = 1e4 * std::numeric_limits<dfloat>::epsilon();
-      bool allUnity = std::all_of(invDegreeL.begin(), invDegreeL.end(), [tol](auto &&val) { return std::abs(val - 1.0) < tol; });
+      bool allUnity = std::all_of(invDegreeL.begin(), invDegreeL.end(), [tol](auto &&val) {
+        return std::abs(val - 1.0) < tol;
+      });
       int err = allUnity ? 0 : 1;
       MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-      nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Encountered non-unity invDegreeL when P=1");
+      nrsCheck(err,
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "%s\n",
+               "Encountered non-unity invDegreeL when P=1");
     }
 
     this->o_invDegree = platform->device.malloc<dfloat>(LFieldOffset, invDegreeL.data());
@@ -641,7 +667,11 @@ void cvode_t::setupEToLMapping()
   auto minmax = std::minmax_element(EToL.begin(), EToL.end());
   err = (*minmax.first == 0 && *minmax.second == LFieldOffset - 1) ? 0 : 1;
   MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-  nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "EToL mapping is not in range [0, LFieldOffset)");
+  nrsCheck(err,
+           platform->comm.mpiComm,
+           EXIT_FAILURE,
+           "%s\n",
+           "EToL mapping is not in range [0, LFieldOffset)");
 
   // every value in [0,LFieldOffset) is covered in the range of EToL
   std::set<dlong> uniqueOutputs;
@@ -675,7 +705,9 @@ void cvode_t::setupDirichletMask()
         // Since EToB must include all of the faces on the T-mesh, we need to explicitly
         // mark the faces on the V-mesh as not having a boundary
         // This ensures that there is no effect in the resulting mask
-        if(e >= NelemV && is != 0) EToB[f + e * mesh->Nfaces + fOffset] = NO_OP;
+        if (e >= NelemV && is != 0) {
+          EToB[f + e * mesh->Nfaces + fOffset] = NO_OP;
+        }
       }
     }
   }
@@ -715,9 +747,11 @@ void cvode_t::applyDirichlet(double time)
   // extrapolate masked Dirichlet values to current time state
   // NOTE: this can only be applied after the extrapolation order is reached
   // to avoid introducing CVODE convergence issues in the first few time steps
-  if(this->isRhsEvaluation() && (this->externalTStep > nrs->nEXT)){
-    
-    if(this->Nmasked == 0) return;
+  if (this->isRhsEvaluation() && (this->externalTStep > nrs->nEXT)) {
+
+    if (this->Nmasked == 0) {
+      return;
+    }
 
     auto cds = nrs->cds;
     const int extOrder = std::min(this->externalTStep, nrs->nEXT);
@@ -734,14 +768,16 @@ void cvode_t::applyDirichlet(double time)
   // lower than any other possible Dirichlet value
   static constexpr dfloat TINY = -1e30;
   cds_t *cds = nrs->cds;
-  
-  auto o_S_start = platform->o_memPool.reserve<dfloat>(cds->fieldOffsetSum); 
+
+  auto o_S_start = platform->o_memPool.reserve<dfloat>(cds->fieldOffsetSum);
 
   for (int is = 0; is < cds->NSfields; is++) {
-    if (!cds->compute[is])
+    if (!cds->compute[is]) {
       continue;
-    if (!cds->cvodeSolve[is])
+    }
+    if (!cds->cvodeSolve[is]) {
       continue;
+    }
 
     mesh_t *mesh = cds->mesh[0];
     oogs_t *gsh = cds->gshT;
@@ -757,8 +793,8 @@ void cvode_t::applyDirichlet(double time)
     auto o_Si = o_S_start + cds->fieldOffsetScan[cvodeScalarId];
 
     platform->linAlg->fill(cds->fieldOffset[is], TINY, o_Si);
-    
-    for(int sweep = 0; sweep < 2; sweep++){
+
+    for (int sweep = 0; sweep < 2; sweep++) {
       cds->dirichletBCKernel(mesh->Nelements,
                              cds->fieldOffset[is],
                              is,
@@ -778,14 +814,18 @@ void cvode_t::applyDirichlet(double time)
                              cds->neknek ? cds->neknek->o_S : o_NULL,
                              *(cds->o_usrwrk),
                              o_Si);
-      if (sweep == 0)
+      if (sweep == 0) {
         oogs::startFinish(o_Si, 1, cds->fieldOffset[is], ogsDfloat, ogsMax, gsh);
-      if (sweep == 1)
+      }
+      if (sweep == 1) {
         oogs::startFinish(o_Si, 1, cds->fieldOffset[is], ogsDfloat, ogsMin, gsh);
+      }
     }
   }
 
-  if(this->Nmasked == 0) return;
+  if (this->Nmasked == 0) {
+    return;
+  }
 
   cds->maskCopyKernel(this->Nmasked,
                       0,
@@ -793,15 +833,13 @@ void cvode_t::applyDirichlet(double time)
                       o_maskIds,
                       o_S_start,
                       cds->o_S);
-  
-  // o_maskValues must be at state t0 to be lagged by the subsequent CVODE solve call
-  if(this->isRhsEvaluation())
-    return;
 
-  this->mapToMaskedPointKernel(this->Nmasked,
-                               o_maskIds,
-                               o_S_start,
-                               o_maskValues);
+  // o_maskValues must be at state t0 to be lagged by the subsequent CVODE solve call
+  if (this->isRhsEvaluation()) {
+    return;
+  }
+
+  this->mapToMaskedPointKernel(this->Nmasked, o_maskIds, o_S_start, o_maskValues);
 }
 
 void cvode_t::computeErrorWeight(occa::memory o_y, occa::memory o_ewt)
@@ -825,8 +863,7 @@ void cvode_t::rhs(double time, occa::memory o_y, occa::memory o_ydot)
 
   if (userRHS) {
     userRHS(nrs, time, tExternal, o_y, o_ydot);
-  }
-  else {
+  } else {
     defaultRHS(time, tExternal, o_y, o_ydot);
   }
 
@@ -841,8 +878,7 @@ void cvode_t::jtvRHS(double time, occa::memory o_y, occa::memory o_ydot)
 
   if (userJacobian) {
     userJacobian(nrs, time, tExternal, o_y, o_ydot);
-  }
-  else {
+  } else {
     this->rhs(time, o_y, o_ydot);
   }
 
@@ -853,8 +889,9 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
 {
   const bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
   mesh_t *mesh = nrs->meshV;
-  if (nrs->cht)
+  if (nrs->cht) {
     mesh = nrs->cds->mesh[0];
+  }
 
   auto *cds = nrs->cds;
 
@@ -907,26 +944,19 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
 
       const int meshOrder = std::min(this->externalTStep, mesh->nAB);
       nek::coeffAB(mesh->coeffAB, dtCvode.data(), meshOrder);
-      for (int i = 0; i < meshOrder; ++i)
+      for (int i = 0; i < meshOrder; ++i) {
         mesh->coeffAB[i] *= dtCvode[0];
-      for (int i = mesh->nAB; i > meshOrder; i--)
+      }
+      for (int i = mesh->nAB; i > meshOrder; i--) {
         mesh->coeffAB[i - 1] = 0.0;
+      }
       mesh->o_coeffAB.copyFrom(mesh->coeffAB, mesh->nAB);
 
       // restore mesh coordinates prior to integration
       {
-        mesh->o_x.copyFrom(this->o_xyz0,
-                           mesh->Nlocal,
-                           0,
-                           0 * nrs->fieldOffset);
-        mesh->o_y.copyFrom(this->o_xyz0,
-                           mesh->Nlocal,
-                           0,
-                           1 * nrs->fieldOffset);
-        mesh->o_z.copyFrom(this->o_xyz0,
-                           mesh->Nlocal,
-                           0,
-                           2 * nrs->fieldOffset);
+        mesh->o_x.copyFrom(this->o_xyz0, mesh->Nlocal, 0, 0 * nrs->fieldOffset);
+        mesh->o_y.copyFrom(this->o_xyz0, mesh->Nlocal, 0, 1 * nrs->fieldOffset);
+        mesh->o_z.copyFrom(this->o_xyz0, mesh->Nlocal, 0, 2 * nrs->fieldOffset);
       }
 
       mesh->move();
@@ -1020,7 +1050,7 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     platform->timer.tic(timerScope + "::fusedAddRhoDiv", 1);
   }
 
-   // (o_FS + userLocalPointSource) / rho
+  // (o_FS + userLocalPointSource) / rho
   if (chtCVODE) {
     if (userLocalPointSource) {
       platform->linAlg->axpby(cds->mesh[0]->Nlocal, 1.0, this->o_pointSource, 1.0, cds->o_FS);
@@ -1041,8 +1071,8 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
     if (userLocalPointSource) {
       o_ptSource_start = this->o_pointSource + cds->fieldOffsetScan[startScalar];
     }
-  
-    const int useFieldRho = !sharedRho; 
+
+    const int useFieldRho = !sharedRho;
     this->fusedAddRhoDivKernel(cds->meshV->Nlocal,
                                numScalars,
                                nrs->fieldOffset,
@@ -1050,7 +1080,6 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
                                o_rho_start,
                                o_ptSource_start,
                                o_FS_start);
-
   }
 
   if (detailedTimersEnabled) {
@@ -1088,7 +1117,7 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
   }
 
   auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[minCvodeScalarId];
-  if(this->Nmasked > 0){
+  if (this->Nmasked > 0) {
     nrs->maskKernel(this->Nmasked, this->o_maskIds, o_FS_start);
   }
 
@@ -1123,14 +1152,13 @@ void cvode_t::makeq(double time)
   }
 
   auto applyTerms = [&](mesh_t *mesh, dlong scalarStart, dlong Nscalar, bool chtPass) {
-
-    if(cds->applyFilter){
+    if (cds->applyFilter) {
       cds->filterRTKernel(cds->meshV->Nelements,
                           scalarStart,
                           Nscalar,
                           nrs->fieldOffset,
                           cds->o_applyFilterRT,
-                          cds->o_filterMT,
+                          cds->o_filterRT,
                           cds->o_filterS,
                           cds->o_rho,
                           cds->o_S,
@@ -1143,7 +1171,7 @@ void cvode_t::makeq(double time)
     platform->flopCounter->add("scalarFilterRT", flops);
 
     int applyLMM = 1;
-    if(chtPass){
+    if (chtPass) {
       applyLMM = 0;
     }
 
@@ -1169,8 +1197,7 @@ void cvode_t::makeq(double time)
                                                  o_Urst,
                                                  cds->o_rho,
                                                  o_FS);
-      }
-      else {
+      } else {
         cds->strongAdvectionVolumeKernel(cds->meshV->Nelements,
                                          Nscalar,
                                          applyLMM,
@@ -1189,7 +1216,7 @@ void cvode_t::makeq(double time)
       // During a CHT pass, the LMM term is not applied in the advection kernels as
       // the advection term is only defined in the V-mesh portion.
       // Therefore, apply the LMM term here over the entire T-mesh.
-      if(chtPass){
+      if (chtPass) {
         auto o_FS_start = o_FS + cds->fieldOffsetScan[scalarStart];
         platform->linAlg->axmyMany(mesh->Nlocal, Nscalar, nrs->fieldOffset, 0, 1.0, mesh->o_LMM, o_FS_start);
       }
@@ -1225,7 +1252,7 @@ void cvode_t::makeq(double time)
 
     if (detailedTimersEnabled) {
       platform->timer.toc(timerScope + "::neumannBC");
-      platform->timer.tic(timerScope + "::weakLaplacian",1);
+      platform->timer.tic(timerScope + "::weakLaplacian", 1);
     }
 
     weakLaplacianKernel(mesh->Nelements,
@@ -1334,8 +1361,9 @@ void cvode_t::solve(double t0, double t1, int tstep)
   }
 
   mesh_t *mesh = nrs->meshV;
-  if (nrs->cht)
+  if (nrs->cht) {
     mesh = nrs->cds->mesh[0];
+  }
 
   bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
 
@@ -1375,7 +1403,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
     nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "Error calling CVodeSetStopTime\n");
   }
 
-  if(!platform->options.getArgs("CVODE HMAX RATIO").empty()) {
+  if (!platform->options.getArgs("CVODE HMAX RATIO").empty()) {
     double hmax;
     platform->options.getArgs("CVODE HMAX RATIO", hmax);
     hmax *= nrs->dt[0];
@@ -1410,10 +1438,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
 
   o_rhoCpAvg.free();
 
-  nrsCheck(retval < 0,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "%s", "CVODE failed after restart. Ending simulation.\n");
+  nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "CVODE failed after restart. Ending simulation.\n");
   platform->device.finish();
 
   if (detailedTimersEnabled) {
@@ -1445,8 +1470,9 @@ void cvode_t::solve(double t0, double t1, int tstep)
   nrs->p0the = p0theSave;
 
   for (int s = nrs->nEXT; s > 1; s--) {
-    if (maskOffset)
+    if (maskOffset) {
       o_maskValues.copyFrom(o_maskValues, maskOffset, (s - 1) * maskOffset, (s - 2) * maskOffset);
+    }
   }
 
   // compute scalar boundary condition at time t1
@@ -1492,13 +1518,25 @@ long cvode_t::numLinIters() const
   return nli - prevNli;
 }
 #else
-long cvode_t::numSteps() const { return 0; }
+long cvode_t::numSteps() const
+{
+  return 0;
+}
 
-long cvode_t::numRHSEvals() const { return 0; }
+long cvode_t::numRHSEvals() const
+{
+  return 0;
+}
 
-long cvode_t::numNonlinSolveIters() const { return 0; }
+long cvode_t::numNonlinSolveIters() const
+{
+  return 0;
+}
 
-long cvode_t::numLinIters() const { return 0; }
+long cvode_t::numLinIters() const
+{
+  return 0;
+}
 #endif
 
 void cvode_t::printInfo(bool printVerboseInfo) const
@@ -1532,11 +1570,10 @@ void cvode_t::printInfo(bool printVerboseInfo) const
            nsteps,
            nrhs,
            nni,
-           static_cast<float>(nni)/nsteps,
+           static_cast<float>(nni) / nsteps,
            nli,
-           static_cast<float>(nli)/nni);
-  }
-  else if (platform->comm.mpiRank == 0) {
+           static_cast<float>(nli) / nni);
+  } else if (platform->comm.mpiRank == 0) {
     std::ostringstream ss;
     ss << "  " << scalars;
     printf("%s: %ld %ld %ld %ldf", ss.str().c_str(), nsteps, nrhs, nni, nli);
@@ -1561,8 +1598,7 @@ void cvode_t::printTimers()
     auto pos = tag.rfind("::");
     if (pos == std::string::npos) {
       tree[""].push_back(tag);
-    }
-    else {
+    } else {
       auto parent = tag.substr(0, pos);
       tree[parent].push_back(tag);
     }
@@ -1577,8 +1613,8 @@ void cvode_t::printTimers()
   auto mesh = nrs->meshV;
   long long int NglobalElements = mesh->Nelements;
   MPI_Allreduce(MPI_IN_PLACE, &NglobalElements, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm);
-  const double GDOF = (NglobalElements * mesh->N * mesh->N * mesh->N * this->cvodeScalarIds.size())
-                      / (1e9 * platform->comm.mpiCommSize);
+  const double GDOF = (NglobalElements * mesh->N * mesh->N * mesh->N * this->cvodeScalarIds.size()) /
+                      (1e9 * platform->comm.mpiCommSize);
 
   // gather timer information from tree
   std::vector<std::string> operations;
@@ -1592,7 +1628,9 @@ void cvode_t::printTimers()
   std::function<void(std::string, std::string, std::string, int)> gatherTreeStats;
   gatherTreeStats = [&](std::string tag, std::string rootTag, std::string parentTag, int level) {
     if (level > 0) {
-      if(level == 1) rootTag = tag; // set as root of timer tree
+      if (level == 1) {
+        rootTag = tag; // set as root of timer tree
+      }
       const auto tTag = platform->timer.query(tag, "DEVICE:MAX");
       const auto nCalls = platform->timer.count(tag);
 
@@ -1600,8 +1638,9 @@ void cvode_t::printTimers()
 
       auto tParent = platform->timer.query(parentTag, "DEVICE:MAX");
 
-      if(tParent < 0.0)
+      if (tParent < 0.0) {
         tParent = tTag;
+      }
 
       const auto tRoot = platform->timer.query(rootTag, "DEVICE:MAX");
 
@@ -1621,53 +1660,42 @@ void cvode_t::printTimers()
 
         ss.str("");
         ss.clear();
-        ss << std::setprecision(3)
-           << std::scientific
-           << tTag;
+        ss << std::setprecision(3) << std::scientific << tTag;
         times.push_back(ss.str());
-        
+
         ss.str("");
         ss.clear();
-        ss << std::setw(6)
-           << nCalls;
+        ss << std::setw(6) << nCalls;
         calls.push_back(ss.str());
-        
+
         ss.str("");
         ss.clear();
-        ss << std::setprecision(1)
-           << std::fixed
-           << 100.0 * tTag/tParent;
+        ss << std::setprecision(1) << std::fixed << 100.0 * tTag / tParent;
         relPercentage.push_back(level == 1 ? "" : ss.str());
-        
+
         ss.str("");
         ss.clear();
-        ss << std::setprecision(1)
-           << std::fixed
-           << 100.0 * tTag/tRoot;
+        ss << std::setprecision(1) << std::fixed << 100.0 * tTag / tRoot;
         absPercentage.push_back(ss.str());
 
         ss.str("");
         ss.clear();
-        ss << std::setprecision(3)
-           << std::scientific
-           << GDOF/tCall;
+        ss << std::setprecision(3) << std::scientific << GDOF / tCall;
         throughputs.push_back(ss.str());
       }
     }
-    
+
     std::vector<std::string> children;
     for (auto &&child : tree[tag]) {
       children.push_back(child);
     }
 
     // sort children by max time, from largest to smallest
-    std::sort(children.begin(),
-              children.end(),
-              [&](const std::string &a, const std::string &b) {
-                const auto ta = platform->timer.query(a, "DEVICE:MAX");
-                const auto tb = platform->timer.query(b, "DEVICE:MAX");
-                return ta > tb;
-              });
+    std::sort(children.begin(), children.end(), [&](const std::string &a, const std::string &b) {
+      const auto ta = platform->timer.query(a, "DEVICE:MAX");
+      const auto tb = platform->timer.query(b, "DEVICE:MAX");
+      return ta > tb;
+    });
 
     for (auto &&child : children) {
       gatherTreeStats(child, rootTag, tag, level + 1);
@@ -1675,7 +1703,7 @@ void cvode_t::printTimers()
   };
 
   gatherTreeStats(start, "", "", 0);
-  
+
   std::map<int, std::vector<std::string>> table;
   table[0] = operations;
   table[1] = times;
@@ -1686,7 +1714,7 @@ void cvode_t::printTimers()
 
   std::vector<std::string> headers = {"Operation", "time", "calls", "rel %", "abs %", "GDOF/s/rank"};
 
-  if(platform->comm.mpiRank == 0){
+  if (platform->comm.mpiRank == 0) {
     std::cout << "\n";
     std::cout << "Timers for " << start << ":\n";
     printTable(table, headers, "    ");
@@ -1717,12 +1745,11 @@ std::string cvode_t::rhsTagName() const
   return this->isJacobianEvaluation() ? timerScope + "::linearSolve::jtv" : timerScope + "::rhs";
 }
 
-
 void cvode_t::setLocalPointSource(userLocalPointSource_t _userLocalPointSource)
 {
   userLocalPointSource = _userLocalPointSource;
 
-  if(o_pointSource.size() == 0){
+  if (o_pointSource.size() == 0) {
     o_pointSource = platform->device.malloc<dfloat>(this->Nscalar * nrs->fieldOffset);
   }
 

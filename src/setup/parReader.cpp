@@ -666,6 +666,16 @@ void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *par, s
       }
     }
   }
+
+  std::string absoluteTol;
+  if (par->extract(parScope, "absolutetol", absoluteTol)) {
+    std::string solver;
+    par->extract(parScope, "solver", solver);
+    if (solver != "cvode" && solver != "none") {
+      append_error("absoluteTol is only supported for solver=cvode");
+    }
+    options.setArgs(parSectionName + "CVODE ABSOLUTE TOLERANCE", absoluteTol);
+  }
 }
 
 void parseCoarseGridDiscretization(const int rank, setupAide &options, inipp::Ini *par, std::string parScope)
@@ -2147,14 +2157,6 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
       options.setArgs("SCALAR" + sid + " DENSITY", to_string_f(rhoCp));
     }
 
-    dfloat cvodeAbsoluteTol = -1.0;
-    if (par->extract("temperature", "absolutetol", cvodeAbsoluteTol)) {
-      options.setArgs("SCALAR" + sid + " CVODE ABSOLUTE TOLERANCE", to_string_f(cvodeAbsoluteTol));
-      if (solver != "cvode") {
-        append_error("absoluteTol is only supported with solver=cvode");
-      }
-    }
-
     std::string s_bcMap;
     if (par->extract("temperature", "boundarytypemap", s_bcMap)) {
       options.setArgs("SCALAR" + sid + " BOUNDARY TYPE MAP", s_bcMap);
@@ -2258,13 +2260,6 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
 
     parseSolverTolerance(rank, options, par, parScope);
 
-    dfloat cvodeAbsoluteTol = -1.0;
-    if (par->extract(parScope, "absolutetol", cvodeAbsoluteTol)) {
-      options.setArgs("SCALAR" + sid + " CVODE ABSOLUTE TOLERANCE", to_string_f(cvodeAbsoluteTol));
-      if (solver != "cvode") {
-        append_error("absoluteTol is only supported with solver=cvode");
-      }
-    }
 
     std::string sbuf;
     if (par->extract(parScope, "diffusivity", sbuf)) {

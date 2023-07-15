@@ -76,8 +76,8 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
 
     auto o_diff = cds->o_diff + cds->fieldOffsetScan[is];
     auto o_rho = cds->o_rho + cds->fieldOffsetScan[is];
-    platform->linAlg->fill(mesh->Nlocal, diff, o_diff); 
-    platform->linAlg->fill(mesh->Nlocal, rho, o_rho); 
+    platform->linAlg->fill(mesh->Nlocal, diff, o_diff);
+    platform->linAlg->fill(mesh->Nlocal, rho, o_rho);
   }
 
   cds->o_ellipticCoeff = nrs->o_ellipticCoeff;
@@ -160,7 +160,7 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
 
     std::vector<dlong> applyFilterRT(cds->NSfields, 0);
     const dlong Nmodes = cds->mesh[0]->N + 1;
-    cds->o_filterMT = platform->device.malloc<dfloat>(cds->NSfields * Nmodes * Nmodes);
+    cds->o_filterRT = platform->device.malloc<dfloat>(cds->NSfields * Nmodes * Nmodes);
     cds->o_filterS = platform->device.malloc<dfloat>(cds->NSfields);
     cds->o_applyFilterRT = platform->device.malloc<dlong>(cds->NSfields);
     for (int is = 0; is < cds->NSfields; is++) {
@@ -181,9 +181,7 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
         filterS = -1.0 * fabs(filterS);
         cds->filterS[is] = filterS;
 
-        cds->o_filterMT.copyFrom(hpfSetup(cds->mesh[is], filterNc),
-                                 Nmodes * Nmodes,
-                                 is * Nmodes * Nmodes);
+        cds->o_filterRT.copyFrom(lowPassFilter(cds->mesh[is], filterNc), Nmodes * Nmodes, is * Nmodes * Nmodes);
 
         applyFilterRT[is] = 1;
         cds->applyFilter = 1;

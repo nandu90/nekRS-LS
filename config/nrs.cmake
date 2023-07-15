@@ -16,7 +16,7 @@ set(SRC
     src/core/numberActiveFields.cpp
     src/core/printHeader.cpp
     src/navierStokes/cfl.cpp
-    src/regularization/hpf.cpp
+    src/regularization/lowPassFilter.cpp
     src/regularization/avm.cpp
     src/bdry/bcMap.cpp
     src/core/compileKernels.cpp
