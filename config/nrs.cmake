@@ -7,6 +7,7 @@ set(SRC
     src/lib/nekrs.cpp
     src/io/writeFld.cpp
     src/io/fileUtils.cpp
+    src/utils/sha1.cpp
     src/utils/inipp.cpp
     src/utils/unifdef.c
     src/utils/mysort.cpp

@@ -22,6 +22,9 @@ include(ExternalProject)
 include(FetchContent)
 include(config/utils.cmake)
 
+
+set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set(CMAKE_INSTALL_MESSAGE NEVER)
 set(CMAKE_INSTALL_MESSAGE ALWAYS)
