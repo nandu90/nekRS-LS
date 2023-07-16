@@ -592,7 +592,7 @@ void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs)
 
   // udf setup
   if (platform->comm.mpiRank == 0) {
-    printf("calling udf_setup ... ");
+    printf("calling UDF_Setup ... ");
   }
   fflush(stdout);
 
