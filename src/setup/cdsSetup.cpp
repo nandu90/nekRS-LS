@@ -5,6 +5,15 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
   platform_t *platform = platform_t::getInstance();
   device_t &device = platform->device;
 
+  // initialize vector entries
+  cds->mesh.resize(nrs->Nscalar);
+  cds->fieldOffset.resize(nrs->Nscalar);
+  cds->fieldOffsetScan.resize(nrs->Nscalar);
+  cds->solver.resize(nrs->Nscalar);
+  cds->compute.resize(nrs->Nscalar);
+  cds->cvodeSolve.resize(nrs->Nscalar);
+  cds->filterS.resize(nrs->Nscalar);
+
   cds->mesh[0] = nrs->_mesh;
   mesh_t *mesh = cds->mesh[0];
   cds->meshV = nrs->_mesh->fluid;
@@ -34,11 +43,11 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
     cds->fieldOffset[s] = cds->fieldOffset[0];
     cds->fieldOffsetScan[s] = sum;
     sum += cds->fieldOffset[s];
-    cds->mesh[s] = cds->mesh[0];
+    cds->mesh[s] = cds->meshV;
   }
   cds->fieldOffsetSum = sum;
 
-  cds->o_fieldOffsetScan = platform->device.malloc<dlong>(cds->NSfields, cds->fieldOffsetScan);
+  cds->o_fieldOffsetScan = platform->device.malloc<dlong>(cds->NSfields, cds->fieldOffsetScan.data());
 
   cds->gsh = nrs->gsh;
   cds->gshT = (nrs->cht) ? oogs::setup(mesh->ogs, 1, nrs->fieldOffset, ogsDfloat, NULL, OOGS_AUTO) : cds->gsh;
@@ -119,8 +128,8 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
   }
   cds->o_EToB = device.malloc<int>(cds->EToBOffset * cds->NSfields, cds->EToB);
 
-  cds->o_compute = platform->device.malloc<dlong>(cds->NSfields, cds->compute);
-  cds->o_cvodeSolve = platform->device.malloc<dlong>(cds->NSfields, cds->cvodeSolve);
+  cds->o_compute = platform->device.malloc<dlong>(cds->NSfields, cds->compute.data());
+  cds->o_cvodeSolve = platform->device.malloc<dlong>(cds->NSfields, cds->cvodeSolve.data());
 
   cds->o_U = nrs->o_U;
   cds->o_Ue = nrs->o_Ue;
@@ -188,7 +197,7 @@ cds_t *cdsSetup(nrs_t *nrs, setupAide options)
       }
     }
 
-    cds->o_filterS.copyFrom(cds->filterS, cds->NSfields);
+    cds->o_filterS.copyFrom(cds->filterS.data(), cds->NSfields);
     cds->o_applyFilterRT.copyFrom(applyFilterRT.data(), cds->NSfields);
 
     if (avmEnabled) {

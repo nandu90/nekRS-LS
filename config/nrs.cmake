@@ -31,6 +31,7 @@ set(SRC
     src/core/registerCdsKernels.cpp
     src/core/registerLinAlgKernels.cpp
     src/core/registerMeshKernels.cpp
+    src/core/LVector.cpp
     src/bdry/createEToBV.cpp
     src/navierStokes/applyDirichlet.cpp
     src/navierStokes/timeStepper.cpp

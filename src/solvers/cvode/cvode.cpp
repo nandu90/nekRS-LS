@@ -33,10 +33,7 @@
 #endif
 #endif
 
-// #define USE_E_VECTOR_LAYOUT 1
-
-namespace
-{
+namespace {
 
 #ifdef ENABLE_CVODE
 sunrealtype *__N_VGetDeviceArrayPointer(N_Vector u)
@@ -107,8 +104,6 @@ cvode_t::cvode_t(nrs_t *_nrs)
   }
   recycleProperties = platform->options.compareArgs("CVODE RECYCLE PROPERTIES", "TRUE");
 
-  setupEToLMapping();
-
   this->scalarIds = std::vector<dlong>();
   this->cvodeScalarIds = std::vector<dlong>(cds->NSfields, -1);
 
@@ -137,6 +132,8 @@ cvode_t::cvode_t(nrs_t *_nrs)
 
   nrsCheck(!valid, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "CVODE scalars must be contiguous");
 
+  std::vector<mesh_t*> meshes;
+
   for (int is = 0; is < cds->NSfields; is++) {
     if (!cds->compute[is]) {
       continue;
@@ -149,15 +146,27 @@ cvode_t::cvode_t(nrs_t *_nrs)
     scalarIds.push_back(is);
 
     Nscalar++;
+
+    meshes.push_back(cds->mesh[is]);
   }
 
-#if 0
-  if(platform->comm.mpiRank == 0){
-    std::cout << "CVODE Nscalar: " << Nscalar << std::endl;
-    std::cout << "E-vector length: " << nrs->meshV->Nlocal << std::endl;
-    std::cout << "L-vector length: " << this->LFieldOffset << std::endl;
+  YLVec = std::make_shared<LVec>(meshes, false);
+  YdotLVec = std::make_shared<LVec>(meshes, false);
+
+  this->nEq = 0;
+  for(int is = 0; is < Nscalar; ++is){
+    this->nEq += YLVec->Nlocal(is);
   }
-#endif
+  
+  // use compact storage for L-vector layout
+  std::vector<dlong> offsets_(this->Nscalar, 0);
+  offsets_[0] = 0;
+  for(int is = 1; is < this->Nscalar; ++is){
+    offsets_[is] = offsets_[is-1] + YLVec->Nlocal(is-1);
+  }
+
+  YLVec->offsets(offsets_);
+  YdotLVec->offsets(offsets_);
 
   o_scalarIds = platform->device.malloc<dlong>(scalarIds.size(), scalarIds.data());
   o_cvodeScalarIds = platform->device.malloc<dlong>(cvodeScalarIds.size(), cvodeScalarIds.data());
@@ -165,14 +174,10 @@ cvode_t::cvode_t(nrs_t *_nrs)
   setupDirichletMask();
 
   this->weakLaplacianKernel = platform->kernels.get("cvode_t::weakLaplacianHex3D");
-  this->nrsToCvKernel = platform->kernels.get("cvode_t::nrsToCv");
-  this->cvToNrsKernel = platform->kernels.get("cvode_t::cvToNrs");
   this->extrapolateDirichletKernel = platform->kernels.get("cvode_t::extrapolateDirichlet");
   this->mapToMaskedPointKernel = platform->kernels.get("cvode_t::mapToMaskedPoint");
   this->errorWeightKernel = platform->kernels.get("cvode_t::errorWeight");
   this->fusedAddRhoDivKernel = platform->kernels.get("cvode_t::rhoDiv");
-
-  nEq = Nscalar * LFieldOffset;
 
   isInitialized = false;
 
@@ -196,6 +201,123 @@ cvode_t::cvode_t(nrs_t *_nrs)
   }
 }
 
+#ifdef ENABLE_CVODE
+int cvode_t::cvodeRHS(double time, N_Vector Y, N_Vector Ydot) {
+  occa::memory o_y = platform->device.occaDevice().wrapMemory<sunrealtype>(
+      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Y)),
+      this->numEquations());
+
+  occa::memory o_ydot = platform->device.occaDevice().wrapMemory<sunrealtype>(
+      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Ydot)),
+      this->numEquations());
+  
+  this->YLVec->optr(o_y);
+  this->YdotLVec->optr(o_ydot);
+
+  this->rhs(time, *(this->YLVec), *(this->YdotLVec));
+
+  return 0;
+}
+  
+int cvode_t::cvodeJtvRHS(double time, N_Vector Y, N_Vector Ydot) {
+  occa::memory o_y = platform->device.occaDevice().wrapMemory<sunrealtype>(
+      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Y)),
+      this->numEquations());
+
+  occa::memory o_ydot = platform->device.occaDevice().wrapMemory<sunrealtype>(
+      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Ydot)),
+      this->numEquations());
+  
+  this->YLVec->optr(o_y);
+  this->YdotLVec->optr(o_ydot);
+
+  this->jtvRHS(time, *(this->YLVec), *(this->YdotLVec));
+
+  return 0;
+}
+  
+int cvode_t::cvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector fy, N_Vector work) {
+
+  int iter, retval;
+
+  retval = CVodeGetErrWeights(cvodeMem, work);
+  if (retval != CV_SUCCESS)
+    return (retval);
+
+  /* Initialize perturbation to 1/||v|| */
+  realtype sig = 1 / N_VWrmsNorm_MPIManyVector(v, work);
+  sig *= sigScale;
+
+  occa::memory o_work = platform->device.occaDevice().wrapMemory<sunrealtype>(
+      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(work)),
+      this->numEquations());
+
+  occa::memory o_Jv = platform->device.occaDevice().wrapMemory<sunrealtype>(
+      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Jv)),
+      this->numEquations());
+  
+  this->YLVec->optr(o_work);
+  this->YdotLVec->optr(o_Jv);
+
+  /* Set work = y + sig*v */
+  N_VLinearSum(sig, v, 1.0, y, work);
+
+  /* Set Jv = f(tn, y+sig*v) */
+  this->jtvRHS(t, *(this->YLVec), *(this->YdotLVec));
+
+  /* Replace Jv by (Jv - fy)/sig */
+  const realtype siginv = 1.0 / sig;
+  N_VLinearSum(siginv, Jv, -siginv, fy, Jv);
+
+  return (0);
+}
+
+int cvode_t::cvodeErrorWt(N_Vector y, N_Vector ewt)
+{
+  occa::memory o_y = platform->device.occaDevice().wrapMemory<sunrealtype>(
+      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(y)),
+      this->numEquations());
+  occa::memory o_ewt = platform->device.occaDevice().wrapMemory<sunrealtype>(
+      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(ewt)),
+      this->numEquations());
+  
+  auto cds = nrs->cds;
+  const auto cvodeCHT = nrs->cht && cds->cvodeSolve[0];
+  if(cvodeCHT){
+    this->errorWeightKernel(YLVec->Nlocal(0),
+                            1,
+                            this->relTol,
+                            YLVec->invDegree(0),
+                            this->o_absTol,
+                            o_y,
+                            o_ewt);
+    if(this->Nscalar > 1) {
+      auto NlocalL = YLVec->Nlocal(1);
+      auto o_yV = o_y + NlocalL;
+      auto o_ewtV = o_ewt + NlocalL;
+      auto o_absV = this->o_absTol + 1;
+      this->errorWeightKernel(NlocalL,
+                              this->Nscalar-1,
+                              this->relTol,
+                              YLVec->invDegree(1),
+                              o_absV,
+                              o_yV,
+                              o_ewtV);
+    }
+  } else {
+    this->errorWeightKernel(YLVec->Nlocal(0),
+                            this->Nscalar,
+                            this->relTol,
+                            YLVec->invDegree(0),
+                            this->o_absTol,
+                            o_y,
+                            o_ewt);
+  }
+  
+  return 0;
+}
+#endif
+
 void cvode_t::initialize()
 {
 
@@ -209,43 +331,12 @@ void cvode_t::initialize()
   int retval;
 
 #ifdef ENABLE_CVODE
-  // wrap RHS function into type expected by CVODE
-  CVRhsFn cvodeRHS = [](double time, N_Vector Y, N_Vector Ydot, void *user_data) {
-    auto data = static_cast<userData_t *>(user_data);
-    auto nrs = data->nrs;
-    auto platform = data->platform;
-    auto cvode = data->cvode;
-
-    occa::memory o_y = platform->device.occaDevice().wrapMemory<sunrealtype>(
-        __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Y)),
-        cvode->numEquations());
-
-    occa::memory o_ydot = platform->device.occaDevice().wrapMemory<sunrealtype>(
-        __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Ydot)),
-        cvode->numEquations());
-
-    cvode->rhs(time, o_y, o_ydot);
-
-    return 0;
+  auto fwdCvodeRHS = [](double time, N_Vector Y, N_Vector Ydot, void *user_data){
+    return static_cast<cvode_t*>(user_data)->cvodeRHS(time, Y, Ydot);
   };
-
-  CVRhsFn cvodeJtvRHS = [](double time, N_Vector Y, N_Vector Ydot, void *user_data) {
-    auto data = static_cast<userData_t *>(user_data);
-    auto nrs = data->nrs;
-    auto platform = data->platform;
-    auto cvode = data->cvode;
-
-    occa::memory o_y = platform->device.occaDevice().wrapMemory<sunrealtype>(
-        __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Y)),
-        cvode->numEquations());
-
-    occa::memory o_ydot = platform->device.occaDevice().wrapMemory<sunrealtype>(
-        __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Ydot)),
-        cvode->numEquations());
-
-    cvode->jtvRHS(time, o_y, o_ydot);
-
-    return 0;
+  
+  auto fwdCvodeJtvRHS = [](double time, N_Vector Y, N_Vector Ydot, void *user_data){
+    return static_cast<cvode_t*>(user_data)->cvodeJtvRHS(time, Y, Ydot);
   };
 
   auto linearSolve = [](SUNLinearSolver S, SUNMatrix A, N_Vector x, N_Vector b, realtype tol) {
@@ -257,66 +348,9 @@ void cvode_t::initialize()
   };
 
   // same as cvLsDQJtimes, but with scaling for sig
-  CVLsJacTimesVecFn cvodeJtv =
-      [](N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector fy, void *user_data, N_Vector work) {
-        auto data = static_cast<userData_t *>(user_data);
-        auto nrs = data->nrs;
-        auto platform = data->platform;
-        auto cvode = data->cvode;
-        const auto sigScale = cvode->sigmaScale();
-
-        void *cvode_mem = cvode->getCvodeMem();
-
-        int iter, retval;
-
-        retval = CVodeGetErrWeights(cvode_mem, work);
-        if (retval != CV_SUCCESS) {
-          return (retval);
-        }
-
-        /* Initialize perturbation to 1/||v|| */
-        realtype sig = 1 / N_VWrmsNorm_MPIManyVector(v, work);
-        sig *= sigScale;
-        constexpr int maxDQIters{3};
-
-        occa::memory o_work = platform->device.occaDevice().wrapMemory<sunrealtype>(
-            __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(work)),
-            cvode->numEquations());
-
-        occa::memory o_Jv = platform->device.occaDevice().wrapMemory<sunrealtype>(
-            __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Jv)),
-            cvode->numEquations());
-
-        for (iter = 0; iter < maxDQIters; iter++) {
-
-          /* Set work = y + sig*v */
-          N_VLinearSum(sig, v, 1.0, y, work);
-
-          /* Set Jv = f(tn, y+sig*v) */
-          cvode->jtvRHS(t, o_work, o_Jv);
-          retval = 0; // currently we don't do any error checking in the RHS
-          if (retval == 0) {
-            break;
-          }
-          if (retval < 0) {
-            return (-1);
-          }
-
-          /* If f failed recoverably, shrink sig and retry */
-          sig *= 0.25;
-        }
-
-        /* If retval still isn't 0, return with a recoverable failure */
-        if (retval > 0) {
-          return (+1);
-        }
-
-        /* Replace Jv by (Jv - fy)/sig */
-        const realtype siginv = 1.0 / sig;
-        N_VLinearSum(siginv, Jv, -siginv, fy, Jv);
-
-        return (0);
-      };
+  auto fwdCvodeJtv = [](N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector fy, void *user_data, N_Vector work) {
+    return static_cast<cvode_t*>(user_data)->cvodeJtv(v, Jv, t, y, fy, work);
+  };
 
   SUNContext sunctx = nullptr;
   retval = SUNContext_Create((void *)&platform->comm.mpiComm, &sunctx);
@@ -366,8 +400,11 @@ void cvode_t::initialize()
       __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(cvodeY)),
       this->numEquations());
 
+  YLVec->optr(o_cvodeY);
+  YdotLVec->optr(o_cvodeY);
+
   // set initial condition
-  nrsToCv(nrs->cds->o_S, o_cvodeY, false);
+  nrsToCv(nrs->cds->o_S, *YLVec, false);
 
   auto integrator = CV_BDF;
   if (platform->options.compareArgs("CVODE INTEGRATOR", "ADAMS")) {
@@ -407,30 +444,16 @@ void cvode_t::initialize()
   platform->options.getArgs("CVODE SIGMA SCALE", this->sigScale);
 
   check_retval((void *)this->cvodeMem, "CVodeCreate", 0);
-  retval = CVodeInit(this->cvodeMem, cvodeRHS, T0, this->cvodeY);
+  retval = CVodeInit(this->cvodeMem, fwdCvodeRHS, T0, this->cvodeY);
   check_retval(&retval, "CVodeInit", 1);
 
   // provide function to compute weights to account for multiplicity
   // same as cvEwtSetSV, but with scaling for multiplicity
-  CVEwtFn cvodeErrorWt = [](N_Vector y, N_Vector ewt, void *user_data) {
-    auto data = static_cast<userData_t *>(user_data);
-    auto nrs = data->nrs;
-    auto platform = data->platform;
-    auto cvode = data->cvode;
-
-    occa::memory o_y = platform->device.occaDevice().wrapMemory<sunrealtype>(
-        __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(y)),
-        cvode->numEquations());
-    occa::memory o_ewt = platform->device.occaDevice().wrapMemory<sunrealtype>(
-        __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(ewt)),
-        cvode->numEquations());
-
-    cvode->computeErrorWeight(o_y, o_ewt);
-
-    return 0;
+  CVEwtFn fwdCvodeErrorWt = [](N_Vector y, N_Vector ewt, void *user_data) {
+    return static_cast<cvode_t*>(user_data)->cvodeErrorWt(y, ewt);
   };
 
-  retval = CVodeWFtolerances(this->cvodeMem, cvodeErrorWt);
+  retval = CVodeWFtolerances(this->cvodeMem, fwdCvodeErrorWt);
   check_retval(&retval, "CVodeWFtolerances", 1);
 
   int nVectors = 10;
@@ -462,13 +485,10 @@ void cvode_t::initialize()
 
   // custom settings
 #if 1
-  retval = CVodeSetJacTimesRhsFn(this->cvodeMem, cvodeJtvRHS);
+  retval = CVodeSetJacTimesRhsFn(this->cvodeMem, fwdCvodeJtvRHS);
   check_retval(&retval, "CVodeSetJacTimesRhsFn", 1);
 
-  retval = CVodeSetJacTimes(this->cvodeMem, NULL, cvodeJtv);
-  check_retval(&retval, "CVodeSetJacTimes", 1);
-
-  retval = CVodeSetJacTimes(this->cvodeMem, NULL, cvodeJtv);
+  retval = CVodeSetJacTimes(this->cvodeMem, NULL, fwdCvodeJtv);
   check_retval(&retval, "CVodeSetJacTimes", 1);
 
   int mxsteps = 500;
@@ -486,10 +506,8 @@ void cvode_t::initialize()
   retval = CVodeSetEpsLin(this->cvodeMem, epsLin);
 #endif
 
-  userdata = std::make_shared<userData_t>(platform, nrs, this);
-
   // set user data as
-  retval = CVodeSetUserData(this->cvodeMem, userdata.get());
+  retval = CVodeSetUserData(this->cvodeMem, this);
   check_retval(&retval, "CVodeSetUserData", 1);
 
 #else
@@ -506,12 +524,6 @@ cvode_t::~cvode_t()
   if (o_coeffExt.size()) {
     o_coeffExt.free();
   }
-  if (o_EToL.size()) {
-    o_EToL.free();
-  }
-  if (o_EToLUnique.size()) {
-    o_EToLUnique.free();
-  }
   if (o_cvodeScalarIds.size()) {
     o_cvodeScalarIds.free();
   }
@@ -520,9 +532,6 @@ cvode_t::~cvode_t()
   }
   if (o_absTol.size()) {
     o_absTol.free();
-  }
-  if (o_invDegree.size()) {
-    o_invDegree.free();
   }
 
 #ifdef ENABLE_CVODE
@@ -542,147 +551,6 @@ cvode_t::~cvode_t()
   }
 
   CVodeFree(&cvodeMem);
-#endif
-}
-
-void cvode_t::setupEToLMapping()
-{
-  auto *mesh = nrs->meshV;
-  if (nrs->cht) {
-    mesh = nrs->cds->mesh[0];
-  }
-
-#ifdef USE_E_VECTOR_LAYOUT
-  std::vector<dlong> Eids(mesh->Nlocal);
-  std::iota(Eids.begin(), Eids.end(), 0);
-  this->o_EToL = platform->device.malloc<dlong>(mesh->Nlocal, Eids.data());
-  this->o_EToLUnique = platform->device.malloc<dlong>(mesh->Nlocal, Eids.data());
-  this->LFieldOffset = mesh->Nlocal;
-#else
-  auto o_Lids = platform->device.malloc<dlong>(mesh->Nlocal);
-  std::vector<dlong> Eids(mesh->Nlocal);
-  std::iota(Eids.begin(), Eids.end(), 0);
-  o_Lids.copyFrom(Eids.data(), mesh->Nlocal);
-
-  {
-    const auto saveNhaloGather = mesh->ogs->NhaloGather;
-    mesh->ogs->NhaloGather = 0;
-    ogsGatherScatter(o_Lids, ogsInt, ogsMin, mesh->ogs);
-    mesh->ogs->NhaloGather = saveNhaloGather;
-  }
-
-  std::vector<dlong> Lids(mesh->Nlocal);
-  o_Lids.copyTo(Lids.data(), mesh->Nlocal);
-
-  std::set<dlong> uniqueIds;
-  for (auto &&id : Lids) {
-    uniqueIds.insert(id);
-  }
-
-  const auto NL = uniqueIds.size();
-
-  this->LFieldOffset = NL;
-
-  std::vector<dlong> EToLUnique(mesh->Nlocal, -1);
-  unsigned ctr = 0;
-  for (auto &&uniqueEid : uniqueIds) {
-    EToLUnique[uniqueEid] = ctr;
-    ctr++;
-  }
-  this->o_EToLUnique = platform->device.malloc<dlong>(mesh->Nlocal, EToLUnique.data());
-
-  // setup non-unique version mapping an E-vector point to its corresponding L-vector point
-  std::vector<dlong> EToL(mesh->Nlocal, -1);
-  for (int n = 0; n < mesh->Nlocal; ++n) {
-    const auto lid = Lids[n];
-    EToL[n] = EToLUnique[lid];
-  }
-  this->o_EToL = platform->device.malloc<dlong>(mesh->Nlocal, EToL.data());
-
-  // construct L-vector version of inv degree, based on duplicated points in L-vector
-  {
-    auto *mesh = nrs->meshV;
-    if (nrs->cht) {
-      mesh = nrs->cds->mesh[0];
-    }
-
-    std::vector<dfloat> degree(mesh->Nlocal, 0.0);
-
-    for (int n = 0; n < mesh->Nlocal; ++n) {
-      const auto lid = EToLUnique[n];
-      if (lid > -1) {
-        degree[n] = 1.0;
-      }
-    }
-
-    ogsGatherScatter(degree.data(), dfloatString, ogsAdd, mesh->ogs);
-
-    std::vector<dfloat> invDegreeL(LFieldOffset, 1.0);
-
-    for (int n = 0; n < mesh->Nlocal; ++n) {
-      const auto lid = EToLUnique[n];
-      if (lid > -1) {
-        invDegreeL[lid] = 1.0 / degree[n];
-      }
-    }
-
-    // sanity check:
-    // entries in invDegreeL are on (0,1]
-    bool allPositive =
-        std::all_of(invDegreeL.begin(), invDegreeL.end(), [](auto &&val) { return val > 0.0 && val <= 1.0; });
-    int err = allPositive ? 0 : 1;
-    MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-    nrsCheck(err,
-             platform->comm.mpiComm,
-             EXIT_FAILURE,
-             "%s\n",
-             "Encountered invDegreeL value outside of (0,1]");
-
-    // on a single processor, T-vector and L-vector are the same --> invDegreeL is unity everywhere
-    if (platform->comm.mpiCommSize == 1) {
-      const auto tol = 1e4 * std::numeric_limits<dfloat>::epsilon();
-      bool allUnity = std::all_of(invDegreeL.begin(), invDegreeL.end(), [tol](auto &&val) {
-        return std::abs(val - 1.0) < tol;
-      });
-      int err = allUnity ? 0 : 1;
-      MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-      nrsCheck(err,
-               platform->comm.mpiComm,
-               EXIT_FAILURE,
-               "%s\n",
-               "Encountered non-unity invDegreeL when P=1");
-    }
-
-    this->o_invDegree = platform->device.malloc<dfloat>(LFieldOffset, invDegreeL.data());
-  }
-
-  // a few sanity checks:
-  // EToL has only non-negative values
-  bool allNonNegative = std::all_of(EToL.begin(), EToL.end(), [](auto &&val) { return val >= 0; });
-  int err = allNonNegative ? 0 : 1;
-  MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-  nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Encountered negative value in EToL mapping");
-
-  // range of EToL is [0, LFieldOffset)
-  auto minmax = std::minmax_element(EToL.begin(), EToL.end());
-  err = (*minmax.first == 0 && *minmax.second == LFieldOffset - 1) ? 0 : 1;
-  MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-  nrsCheck(err,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s\n",
-           "EToL mapping is not in range [0, LFieldOffset)");
-
-  // every value in [0,LFieldOffset) is covered in the range of EToL
-  std::set<dlong> uniqueOutputs;
-  for (auto &&val : EToL) {
-    uniqueOutputs.insert(val);
-  }
-  err = (uniqueOutputs.size() == LFieldOffset) ? 0 : 1;
-  MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-  nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "EToL mapping is not surjective");
-
-  o_Lids.free();
 #endif
 }
 
@@ -842,18 +710,7 @@ void cvode_t::applyDirichlet(double time)
   this->mapToMaskedPointKernel(this->Nmasked, o_maskIds, o_S_start, o_maskValues);
 }
 
-void cvode_t::computeErrorWeight(occa::memory o_y, occa::memory o_ewt)
-{
-  this->errorWeightKernel(this->LFieldOffset,
-                          this->Nscalar,
-                          this->relTol,
-                          this->o_invDegree,
-                          this->o_absTol,
-                          o_y,
-                          o_ewt);
-}
-
-void cvode_t::rhs(double time, occa::memory o_y, occa::memory o_ydot)
+void cvode_t::rhs(double time, const LVec & o_y, LVec & o_ydot)
 {
   const auto tag = this->rhsTagName();
   const auto saveTimerScope = timerScope;
@@ -872,7 +729,7 @@ void cvode_t::rhs(double time, occa::memory o_y, occa::memory o_ydot)
   timerScope = saveTimerScope;
 }
 
-void cvode_t::jtvRHS(double time, occa::memory o_y, occa::memory o_ydot)
+void cvode_t::jtvRHS(double time, const LVec& o_y, LVec& o_ydot)
 {
   this->setIsJacobianEvaluation(true);
 
@@ -885,7 +742,7 @@ void cvode_t::jtvRHS(double time, occa::memory o_y, occa::memory o_ydot)
   this->setIsJacobianEvaluation(false);
 }
 
-void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory o_ydot)
+void cvode_t::defaultRHS(double time, double t0, const LVec& o_y, LVec & o_ydot)
 {
   const bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
   mesh_t *mesh = nrs->meshV;
@@ -1037,7 +894,7 @@ void cvode_t::defaultRHS(double time, double t0, occa::memory o_y, occa::memory 
   if (userLocalPointSource) {
     platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::localPointSource", 1);
     // o_ydot is used as scratch space to store the L-vector source term
-    userLocalPointSource(nrs, LFieldOffset, o_y, o_ydot);
+    userLocalPointSource(nrs, o_y, o_ydot);
     platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::localPointSource");
 
     cvToNrs(o_ydot, this->o_pointSource, true);
@@ -1295,20 +1152,16 @@ void cvode_t::makeq(double time)
   timerScope = timerScopeSave;
 }
 
-void cvode_t::nrsToCv(occa::memory o_EField, occa::memory o_LField, bool isYdot)
+void cvode_t::nrsToCv(occa::memory o_EField, LVec& o_LField, bool isYdot)
 {
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::nrsToCv", 1);
   }
-  nrsToCvKernel(nrs->cds->mesh[0]->Nlocal,
-                nrs->meshV->Nlocal,
-                nrs->Nscalar,
-                nrs->fieldOffset,
-                this->LFieldOffset,
-                this->o_cvodeScalarIds,
-                this->o_EToLUnique,
-                o_EField,
-                o_LField);
+  
+  auto cds = nrs->cds;
+  auto o_E = o_EField + cds->fieldOffsetScan[this->minCvodeScalarId];
+  o_LField.copyFromE(nrs->fieldOffset, o_E);
+
   if (userPostNrsToCv) {
     userPostNrsToCv(nrs, o_LField, isYdot);
   }
@@ -1317,22 +1170,18 @@ void cvode_t::nrsToCv(occa::memory o_EField, occa::memory o_LField, bool isYdot)
   }
 }
 
-void cvode_t::cvToNrs(occa::memory o_LField, occa::memory o_EField, bool isYdot)
+void cvode_t::cvToNrs(const LVec& o_LField, occa::memory o_EField, bool isYdot)
 {
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::cvToNrs", 1);
   }
+  
+  auto cds = nrs->cds;
+  
+  auto o_E = o_EField + cds->fieldOffsetScan[this->minCvodeScalarId];
+  o_LField.copyToE(nrs->fieldOffset, o_E);
 
-  cvToNrsKernel(nrs->cds->mesh[0]->Nlocal,
-                nrs->meshV->Nlocal,
-                this->Nscalar,
-                nrs->fieldOffset,
-                this->LFieldOffset,
-                this->o_scalarIds,
-                this->o_EToL,
-                o_LField,
-                o_EField);
-  if (userPostCvToNrs) {
+  if(userPostCvToNrs) {
     userPostCvToNrs(nrs, o_EField, isYdot);
   }
 
@@ -1389,7 +1238,8 @@ void cvode_t::solve(double t0, double t1, int tstep)
     o_xyz0.copyFrom(mesh->o_z, mesh->Nlocal, 2 * nrs->fieldOffset, 0);
   }
 
-  nrsToCv(nrs->cds->o_S, o_cvodeY, false);
+  YLVec->optr(o_cvodeY);
+  nrsToCv(nrs->cds->o_S, *YLVec, false);
 
   this->tExternal = t0;
   this->externalTStep = tstep;
@@ -1427,7 +1277,8 @@ void cvode_t::solve(double t0, double t1, int tstep)
     if (platform->comm.mpiRank == 0) {
       std::cout << "... Restarting CVODE integrator\n";
     }
-    nrsToCv(nrs->cds->o_S, o_cvodeY, false);
+    YLVec->optr(o_cvodeY);
+    nrsToCv(nrs->cds->o_S, *YLVec, false);
     retval = CVodeReInit(cvodeMem, t0, cvodeY);
     check_retval(&retval, "CVodeReInit", 1);
     this->tprev = std::numeric_limits<double>::max();
@@ -1446,7 +1297,8 @@ void cvode_t::solve(double t0, double t1, int tstep)
   }
   timerScope = oldScope;
 
-  cvToNrs(o_cvodeY, nrs->cds->o_S, false);
+  YLVec->optr(o_cvodeY);
+  cvToNrs(*YLVec, nrs->cds->o_S, false);
 
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::restore", 1);
