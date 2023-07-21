@@ -710,7 +710,7 @@ void cvode_t::applyDirichlet(double time)
   this->mapToMaskedPointKernel(this->Nmasked, o_maskIds, o_S_start, o_maskValues);
 }
 
-void cvode_t::rhs(double time, const LVec & o_y, LVec & o_ydot)
+void cvode_t::rhs(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)
 {
   const auto tag = this->rhsTagName();
   const auto saveTimerScope = timerScope;
@@ -729,7 +729,7 @@ void cvode_t::rhs(double time, const LVec & o_y, LVec & o_ydot)
   timerScope = saveTimerScope;
 }
 
-void cvode_t::jtvRHS(double time, const LVec& o_y, LVec& o_ydot)
+void cvode_t::jtvRHS(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)
 {
   this->setIsJacobianEvaluation(true);
 
@@ -742,7 +742,7 @@ void cvode_t::jtvRHS(double time, const LVec& o_y, LVec& o_ydot)
   this->setIsJacobianEvaluation(false);
 }
 
-void cvode_t::defaultRHS(double time, double t0, const LVec& o_y, LVec & o_ydot)
+void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)
 {
   const bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
   mesh_t *mesh = nrs->meshV;
@@ -1152,7 +1152,7 @@ void cvode_t::makeq(double time)
   timerScope = timerScopeSave;
 }
 
-void cvode_t::nrsToCv(occa::memory o_EField, LVec& o_LField, bool isYdot)
+void cvode_t::nrsToCv(occa::memory o_EField,  LVector_t<dfloat> & o_LField, bool isYdot)
 {
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::nrsToCv", 1);
@@ -1170,7 +1170,7 @@ void cvode_t::nrsToCv(occa::memory o_EField, LVec& o_LField, bool isYdot)
   }
 }
 
-void cvode_t::cvToNrs(const LVec& o_LField, occa::memory o_EField, bool isYdot)
+void cvode_t::cvToNrs(const  LVector_t<dfloat> & o_LField, occa::memory o_EField, bool isYdot)
 {
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::cvToNrs", 1);

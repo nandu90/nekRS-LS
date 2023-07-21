@@ -29,12 +29,12 @@ public:
   static constexpr bool enabled = false;
 #endif
   using userRHS_t = std::function<
-      void(nrs_t *nrs, double time, double t0, const LVec& o_y, LVec& o_ydot)>;
+      void(nrs_t *nrs, double time, double t0, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)>;
   using userJacobian_t = std::function<
-      void(nrs_t *nrs, double time, double t0, const LVec& o_y, LVec& o_ydot)>;
+      void(nrs_t *nrs, double time, double t0, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)>;
   using userLocalPointSource_t =
-      std::function<void(nrs_t *nrs, const LVec& o_y, LVec& o_ydot)>;
-  using userPostNrsToCv_t = std::function<void(nrs_t *nrs, LVec& o_LField, bool isYdot)>;
+      std::function<void(nrs_t *nrs, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)>;
+  using userPostNrsToCv_t = std::function<void(nrs_t *nrs,  LVector_t<dfloat> & o_LField, bool isYdot)>;
   using userPostCvToNrs_t = std::function<void(nrs_t *nrs, occa::memory o_EField, bool isYdot)>;
 
   cvode_t(nrs_t *nrs);
@@ -65,8 +65,8 @@ public:
   void setTimeStep(int tstep) { externalTStep = tstep; }
   double time() const { return tExternal; }
 
-  void rhs(double time, const LVec& o_y, LVec& o_ydot);
-  void jtvRHS(double time, const LVec& o_y, LVec& o_ydot);
+  void rhs(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot);
+  void jtvRHS(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot);
   dlong numEquations() const { return nEq; }
 
   bool mixedPrecisionJtv() const { return mixedPrecisionJtvEnabled; }
@@ -109,13 +109,13 @@ private:
   int cvodeErrorWt(N_Vector y, N_Vector ewt);
 #endif
   
-  void defaultRHS(double time, double t0, const LVec& o_y, LVec& o_ydot);
+  void defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot);
   
   // hand nekRS-style E-vector to CVODE, which uses an L-vector
-  void nrsToCv(occa::memory o_EFeild, LVec& o_LField, bool isYdot);
+  void nrsToCv(occa::memory o_EFeild,  LVector_t<dfloat> & o_LField, bool isYdot);
 
   // unpack CVODE L-vector into nekRS-style E-vector
-  void cvToNrs(const LVec& o_LField, occa::memory o_EField, bool isYdot);
+  void cvToNrs(const  LVector_t<dfloat> & o_LField, occa::memory o_EField, bool isYdot);
 
   nrs_t* nrs;
 
