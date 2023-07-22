@@ -356,7 +356,7 @@ void cvode_t::initialize()
       retval = N_VSetKernelExecPolicy_Cuda(this->y, &stream_exec_policy, &reduce_exec_policy);
       check_retval(&retval, "N_VSetKernelExecPolicy_Cuda", 0);
 
-      retVal = N_VEnableFusedOps_Cuda(this->y , SUNTRUE);
+      retval = N_VEnableFusedOps_Cuda(this->y , SUNTRUE);
       check_retval(&retval, "N_VEnableFusedOps_Cuda", 1);
 #else
       nrsCheck(true,
