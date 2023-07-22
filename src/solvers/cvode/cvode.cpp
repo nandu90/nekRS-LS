@@ -19,19 +19,22 @@
 
 #ifdef ENABLE_CVODE
 // cvode includes
-#include <sunlinsol/sunlinsol_spgmr.h>
-#include <sundials/sundials_types.h>
-#include <sundials/sundials_math.h>
-#include <cvode/cvode.h>
-#include <nvector/nvector_serial.h>
-#include <nvector/nvector_mpiplusx.h>
+#include "sunlinsol/sunlinsol_spgmr.h"
+#include "sundials/sundials_types.h"
+#include "sundials/sundials_math.h"
+#include "cvode/cvode.h"
+#include "nvector/nvector_serial.h"
+#include "nvector/nvector_mpiplusx.h"
+
 #ifdef ENABLE_CUDA
-#include <nvector/nvector_cuda.h>
+#include "nvector/nvector_cuda.h"
 #endif
 #ifdef ENABLE_HIP
-#include <nvector/nvector_hip.h>
+#include "nvector/nvector_hip.h"
 #endif
 #endif
+
+#define getN_VectorMemory(T,S) (  platform->device.occaDevice().wrapMemory<T>( __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(S)), N_VGetLocalLength(S)) )
 
 namespace {
 
@@ -50,6 +53,8 @@ sunrealtype *__N_VGetDeviceArrayPointer(N_Vector u)
   }
 }
 #endif
+
+#include "spgmr.inc"
 
 void check_retval(void *returnvalue, const char *funcname, int opt)
 {
@@ -203,13 +208,8 @@ cvode_t::cvode_t(nrs_t *_nrs)
 
 #ifdef ENABLE_CVODE
 int cvode_t::cvodeRHS(double time, N_Vector Y, N_Vector Ydot) {
-  occa::memory o_y = platform->device.occaDevice().wrapMemory<sunrealtype>(
-      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Y)),
-      this->numEquations());
-
-  occa::memory o_ydot = platform->device.occaDevice().wrapMemory<sunrealtype>(
-      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Ydot)),
-      this->numEquations());
+  auto o_y = getN_VectorMemory(sunrealtype, Y);
+  auto o_ydot = getN_VectorMemory(sunrealtype, Ydot);
   
   this->YLVec->optr(o_y);
   this->YdotLVec->optr(o_ydot);
@@ -220,13 +220,8 @@ int cvode_t::cvodeRHS(double time, N_Vector Y, N_Vector Ydot) {
 }
   
 int cvode_t::cvodeJtvRHS(double time, N_Vector Y, N_Vector Ydot) {
-  occa::memory o_y = platform->device.occaDevice().wrapMemory<sunrealtype>(
-      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Y)),
-      this->numEquations());
-
-  occa::memory o_ydot = platform->device.occaDevice().wrapMemory<sunrealtype>(
-      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Ydot)),
-      this->numEquations());
+  auto o_y = getN_VectorMemory(sunrealtype, Y);
+  auto o_ydot = getN_VectorMemory(sunrealtype, Ydot);
   
   this->YLVec->optr(o_y);
   this->YdotLVec->optr(o_ydot);
@@ -248,22 +243,11 @@ int cvode_t::cvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector 
   realtype sig = 1 / N_VWrmsNorm_MPIManyVector(v, work);
   sig *= sigScale;
 
-  occa::memory o_work = platform->device.occaDevice().wrapMemory<sunrealtype>(
-      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(work)),
-      this->numEquations());
-
-  occa::memory o_Jv = platform->device.occaDevice().wrapMemory<sunrealtype>(
-      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(Jv)),
-      this->numEquations());
-  
-  this->YLVec->optr(o_work);
-  this->YdotLVec->optr(o_Jv);
-
   /* Set work = y + sig*v */
   N_VLinearSum(sig, v, 1.0, y, work);
 
   /* Set Jv = f(tn, y+sig*v) */
-  this->jtvRHS(t, *(this->YLVec), *(this->YdotLVec));
+  this->cvodeJtvRHS(t, work, Jv);
 
   /* Replace Jv by (Jv - fy)/sig */
   const realtype siginv = 1.0 / sig;
@@ -274,12 +258,8 @@ int cvode_t::cvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector 
 
 int cvode_t::cvodeErrorWt(N_Vector y, N_Vector ewt)
 {
-  occa::memory o_y = platform->device.occaDevice().wrapMemory<sunrealtype>(
-      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(y)),
-      this->numEquations());
-  occa::memory o_ewt = platform->device.occaDevice().wrapMemory<sunrealtype>(
-      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(ewt)),
-      this->numEquations());
+  auto o_y = getN_VectorMemory(sunrealtype, y);
+  auto o_ewt = getN_VectorMemory(sunrealtype, ewt);
   
   auto cds = nrs->cds;
   const auto cvodeCHT = nrs->cht && cds->cvodeSolve[0];
@@ -342,7 +322,11 @@ void cvode_t::initialize()
   auto linearSolve = [](SUNLinearSolver S, SUNMatrix A, N_Vector x, N_Vector b, realtype tol) {
     const std::string timerName = "cvode_t::";
     platform->timer.tic(timerName + "solve::cvode::linearSolve", 1);
+#if 1
+    auto retVal = SPGMR(S, NULL, x, b, tol);
+#else 
     auto retVal = SUNLinSolSolve_SPGMR(S, NULL, x, b, tol);
+#endif
     platform->timer.toc(timerName + "solve::cvode::linearSolve");
     return retVal;
   };
@@ -358,6 +342,7 @@ void cvode_t::initialize()
 
   int blockSize = BLOCKSIZE;
 
+
   {
     this->y = nullptr;
     if (platform->device.mode() == "CUDA") {
@@ -370,6 +355,9 @@ void cvode_t::initialize()
 
       retval = N_VSetKernelExecPolicy_Cuda(this->y, &stream_exec_policy, &reduce_exec_policy);
       check_retval(&retval, "N_VSetKernelExecPolicy_Cuda", 0);
+
+      retVal = N_VEnableFusedOps_Cuda(this->y , SUNTRUE);
+      check_retval(&retval, "N_VEnableFusedOps_Cuda", 1);
 #else
       nrsCheck(true,
                platform->comm.mpiComm,
@@ -381,6 +369,9 @@ void cvode_t::initialize()
 #ifdef ENABLE_HIP
       this->y = N_VNew_Hip(data->nEq, sunctx);
       check_retval((void *)this->y, "N_VNew_Hip", 0);
+
+      retVal = N_VEnableFusedOps_Hip(this->y, SUNTRUE);
+      check_retval(&retval, "N_VEnableFusedOps_Hip", 1);
 #else
       nrsCheck(true,
                platform->comm.mpiComm,
@@ -391,14 +382,18 @@ void cvode_t::initialize()
     } else if (platform->device.mode() == "Serial") {
       this->y = N_VNew_Serial(this->nEq, sunctx);
       check_retval((void *)this->y, "N_VNew_Serial", 0);
+
+      retval = N_VEnableFusedOps_Serial(this->y, SUNTRUE);
+      check_retval(&retval, "N_VEnableFusedOps_Serial", 1);
     }
     this->cvodeY = N_VMake_MPIPlusX(platform->comm.mpiComm, this->y, sunctx);
     this->nEqTotal = N_VGetLength(this->cvodeY);
+
+    retval = N_VEnableFusedOps_MPIPlusX(this->cvodeY, SUNTRUE);
+    check_retval(&retval, "N_VEnableFusedOps_MPIPlusX", 1);
   }
 
-  o_cvodeY = platform->device.occaDevice().wrapMemory<sunrealtype>(
-      __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(cvodeY)),
-      this->numEquations());
+  o_cvodeY = getN_VectorMemory(sunrealtype, cvodeY);
 
   YLVec->optr(o_cvodeY);
   YdotLVec->optr(o_cvodeY);
@@ -468,10 +463,6 @@ void cvode_t::initialize()
     LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
     check_retval(&retval, "SUNLinSol_SPFGMR", 1);
     LS->ops->solve = linearSolve;
-
-    SUNLinSol_SPGMRSetGSType(LS, SUN_MODIFIED_GS);
-    check_retval(&retval, "SUNLinSol_SPGMRSetGSType", 1);
-
   } else {
     nrsCheck(true,
              platform->comm.mpiComm,
@@ -485,6 +476,11 @@ void cvode_t::initialize()
 
   // custom settings
 #if 1
+  if (linearSolver == "GMRES") {
+    SUNLinSol_SPGMRSetGSType(LS, SUN_CLASSICAL_GS);
+    check_retval(&retval, "SUNLinSol_SPGMRSetGSType", 1);
+  }
+
   retval = CVodeSetJacTimesRhsFn(this->cvodeMem, fwdCvodeJtvRHS);
   check_retval(&retval, "CVodeSetJacTimesRhsFn", 1);
 
@@ -511,8 +507,7 @@ void cvode_t::initialize()
   check_retval(&retval, "CVodeSetUserData", 1);
 
 #else
-  nrsCheck(true, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "No cvode installation found");
-
+  nrsCheck(true, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "cvode was not enabled");
 #endif
 }
 
@@ -727,6 +722,9 @@ void cvode_t::rhs(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat
   this->setIsRhsEvaluation(false);
   platform->timer.toc(tag);
   timerScope = saveTimerScope;
+
+  // explicit sync because CVODE is not aware of occa's stream
+  platform->device.finish();
 }
 
 void cvode_t::jtvRHS(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)
@@ -1289,7 +1287,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
 
   o_rhoCpAvg.free();
 
-  nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "CVODE failed after restart. Ending simulation.\n");
+  nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "CVODE failed after restart\n");
   platform->device.finish();
 
   if (detailedTimersEnabled) {
