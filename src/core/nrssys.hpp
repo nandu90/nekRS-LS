@@ -84,6 +84,7 @@ using dlong = long long int;
 #include "ogs.hpp"
 #include "setupAide.hpp"
 #include "timer.hpp"
+#include "stacktrace.hpp" 
 
 #define nrsCheck(_nrsCheckCond, _nrsCheckComm, _nrsCheckExitCode, _nrsCheckMessage, ...) \
   do { \
@@ -96,6 +97,7 @@ using dlong = long long int;
       if(rank == 0) { \
         fprintf(stderr, "Error in %s: ", __func__);\
         fprintf(stderr, _nrsCheckMessage, __VA_ARGS__); \
+        print_stacktrace(); \
       } \
       fflush(stderr); \
       fflush(stdout); \
