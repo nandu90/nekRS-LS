@@ -1432,6 +1432,13 @@ void cvode_t::printInfo(bool printVerboseInfo) const
 
 void cvode_t::printTimers()
 {
+  {
+    const auto tCv = platform->timer.query("cvode_t::solve::cvode", "DEVICE:MAX");
+    const auto tLs = platform->timer.query("cvode_t::solve::cvode::linearSolve", "DEVICE:MAX");
+    const auto nli = platform->timer.count("cvode_t::solve::cvode::newtonSolve::rhs");
+    platform->timer.set("cvode_t::solve::cvode::newtonSolve", tCv - tLs, nli);
+  }
+
   const auto timerTags = platform->timer.tags();
 
   // filter out tags that do not start with timerName
@@ -1592,7 +1599,7 @@ void cvode_t::resetTimers()
 
 std::string cvode_t::rhsTagName() const
 {
-  return this->isJacobianEvaluation() ? timerScope + "::linearSolve::jtv" : timerScope + "::rhs";
+  return this->isJacobianEvaluation() ? timerScope + "::linearSolve::jtv" : timerScope + "::newtonSolve::rhs";
 }
 
 void cvode_t::setLocalPointSource(userLocalPointSource_t _userLocalPointSource)
