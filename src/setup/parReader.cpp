@@ -202,6 +202,7 @@ static std::vector<std::string> cvodeKeys = {
     {"relativetol"},
     {"absolutetol"},
     {"epslin"},
+    {"gstype"},
     {"sigscale"},
     {"jtvrecycleproperties"},
     {"sharedrho"},
@@ -508,15 +509,14 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
 #endif
 
   // default values
-  double relativeTol = 1e-4;
-  double absoluteTol = 1e-6;
+  double relativeTol;
+  double absoluteTol;
+  double hmax;
   int maxSteps = 500;
-  double hmax = 3;
-  double epsLin = 0.1;
-  int maxOrder = 3;
-  double sigScale = 1.0;
-  bool recycleProps = false;
-  bool mixedPrecisionJtv = false;
+  double epsLin;
+  double sigScale;
+  bool recycleProps;
+  bool mixedPrecisionJtv;
 
   std::string integrator = "bdf";
 
@@ -576,13 +576,29 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
     options.setArgs("CVODE STOP TIME", "FALSE");
   }
 
-  par->extract(parScope, "epslin", epsLin);
-  options.setArgs("CVODE EPS LIN", std::to_string(epsLin));
+  if (par->extract(parScope, "epslin", epsLin)) {
+    options.setArgs("CVODE EPS LIN", std::to_string(epsLin));
+  }
 
-  options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
+  if (par->extract(parScope, "maxSteps", maxSteps)) {
+    options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
+  }
 
+  int maxOrder;
   if (par->extract(parScope, "maxOrder", maxOrder)) {
     options.setArgs("CVODE MAX TIMESTEPPER ORDER", std::to_string(maxOrder));
+  }
+
+  options.setArgs("CVODE GS TYPE", "CLASSICAL");
+  std::string gstype;
+  if (par->extract(parScope, "gstype", gstype)) {
+    if (gstype.find("classical") != std::string::npos) {
+      options.setArgs("CVODE GS TYPE", "CLASSICAL");
+    } else if (gstype.find("classical") != std::string::npos) {
+      options.setArgs("CVODE GS TYPE", "MODIFIED");
+    } else {
+      append_error("Invalid gsType for " + parScope);
+    }
   }
 
   upperCase(integrator);

@@ -219,7 +219,8 @@ int cvode_t::cvodeRHS(double time, N_Vector Y, N_Vector Ydot) {
   return 0;
 }
   
-int cvode_t::cvodeJtvRHS(double time, N_Vector Y, N_Vector Ydot) {
+int cvode_t::cvodeJtvRHS(double time, N_Vector Y, N_Vector Ydot) 
+{
   auto o_y = getN_VectorMemory(sunrealtype, Y);
   auto o_ydot = getN_VectorMemory(sunrealtype, Ydot);
   
@@ -231,7 +232,9 @@ int cvode_t::cvodeJtvRHS(double time, N_Vector Y, N_Vector Ydot) {
   return 0;
 }
   
-int cvode_t::cvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector fy, N_Vector work) {
+int cvode_t::cvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector fy, N_Vector work) 
+{
+  platform->timer.tic(timerName + "solve::cvode::linearSolve::jtv", 1);
 
   int iter, retval;
 
@@ -253,6 +256,7 @@ int cvode_t::cvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector 
   const realtype siginv = 1.0 / sig;
   N_VLinearSum(siginv, Jv, -siginv, fy, Jv);
 
+  platform->timer.toc(timerName + "solve::cvode::linearSolve::jtv");
   return (0);
 }
 
@@ -367,6 +371,9 @@ void cvode_t::initialize()
 #endif
     } else if (platform->device.mode() == "HIP") {
 #ifdef ENABLE_HIP
+      SUNHipThreadDirectExecPolicy stream_exec_policy(blockSize);
+      SUNHipBlockReduceExecPolicy reduce_exec_policy(blockSize, 0);
+
       this->y = N_VNew_Hip(data->nEq, sunctx);
       check_retval((void *)this->y, "N_VNew_Hip", 0);
 
@@ -451,15 +458,15 @@ void cvode_t::initialize()
   retval = CVodeWFtolerances(this->cvodeMem, fwdCvodeErrorWt);
   check_retval(&retval, "CVodeWFtolerances", 1);
 
-  int nVectors = 10;
-  platform->options.getArgs("CVODE GMRES RESTART", nVectors);
-
   std::string linearSolver = "GMRES";
   platform->options.getArgs("CVODE SOLVER", linearSolver);
 
   SUNLinearSolver LS;
 
   if (linearSolver == "GMRES") {
+    int nVectors = 10;
+    platform->options.getArgs("CVODE GMRES RESTART", nVectors);
+
     LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
     check_retval(&retval, "SUNLinSol_SPFGMR", 1);
     LS->ops->solve = linearSolve;
@@ -477,8 +484,10 @@ void cvode_t::initialize()
   // custom settings
 #if 1
   if (linearSolver == "GMRES") {
-    SUNLinSol_SPGMRSetGSType(LS, SUN_CLASSICAL_GS);
-    check_retval(&retval, "SUNLinSol_SPGMRSetGSType", 1);
+    if(platform->options.compareArgs("CVODE GS TYPE", "CLASSICAL")) {
+      SUNLinSol_SPGMRSetGSType(LS, SUN_CLASSICAL_GS);
+      check_retval(&retval, "SUNLinSol_SPGMRSetGSType", 1);
+    }
   }
 
   retval = CVodeSetJacTimesRhsFn(this->cvodeMem, fwdCvodeJtvRHS);
@@ -497,9 +506,17 @@ void cvode_t::initialize()
     retval = CVodeSetMaxOrd(this->cvodeMem, maxOrder);
   }
 
-  double epsLin = 0.1;
+  // non-linear convergence factor
+  double epsNl = 0.1;
+  retval = CVodeSetNonlinConvCoef(this->cvodeMem, epsNl);
+  check_retval(&retval, "CVodeSetNonlinConvCoef", 1);
+
+  // linear convergence safety factor
+  // linear residual satisfies |r|_wrms < 0.1 * epsLin * epsNl
+  double epsLin = 0.5;
   platform->options.getArgs("CVODE EPS LIN", epsLin);
   retval = CVodeSetEpsLin(this->cvodeMem, epsLin);
+  check_retval(&retval, "CVodeSetEpsLin", 1);
 #endif
 
   // set user data as
@@ -1432,13 +1449,6 @@ void cvode_t::printInfo(bool printVerboseInfo) const
 
 void cvode_t::printTimers()
 {
-  {
-    const auto tCv = platform->timer.query("cvode_t::solve::cvode", "DEVICE:MAX");
-    const auto tLs = platform->timer.query("cvode_t::solve::cvode::linearSolve", "DEVICE:MAX");
-    const auto nli = platform->timer.count("cvode_t::solve::cvode::newtonSolve::rhs");
-    platform->timer.set("cvode_t::solve::cvode::newtonSolve", tCv - tLs, nli);
-  }
-
   const auto timerTags = platform->timer.tags();
 
   // filter out tags that do not start with timerName
@@ -1599,7 +1609,7 @@ void cvode_t::resetTimers()
 
 std::string cvode_t::rhsTagName() const
 {
-  return this->isJacobianEvaluation() ? timerScope + "::linearSolve::jtv" : timerScope + "::newtonSolve::rhs";
+  return this->isJacobianEvaluation() ? timerScope + "::linearSolve::jtv::rhs" : timerScope + "::rhs";
 }
 
 void cvode_t::setLocalPointSource(userLocalPointSource_t _userLocalPointSource)
