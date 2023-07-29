@@ -18,11 +18,13 @@
 #include "tabularPrinter.hpp"
 
 #ifdef ENABLE_CVODE
+
 // cvode includes
 #include "sunlinsol/sunlinsol_spgmr.h"
 #include "sundials/sundials_types.h"
 #include "sundials/sundials_math.h"
 #include "cvode/cvode.h"
+
 #include "nvector/nvector_serial.h"
 #include "nvector/nvector_mpiplusx.h"
 
@@ -32,29 +34,13 @@
 #ifdef ENABLE_HIP
 #include "nvector/nvector_hip.h"
 #endif
-#endif
 
-#define getN_VectorMemory(T,S) (  platform->device.occaDevice().wrapMemory<T>( __N_VGetDeviceArrayPointer(N_VGetLocalVector_MPIPlusX(S)), N_VGetLocalLength(S)) )
+#include "getN_VectorMemory.hpp"
+#include "cbGMRES.hpp"
+
+#endif
 
 namespace {
-
-#ifdef ENABLE_CVODE
-sunrealtype *__N_VGetDeviceArrayPointer(N_Vector u)
-{
-  bool useDevice = false;
-  useDevice |= platform->device.mode() == "CUDA";
-  useDevice |= platform->device.mode() == "HIP";
-  useDevice |= platform->device.mode() == "OPENCL";
-
-  if (useDevice) {
-    return N_VGetDeviceArrayPointer(u);
-  } else {
-    return N_VGetArrayPointer_Serial(u);
-  }
-}
-#endif
-
-#include "spgmr.inc"
 
 void check_retval(void *returnvalue, const char *funcname, int opt)
 {
@@ -207,7 +193,7 @@ cvode_t::cvode_t(nrs_t *_nrs)
 }
 
 #ifdef ENABLE_CVODE
-int cvode_t::cvodeRHS(double time, N_Vector Y, N_Vector Ydot) {
+int cvode_t::cvodeRHS(realtype time, N_Vector Y, N_Vector Ydot) {
   auto o_y = getN_VectorMemory(sunrealtype, Y);
   auto o_ydot = getN_VectorMemory(sunrealtype, Ydot);
   
@@ -218,53 +204,72 @@ int cvode_t::cvodeRHS(double time, N_Vector Y, N_Vector Ydot) {
 
   return 0;
 }
-  
-int cvode_t::cvodeJtvRHS(double time, N_Vector Y, N_Vector Ydot) 
+
+// callback used by cvode to compute Jv
+// linear solver requires matVec: Mv = (I - gamma*J)v
+int cvode_t::cvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector fy, N_Vector ytemp) 
 {
-  auto o_y = getN_VectorMemory(sunrealtype, Y);
-  auto o_ydot = getN_VectorMemory(sunrealtype, Ydot);
-  
-  this->YLVec->optr(o_y);
-  this->YdotLVec->optr(o_ydot);
-
-  this->jtvRHS(time, *(this->YLVec), *(this->YdotLVec));
-
-  return 0;
-}
-  
-int cvode_t::cvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector fy, N_Vector work) 
-{
-  platform->timer.tic(timerName + "solve::cvode::linearSolve::jtv", 1);
-
+#if 0
   int iter, retval;
 
-  retval = CVodeGetErrWeights(cvodeMem, work);
+  retval = CVodeGetErrWeights(cvodeMem, ytemp);
   if (retval != CV_SUCCESS)
     return (retval);
 
+  auto o_ytemp = getN_VectorMemory(sunrealtype, ytemp);
+  auto o_Jv = getN_VectorMemory(sunrealtype, Jv);
+
   /* Initialize perturbation to 1/||v|| */
-  realtype sig = 1 / N_VWrmsNorm_MPIManyVector(v, work);
-  sig *= sigScale;
-
-  /* Set work = y + sig*v */
-  N_VLinearSum(sig, v, 1.0, y, work);
-
-  /* Set Jv = f(tn, y+sig*v) */
-  this->cvodeJtvRHS(t, work, Jv);
-
-  /* Replace Jv by (Jv - fy)/sig */
+  const realtype sig = sigScale / N_VWrmsNorm_MPIManyVector(v, ytemp);
   const realtype siginv = 1.0 / sig;
+
+  std::cout << "sig = " << sig << std::endl;
+
+  N_VLinearSum(sig, v, 1.0, y, ytemp);
+  this->jtvRhs(t, o_ytemp, o_Jv);
   N_VLinearSum(siginv, Jv, -siginv, fy, Jv);
 
-  platform->timer.toc(timerName + "solve::cvode::linearSolve::jtv");
   return (0);
+#else
+  const auto o_v = getN_VectorMemory(sunrealtype, v);
+  auto o_Jv = getN_VectorMemory(sunrealtype, Jv);
+  const auto o_y = getN_VectorMemory(sunrealtype, y);
+  const auto o_fy = getN_VectorMemory(sunrealtype, fy);
+  auto o_ytemp = getN_VectorMemory(sunrealtype, ytemp);
+
+  return this->jtv(t, o_v, o_y, o_fy, o_ytemp, o_Jv);
+#endif
+}
+
+// Jv = [f(y + v*sig) - f(y)]/sig, where sig = sigScale / ||v||_WRMS, 
+int cvode_t::jtv(double t, const occa::memory& o_v, const occa::memory& o_y, const occa::memory& o_fy, 
+                 occa::memory& o_work, occa::memory& o_Jv) 
+{
+  if (detailedTimersEnabled)
+    platform->timer.tic(timerName + "solve::cvode::linearSolve::jtv", 0);
+
+  const auto norm = sqrt(platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_v, platform->comm.mpiComm) / this->nEqTotal);
+  const auto sig = sigScale / norm;
+  const auto siginv = 1.0 / sig;
+
+  platform->linAlg->axpbyz(this->nEq, sig, o_v, 1.0, o_y, o_work);
+  this->jtvRhs(t, o_work, o_Jv);
+  platform->linAlg->axpbyz(this->nEq, siginv, o_Jv, -siginv,  o_fy, o_Jv);
+
+  if (detailedTimersEnabled)
+    platform->timer.toc(timerName + "solve::cvode::linearSolve::jtv");
+
+  return 0;
 }
 
 int cvode_t::cvodeErrorWt(N_Vector y, N_Vector ewt)
 {
+  if (detailedTimersEnabled)
+    platform->timer.tic(timerName + "solve::cvode::errorWt", 0);
+
   auto o_y = getN_VectorMemory(sunrealtype, y);
-  auto o_ewt = getN_VectorMemory(sunrealtype, ewt);
-  
+  o_ewt = getN_VectorMemory(sunrealtype, ewt);
+ 
   auto cds = nrs->cds;
   const auto cvodeCHT = nrs->cht && cds->cvodeSolve[0];
   if(cvodeCHT){
@@ -297,7 +302,10 @@ int cvode_t::cvodeErrorWt(N_Vector y, N_Vector ewt)
                             o_y,
                             o_ewt);
   }
-  
+
+  if (detailedTimersEnabled)
+    platform->timer.toc(timerName + "solve::cvode::errorWt");
+
   return 0;
 }
 #endif
@@ -315,22 +323,22 @@ void cvode_t::initialize()
   int retval;
 
 #ifdef ENABLE_CVODE
-  auto fwdCvodeRHS = [](double time, N_Vector Y, N_Vector Ydot, void *user_data){
+  auto fwdCvodeRHS = [](double time, N_Vector Y, N_Vector Ydot, void *user_data) {
     return static_cast<cvode_t*>(user_data)->cvodeRHS(time, Y, Ydot);
   };
-  
-  auto fwdCvodeJtvRHS = [](double time, N_Vector Y, N_Vector Ydot, void *user_data){
-    return static_cast<cvode_t*>(user_data)->cvodeJtvRHS(time, Y, Ydot);
-  };
-
-  auto linearSolve = [](SUNLinearSolver S, SUNMatrix A, N_Vector x, N_Vector b, realtype tol) {
+ 
+  auto fwdLinearSolve = [](SUNLinearSolver S, SUNMatrix A, N_Vector x, N_Vector b, realtype tol) {
     const std::string timerName = "cvode_t::";
-    platform->timer.tic(timerName + "solve::cvode::linearSolve", 1);
-#if 1
-    auto retVal = SPGMR(S, NULL, x, b, tol);
-#else 
-    auto retVal = SUNLinSolSolve_SPGMR(S, NULL, x, b, tol);
-#endif
+    std::string solverType;
+    platform->options.getArgs("CVODE SOLVER", solverType);
+ 
+    platform->timer.tic(timerName + "solve::cvode::linearSolve", 0);
+    int retVal;
+    if(solverType == "CBGMRES") {
+      retVal = cbGMRES(S, x, b, tol);
+    } else if (solverType == "GMRES"){
+      retVal = SUNLinSolSolve_SPGMR(S, NULL, x, b, tol);
+    }
     platform->timer.toc(timerName + "solve::cvode::linearSolve");
     return retVal;
   };
@@ -344,16 +352,16 @@ void cvode_t::initialize()
   retval = SUNContext_Create((void *)&platform->comm.mpiComm, &sunctx);
   check_retval(&retval, "SUNContext_Create", 1);
 
-  int blockSize = BLOCKSIZE;
-
+  const int blockSize = BLOCKSIZE;
 
   {
     this->y = nullptr;
     if (platform->device.mode() == "CUDA") {
 #ifdef ENABLE_CUDA
-      SUNCudaThreadDirectExecPolicy stream_exec_policy(blockSize);
-      SUNCudaBlockReduceExecPolicy reduce_exec_policy(blockSize, 0);
-
+      auto occaStream = platform->device.occaDevice().getStream();
+      auto backendStreamNative = occa::unwrap(occaStream);
+      SUNCudaThreadDirectExecPolicy stream_exec_policy(blockSize, *static_cast<cudaStream_t*>(backendStreamNative));
+      SUNCudaBlockReduceExecPolicy reduce_exec_policy(blockSize, 0, *static_cast<cudaStream_t*>(backendStreamNative));
       this->y = N_VNew_Cuda(this->nEq, sunctx);
       check_retval((void *)this->y, "N_VNew_Cuda", 0);
 
@@ -371,8 +379,10 @@ void cvode_t::initialize()
 #endif
     } else if (platform->device.mode() == "HIP") {
 #ifdef ENABLE_HIP
-      SUNHipThreadDirectExecPolicy stream_exec_policy(blockSize);
-      SUNHipBlockReduceExecPolicy reduce_exec_policy(blockSize, 0);
+      auto occaStream = platform->device.occaDevice().getStream();
+      auto backendStreamNative = occa::unwrap(occaStream);
+      SUNHipThreadDirectExecPolicy stream_exec_policy(blockSize, *static_cast<hipStream_t*>(backendStreamNative));
+      SUNHupBlockReduceExecPolicy reduce_exec_policy(blockSize, 0, *static_cast<hipStream_t*>(backendStreamNative));
 
       this->y = N_VNew_Hip(data->nEq, sunctx);
       check_retval((void *)this->y, "N_VNew_Hip", 0);
@@ -458,24 +468,24 @@ void cvode_t::initialize()
   retval = CVodeWFtolerances(this->cvodeMem, fwdCvodeErrorWt);
   check_retval(&retval, "CVodeWFtolerances", 1);
 
-  std::string linearSolver = "GMRES";
-  platform->options.getArgs("CVODE SOLVER", linearSolver);
-
+  this->linearSolverType = "CBGMRES";
+  platform->options.getArgs("CVODE SOLVER", this->linearSolverType);
+ 
   SUNLinearSolver LS;
 
-  if (linearSolver == "GMRES") {
+  if (this->linearSolverType.find("GMRES") != std::string::npos) {
     int nVectors = 10;
-    platform->options.getArgs("CVODE GMRES RESTART", nVectors);
+    platform->options.getArgs("CVODE GMRES BASIS VECTORS", nVectors);
 
     LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
     check_retval(&retval, "SUNLinSol_SPFGMR", 1);
-    LS->ops->solve = linearSolve;
+    LS->ops->solve = fwdLinearSolve;
   } else {
     nrsCheck(true,
              platform->comm.mpiComm,
              EXIT_FAILURE,
              "CVODE SOLVER %s not supported!\n",
-             linearSolver.c_str());
+             linearSolverType.c_str());
   }
 
   retval = CVodeSetLinearSolver(this->cvodeMem, LS, NULL);
@@ -483,15 +493,12 @@ void cvode_t::initialize()
 
   // custom settings
 #if 1
-  if (linearSolver == "GMRES") {
+  if (linearSolverType.find("GMRES") !=std::string::npos) {
     if(platform->options.compareArgs("CVODE GS TYPE", "CLASSICAL")) {
       SUNLinSol_SPGMRSetGSType(LS, SUN_CLASSICAL_GS);
       check_retval(&retval, "SUNLinSol_SPGMRSetGSType", 1);
     }
   }
-
-  retval = CVodeSetJacTimesRhsFn(this->cvodeMem, fwdCvodeJtvRHS);
-  check_retval(&retval, "CVodeSetJacTimesRhsFn", 1);
 
   retval = CVodeSetJacTimes(this->cvodeMem, NULL, fwdCvodeJtv);
   check_retval(&retval, "CVodeSetJacTimes", 1);
@@ -727,7 +734,8 @@ void cvode_t::rhs(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat
   const auto tag = this->rhsTagName();
   const auto saveTimerScope = timerScope;
   timerScope = tag;
-  platform->timer.tic(tag, 1);
+  if (detailedTimersEnabled)
+    platform->timer.tic(tag, 0);
   this->setIsRhsEvaluation(true);
 
   if (userRHS) {
@@ -737,14 +745,23 @@ void cvode_t::rhs(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat
   }
 
   this->setIsRhsEvaluation(false);
-  platform->timer.toc(tag);
+  if (detailedTimersEnabled)
+    platform->timer.toc(tag);
   timerScope = saveTimerScope;
-
-  // explicit sync because CVODE is not aware of occa's stream
-  platform->device.finish();
 }
 
-void cvode_t::jtvRHS(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)
+int cvode_t::jtvRhs(double time, const occa::memory& o_y, occa::memory& o_ydot) 
+{
+  auto o_yy = o_y; /* kludge because optr takes occa::memory&*/
+  this->YLVec->optr(o_yy);
+  this->YdotLVec->optr(o_ydot);
+
+  this->jtvRhs(time, *(this->YLVec), *(this->YdotLVec));
+
+  return 0;
+}
+
+void cvode_t::jtvRhs(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)
 {
   this->setIsJacobianEvaluation(true);
 
@@ -770,7 +787,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   if (time != tprev) {
 
     if (detailedTimersEnabled) {
-      platform->timer.tic(timerScope + "::extrapolate", 1);
+      platform->timer.tic(timerScope + "::extrapolate", 0);
     }
 
     if (platform->comm.mpiRank == 0 && time - tprev > 0 && verboseCVODE) {
@@ -852,7 +869,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   cvToNrs(o_y, cds->o_S, false);
 
   if (detailedTimersEnabled) {
-    platform->timer.tic(timerScope + "::applyDirichlet", 1);
+    platform->timer.tic(timerScope + "::applyDirichlet", 0);
   }
 
   this->applyDirichlet(time);
@@ -864,7 +881,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   const bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
 
   if (!(isJacobianEvaluation() && recycleProperties)) {
-    platform->timer.tic(timerScope + "::evaluateProperties", 1);
+    platform->timer.tic(timerScope + "::evaluateProperties", 0);
 
     evaluateProperties(nrs, time);
 
@@ -901,13 +918,13 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   };
 
   if (detailedTimersEnabled) {
-    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint", 1);
+    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint", 0);
   }
 
   applyOgsOperation(oogs::start);
 
   if (userLocalPointSource) {
-    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::localPointSource", 1);
+    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::localPointSource", 0);
     // o_ydot is used as scratch space to store the L-vector source term
     userLocalPointSource(nrs, o_y, o_ydot);
     platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::localPointSource");
@@ -919,7 +936,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint");
-    platform->timer.tic(timerScope + "::fusedAddRhoDiv", 1);
+    platform->timer.tic(timerScope + "::fusedAddRhoDiv", 0);
   }
 
   // (o_FS + userLocalPointSource) / rho
@@ -961,17 +978,19 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   // add dpdt term to temperature eqn
   if (platform->options.compareArgs("LOWMACH", "TRUE") && nrs->pSolver->allNeumann) {
     if (detailedTimersEnabled) {
-      platform->timer.tic(timerScope + "::dp0thdt", 1);
+      platform->timer.tic(timerScope + "::dp0thdt", 0);
     }
 
     platform->linAlg->fill(mesh->Nlocal, 0.0, nrs->o_div);
 
     // evaluate dp0thdt (not divergence)
-    platform->timer.tic(timerScope + "::dp0thdt::udfDiv", 1);
+    if (detailedTimersEnabled)
+      platform->timer.tic(timerScope + "::dp0thdt::udfDiv", 0);
     cds->cvode->setTimerScope(timerScope + "::dp0thdt::udfDiv");
     udf.div(nrs, time, nrs->o_div);
     cds->cvode->setTimerScope(timerScope);
-    platform->timer.toc(timerScope + "::dp0thdt::udfDiv");
+    if (detailedTimersEnabled)
+      platform->timer.toc(timerScope + "::dp0thdt::udfDiv");
 
     // RHS += 1/vtrans * dp0thdt * alpha0
     auto o_tmp = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
@@ -985,7 +1004,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   }
 
   if (detailedTimersEnabled) {
-    platform->timer.tic(timerScope + "::maskDirichlet", 1);
+    platform->timer.tic(timerScope + "::maskDirichlet", 0);
   }
 
   auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[minCvodeScalarId];
@@ -1005,7 +1024,7 @@ void cvode_t::makeq(double time)
 
   const auto timerScopeSave = timerScope;
   timerScope = timerScopeSave + "::makeq";
-  platform->timer.tic(timerScope, 1);
+  platform->timer.tic(timerScope, 0);
 
   auto *cds = nrs->cds;
   auto o_FS = nrs->cds->o_FS;
@@ -1017,7 +1036,7 @@ void cvode_t::makeq(double time)
     const auto makeQScope = timerScope;
     // ensure that user/application forward the correct base timer
     timerScope = makeQScope + "::udfSEqnSource";
-    platform->timer.tic(timerScope, 1);
+    platform->timer.tic(timerScope, 0);
     udf.sEqnSource(nrs, time, cds->o_S, o_FS);
     platform->timer.toc(timerScope);
     timerScope = makeQScope;
@@ -1048,7 +1067,7 @@ void cvode_t::makeq(double time)
     }
 
     if (detailedTimersEnabled) {
-      platform->timer.tic(timerScope + "::advection", 1);
+      platform->timer.tic(timerScope + "::advection", 0);
     }
 
     if (platform->options.compareArgs("ADVECTION", "TRUE")) {
@@ -1098,7 +1117,7 @@ void cvode_t::makeq(double time)
 
     if (detailedTimersEnabled) {
       platform->timer.toc(timerScope + "::advection");
-      platform->timer.tic(timerScope + "::neumannBC", 1);
+      platform->timer.tic(timerScope + "::neumannBC", 0);
     }
 
     // weak Laplacian + boundary terms
@@ -1124,7 +1143,7 @@ void cvode_t::makeq(double time)
 
     if (detailedTimersEnabled) {
       platform->timer.toc(timerScope + "::neumannBC");
-      platform->timer.tic(timerScope + "::weakLaplacian", 1);
+      platform->timer.tic(timerScope + "::weakLaplacian", 0);
     }
 
     weakLaplacianKernel(mesh->Nelements,
@@ -1170,7 +1189,7 @@ void cvode_t::makeq(double time)
 void cvode_t::nrsToCv(occa::memory o_EField,  LVector_t<dfloat> & o_LField, bool isYdot)
 {
   if (detailedTimersEnabled) {
-    platform->timer.tic(timerScope + "::nrsToCv", 1);
+    platform->timer.tic(timerScope + "::nrsToCv", 0);
   }
   
   auto cds = nrs->cds;
@@ -1188,7 +1207,7 @@ void cvode_t::nrsToCv(occa::memory o_EField,  LVector_t<dfloat> & o_LField, bool
 void cvode_t::cvToNrs(const  LVector_t<dfloat> & o_LField, occa::memory o_EField, bool isYdot)
 {
   if (detailedTimersEnabled) {
-    platform->timer.tic(timerScope + "::cvToNrs", 1);
+    platform->timer.tic(timerScope + "::cvToNrs", 0);
   }
   
   auto cds = nrs->cds;
@@ -1208,7 +1227,7 @@ void cvode_t::cvToNrs(const  LVector_t<dfloat> & o_LField, occa::memory o_EField
 void cvode_t::solve(double t0, double t1, int tstep)
 {
 #ifdef ENABLE_CVODE
-  platform->timer.tic(timerName + "solve", 1);
+  platform->timer.tic(timerName + "solve", 0);
   timerScope = timerName + "solve";
 
   // update solver statistics from previous state
@@ -1276,12 +1295,10 @@ void cvode_t::solve(double t0, double t1, int tstep)
     nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "Error calling CVodeSetMaxStep\n");
   }
 
-  platform->device.finish();
-
   const auto oldScope = timerScope;
   timerScope = oldScope + "::cvode";
   if (detailedTimersEnabled) {
-    platform->timer.tic(timerScope, 1);
+    platform->timer.tic(timerScope, 0);
   }
 
   o_rhoCpAvg = platform->o_memPool.reserve<dfloat>(nrs->cds->fieldOffset[0]);
@@ -1298,14 +1315,12 @@ void cvode_t::solve(double t0, double t1, int tstep)
     check_retval(&retval, "CVodeReInit", 1);
     this->tprev = std::numeric_limits<double>::max();
 
-    platform->device.finish();
     retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
   }
 
   o_rhoCpAvg.free();
 
   nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "CVODE failed after restart\n");
-  platform->device.finish();
 
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope);
@@ -1316,7 +1331,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
   cvToNrs(*YLVec, nrs->cds->o_S, false);
 
   if (detailedTimersEnabled) {
-    platform->timer.tic(timerScope + "::restore", 1);
+    platform->timer.tic(timerScope + "::restore", 0);
   }
 
   // restore previous state
