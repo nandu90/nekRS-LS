@@ -1140,9 +1140,16 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
   std::string parSectionName = parPrefixFromParSection(parScope);
   upperCase(parSectionName);
 
-  options.setArgs(parSectionName + "MAXIMUM ITERATIONS", "500");
+  int maxIter = 500;
+  par->extract(parScope, "maxiterations", maxIter);
+
+  options.setArgs(parSectionName + "MAXIMUM ITERATIONS", std::to_string(maxIter));
 
   options.setArgs(parSectionName + "SOLVER", "PCG");
+  if (options.compareArgs(parSectionName + "PRECONDITIONER", "JACOBI")) {
+    options.setArgs(parSectionName + "SOLVER", "PCG+COMBINED");
+  }
+
   if (parScope == "pressure") {
     options.setArgs(parSectionName + "SOLVER", "PGMRES+FLEXIBLE");
   }
@@ -1166,6 +1173,7 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
       {"flexible"},
       {"pgmres"},
       {"pcg"},
+      {"combined"},
       {"block"},
   };
   std::vector<std::string> list = serializeString(p_solver, '+');
@@ -1201,9 +1209,22 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
 
     if (p_solver.find("fcg") != std::string::npos || p_solver.find("flexible") != std::string::npos) {
       p_solver = "PCG+FLEXIBLE";
-    }
-    else {
-      p_solver = "PCG";
+      if (p_solver.find("combined") != std::string::npos) {
+        std::ostringstream ss;
+        ss << "combined PCG solver not supported with flexible preconditioner!\n";
+        append_value_error(ss.str());
+      }
+    } else {
+      if (p_solver.find("combined") != std::string::npos) {
+        if (!options.compareArgs(parSectionName + "PRECONDITIONER", "JACOBI")) {
+          std::ostringstream ss;
+          ss << "combined PCG solver only supported with Jacobi preconditioner!\n";
+          append_value_error(ss.str());
+        }
+        p_solver = "PCG+COMBINED";
+      } else {
+        p_solver = "PCG";
+      }
     }
   }
   else if (p_solver.find("user") != std::string::npos) {
