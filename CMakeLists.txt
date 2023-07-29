@@ -129,6 +129,10 @@ set(OCCA_OPENCL_COMPILER_FLAGS "-w -cl-std=CL2.0 -cl-unsafe-math-optimizations -
 
 set(OCCA_FOUND ON)
 
+if(USING_APPLE_LLVM AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
+  message(FATAL_ERROR "Apple Clang compiler not supported on arm64!")
+endif()
+
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(powerpc|ppc)64le" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
   string(REPLACE "-march" "-mcpu" OCCA_CXXFLAGS ${OCCA_CXXFLAGS})
   string(REPLACE "-march" "-mcpu" CMAKE_Fortran_FLAGS_RELWITHDEBINFO ${CMAKE_Fortran_FLAGS_RELWITHDEBINFO})
