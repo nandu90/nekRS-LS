@@ -40,7 +40,6 @@ static occa::kernel innerProdMultiKernel;
 
 static dlong N;
 
-
 static N_Vector s2Inv;
 static N_Vector vtemp2;
 
@@ -57,10 +56,13 @@ static occa::memory o_s2;
 static occa::memory o_s2Inv;
 
 static occa::memory o_yg;
+static occa::memory h_yg;
+
 static occa::memory o_stemp;
+static occa::memory h_stemp;
 
 static occa::memory o_scratch;
-realtype *scratch;
+static occa::memory h_scratch;
 
 // o_z[n] = alpha*o_x[n]*o_y[n]
 static void axmyz(const dfloat alpha,
@@ -102,6 +104,7 @@ static void innerProdMulti(const dlong NVec,
 {
   const int Nblock = (N + BLOCKSIZE - 1) / BLOCKSIZE;
   const size_t Nbytes = NVec * Nblock * sizeof(dfloat);
+  auto scratch = (sunrealtype *) h_scratch.ptr();
 
   {
     innerProdMultiKernel(Nblock,
@@ -145,8 +148,9 @@ static void setup(N_Vector x, N_Vector b, N_Vector xcor, N_Vector vtemp,
 
   const int Nblock = (N + BLOCKSIZE - 1) / BLOCKSIZE;
   const size_t Nbytes = (l_max+1) * Nblock * sizeof(dfloat);
+
   o_scratch = platform->device.malloc(Nbytes); 
-  scratch = (sunrealtype*) std::malloc(o_scratch.size());
+  h_scratch = platform->device.mallocHost(o_scratch.size());
 
   s2Inv = N_VClone(s2);
   vtemp2 = N_VClone(vtemp);
@@ -161,7 +165,10 @@ static void setup(N_Vector x, N_Vector b, N_Vector xcor, N_Vector vtemp,
   o_s2Inv = getN_VectorMemory(sunrealtype, s2Inv);
 
   o_yg = platform->device.malloc<sunrealtype>(l_max+1);
+  h_yg = platform->device.mallocHost(o_yg.size());
+
   o_stemp = platform->device.malloc<sunrealtype>(l_max+1);
+  h_stemp = platform->device.mallocHost(o_stemp.size());
 
   N_VDestroyVectorArray(V, l_max+1);
   o_V = platform->device.malloc<pfloat>((l_max+1) * N_VGetLocalLength(x));
@@ -169,10 +176,11 @@ static void setup(N_Vector x, N_Vector b, N_Vector xcor, N_Vector vtemp,
 
 
 /* two pass (iterative) classical Gram-Schmidt */
-static void CGS2(realtype **h, int k, int p, realtype *stemp, realtype *new_vk_norm, occa::memory& o_omega)  
+static void CGS2(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory& o_omega)  
 {
-  const int k_minus_1 = k - 1;
+  auto stemp = (sunrealtype *) h_stemp.ptr(); 
 
+  const int k_minus_1 = k - 1;
   const int nIterMax = 2;
   const realtype Kthres = 100;
 
@@ -205,54 +213,41 @@ static void CGS2(realtype **h, int k, int p, realtype *stemp, realtype *new_vk_n
 int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
 {
   /* local data and shortcut variables */
-  N_Vector *V, xcor, vtemp, s1, s2;
-  realtype **Hes, *givens, *yg, *res_norm;
-  realtype beta, rotation_product, r_norm, s_product, rho;
+  N_Vector xcor, vtemp, s1, s2;
+  realtype **Hes, *givens, *res_norm;
+  realtype beta, rotation_product, r_norm, rho;
   booleantype converged;
   booleantype *zeroguess;
-  int i, j, k, l, l_plus_1, l_max, krydim, ier, ntries, max_restarts, gstype;
+  int i, j, k, l, l_plus_1, l_max, krydim, ier;
   int *nli;
   void *A_data, *P_data;
   SUNATimesFn atimes;
-  SUNPSolveFn psolve;
-
-  /* local shortcuts for fused vector operations */
-  realtype* cv;
-  N_Vector* Xv;
 
   /* Initialize some variables */
   l_plus_1 = 0;
   krydim = 0;
 
-
   /* Make local shorcuts to solver variables. */
   if (S == NULL) return(SUNLS_MEM_NULL);
   l_max        = SPGMR_CONTENT(S)->maxl;
-  max_restarts = SPGMR_CONTENT(S)->max_restarts;
-  gstype       = SPGMR_CONTENT(S)->gstype;
-  V            = SPGMR_CONTENT(S)->V;
   Hes          = SPGMR_CONTENT(S)->Hes;
   givens       = SPGMR_CONTENT(S)->givens;
   xcor         = SPGMR_CONTENT(S)->xcor;
-  yg           = SPGMR_CONTENT(S)->yg;
   vtemp        = SPGMR_CONTENT(S)->vtemp;
   s1           = SPGMR_CONTENT(S)->s1;
   s2           = SPGMR_CONTENT(S)->s2;
 
-
   A_data       = SPGMR_CONTENT(S)->ATData;
   P_data       = SPGMR_CONTENT(S)->PData;
   atimes       = SPGMR_CONTENT(S)->ATimes;
-  psolve       = SPGMR_CONTENT(S)->Psolve;
   zeroguess    = &(SPGMR_CONTENT(S)->zeroguess);
   nli          = &(SPGMR_CONTENT(S)->numiters);
   res_norm     = &(SPGMR_CONTENT(S)->resnorm);
-  cv           = SPGMR_CONTENT(S)->cv;
-  Xv           = SPGMR_CONTENT(S)->Xv;
+
 
   static int firstTime = 1;
   if (firstTime) {
-    setup(x, b, xcor, vtemp, s1, s2, V, l_max); 
+    setup(x, b, xcor, vtemp, s1, s2, SPGMR_CONTENT(S)->V, l_max); 
     firstTime = 0; 
   } 
 
@@ -333,7 +328,7 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
 
     /* Orthogonalize vtemp2 (V[l+1]) against previous V[i] */
     platform->timer.tic(timerName + "solve::cvode::linearSolve::cgs2", 0);
-    CGS2(Hes, l_plus_1, l_max, cv, &(Hes[l_plus_1][l]), o_vtemp2);
+    CGS2(Hes, l_plus_1, l_max, &(Hes[l_plus_1][l]), o_vtemp2);
     platform->timer.toc(timerName + "solve::cvode::linearSolve::cgs2");
 
     /* Update the QR factorization of Hes */
@@ -354,6 +349,7 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
   /* Inner loop is done.  Compute the new correction vector xcor */
 
   /* Construct g, then solve for y */
+  auto yg = (sunrealtype *) h_yg.ptr();
   yg[0] = r_norm;
   for (i=1; i<=krydim; i++) yg[i]=ZERO;
   if (SUNQRsol(krydim, Hes, givens, yg) != 0) {
