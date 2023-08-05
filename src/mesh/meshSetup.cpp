@@ -274,6 +274,19 @@ mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &k
     mesh->o_coeffAB = platform->device.malloc<dfloat>(maxTemporalOrder, mesh->coeffAB);
   }
 
+  { 
+    std::vector<dfloat> tmp(mesh->Nlocal);
+    mesh->ogs->o_invDegree.copyTo(tmp.data());
+
+    double sum = 0;
+    for (int i = 0; i < mesh->Nlocal; i++) {
+      sum += tmp[i];
+    }
+    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, platform->comm.mpiComm);
+    if (platform->comm.mpiRank == 0)
+      printf("unique number of gridpoints: : %lld\n", static_cast<hlong>(sum+0.1));
+  }
+
   {
     double valMin = (double)mesh->NlocalGatherElements / mesh->Nelements;
     double valMax = (double)mesh->NlocalGatherElements / mesh->Nelements;
@@ -453,6 +466,19 @@ mesh_t *createMeshV(MPI_Comm comm, int N, int cubN, mesh_t *meshT, occa::propert
   mesh->computeInvLMM();
 
   mesh->volume = platform->linAlg->sum(mesh->Nlocal, mesh->o_LMM, platform->comm.mpiComm);
+
+  { 
+    std::vector<dfloat> tmp(mesh->Nlocal);
+    mesh->ogs->o_invDegree.copyTo(tmp.data());
+
+    double sum = 0;
+    for (int i = 0; i < mesh->Nlocal; i++) {
+      sum += tmp[i];
+    }
+    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, platform->comm.mpiComm);
+    if (platform->comm.mpiRank == 0)
+      printf("unique number of gridpoints: : %lld\n", static_cast<hlong>(sum+0.1));
+  }
 
   {
     double valMin = (double)mesh->NlocalGatherElements / mesh->Nelements;

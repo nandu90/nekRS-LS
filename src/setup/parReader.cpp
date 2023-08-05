@@ -1567,7 +1567,6 @@ void setDefaultSettings(setupAide &options, std::string casename, int rank)
   options.setArgs("ADVECTION", "TRUE");
   options.setArgs("ADVECTION TYPE", "CUBATURE+CONVECTIVE");
 
-  options.setArgs("RESTART FROM FILE", "FALSE");
   options.setArgs("SOLUTION OUTPUT INTERVAL", "-1");
   options.setArgs("SOLUTION OUTPUT CONTROL", "STEPS");
   options.setArgs("REGULARIZATION METHOD", "NONE");
