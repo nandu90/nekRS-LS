@@ -101,6 +101,8 @@ private:
   std::shared_ptr<LVec> YLVec;
   std::shared_ptr<LVec> YdotLVec;
 
+  oogs_t *gsh;
+
 #ifdef ENABLE_CVODE
   // CVODE function pointers (required to access private data members)
   int cvodeRHS(double time, N_Vector Y, N_Vector Ydot);

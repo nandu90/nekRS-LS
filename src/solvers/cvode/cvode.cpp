@@ -78,6 +78,10 @@ void check_retval(void *returnvalue, const char *funcname, int opt)
 
 cvode_t::cvode_t(nrs_t *_nrs)
 {
+  if (platform->comm.mpiRank == 0) {
+    std::cout << "initializing CVODE ...\n";
+  }
+
   this->nrs = _nrs;
   auto cds = nrs->cds;
 
@@ -178,6 +182,8 @@ cvode_t::cvode_t(nrs_t *_nrs)
     sharedRho = false;
   }
 
+  this->gsh = oogs::setup(nrs->meshV->ogs, this->Nscalar, nrs->fieldOffset, ogsDfloat, NULL, OOGS_AUTO);
+
   mixedPrecisionJtvEnabled = platform->options.compareArgs("CVODE MIXED PRECISION JTV", "TRUE");
   nrsCheck(mixedPrecisionJtvEnabled,
            platform->comm.mpiComm,
@@ -190,6 +196,11 @@ cvode_t::cvode_t(nrs_t *_nrs)
     o_vgeoPfloat = platform->device.malloc<pfloat>(mesh->Nelements * mesh->Np * mesh->Nvgeo);
     platform->copyDfloatToPfloatKernel(mesh->Nelements * mesh->Np * mesh->Nvgeo, mesh->o_vgeo, o_vgeoPfloat);
   }
+
+  if (platform->comm.mpiRank == 0) {
+    std::cout << "done\n";
+  }
+
 }
 
 #ifdef ENABLE_CVODE
@@ -887,10 +898,9 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
     if (chtCVODE) {
       auto mesh = cds->mesh[0];
-      auto gsh = cds->mesh[0]->oogs;
       o_rhoCpAvg.copyFrom(cds->o_rho);
       platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_rhoCpAvg);
-      oogs::startFinish(o_rhoCpAvg, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, gsh);
+      oogs::startFinish(o_rhoCpAvg, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, cds->gshT);
       platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_rhoCpAvg);
     }
 
@@ -913,7 +923,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
         numScalars--;
       }
       auto o_fld = cds->o_FS + nrs->cds->fieldOffsetScan[startScalar];
-      ogsFunc(o_fld, numScalars, cds->fieldOffset[startScalar], ogsDfloat, ogsAdd, cds->gsh);
+      ogsFunc(o_fld, numScalars, cds->fieldOffset[startScalar], ogsDfloat, ogsAdd, this->gsh);
     }
   };
 
