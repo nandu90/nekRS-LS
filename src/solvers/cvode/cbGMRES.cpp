@@ -171,7 +171,6 @@ static void setup(N_Vector x, N_Vector b, N_Vector xcor, N_Vector vtemp,
   h_stemp = platform->device.mallocHost(o_stemp.size());
 
   N_VDestroyVectorArray(V, l_max+1);
-  o_V = platform->device.malloc<pfloat>((l_max+1) * N_VGetLocalLength(x));
 }
 
 
@@ -210,6 +209,12 @@ static void CGS2(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory
   }
 }
 
+#define cbGMRESFinish(lastFlag)   \
+{                                 \
+  o_V.free();                     \
+  return lastFlag;                \
+}
+
 int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
 {
   /* local data and shortcut variables */
@@ -244,12 +249,13 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
   nli          = &(SPGMR_CONTENT(S)->numiters);
   res_norm     = &(SPGMR_CONTENT(S)->resnorm);
 
-
   static int firstTime = 1;
   if (firstTime) {
     setup(x, b, xcor, vtemp, s1, s2, SPGMR_CONTENT(S)->V, l_max); 
     firstTime = 0; 
   } 
+
+  o_V = platform->o_memPool.reserve<pfloat>((l_max+1) * N_VGetLocalLength(x));
 
   /* Initialize counters and convergence flag */
   *nli = 0;
@@ -259,7 +265,7 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
   if (atimes == NULL) {
     *zeroguess  = SUNFALSE;
     LASTFLAG(S) = SUNLS_ATIMES_NULL;
-    return(LASTFLAG(S));
+    cbGMRESFinish(LASTFLAG(S));
   }
 
   /* cache s2Inv */
@@ -274,7 +280,7 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
       *zeroguess  = SUNFALSE;
       LASTFLAG(S) = (ier < 0) ?
         SUNLS_ATIMES_FAIL_UNREC : SUNLS_ATIMES_FAIL_REC;
-      return(LASTFLAG(S));
+      cbGMRESFinish(LASTFLAG(S));
     }
 
     platform->linAlg->axpbyz(N, ONE, o_b, -ONE, o_vtemp, o_vtemp);
@@ -289,7 +295,7 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
   if (r_norm <= delta) {
     *zeroguess  = SUNFALSE;
     LASTFLAG(S) = SUNLS_SUCCESS;
-    return(LASTFLAG(S));
+    cbGMRESFinish(LASTFLAG(S));
   }
 
   /* Initialize rho to avoid compiler warning message */
@@ -320,7 +326,7 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
       *zeroguess  = SUNFALSE;
       LASTFLAG(S) = (ier < 0) ?
         SUNLS_ATIMES_FAIL_UNREC : SUNLS_ATIMES_FAIL_REC;
-      return(LASTFLAG(S));
+      cbGMRESFinish(LASTFLAG(S));
     }
 
     /* Apply left scaling: V[l+1] = s1 A s2_inv V[l] */
@@ -335,7 +341,7 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
     if(SUNQRfact(krydim, Hes, givens, l) != 0 ) {
       *zeroguess  = SUNFALSE;
       LASTFLAG(S) = SUNLS_QRFACT_FAIL;
-      return(LASTFLAG(S));
+      cbGMRESFinish(LASTFLAG(S));
     }
 
     /* Update residual norm estimate; break if convergence test passes */
@@ -355,7 +361,7 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
   if (SUNQRsol(krydim, Hes, givens, yg) != 0) {
     *zeroguess  = SUNFALSE;
     LASTFLAG(S) = SUNLS_QRSOL_FAIL;
-    return(LASTFLAG(S));
+    cbGMRESFinish(LASTFLAG(S));
   }
   yg[krydim] = ZERO;
 
@@ -374,12 +380,12 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
 
     *zeroguess  = SUNFALSE;
     LASTFLAG(S) = (converged) ? SUNLS_SUCCESS : SUNLS_RES_REDUCED;
-    return(LASTFLAG(S));
+    cbGMRESFinish(LASTFLAG(S));
   }
 
   *zeroguess  = SUNFALSE;
   LASTFLAG(S) = SUNLS_CONV_FAIL;
-  return(LASTFLAG(S));
+  cbGMRESFinish(LASTFLAG(S));
 }
 
 #endif
