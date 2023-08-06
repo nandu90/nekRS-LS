@@ -191,7 +191,7 @@ cvode_t::cvode_t(nrs_t *_nrs)
            "%s\n",
            "CVODE MIXED PRECISION JTV = TRUE not supported yet");
 
-  if (mixedPrecisionJtvEnabled) {
+  {
     auto mesh = cds->mesh[0];
     o_vgeoPfloat = platform->device.malloc<pfloat>(mesh->Nelements * mesh->Np * mesh->Nvgeo);
     platform->copyDfloatToPfloatKernel(mesh->Nelements * mesh->Np * mesh->Nvgeo, mesh->o_vgeo, o_vgeoPfloat);
@@ -514,7 +514,7 @@ void cvode_t::initialize()
   retval = CVodeSetJacTimes(this->cvodeMem, NULL, fwdCvodeJtv);
   check_retval(&retval, "CVodeSetJacTimes", 1);
 
-  int mxsteps = 500;
+  int mxsteps = 100;
   platform->options.getArgs("CVODE MAX STEPS", mxsteps);
   retval = CVodeSetMaxNumSteps(this->cvodeMem, mxsteps);
 
@@ -540,6 +540,8 @@ void cvode_t::initialize()
   // set user data as
   retval = CVodeSetUserData(this->cvodeMem, this);
   check_retval(&retval, "CVodeSetUserData", 1);
+
+  resetCounters();
 
 #else
   nrsCheck(true, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "cvode was not enabled");
@@ -898,10 +900,13 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
     if (chtCVODE) {
       auto mesh = cds->mesh[0];
-      o_rhoCpAvg.copyFrom(cds->o_rho);
-      platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_rhoCpAvg);
-      oogs::startFinish(o_rhoCpAvg, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, cds->gshT);
-      platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_rhoCpAvg);
+      o_invRhoCpAvg.copyFrom(cds->o_rho);
+      platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_invRhoCpAvg);
+      oogs::startFinish(o_invRhoCpAvg, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, cds->gshT);
+      platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_invRhoCpAvg);
+      platform->linAlg->ady(mesh->Nlocal, 1.0, o_invRhoCpAvg);
+    } else {
+      platform->linAlg->adyz(mesh->Nlocal, 1.0, cds->o_rho, o_invRhoCpAvg);
     }
 
     platform->timer.toc(timerScope + "::evaluateProperties");
@@ -954,7 +959,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
     if (userLocalPointSource) {
       platform->linAlg->axpby(cds->mesh[0]->Nlocal, 1.0, this->o_pointSource, 1.0, cds->o_FS);
     }
-    platform->linAlg->aydx(cds->mesh[0]->Nlocal, 1.0, o_rhoCpAvg, cds->o_FS);
+    platform->linAlg->axmy(cds->mesh[0]->Nlocal, 1.0, o_invRhoCpAvg, cds->o_FS);
   }
   if (!chtCVODE || (chtCVODE && this->Nscalar > 1)) {
     dlong startScalar = minCvodeScalarId;
@@ -991,22 +996,22 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
       platform->timer.tic(timerScope + "::dp0thdt", 0);
     }
 
-    platform->linAlg->fill(mesh->Nlocal, 0.0, nrs->o_div);
+    // evaluate dp0thdt (evaluate together with divergence)
+    if (!(isJacobianEvaluation() && recycleProperties)) {
+      if (detailedTimersEnabled) {
+        platform->timer.tic(timerScope + "::dp0thdt::udfDiv", 0);
+      }
+      cds->cvode->setTimerScope(timerScope + "::dp0thdt::udfDiv");
 
-    // evaluate dp0thdt (not divergence)
-    if (detailedTimersEnabled)
-      platform->timer.tic(timerScope + "::dp0thdt::udfDiv", 0);
-    cds->cvode->setTimerScope(timerScope + "::dp0thdt::udfDiv");
-    udf.div(nrs, time, nrs->o_div);
-    cds->cvode->setTimerScope(timerScope);
-    if (detailedTimersEnabled)
-      platform->timer.toc(timerScope + "::dp0thdt::udfDiv");
+      platform->linAlg->fill(mesh->Nlocal, 0.0, nrs->o_div);
+      udf.div(nrs, time, nrs->o_div);
 
-    // RHS += 1/vtrans * dp0thdt * alpha0
-    auto o_tmp = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
-    o_tmp.copyFrom(cds->o_rho);
-    platform->linAlg->ady(mesh->Nlocal, nrs->dp0thdt * nrs->alpha0Ref, o_tmp);
-    platform->linAlg->axpby(mesh->Nlocal, 1.0, o_tmp, 1.0, cds->o_FS);
+      cds->cvode->setTimerScope(timerScope);
+      if (detailedTimersEnabled)
+        platform->timer.toc(timerScope + "::dp0thdt::udfDiv");
+    }
+
+    platform->linAlg->axpby(mesh->Nlocal, nrs->dp0thdt * nrs->alpha0Ref, o_invRhoCpAvg, 1.0, cds->o_FS); 
 
     if (detailedTimersEnabled) {
       platform->timer.toc(timerScope + "::dp0thdt");
@@ -1241,7 +1246,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
   timerScope = timerName + "solve";
 
   // update solver statistics from previous state
-  {
+  auto setPreviousCounters = [&]() {
     int retval = 0;
     retval = CVodeGetNumSteps(cvodeMem, &prevNsteps);
     check_retval(&retval, "CVodeGetNumSteps", 1);
@@ -1251,7 +1256,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
     check_retval(&retval, "CVodeGetNumNonlinSolvIters", 1);
     retval = CVodeGetNumLinIters(cvodeMem, &prevNli);
     check_retval(&retval, "CVodeGetNumLinIters", 1);
-  }
+  };
 
   mesh_t *mesh = nrs->meshV;
   if (nrs->cht) {
@@ -1311,24 +1316,38 @@ void cvode_t::solve(double t0, double t1, int tstep)
     platform->timer.tic(timerScope, 0);
   }
 
-  o_rhoCpAvg = platform->o_memPool.reserve<dfloat>(nrs->cds->fieldOffset[0]);
+  o_invRhoCpAvg = platform->o_memPool.reserve<dfloat>(nrs->cds->fieldOffset[0]);
 
   // call cvode solver
+  setPreviousCounters();
   retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
-  if (retval < 0) {
-    if (platform->comm.mpiRank == 0) {
-      std::cout << "... Restarting CVODE integrator\n";
-    }
-    YLVec->optr(o_cvodeY);
-    nrsToCv(nrs->cds->o_S, *YLVec, false);
-    retval = CVodeReInit(cvodeMem, t0, cvodeY);
-    check_retval(&retval, "CVodeReInit", 1);
-    this->tprev = std::numeric_limits<double>::max();
+  updateCounters();
 
-    retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
+  // restart if needed
+  if (retval != CV_SUCCESS) {
+    int cnt = 0;
+    while (retval != CV_SUCCESS) {
+      cnt++;
+      if (platform->comm.mpiRank == 0) {
+        std::cout << "Restarting CVODE integrator ...\n";
+      }
+      retval = CVodeReInit(cvodeMem, t, cvodeY);
+      check_retval(&retval, "CVodeReInit", 1);
+
+      this->tprev = std::numeric_limits<double>::max();
+      setPreviousCounters();
+      retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
+      updateCounters();
+
+      if(cnt > 20) {
+        if (platform->comm.mpiRank == 0) {
+          std::cout << "Giving up ...\n";
+        }
+      }
+    }
   }
 
-  o_rhoCpAvg.free();
+  o_invRhoCpAvg.free();
 
   nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "CVODE failed after restart\n");
 
@@ -1378,67 +1397,50 @@ void cvode_t::solve(double t0, double t1, int tstep)
 }
 
 #ifdef ENABLE_CVODE
-long cvode_t::numSteps() const
+
+void cvode_t::updateCounters()
 {
-  long int nsteps;
-  auto retval = CVodeGetNumSteps(cvodeMem, &nsteps);
+  long int cnt;
+
+  auto retval = CVodeGetNumSteps(cvodeMem, &cnt);
   check_retval(&retval, "CVodeGetNumSteps", 1);
-  return nsteps - prevNsteps;
-}
+  this->nsteps += (cnt - prevNsteps);
 
-long cvode_t::numRHSEvals() const
-{
-  long int nrhs;
-  auto retval = CVodeGetNumRhsEvals(cvodeMem, &nrhs);
+  retval = CVodeGetNumRhsEvals(cvodeMem, &cnt);
   check_retval(&retval, "CVodeGetNumRhsEvals", 1);
-  return nrhs - prevNrhs;
-}
+  this->nrhs += (cnt - prevNrhs);
 
-long cvode_t::numNonlinSolveIters() const
-{
-  long int nni;
-  auto retval = CVodeGetNumNonlinSolvIters(cvodeMem, &nni);
+  retval = CVodeGetNumNonlinSolvIters(cvodeMem, &cnt);
   check_retval(&retval, "CVodeGetNumNonlinSolvIters", 1);
-  return nni - prevNni;
-}
+  this->nni += (cnt - prevNni);
 
-long cvode_t::numLinIters() const
-{
-  long int nli;
-  auto retval = CVodeGetNumLinIters(cvodeMem, &nli);
+  retval = CVodeGetNumLinIters(cvodeMem, &cnt);
   check_retval(&retval, "CVodeGetNumLinIters", 1);
-  return nli - prevNli;
+  this->nli += (cnt - prevNli);
 }
+
+void cvode_t::resetCounters()
+{
+  this->nsteps = 0;
+  this->nrhs = 0;
+  this->nni = 0;
+  this->nli = 0;
+}
+
 #else
-long cvode_t::numSteps() const
+
+void cvode_t::updateCounters()
 {
-  return 0;
 }
 
-long cvode_t::numRHSEvals() const
+void cvode_t::resetCounters()
 {
-  return 0;
-}
-
-long cvode_t::numNonlinSolveIters() const
-{
-  return 0;
-}
-
-long cvode_t::numLinIters() const
-{
-  return 0;
 }
 #endif
 
-void cvode_t::printInfo(bool printVerboseInfo) const
+void cvode_t::printInfo(bool printVerboseInfo)
 {
   auto cvodeMem = this->cvodeMem;
-
-  const auto nsteps = numSteps();
-  const auto nrhs = numRHSEvals();
-  const auto nni = numNonlinSolveIters();
-  const auto nli = numLinIters();
 
   constexpr auto lengthToColon = 9;
   std::string scalars;
@@ -1470,6 +1472,8 @@ void cvode_t::printInfo(bool printVerboseInfo) const
     ss << "  " << scalars;
     printf("%s: %ld %ld %ld %ldf", ss.str().c_str(), nsteps, nrhs, nni, nli);
   }
+
+  resetCounters();
 }
 
 void cvode_t::printTimers()

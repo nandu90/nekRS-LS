@@ -50,7 +50,7 @@ public:
   void setUserPostCvToNrs(userPostCvToNrs_t _userPostCvToNrs) { userPostCvToNrs = _userPostCvToNrs; }
   void setUserPostNrsToCv(userPostNrsToCv_t _userPostNrsToCv) { userPostNrsToCv = _userPostNrsToCv; }
 
-  void printInfo(bool printVerboseInfo) const;
+  void printInfo(bool printVerboseInfo);
 
   bool isRhsEvaluation() const { return rhsEval; }
   void setIsRhsEvaluation(bool _rhsEval) { rhsEval = _rhsEval; }
@@ -76,11 +76,8 @@ public:
   dfloat *coeffBDF() { return _coeffBDF.data(); }
   dfloat *coeffEXT() { return _coeffEXT.data(); }
 
-  // CVODE solver statistics
-  long numSteps() const;
-  long numRHSEvals() const;
-  long numNonlinSolveIters() const;
-  long numLinIters() const;
+  void updateCounters();
+  void resetCounters();
 
   void printTimers();
   void resetTimers();
@@ -97,6 +94,10 @@ public:
   auto getLocalPointSource() { return userLocalPointSource; }
 
 private:
+  long int nsteps;
+  long int nrhs;
+  long int nni;
+  long int nli;
   
   std::shared_ptr<LVec> YLVec;
   std::shared_ptr<LVec> YdotLVec;
@@ -186,7 +187,7 @@ private:
 
   dlong Nscalar;
 
-  occa::memory o_rhoCpAvg;
+  occa::memory o_invRhoCpAvg;
 
   occa::memory o_coeffExt;
 
