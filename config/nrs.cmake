@@ -64,6 +64,7 @@ set(SRC
     src/pointInterpolation/findpts/findpts.cpp
     src/pointInterpolation/pointInterpolation.cpp
     src/neknek/neknek.cpp
+    src/neknek/fixCoupledSurfaceFlux.cpp
     src/udf/udf.cpp
     src/udf/compileUDFKernels.cpp
     src/nekInterface/nekInterfaceAdapter.cpp
