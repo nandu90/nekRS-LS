@@ -526,10 +526,6 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
     options.setArgs("CVODE RELATIVE TOLERANCE", to_string_f(relativeTol));
   }
 
-  if (par->extract(parScope, "absolutetol", absoluteTol)) {
-    options.setArgs("CVODE ABSOLUTE TOLERANCE", to_string_f(absoluteTol));
-  }
-
   options.setArgs("CVODE GMRES BASIS VECTORS", "10");
   options.setArgs("CVODE SOLVER", "GMRES");
 

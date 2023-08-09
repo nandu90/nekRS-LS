@@ -459,7 +459,6 @@ void cvode_t::initialize()
   platform->options.getArgs("CVODE RELATIVE TOLERANCE", this->relTol);
 
   double absTol = 1e-6;
-  platform->options.getArgs("CVODE ABSOLUTE TOLERANCE", absTol);
 
   // populate absolute tolerance vector
   std::vector<dfloat> absTols(this->Nscalar, absTol);
@@ -550,7 +549,10 @@ void cvode_t::initialize()
   retval = CVodeSetJacTimes(this->cvodeMem, NULL, fwdCvodeJtv);
   check_retval(&retval, "CVodeSetJacTimes", 1);
 
-  int mxsteps = 100;
+  if (platform->options.getArgs("CVODE MAX STEPS").empty())
+    platform->options.setArgs("CVODE MAX STEPS", "100");
+
+  int mxsteps;
   platform->options.getArgs("CVODE MAX STEPS", mxsteps);
   retval = CVodeSetMaxNumSteps(this->cvodeMem, mxsteps);
 
@@ -567,7 +569,10 @@ void cvode_t::initialize()
 
   // linear convergence safety factor
   // linear residual satisfies |r|_wrms < 0.1 * epsLin * epsNl
-  double epsLin = 0.5;
+  if (platform->options.getArgs("CVODE EPS LIN").empty())
+    platform->options.setArgs("CVODE EPS LIN", "0.5");
+
+  double epsLin;
   platform->options.getArgs("CVODE EPS LIN", epsLin);
   retval = CVodeSetEpsLin(this->cvodeMem, epsLin);
   check_retval(&retval, "CVodeSetEpsLin", 1);

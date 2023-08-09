@@ -230,10 +230,10 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   if (ciMode == 16) {
 
     options.setArgs("CVODE", "TRUE");
-    options.setArgs("CVODE INTEGRATOR", "BDF");
-    options.setArgs("CVODE EPS LIN", "0.05");
-
+    options.setArgs("SCALAR00 CVODE ABSOLUTE TOLERANCE", "1e-10");
+    options.setArgs("SCALAR01 CVODE ABSOLUTE TOLERANCE", "1e-10");
     options.setArgs("CVODE RELATIVE TOLERANCE", "1e-10");
+
     options.setArgs("CVODE GMRES BASIS VECTORS", "20");
 
     options.setArgs("SCALAR00 SOLVER", "CVODE");
@@ -244,8 +244,9 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   if (ciMode == 17) {
 
     options.setArgs("CVODE", "TRUE");
-    options.setArgs("CVODE INTEGRATOR", "BDF");
-    options.setArgs("CVODE EPS LIN", "0.05");
+
+    options.setArgs("SCALAR00 CVODE ABSOLUTE TOLERANCE", "1e-10");
+    options.setArgs("SCALAR01 CVODE ABSOLUTE TOLERANCE", "1e-10");
 
     options.setArgs("CVODE RELATIVE TOLERANCE", "1e-10");
     options.setArgs("CVODE GMRES BASIS VECTORS", "20");
@@ -258,8 +259,9 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   if (ciMode == 18) {
 
     options.setArgs("CVODE", "TRUE");
-    options.setArgs("CVODE INTEGRATOR", "BDF");
-    options.setArgs("CVODE EPS LIN", "0.05");
+
+    options.setArgs("SCALAR00 CVODE ABSOLUTE TOLERANCE", "1e-10");
+    options.setArgs("SCALAR01 CVODE ABSOLUTE TOLERANCE", "1e-10");
 
     options.setArgs("ADVECTION TYPE", "CONVECTIVE");
     options.setArgs("CVODE ADVECTION TYPE", "CONVECTIVE");
