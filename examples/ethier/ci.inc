@@ -231,16 +231,10 @@ void ciSetup(MPI_Comm comm, setupAide &options)
 
     options.setArgs("CVODE", "TRUE");
     options.setArgs("CVODE INTEGRATOR", "BDF");
-    options.setArgs("CVODE MAX TIMESTEPPER ORDER", "3");
     options.setArgs("CVODE EPS LIN", "0.05");
-    options.setArgs("CVODE STOP TIME", "TRUE");
-
-    const auto maxSteps = 10000;
-    options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
 
     options.setArgs("CVODE RELATIVE TOLERANCE", "1e-10");
-    options.setArgs("CVODE ABSOLUTE TOLERANCE", "1e-12");
-    options.setArgs("CVODE GMR VECTORS", "20");
+    options.setArgs("CVODE GMRES BASIS VECTORS", "20");
 
     options.setArgs("SCALAR00 SOLVER", "CVODE");
     options.setArgs("SCALAR01 SOLVER", "CVODE");
@@ -251,16 +245,10 @@ void ciSetup(MPI_Comm comm, setupAide &options)
 
     options.setArgs("CVODE", "TRUE");
     options.setArgs("CVODE INTEGRATOR", "BDF");
-    options.setArgs("CVODE MAX TIMESTEPPER ORDER", "3");
     options.setArgs("CVODE EPS LIN", "0.05");
-    options.setArgs("CVODE STOP TIME", "TRUE");
-
-    const auto maxSteps = 10000;
-    options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
 
     options.setArgs("CVODE RELATIVE TOLERANCE", "1e-10");
-    options.setArgs("CVODE ABSOLUTE TOLERANCE", "1e-12");
-    options.setArgs("CVODE GMR VECTORS", "20");
+    options.setArgs("CVODE GMRES BASIS VECTORS", "20");
 
     options.setArgs("SCALAR01 SOLVER", "CVODE");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
@@ -271,11 +259,10 @@ void ciSetup(MPI_Comm comm, setupAide &options)
 
     options.setArgs("CVODE", "TRUE");
     options.setArgs("CVODE INTEGRATOR", "BDF");
-    options.setArgs("CVODE MAX TIMESTEPPER ORDER", "3");
     options.setArgs("CVODE EPS LIN", "0.05");
-    options.setArgs("CVODE STOP TIME", "TRUE");
 
     options.setArgs("ADVECTION TYPE", "CONVECTIVE");
+    options.setArgs("CVODE ADVECTION TYPE", "CONVECTIVE");
 
     options.setArgs("SCALAR00 REGULARIZATION METHOD", "HPFRT");
     options.setArgs("SCALAR01 REGULARIZATION METHOD", "HPFRT");
@@ -284,12 +271,8 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("SCALAR00 HPFRT STRENGTH", "10.0");
     options.setArgs("SCALAR01 HPFRT STRENGTH", "10.0");
 
-    const auto maxSteps = 10000;
-    options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
-
     options.setArgs("CVODE RELATIVE TOLERANCE", "1e-10");
-    options.setArgs("CVODE ABSOLUTE TOLERANCE", "1e-12");
-    options.setArgs("CVODE GMR VECTORS", "20");
+    options.setArgs("CVODE GMRES BASIS VECTORS", "20");
 
     options.setArgs("SCALAR00 SOLVER", "CVODE");
     options.setArgs("SCALAR01 SOLVER", "CVODE");

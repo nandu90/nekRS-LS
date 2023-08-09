@@ -531,7 +531,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   }
 
   options.setArgs("CVODE GMRES BASIS VECTORS", "10");
-  options.setArgs("CVODE SOLVER", "CBGMRES");
+  options.setArgs("CVODE SOLVER", "GMRES");
 
   // parse cvode linear solver
   [&]() {
@@ -622,6 +622,10 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
     options.setArgs("CVODE ADVECTION TYPE", "CUBATURE+CONVECTIVE");
   else
     options.setArgs("CVODE ADVECTION TYPE", "CONVECTIVE");
+
+  if(dealiasing && !options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+    append_error("dealiasing for CVODE only is not supported!" + parScope);
+  }
 
   std::string recyclePropsStr;
   if (par->extract(parScope, "jtvrecycleproperties", recyclePropsStr)) {

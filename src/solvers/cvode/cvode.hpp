@@ -79,6 +79,11 @@ public:
   void updateCounters();
   void resetCounters();
 
+  long numSteps() const;
+  long numRHSEvals() const;
+  long numNonlinSolveIters() const;
+  long numLinIters() const;
+
   void printTimers();
   void resetTimers();
 

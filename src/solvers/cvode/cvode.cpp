@@ -429,9 +429,25 @@ void cvode_t::initialize()
   // set initial condition
   nrsToCv(nrs->cds->o_S, *YLVec, false);
 
-  auto integrator = CV_BDF;
-  if (platform->options.compareArgs("CVODE INTEGRATOR", "ADAMS")) {
+  if (platform->options.getArgs("CVODE ADVECTION TYPE").empty()) {
+    const auto dealiasing = platform->options.compareArgs("ADVECTION TYPE", "CUBATURE") ? true : false;
+    if (dealiasing)
+      platform->options.setArgs("CVODE ADVECTION TYPE", "CUBATURE+CONVECTIVE");
+    else
+      platform->options.setArgs("CVODE ADVECTION TYPE", "CONVECTIVE");
+  }
+
+  if (platform->options.getArgs("CVODE INTEGRATOR").empty())
+    platform->options.setArgs("CVODE INTEGRATOR", "BDF");
+
+  int integrator; 
+  if (platform->options.compareArgs("CVODE INTEGRATOR", "BDF")) {
+    integrator = CV_BDF;
+  } else if (platform->options.compareArgs("CVODE INTEGRATOR", "ADAMS")) {
     integrator = CV_ADAMS;
+  } else {
+    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s",
+             "Invalid CVODE INTEGRATOR!\n");
   }
 
   this->cvodeMem = CVodeCreate(integrator, sunctx);
@@ -463,7 +479,9 @@ void cvode_t::initialize()
 
   this->o_absTol = platform->device.malloc<dfloat>(this->Nscalar, absTols.data());
 
-  this->sigScale = 1.0;
+  if (platform->options.getArgs("CVODE SIGMA SCALE").empty())
+    platform->options.setArgs("CVODE SIGMA SCALE", "1.0");
+
   platform->options.getArgs("CVODE SIGMA SCALE", this->sigScale);
 
   check_retval((void *)this->cvodeMem, "CVodeCreate", 0);
@@ -479,13 +497,21 @@ void cvode_t::initialize()
   retval = CVodeWFtolerances(this->cvodeMem, fwdCvodeErrorWt);
   check_retval(&retval, "CVodeWFtolerances", 1);
 
-  this->linearSolverType = "CBGMRES";
+  if (platform->options.getArgs("CVODE STOP TIME").empty())
+    platform->options.setArgs("CVODE STOP TIME", "TRUE");
+
+  if (platform->options.getArgs("CVODE SOLVER").empty())
+    platform->options.setArgs("CVODE SOLVER", "GMRES");
+
   platform->options.getArgs("CVODE SOLVER", this->linearSolverType);
  
   SUNLinearSolver LS;
 
   if (this->linearSolverType.find("GMRES") != std::string::npos) {
-    int nVectors = 10;
+    if (platform->options.getArgs("CVODE GMRES BASIS VECTORS").empty())
+      platform->options.setArgs("CVODE GMRES BASIS VECTORS", "10");
+
+    int nVectors;
     platform->options.getArgs("CVODE GMRES BASIS VECTORS", nVectors);
 
     LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
@@ -504,10 +530,20 @@ void cvode_t::initialize()
 
   // custom settings
 #if 1
+  if (platform->options.getArgs("CVODE GS TYPE").empty())
+    platform->options.setArgs("CVODE GS TYPE", "CLASSICAL");
+
   if (linearSolverType.find("GMRES") !=std::string::npos) {
     if(platform->options.compareArgs("CVODE GS TYPE", "CLASSICAL")) {
       SUNLinSol_SPGMRSetGSType(LS, SUN_CLASSICAL_GS);
       check_retval(&retval, "SUNLinSol_SPGMRSetGSType", 1);
+    } else if (platform->options.compareArgs("CVODE GS TYPE", "MODIFIED")) {
+      nrsCheck(this->linearSolverType == "CBGMRES", 
+               platform->comm.mpiComm, EXIT_FAILURE, "%s",
+               "CVODE GS TYPE MODIFIED not available for CBGMRES!\n");
+    } else {
+      nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s",
+               "Invalid CVODE GS TYPE!\n");
     }
   }
 
@@ -1319,6 +1355,8 @@ void cvode_t::solve(double t0, double t1, int tstep)
   o_invRhoCpAvg = platform->o_memPool.reserve<dfloat>(nrs->cds->fieldOffset[0]);
 
   // call cvode solver
+  if(platform->verbose && platform->comm.mpiRank == 0)
+    std::cout << "calling cvode ...\n";
   setPreviousCounters();
   retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
   updateCounters();
@@ -1346,6 +1384,8 @@ void cvode_t::solve(double t0, double t1, int tstep)
       }
     }
   }
+  if(platform->verbose && platform->comm.mpiRank == 0)
+    std::cout << "done\n"; 
 
   o_invRhoCpAvg.free();
 
@@ -1396,8 +1436,27 @@ void cvode_t::solve(double t0, double t1, int tstep)
 #endif
 }
 
-#ifdef ENABLE_CVODE
+long cvode_t::numSteps() const
+{
+  return this->nsteps;
+}
 
+long cvode_t::numRHSEvals() const
+{
+  return this->nrhs; 
+}
+
+long cvode_t::numNonlinSolveIters() const
+{
+  return this->nni;
+}
+
+long cvode_t::numLinIters() const
+{
+  return this->nli;
+}
+
+#ifdef ENABLE_CVODE
 void cvode_t::updateCounters()
 {
   long int cnt;
