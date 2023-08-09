@@ -767,6 +767,58 @@ void ciTestSurfaceIntegral(nrs_t *nrs)
   }
 }
 
+void ciTestDistance(nrs_t *nrs)
+{
+  auto mesh = nrs->meshV;
+
+  int nbID = 1;
+  int bID = 1;
+  occa::memory o_bID = platform->o_memPool.reserve<int>(nbID);
+  o_bID.copyFrom(&bID);
+
+  auto o_dist = mesh->minDistance(nbID, o_bID, "cheap_dist");
+
+  std::vector<dfloat> dist(mesh->Nlocal);
+  o_dist.copyTo(dist.data(), mesh->Nlocal);
+
+  // distance from wall is 1-r
+  dfloat maxRelErr = 0.0;
+  std::vector<dfloat> refVal(mesh->Nlocal, 0.0);
+  for(int n = 0; n < mesh->Nlocal; ++n){
+    const auto x = mesh->x[n];
+    const auto y = mesh->y[n];
+    const auto z = mesh->z[n];
+    const auto r = std::sqrt(x*x + y*y + z*z);
+
+    const auto ref = std::abs(1. - r);
+    refVal[n] = ref;
+  }
+
+  auto o_refVal = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+  o_refVal.copyFrom(refVal.data(), mesh->Nlocal);
+
+  platform->linAlg->axpby(mesh->Nlocal, 1.0, o_refVal, -1.0, o_dist);
+  platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_dist);
+  platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_refVal);
+  auto intErr = platform->linAlg->sum(mesh->Nlocal, o_dist, platform->comm.mpiComm);
+  auto intRef = platform->linAlg->sum(mesh->Nlocal, o_refVal, platform->comm.mpiComm);
+  auto relErr = std::abs(intErr / intRef);
+  const auto relTol = 2e-2;
+  if(relErr > relTol){
+    if(platform->comm.mpiRank == 0){
+      std::cout << "ciTestDistance: relative error " << relErr << " is too large!\n";
+    }
+    CIFAIL;
+  }
+
+  if (platform->exitValue) {
+    nrsFinalize(nrs);
+    exit(platform->exitValue);
+  }
+
+
+}
+
 dfloat sum(dfloat const *const array, const int size, MPI_Comm comm)
 {
   dfloat sumr = 0.0;
@@ -958,6 +1010,9 @@ void ciTestErrors(nrs_t *nrs,
   }
 
   if (ciMode == 15) {
+
+    ciTestDistance(nrs);
+    
     ciTestLVector(nrs, time, exactUVWPKernel);
 
     ciTestPointInterpolation(nrs, time, exactUVWPKernel);

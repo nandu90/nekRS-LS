@@ -173,6 +173,10 @@ static void loadKernels(mesh_t *mesh)
   mesh->surfaceGeometricFactorsKernel = platform->kernels.get(meshPrefix + "surfaceGeometricFactorsHex3D" + orderSuffix);
   mesh->cubatureGeometricFactorsKernel = platform->kernels.get(meshPrefix + "cubatureGeometricFactorsHex3D" + orderSuffix);
 
+  mesh->setBIDKernel = platform->kernels.get(meshPrefix + "setBIDHex3D" + orderSuffix);
+  mesh->distanceKernel = platform->kernels.get(meshPrefix + "distanceHex3D" + orderSuffix);
+  mesh->hlongSumKernel = platform->kernels.get("hlong-" + meshPrefix + "sum" + orderSuffix);
+
   mesh->velocityDirichletKernel = platform->kernels.get(meshPrefix + "velocityDirichletBCHex3D");
   mesh->nStagesSumVectorKernel = platform->kernels.get(meshPrefix + "nStagesSumVector");
 }
