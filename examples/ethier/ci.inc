@@ -125,7 +125,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("SCALAR00 SOLVER", "PCG+COMBINED");
   options.setArgs("SCALAR01 SOLVER", "PCG");
 
-  if (ciMode == 2) {
+  if (ciMode == 2 || ciMode == 19) {
     options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
     options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
@@ -1089,6 +1089,14 @@ void ciTestErrors(nrs_t *nrs,
     s1Err = abs((err[2] - 6.67E-12) / err[2]);
     s2Err = abs((err[3] - 7.49E-12) / err[3]);
     pIterErr = abs(NiterP - 4);
+    vxErr = abs((err[0] - 2.77E-10) / err[0]);
+    prErr = abs((err[1] - 6.98E-10) / err[1]);
+    break;
+  case 19: // same as 2, 11, but solves converge in a single step
+    velIterErr = abs(NiterU - 1);
+    s1Err = abs((err[2] - 6.67E-12) / err[2]);
+    s2Err = abs((err[3] - 7.49E-12) / err[3]);
+    pIterErr = abs(NiterP - 1);
     vxErr = abs((err[0] - 2.77E-10) / err[0]);
     prErr = abs((err[1] - 6.98E-10) / err[1]);
     break;
