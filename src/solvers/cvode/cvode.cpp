@@ -1287,16 +1287,23 @@ void cvode_t::solve(double t0, double t1, int tstep)
   timerScope = timerName + "solve";
 
   // update solver statistics from previous state
-  auto setPreviousCounters = [&]() {
-    int retval = 0;
-    retval = CVodeGetNumSteps(cvodeMem, &prevNsteps);
-    check_retval(&retval, "CVodeGetNumSteps", 1);
-    retval = CVodeGetNumRhsEvals(cvodeMem, &prevNrhs);
-    check_retval(&retval, "CVodeGetNumRhsEvals", 1);
-    retval = CVodeGetNumNonlinSolvIters(cvodeMem, &prevNni);
-    check_retval(&retval, "CVodeGetNumNonlinSolvIters", 1);
-    retval = CVodeGetNumLinIters(cvodeMem, &prevNli);
-    check_retval(&retval, "CVodeGetNumLinIters", 1);
+  auto setPreviousCounters = [&](bool reset = false) {
+    if (reset) {
+      prevNsteps = 0;
+      prevNrhs = 0;
+      prevNni = 0; 
+      prevNli = 0;
+    } else {
+      int retval = 0;
+      retval = CVodeGetNumSteps(cvodeMem, &prevNsteps);
+      check_retval(&retval, "CVodeGetNumSteps", 1);
+      retval = CVodeGetNumRhsEvals(cvodeMem, &prevNrhs);
+      check_retval(&retval, "CVodeGetNumRhsEvals", 1);
+      retval = CVodeGetNumNonlinSolvIters(cvodeMem, &prevNni);
+      check_retval(&retval, "CVodeGetNumNonlinSolvIters", 1);
+      retval = CVodeGetNumLinIters(cvodeMem, &prevNli);
+      check_retval(&retval, "CVodeGetNumLinIters", 1);
+    }
   };
 
   mesh_t *mesh = nrs->meshV;
@@ -1378,7 +1385,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
       check_retval(&retval, "CVodeReInit", 1);
 
       this->tprev = std::numeric_limits<double>::max();
-      setPreviousCounters();
+      setPreviousCounters(true);
       retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
       updateCounters();
 
