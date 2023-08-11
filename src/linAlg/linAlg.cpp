@@ -1044,7 +1044,10 @@ void linAlg_t::weightedInnerProdMulti(const dlong N,
     o_w.copyTo(&w, N);
     o_x.copyTo(&x, N);
     o_y.copyTo(&y, N);
-    result[0] = w * x * y;
+    if (weight)
+      result[0] = w * x * y;
+    else
+      result[0] = x * y;
   }
 
   if (_comm != MPI_COMM_SELF) {

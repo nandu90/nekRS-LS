@@ -855,6 +855,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
     dtCvode[1] = nrs->dt[1];
     dtCvode[2] = nrs->dt[2];
 
+    // evaluate external variables at integrator time using extrapolation
     const int bdfOrder = std::min(this->externalTStep, nrs->nBDF);
     const int extOrder = std::min(this->externalTStep, nrs->nEXT);
     nek::extCoeff(_coeffEXT.data(), dtCvode.data(), extOrder, bdfOrder);
