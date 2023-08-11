@@ -472,8 +472,9 @@ int ellipticType(int bid, std::string field)
       const int bcID = bToBc.at({field, bid - 1});
 
       bcType = NEUMANN;
-      if (bcID == bcTypeS)
+      if (bcID == bcTypeS || bcID == bcTypeINTS) {
         bcType = DIRICHLET;
+      }
       if (bcID == bcTypeNone)
         bcType = NO_OP;
     }

@@ -4,7 +4,7 @@
 
 void fixCoupledSurfaceFlux(nrs_t *nrs, occa::memory o_U)
 {
-  if (nrs->neknek == nullptr) {
+  if (nrs->neknek == nullptr || !nrs->flow) {
     return;
   }
 
