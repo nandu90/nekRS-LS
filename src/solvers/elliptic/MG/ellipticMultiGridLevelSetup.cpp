@@ -305,7 +305,7 @@ dfloat pMGLevel::maxEigSmoothAx()
   const auto k = (unsigned int) std::min(pMGLevel::Narnoldi, Nglobal);
 
   std::vector<double> H(k*k, 0.0);
-  auto Vx = randomVector<dfloat>(M);
+  auto Vx = randomVector<dfloat>(M, 0.0, 1.0, true); // deterministic random numbers
 
   std::vector<occa::memory> o_V(k+1);
   for(int i = 0; i <= k; i++) {
