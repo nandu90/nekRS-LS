@@ -867,10 +867,12 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
       _coeffBDF[i - 1] = 0.0;
     }
 
-    if (nrs->pSolver->allNeumann && platform->options.compareArgs("LOWMACH", "TRUE")) {
-      nrs->p0the = 0.0;
-      for (int ext = 0; ext < extOrder; ++ext) {
-        nrs->p0the += _coeffEXT[ext] * nrs->p0th[ext];
+    if (nrs->pSolver) {
+      if (nrs->pSolver->allNeumann && platform->options.compareArgs("LOWMACH", "TRUE")) {
+        nrs->p0the = 0.0;
+        for (int ext = 0; ext < extOrder; ++ext) {
+          nrs->p0the += _coeffEXT[ext] * nrs->p0th[ext];
+        }
       }
     }
 
@@ -1033,30 +1035,32 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   }
 
   // add dpdt term to temperature eqn
-  if (platform->options.compareArgs("LOWMACH", "TRUE") && nrs->pSolver->allNeumann) {
-    if (detailedTimersEnabled) {
-      platform->timer.tic(timerScope + "::dp0thdt", 0);
-    }
-
-    // evaluate dp0thdt (evaluate together with divergence)
-    if (!(isJacobianEvaluation() && recycleProperties)) {
+  if (nrs->pSolver) {
+    if (platform->options.compareArgs("LOWMACH", "TRUE") && nrs->pSolver->allNeumann) {
       if (detailedTimersEnabled) {
-        platform->timer.tic(timerScope + "::dp0thdt::udfDiv", 0);
+        platform->timer.tic(timerScope + "::dp0thdt", 0);
       }
-      cds->cvode->setTimerScope(timerScope + "::dp0thdt::udfDiv");
-
-      platform->linAlg->fill(mesh->Nlocal, 0.0, nrs->o_div);
-      udf.div(nrs, time, nrs->o_div);
-
-      cds->cvode->setTimerScope(timerScope);
-      if (detailedTimersEnabled)
-        platform->timer.toc(timerScope + "::dp0thdt::udfDiv");
-    }
-
-    platform->linAlg->axpby(mesh->Nlocal, nrs->dp0thdt * nrs->alpha0Ref, o_invRhoCpAvg, 1.0, cds->o_FS); 
-
-    if (detailedTimersEnabled) {
-      platform->timer.toc(timerScope + "::dp0thdt");
+ 
+      // evaluate dp0thdt (evaluate together with divergence)
+      if (!(isJacobianEvaluation() && recycleProperties)) {
+        if (detailedTimersEnabled) {
+          platform->timer.tic(timerScope + "::dp0thdt::udfDiv", 0);
+        }
+        cds->cvode->setTimerScope(timerScope + "::dp0thdt::udfDiv");
+ 
+        platform->linAlg->fill(mesh->Nlocal, 0.0, nrs->o_div);
+        udf.div(nrs, time, nrs->o_div);
+ 
+        cds->cvode->setTimerScope(timerScope);
+        if (detailedTimersEnabled)
+          platform->timer.toc(timerScope + "::dp0thdt::udfDiv");
+      }
+ 
+      platform->linAlg->axpby(mesh->Nlocal, nrs->dp0thdt * nrs->alpha0Ref, o_invRhoCpAvg, 1.0, cds->o_FS); 
+ 
+      if (detailedTimersEnabled) {
+        platform->timer.toc(timerScope + "::dp0thdt");
+      }
     }
   }
 
