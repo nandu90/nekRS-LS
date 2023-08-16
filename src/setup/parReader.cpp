@@ -204,6 +204,7 @@ static std::vector<std::string> cvodeKeys = {
     {"epslin"},
     {"gstype"},
     {"sigscale"},
+    {"maxSteps"},
     {"jtvrecycleproperties"},
     {"sharedrho"},
     {"dealiasing"},
