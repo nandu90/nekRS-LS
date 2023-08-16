@@ -1186,6 +1186,7 @@ void cvode_t::makeq(double time)
                          scalarStart,
                          time,
                          nrs->fieldOffset,
+                         nrs->fieldOffset,
                          cds->EToBOffset,
                          mesh->o_x,
                          mesh->o_y,
