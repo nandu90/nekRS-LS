@@ -145,23 +145,20 @@ cvode_t::cvode_t(nrs_t *_nrs)
     meshes.push_back(cds->mesh[is]);
   }
 
-  YLVec = std::make_shared<LVec>(meshes, false);
-  YdotLVec = std::make_shared<LVec>(meshes, false);
+  YLVec = std::make_shared<LVector_t<dfloat>>(meshes, false);
+  YdotLVec = std::make_shared<LVector_t<dfloat>>(meshes, false);
 
+  std::vector<dlong> lengths_(this->Nscalar, 0);
   this->nEq = 0;
   for(int is = 0; is < Nscalar; ++is){
-    this->nEq += YLVec->Nlocal(is);
-  }
-  
-  // use compact storage for L-vector layout
-  std::vector<dlong> offsets_(this->Nscalar, 0);
-  offsets_[0] = 0;
-  for(int is = 1; is < this->Nscalar; ++is){
-    offsets_[is] = offsets_[is-1] + YLVec->Nlocal(is-1);
+    const auto Nlocal = YLVec->Nlocal(is);
+    this->nEq += Nlocal;
+    lengths_[is] = Nlocal;
   }
 
-  YLVec->offsets(offsets_);
-  YdotLVec->offsets(offsets_);
+  // use compact L-vector layout for CVODE
+  YLVec->fieldOffsets(lengths_);
+  YdotLVec->fieldOffsets(lengths_);
 
   o_scalarIds = platform->device.malloc<dlong>(scalarIds.size(), scalarIds.data());
   o_cvodeScalarIds = platform->device.malloc<dlong>(cvodeScalarIds.size(), cvodeScalarIds.data());
@@ -838,6 +835,8 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
   auto *cds = nrs->cds;
 
+  o_invRhoCpAvg = platform->o_memPool.reserve<dfloat>(nrs->cds->fieldOffset[0]);
+
   if (time != tprev) {
 
     if (detailedTimersEnabled) {
@@ -984,10 +983,8 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
   if (userLocalPointSource) {
     platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::localPointSource", 0);
-    // o_ydot is used as scratch space to store the L-vector source term
     userLocalPointSource(nrs, o_y, o_ydot);
     platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::localPointSource");
-
     cvToNrs(o_ydot, this->o_pointSource, true);
   }
 
@@ -1078,6 +1075,8 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   }
 
   nrsToCv(cds->o_FS, o_ydot, true);
+
+  o_invRhoCpAvg.free();
 }
 
 void cvode_t::makeq(double time)
@@ -1369,8 +1368,6 @@ void cvode_t::solve(double t0, double t1, int tstep)
     platform->timer.tic(timerScope, 0);
   }
 
-  o_invRhoCpAvg = platform->o_memPool.reserve<dfloat>(nrs->cds->fieldOffset[0]);
-
   // call cvode solver
   if(platform->verbose && platform->comm.mpiRank == 0)
     std::cout << "calling cvode ...\n";
@@ -1403,8 +1400,6 @@ void cvode_t::solve(double t0, double t1, int tstep)
   }
   if(platform->verbose && platform->comm.mpiRank == 0)
     std::cout << "done\n"; 
-
-  o_invRhoCpAvg.free();
 
   nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "CVODE failed after restart\n");
 

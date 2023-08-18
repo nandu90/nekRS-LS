@@ -20,9 +20,6 @@ class nrs_t;
 
 class cvode_t {
 public:
-  
-  using LVec = LVector_t<dfloat>;
-
 #ifdef ENABLE_CVODE
   static constexpr bool enabled = true;
 #else
@@ -93,19 +90,14 @@ public:
   occa::memory o_pointSource; // scratch field for point source
   occa::memory o_vgeoPfloat;
 
-  // L-vector specific accessors
-  const auto & meshes() const { return YLVec->meshes(); }
-  const auto & offsets() const { return YLVec->offsets(); }
-  auto getLocalPointSource() { return userLocalPointSource; }
-
 private:
   long int nsteps;
   long int nrhs;
   long int nni;
   long int nli;
-  
-  std::shared_ptr<LVec> YLVec;
-  std::shared_ptr<LVec> YdotLVec;
+
+  std::shared_ptr<LVector_t<dfloat>> YLVec;
+  std::shared_ptr<LVector_t<dfloat>> YdotLVec;
 
   oogs_t *gsh;
 
