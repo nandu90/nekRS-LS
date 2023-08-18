@@ -1122,16 +1122,16 @@ void cvode_t::makeq(double time)
     flops *= Nscalar;
     platform->flopCounter->add("scalarFilterRT", flops);
 
-    int applyLMM = 1;
-    if (chtPass) {
-      applyLMM = 0;
-    }
-
     if (detailedTimersEnabled) {
       platform->timer.tic(timerScope + "::advection", 0);
     }
 
     if (platform->options.compareArgs("ADVECTION", "TRUE")) {
+      int applyLMM = 1;
+      if (chtPass) {
+        applyLMM = 0;
+      }
+
       if (platform->options.compareArgs("CVODE ADVECTION TYPE", "CUBATURE")) {
         cds->strongAdvectionCubatureVolumeKernel(cds->meshV->Nelements,
                                                  Nscalar,
@@ -1210,7 +1210,6 @@ void cvode_t::makeq(double time)
 
     weakLaplacianKernel(mesh->Nelements,
                         Nscalar,
-                        cds->o_cvodeSolve + scalarStart,
                         cds->o_fieldOffsetScan + scalarStart,
                         mesh->o_ggeo,
                         mesh->o_invLMM,

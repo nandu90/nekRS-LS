@@ -528,7 +528,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   }
 
   options.setArgs("CVODE GMRES BASIS VECTORS", "10");
-  options.setArgs("CVODE SOLVER", "GMRES");
+  options.setArgs("CVODE SOLVER", "CBGMRES");
 
   // parse cvode linear solver
   [&]() {
