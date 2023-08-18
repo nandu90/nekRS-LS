@@ -723,14 +723,19 @@ dfloat tensor_ig3_j(@ restrict dfloat *g_partials,
   return uJtJs * Jr[j];
 }
 
-@kernel void findptsLocal(const dlong npt,
+@kernel void findptsLocal(const dlong multiSess,
+                          const dlong sessionId,
+                          const dlong sessionIdMatch,
+                          const dlong npt,
                           const dfloat tol,
                           @ restrict const dfloat *x,
                           @ restrict const dfloat *y,
                           @ restrict const dfloat *z,
+                          @ restrict const dlong *sess,
                           @ restrict const dfloat *xElemCoord,
                           @ restrict const dfloat *yElemCoord,
                           @ restrict const dfloat *zElemCoord,
+                          @ restrict const dfloat *distfint,
                           @ restrict dfloat *wtend_x,
                           @ restrict dfloat *wtend_y,
                           @ restrict dfloat *wtend_z,
@@ -744,8 +749,10 @@ dfloat tensor_ig3_j(@ restrict dfloat *g_partials,
                           @ restrict dlong *hashOffset,
                           dlong *const code_base,
                           @ restrict dlong *const el_base,
+                          @ restrict dlong *const elsid_base,
                           @ restrict dfloat *const r_base,
-                          @ restrict dfloat *const dist2_base)
+                          @ restrict dfloat *const dist2_base,
+                          @ restrict dfloat *const disti_base)
 {
 #define MAX_CONST(a, b) (((a) > (b)) ? (a) : (b))
 #define p_innerSize 32
@@ -773,8 +780,10 @@ dfloat tensor_ig3_j(@ restrict dfloat *g_partials,
 
     dlong *code_i = code_base + i;
     dlong *el_i = el_base + i;
+    dlong *elsid_i = elsid_base + i;
     dfloat *r_i = r_base + 3 * i;
     dfloat *dist2_i = dist2_base + i;
+    dfloat *disti_i = disti_base + i;
 
     //// map_points_to_els ////
     findptsLocalHashData_t hash;
@@ -1314,6 +1323,48 @@ dfloat tensor_ig3_j(@ restrict dfloat *g_partials,
             }
           }
 
+          @barrier();
+ 
+          //// findpts_el_eval ////
+          if(multiSess){
+            dfloat * wtr = r_workspace_ptr + 0 * p_Nq;
+            dfloat * wts = r_workspace_ptr + 1 * p_Nq;
+            dfloat * wtt = r_workspace_ptr + 2 * p_Nq;
+            dfloat * sums = r_workspace_ptr + 3 * p_Nq;
+            dfloat * distrsti = r_workspace_ptr + 4 * p_Nq;
+            for (dlong j = 0; j < p_innerSize; ++j; @inner) {
+              if(j < p_Nq){
+                lagrange_eval(wtr, fpt->r[0], j);
+                lagrange_eval(wts, fpt->r[1], j);
+                lagrange_eval(wtt, fpt->r[2], j);
+              }
+            }
+            @barrier();
+            
+            for (dlong j = 0; j < p_innerSize; ++j; @inner) {
+              dfloat sum_j = 0;
+              for (dlong k = 0; k < p_Nq; ++k) {
+                dfloat sum_k = 0;
+
+                for (dlong l = 0; l < p_Nq; ++l) {
+                  sum_k += distfint[el * p_Np + j + k * p_Nq + l * p_Nq * p_Nq] * wtt[l];
+                }
+                sum_j += wts[k] * sum_k;
+              }
+              sums[j] = wtr[j] * sum_j;
+            }
+            @barrier();
+            for (dlong j = 0; j < p_innerSize; ++j; @inner) {
+              if(j == 0){
+                *distrsti = 0.0;
+                for(int k = 0; k < p_Nq; ++k){
+                  *distrsti += sums[k];
+                }
+              }
+            }
+            @barrier();
+          }
+
           bool converged_internal = (fpt->flags & FLAG_MASK) == CONVERGED_FLAG;
           if (*code_i == CODE_NOT_FOUND || converged_internal || fpt->dist2 < *dist2_i) {
             for (dlong j = 0; j < p_innerSize; ++j; @inner) {
@@ -1321,6 +1372,12 @@ dfloat tensor_ig3_j(@ restrict dfloat *g_partials,
                 *el_i = el;
                 *code_i = converged_internal ? CODE_INTERNAL : CODE_BORDER;
                 *dist2_i = fpt->dist2;
+                if(multiSess){
+                  // from findpts_el_eval above
+                  dfloat * distrsti = r_workspace_ptr + 4 * p_Nq;
+                  *disti_i = *distrsti;
+                  *elsid_i = sessionId;
+                }
               }
               if (j < 3)
                 r_i[j] = fpt->r[j];

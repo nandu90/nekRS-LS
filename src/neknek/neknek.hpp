@@ -38,6 +38,7 @@ public:
   occa::memory o_x;
   occa::memory o_y;
   occa::memory o_z;
+  occa::memory o_session;
 
   // metrics for printing
   dfloat tSync;

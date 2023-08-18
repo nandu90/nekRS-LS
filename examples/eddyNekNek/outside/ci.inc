@@ -76,7 +76,7 @@ void ciTestPointInterp(nrs_t *nrs, double time, int tstep)
   exactUVW(n, n, time, o_xinterp, o_yinterp, o_zinterp, o_UouterExact);
 
   auto interp = pointInterpolation_t(nrs);
-  interp.setPoints(n, x.data(), y.data(), z.data());
+  interp.setPoints(n, o_xinterp, o_yinterp, o_zinterp);
   interp.find(pointInterpolation_t::VerbosityLevel::Detailed);
   interp.eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, n, o_Uouter);
 
@@ -119,16 +119,87 @@ void ciTestPointInterp(nrs_t *nrs, double time, int tstep)
   }
 }
 
+void vizNekNekField(nrs_t* nrs)
+{
+  auto mesh = nrs->meshV;
+  auto neknek = nrs->neknek;
+
+  occa::memory o_null;
+  
+  std::vector<dfloat> Uviz(nrs->NVfields * nrs->fieldOffset, 0.0);
+  std::vector<dfloat> neknekU(nrs->NVfields * neknek->fieldOffset, 0.0);
+  std::fill(Uviz.begin(), Uviz.end(), 0.0);
+  std::fill(neknekU.begin(), neknekU.end(), 0.0);
+  neknek->o_U.copyTo(neknekU.data(), nrs->NVfields * neknek->fieldOffset);
+
+  for(int n = 0; n < mesh->Nlocal; ++n){
+    auto ip = neknek->pointMap[n];
+    if(ip != -1){
+      for(int fld = 0; fld < nrs->NVfields; ++fld){
+        Uviz[fld * nrs->fieldOffset + n] = neknekU[fld * neknek->fieldOffset + ip];
+      }
+    } else {
+      // not a neknek point, set to 0
+      for(int fld = 0; fld < nrs->NVfields; ++fld){
+        Uviz[fld * nrs->fieldOffset + n] = 0.0;
+      }
+
+    }
+  }
+  
+  auto o_Uviz = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset, Uviz.data());
+  writeFld("viz", 0.0, 0, 1, 1, o_Uviz, o_null, o_null, 0);
+}
+
+void ciTestInitialStep(nrs_t* nrs, double time, int tstep)
+{
+  auto mesh = nrs->meshV;
+  auto neknek = nrs->neknek;
+  exactUVW(mesh->Nlocal, nrs->fieldOffset, time, mesh->o_x, mesh->o_y, mesh->o_z, nrs->o_U);
+
+  platform->linAlg->fill(nrs->NVfields*neknek->fieldOffset, 0.0, neknek->o_U);
+  neknek->updateBoundary(nrs, tstep, 2); // pass in stage == 2 to prevent lagging
+
+  auto o_Uexp = platform->o_memPool.reserve<dfloat>(nrs->NVfields * neknek->fieldOffset);
+  auto npt = neknek->npt;
+  exactUVW(npt, neknek->fieldOffset, time, neknek->o_x, neknek->o_y, neknek->o_z, o_Uexp);
+
+  // compare errors
+  platform->linAlg->axpbyMany(npt, nrs->NVfields, neknek->fieldOffset, 1.0, neknek->o_U, -1.0, o_Uexp);
+  platform->linAlg->aydxMany(npt, nrs->NVfields, neknek->fieldOffset, 1, 1.0, neknek->o_U, o_Uexp);
+  platform->linAlg->abs(nrs->NVfields * neknek->fieldOffset, o_Uexp);
+  auto maxRelErr = platform->linAlg->max(nrs->NVfields * neknek->fieldOffset, o_Uexp, platform->comm.mpiComm);
+  auto maxRelErrGlob = platform->linAlg->max(nrs->NVfields * neknek->fieldOffset, o_Uexp, platform->comm.mpiCommParent);
+  if(platform->comm.mpiRank == 0){
+    std::cout << "NekNek interpolation errors:\n";
+    std::cout << "  maxRelErr = " << maxRelErr << "\n";
+    std::cout << "  maxRelErrGlob = " << maxRelErrGlob << "\n";
+  }
+
+  const auto tol = 1e-5;
+  bool passed = (maxRelErrGlob < tol);
+
+  if(!passed){
+    vizNekNekField(nrs);
+    CIFAIL;
+    nrsFinalize(nrs);
+    exit(platform->exitValue);
+  }
+}
+
 void ciTestErrors(nrs_t *nrs, double time, int tstep)
 {
+  if(tstep == 0){
+    ciTestInitialStep(nrs, time, tstep);
+    ciTestPointInterp(nrs, time, tstep);
+  }
+
   const int rank = platform->comm.mpiRank;
   
   if (!nrs->lastStep) {
     return;
   }
   
-  ciTestPointInterp(nrs, time, tstep);
-
   auto *mesh = nrs->meshV;
 
   auto o_Uexact = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);

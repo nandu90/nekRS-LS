@@ -85,16 +85,8 @@ void updateInterpPoints(nrs_t *nrs)
 
   auto &device = platform->device.occaDevice();
 
-  // TODO: possible to cache this in moving mesh case?
-  std::vector<std::shared_ptr<pointInterpolation_t>> sessionInterpolators(nsessions);
-  for (dlong i = 0; i < nsessions; ++i) {
-    sessionInterpolators[i] = std::make_shared<pointInterpolation_t>(nrs, bb_tol, tol, i == sessionID);
-    sessionInterpolators[i]->setTimerLevel(TimerLevel::Basic);
-    sessionInterpolators[i]->setTimerName("neknek_t::");
-  }
-
   neknek->interpolator.reset();
-  neknek->interpolator = std::make_shared<pointInterpolation_t>(nrs, bb_tol, tol);
+  neknek->interpolator = std::make_shared<pointInterpolation_t>(nrs, bb_tol, tol, true, sessionID, true);
   neknek->interpolator->setTimerLevel(TimerLevel::Basic);
   neknek->interpolator->setTimerName("neknek_t::");
 
@@ -108,40 +100,10 @@ void updateInterpPoints(nrs_t *nrs)
                                  neknek->o_y,
                                  neknek->o_z);
 
-  // add points (use GPU version)
-  for (dlong sess = 0; sess < nsessions; ++sess) {
-    const auto nPoint = (sess == sessionID) ? 0 : neknek->npt;
-    sessionInterpolators[sess]->setPoints(nPoint, neknek->o_x, neknek->o_y, neknek->o_z);
-  }
-
-  neknek->interpolator->setPoints(neknek->npt, neknek->o_x, neknek->o_y, neknek->o_z);
+  neknek->interpolator->setPoints(neknek->npt, neknek->o_x, neknek->o_y, neknek->o_z, neknek->o_session);
 
   const auto verboseLevel = pointInterpolation_t::VerbosityLevel::Detailed;
-  for (dlong sess = 0; sess < nsessions; ++sess) {
-    sessionInterpolators[sess]->find(verboseLevel);
-  }
-
-  auto &sessionData = neknek->interpolator->data();
-
-  // TODO: possible to move to GPU?
-  // copy results from other session into the point interpolator
-  for (dlong sess = 0; sess < nsessions; ++sess) {
-    auto data = sessionInterpolators[sess]->data();
-    const auto nPoint = (sess == sessionID) ? 0 : neknek->npt;
-    for (dlong pt = 0; pt < nPoint; ++pt) {
-      sessionData.code[pt] = data.code[pt];
-      sessionData.proc[pt] = data.proc[pt];
-      sessionData.el[pt] = data.el[pt];
-
-      sessionData.r[3 * pt + 0] = data.r[3 * pt + 0];
-      sessionData.r[3 * pt + 1] = data.r[3 * pt + 1];
-      sessionData.r[3 * pt + 2] = data.r[3 * pt + 2];
-
-      sessionData.dist2[pt] = data.dist2[pt];
-    }
-  }
-
-  neknek->interpolator->o_update();
+  neknek->interpolator->find(verboseLevel);
 }
 
 dlong computeNumInterpPoints(nrs_t *nrs)
@@ -178,16 +140,8 @@ void findIntPoints(nrs_t *nrs)
 
   auto &device = platform->device.occaDevice();
 
-  // TODO: possible to cache this in moving mesh case?
-  std::vector<std::shared_ptr<pointInterpolation_t>> sessionInterpolators(nsessions);
-  for (dlong i = 0; i < nsessions; ++i) {
-    sessionInterpolators[i] = std::make_shared<pointInterpolation_t>(nrs, bb_tol, tol, i == sessionID);
-    sessionInterpolators[i]->setTimerLevel(TimerLevel::Basic);
-    sessionInterpolators[i]->setTimerName("neknek_t::");
-  }
-
   neknek->interpolator.reset();
-  neknek->interpolator = std::make_shared<pointInterpolation_t>(nrs, bb_tol, tol);
+  neknek->interpolator = std::make_shared<pointInterpolation_t>(nrs, bb_tol, tol, true, sessionID, true);
   neknek->interpolator->setTimerLevel(TimerLevel::Basic);
   neknek->interpolator->setTimerName("neknek_t::");
 
@@ -197,6 +151,7 @@ void findIntPoints(nrs_t *nrs)
   std::vector<dfloat> neknekX(numPoints, 0.0);
   std::vector<dfloat> neknekY(numPoints, 0.0);
   std::vector<dfloat> neknekZ(numPoints, 0.0);
+  std::vector<dlong> session(numPoints, 0.0);
 
   auto fields = neknekSolveFields();
 
@@ -218,6 +173,7 @@ void findIntPoints(nrs_t *nrs)
             neknekX[ip] = mesh->x[idM];
             neknekY[ip] = mesh->y[idM];
             neknekZ[ip] = mesh->z[idM];
+            session[ip] = sessionID;
 
             neknek->pointMap[idM] = ip;
             ++ip;
@@ -230,45 +186,15 @@ void findIntPoints(nrs_t *nrs)
   neknek->pointMap[nrs->fieldOffset] = neknek->fieldOffset;
   neknek->o_pointMap.copyFrom(neknek->pointMap.data());
 
-  // add points
-  for (dlong sess = 0; sess < nsessions; ++sess) {
-    const auto nPoint = (sess == sessionID) ? 0 : numPoints;
-    sessionInterpolators[sess]->setPoints(nPoint, neknekX.data(), neknekY.data(), neknekZ.data());
-  }
-
-  neknek->interpolator->setPoints(numPoints, neknekX.data(), neknekY.data(), neknekZ.data());
+  neknek->interpolator->setPoints(numPoints, neknekX.data(), neknekY.data(), neknekZ.data(), session.data());
 
   const auto verboseLevel = pointInterpolation_t::VerbosityLevel::Detailed;
-  for (dlong sess = 0; sess < nsessions; ++sess) {
-    sessionInterpolators[sess]->find(verboseLevel);
-  }
+  neknek->interpolator->find(verboseLevel);
 
-  auto &sessionData = neknek->interpolator->data();
-
-  // copy results from other session into the point interpolator
-  for (dlong sess = 0; sess < nsessions; ++sess) {
-    auto data = sessionInterpolators[sess]->data();
-    const auto nPoint = (sess == sessionID) ? 0 : numPoints;
-    for (dlong pt = 0; pt < nPoint; ++pt) {
-      sessionData.code[pt] = data.code[pt];
-      sessionData.proc[pt] = data.proc[pt];
-      sessionData.el[pt] = data.el[pt];
-
-      sessionData.r[3 * pt + 0] = data.r[3 * pt + 0];
-      sessionData.r[3 * pt + 1] = data.r[3 * pt + 1];
-      sessionData.r[3 * pt + 2] = data.r[3 * pt + 2];
-
-      sessionData.dist2[pt] = data.dist2[pt];
-    }
-  }
-  neknek->interpolator->o_update();
-
-  // allocate device coordinates for later use
-  if (neknek->globalMovingMesh) {
-    neknek->o_x = platform->device.malloc<dfloat>(neknek->npt, neknekX.data());
-    neknek->o_y = platform->device.malloc<dfloat>(neknek->npt, neknekY.data());
-    neknek->o_z = platform->device.malloc<dfloat>(neknek->npt, neknekZ.data());
-  }
+  neknek->o_x = platform->device.malloc<dfloat>(neknek->npt, neknekX.data());
+  neknek->o_y = platform->device.malloc<dfloat>(neknek->npt, neknekY.data());
+  neknek->o_z = platform->device.malloc<dfloat>(neknek->npt, neknekZ.data());
+  neknek->o_session = platform->device.malloc<dlong>(neknek->npt, session.data());
 }
 
 void neknekSetup(nrs_t *nrs)
