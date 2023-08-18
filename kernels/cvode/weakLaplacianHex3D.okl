@@ -1,6 +1,5 @@
 @kernel void weakLaplacianHex3D(const dlong Nelements,
                                 const dlong Nscalars,
-                                @ restrict const dlong *computeScalar,
                                 @ restrict const dlong *fieldOffsetScan,
                                 @ restrict const dfloat *ggeo,
                                 @ restrict const dfloat *invLMM,
