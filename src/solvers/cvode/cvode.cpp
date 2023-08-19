@@ -1173,6 +1173,9 @@ void cvode_t::makeq(double time)
       }
 
       timeStepper::advectionFlops(cds->mesh[scalarStart], Nscalar);
+    } else {
+      auto o_FS_start = o_FS + cds->fieldOffsetScan[scalarStart];
+      platform->linAlg->axmyMany(mesh->Nlocal, Nscalar, nrs->fieldOffset, 0, 1.0, mesh->o_LMM, o_FS_start);
     }
 
     if (detailedTimersEnabled) {
