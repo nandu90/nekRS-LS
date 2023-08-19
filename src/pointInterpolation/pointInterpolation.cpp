@@ -83,7 +83,14 @@ pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_,
       }
     }
 
-    dist = mesh->minDistance(bID, "cheap_dist");
+    const auto nbID = bID.size();
+    auto o_bID = platform->o_memPool.reserve<dlong>(nbID);
+    o_bID.copyFrom(bID.data());
+
+    _o_distance = mesh->minDistance(nbID, o_bID, "cheap_dist");
+    dist.resize(mesh->Nlocal);
+    _o_distance.copyTo(dist.data(), mesh->Nlocal);
+    o_bID.free();
   }
 
   findpts_ = std::make_unique<findpts::findpts_t>(comm,
@@ -102,7 +109,17 @@ pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_,
                                                   dist.data());
 }
 
-void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity)
+occa::memory pointInterpolation_t::distance()
+{
+  nrsCheck(!multipleSessionSupport,
+           platform->comm.mpiComm,
+           EXIT_FAILURE,
+           "%s\n",
+           "distance requires multipleSessionSupport to be enabled in the pointInterpolation_t object!");
+  return _o_distance;
+}
+
+void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, bool matchSession)
 {
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic("pointInterpolation_t::find", 1);
@@ -114,11 +131,12 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity)
            "%s\n", "find called without any points added!");
 
   const auto n = nPoints;
+  const dlong sessionIDMatch = matchSession;
 
   if (useHostPoints) {
-    findpts_->find(&data_, _x, _y, _z, _session, 0, n);
+    findpts_->find(&data_, _x, _y, _z, _session, sessionIDMatch, n);
   } else {
-    findpts_->find(&data_, _o_x, _o_y, _o_z, _o_session, 0, n);
+    findpts_->find(&data_, _o_x, _o_y, _o_z, _o_session, sessionIDMatch, n);
   }
 
   if (verbosity != VerbosityLevel::None) {

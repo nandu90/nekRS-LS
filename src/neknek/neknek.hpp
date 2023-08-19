@@ -16,6 +16,10 @@ void fixCoupledSurfaceFlux(nrs_t *nrs, occa::memory o_U);
 class neknek_t {
 public:
   neknek_t(nrs_t *nrs, dlong _nsessions, dlong _sessionID);
+  void updateBoundary(nrs_t *nrs, int tstep, int stage);
+
+  occa::memory partitionOfUnity(nrs_t *nrs);
+
   dlong nsessions, sessionID;
 
   dlong Nscalar;
@@ -46,11 +50,14 @@ public:
   dfloat ratio;
 
   std::shared_ptr<pointInterpolation_t> interpolator;
-  void updateBoundary(nrs_t *nrs, int tstep, int stage);
 
   occa::kernel copyNekNekPointsKernel;
   occa::kernel computeFluxKernel;
   occa::kernel fixSurfaceFluxKernel;
+
+private:
+  bool recomputePartition = true;
+  occa::memory o_partition;
 };
 
 #endif

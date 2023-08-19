@@ -31,7 +31,7 @@ public:
   ~pointInterpolation_t() = default;
 
   // Finds the process, element, and reference coordinates of the given points
-  void find(VerbosityLevel verbosity = VerbosityLevel::Basic);
+  void find(VerbosityLevel verbosity = VerbosityLevel::Basic, bool matchSession = false);
 
   void
   eval(dlong nFields, dlong inputFieldOffset, const occa::memory& o_in, dlong outputFieldOffset, occa::memory& o_out);
@@ -66,6 +66,9 @@ public:
   // this is used to prefix the timer names
   void setTimerName(std::string name);
 
+  // for multi-session cases, query distance function to "int" bounds
+  occa::memory distance();
+
 private:
   nrs_t *nrs;
   double newton_tol;
@@ -96,6 +99,7 @@ private:
   occa::memory _o_y;
   occa::memory _o_z;
   occa::memory _o_session;
+  occa::memory _o_distance;
 
   // for storing host points to output when a particle leaves the domain
   std::vector<dfloat> h_x_vec;

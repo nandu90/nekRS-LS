@@ -1,5 +1,6 @@
 #include <cfloat>
 #include "bcMap.hpp"
+#include "findpts.hpp"
 #include "neknek.hpp"
 #include "nrs.hpp"
 #include "nekInterfaceAdapter.hpp"
@@ -322,6 +323,8 @@ void neknek_t::updateBoundary(nrs_t *nrs, int tstep, int stage)
     platform->timer.tic("neknek updateInterpPoints", 1);
     updateInterpPoints(nrs);
     platform->timer.toc("neknek updateInterpPoints");
+
+    this->recomputePartition = true;
   }
 
   platform->timer.tic("neknek exchange", 1);
@@ -386,4 +389,67 @@ void neknek_t::updateBoundary(nrs_t *nrs, int tstep, int stage)
   this->ratio = this->tSync / this->tExch;
 
   platform->timer.toc("neknek update boundary");
+}
+
+occa::memory neknek_t::partitionOfUnity(nrs_t *nrs)
+{
+  if (!o_partition.isInitialized()) {
+    o_partition = platform->device.malloc<dfloat>(nrs->fieldOffset);
+  }
+
+  if (!recomputePartition) {
+    return o_partition;
+  }
+  recomputePartition = false;
+
+  const dfloat tol = (sizeof(dfloat) == sizeof(double)) ? 5e-13 : 1e-6;
+  constexpr dlong npt_max = 1;
+  const dfloat bb_tol = 0.01;
+  auto pointInterp = pointInterpolation_t(nrs, bb_tol, tol, true, sessionID, true);
+  auto o_dist = pointInterp.distance();
+
+  auto mesh = nrs->meshV;
+
+  auto o_sess = platform->o_memPool.reserve<dlong>(nrs->fieldOffset);
+  auto o_sumDist = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+  auto o_found = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+  auto o_interpDist = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+  o_sumDist.copyFrom(o_dist, mesh->Nlocal);
+
+  std::vector<dfloat> found(mesh->Nlocal);
+  std::vector<dlong> sessions(mesh->Nlocal);
+
+  for (int sess = 0; sess < nsessions; ++sess) {
+    auto id = (sess + this->sessionID) % this->nsessions;
+    if (id == sessionID) {
+      continue;
+    }
+    std::fill(sessions.begin(), sessions.end(), id);
+    o_sess.copyFrom(sessions.data(), mesh->Nlocal);
+
+    pointInterp.setPoints(mesh->Nlocal, mesh->o_x, mesh->o_y, mesh->o_z, o_sess);
+    pointInterp.find(pointInterpolation_t::VerbosityLevel::None, true);
+
+    auto &data = pointInterp.data();
+    for (int n = 0; n < mesh->Nlocal; ++n) {
+      found[n] = (data.code[n] == findpts::CODE_NOT_FOUND) ? 0.0 : 1.0;
+    }
+
+    o_found.copyFrom(found.data());
+    pointInterp.eval(1, nrs->fieldOffset, o_dist, nrs->fieldOffset, o_interpDist);
+
+    platform->linAlg->axmy(mesh->Nlocal, 1.0, o_found, o_interpDist);
+    platform->linAlg->axpby(mesh->Nlocal, 1.0, o_interpDist, 1.0, o_sumDist);
+  }
+
+  // \Xi(x) = \dfrac{\delta^s(x)}{\sum_{i=1}^S \delta^s(x_i)}
+  o_partition.copyFrom(o_dist, mesh->Nlocal);
+  platform->linAlg->aydx(mesh->Nlocal, 1.0, o_sumDist, o_partition);
+
+  o_sess.free();
+  o_sumDist.free();
+  o_found.free();
+  o_interpDist.free();
+
+  return o_partition;
 }
