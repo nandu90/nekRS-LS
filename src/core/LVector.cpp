@@ -280,6 +280,10 @@ void LVector_t<FPType>::optr(occa::memory &o_L)
 // =======================================================================================================
 template <typename FPType> void LVector_t<FPType>::fieldOffsets(const std::vector<dlong> &fieldOffsets)
 {
+  if (this->nFields() == 0) {
+    return;
+  }
+
   // offsets size _must_ match the number of fields
   nrsCheck(fieldOffsets.size() != this->nFields(),
            platform->comm.mpiComm,
