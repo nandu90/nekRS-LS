@@ -386,7 +386,7 @@ bool runStep(nrs_t *nrs, std::function<bool(int)> convergenceCheck, int stage)
   const int isOutputStep = nrs->isOutputStep;
 
   if (nrs->neknek) {
-    nrs->neknek->updateBoundary(nrs, tstep, stage);
+    nrs->neknek->updateBoundary(tstep, stage);
   }
 
   if (nrs->cvode) {
@@ -850,7 +850,7 @@ void printInfo(nrs_t *nrs, double time, int tstep, bool printStepInfo, bool prin
       }
 
       if (nrs->neknek) {
-        printf("neknek   : sync %.2e  exchange %.2e\n", nrs->neknek->tSync, nrs->neknek->tExch);
+        printf("neknek   : sync %.2e  exchange %.2e\n", nrs->neknek->tSync(), nrs->neknek->tExch());
       }
 
       if (nrs->flow) {

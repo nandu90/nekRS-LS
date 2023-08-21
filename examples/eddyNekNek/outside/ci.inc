@@ -62,7 +62,7 @@ void ciTestPartitionOfUnity(nrs_t *nrs, double time, int tstep)
   const auto [minZ, maxZ] = minMaxFld(mesh->o_z);
   const auto expectedGlobalVolume = (maxX - minX) * (maxY - minY) * (maxZ - minZ);
 
-  const auto o_partition = nrs->neknek->partitionOfUnity(nrs);
+  const auto o_partition = nrs->neknek->partitionOfUnity();
   auto o_volume = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
 
   platform->linAlg->axmyz(mesh->Nlocal, 1.0, o_partition, mesh->o_LMM, o_volume);
@@ -171,17 +171,22 @@ void vizNekNekField(nrs_t *nrs)
 
   occa::memory o_null;
 
+  const auto neknekFieldOffset = neknek->fieldOffset();
+
   std::vector<dfloat> Uviz(nrs->NVfields * nrs->fieldOffset, 0.0);
-  std::vector<dfloat> neknekU(nrs->NVfields * neknek->fieldOffset, 0.0);
+  std::vector<dfloat> neknekU(nrs->NVfields * neknekFieldOffset, 0.0);
   std::fill(Uviz.begin(), Uviz.end(), 0.0);
   std::fill(neknekU.begin(), neknekU.end(), 0.0);
-  neknek->o_U.copyTo(neknekU.data(), nrs->NVfields * neknek->fieldOffset);
+  neknek->o_U().copyTo(neknekU.data(), nrs->NVfields * neknekFieldOffset);
+
+  std::vector<dlong> neknekPointMap(mesh->Nlocal, -1);
+  neknek->o_pointMap().copyTo(neknekPointMap.data(), mesh->Nlocal);
 
   for (int n = 0; n < mesh->Nlocal; ++n) {
-    auto ip = neknek->pointMap[n];
+    auto ip = neknekPointMap[n];
     if (ip != -1) {
       for (int fld = 0; fld < nrs->NVfields; ++fld) {
-        Uviz[fld * nrs->fieldOffset + n] = neknekU[fld * neknek->fieldOffset + ip];
+        Uviz[fld * nrs->fieldOffset + n] = neknekU[fld * neknekFieldOffset + ip];
       }
     } else {
       // not a neknek point, set to 0
@@ -199,22 +204,22 @@ void ciTestInitialStep(nrs_t *nrs, double time, int tstep)
 {
   auto mesh = nrs->meshV;
   auto neknek = nrs->neknek;
+  const auto neknekFieldOffset = neknek->fieldOffset();
   exactUVW(mesh->Nlocal, nrs->fieldOffset, time, mesh->o_x, mesh->o_y, mesh->o_z, nrs->o_U);
+  
+  neknek->updateBoundary(tstep, 2); // pass in stage == 2 to prevent lagging
 
-  platform->linAlg->fill(nrs->NVfields * neknek->fieldOffset, 0.0, neknek->o_U);
-  neknek->updateBoundary(nrs, tstep, 2); // pass in stage == 2 to prevent lagging
-
-  auto o_Uexp = platform->o_memPool.reserve<dfloat>(nrs->NVfields * neknek->fieldOffset);
-  auto npt = neknek->npt;
-  exactUVW(npt, neknek->fieldOffset, time, neknek->o_x, neknek->o_y, neknek->o_z, o_Uexp);
+  auto o_Uexp = platform->o_memPool.reserve<dfloat>(nrs->NVfields * neknekFieldOffset);
+  auto npt = neknek->npt();
+  exactUVW(npt, neknekFieldOffset, time, neknek->o_x(), neknek->o_y(), neknek->o_z(), o_Uexp);
 
   // compare errors
-  platform->linAlg->axpbyMany(npt, nrs->NVfields, neknek->fieldOffset, 1.0, neknek->o_U, -1.0, o_Uexp);
-  platform->linAlg->aydxMany(npt, nrs->NVfields, neknek->fieldOffset, 1, 1.0, neknek->o_U, o_Uexp);
-  platform->linAlg->abs(nrs->NVfields * neknek->fieldOffset, o_Uexp);
-  auto maxRelErr = platform->linAlg->max(nrs->NVfields * neknek->fieldOffset, o_Uexp, platform->comm.mpiComm);
+  platform->linAlg->axpbyMany(npt, nrs->NVfields, neknekFieldOffset, 1.0, neknek->o_U(), -1.0, o_Uexp);
+  platform->linAlg->aydxMany(npt, nrs->NVfields, neknekFieldOffset, 1, 1.0, neknek->o_U(), o_Uexp);
+  platform->linAlg->abs(nrs->NVfields * neknekFieldOffset, o_Uexp);
+  auto maxRelErr = platform->linAlg->max(nrs->NVfields * neknekFieldOffset, o_Uexp, platform->comm.mpiComm);
   auto maxRelErrGlob =
-      platform->linAlg->max(nrs->NVfields * neknek->fieldOffset, o_Uexp, platform->comm.mpiCommParent);
+      platform->linAlg->max(nrs->NVfields * neknekFieldOffset, o_Uexp, platform->comm.mpiCommParent);
   if (platform->comm.mpiRank == 0) {
     std::cout << "NekNek interpolation errors:\n";
     std::cout << "  maxRelErr = " << maxRelErr << "\n";

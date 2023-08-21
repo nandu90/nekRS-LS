@@ -203,7 +203,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 
 int timeStepConverged(nrs_t *nrs, int stage)
 {
-  if (nrs->neknek->nEXT == 1) {
+  if (nrs->neknek->nEXT() == 1) {
     return 1;
   }
 

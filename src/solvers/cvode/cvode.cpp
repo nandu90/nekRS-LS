@@ -708,6 +708,7 @@ void cvode_t::applyDirichlet(double time)
   cds_t *cds = nrs->cds;
 
   auto o_S_start = platform->o_memPool.reserve<dfloat>(cds->fieldOffsetSum);
+  const auto neknekFieldOffset = cds->neknek ? cds->neknek->fieldOffset() : 0;
 
   for (int is = 0; is < cds->NSfields; is++) {
     if (!cds->compute[is]) {
@@ -747,9 +748,10 @@ void cvode_t::applyDirichlet(double time)
                              cds->o_U,
                              o_diff_i,
                              o_rho_i,
-                             cds->neknek ? cds->neknek->o_pointMap : o_NULL,
-                             cds->neknek ? cds->neknek->o_U : o_NULL,
-                             cds->neknek ? cds->neknek->o_S : o_NULL,
+                             neknekFieldOffset,
+                             cds->neknek ? cds->neknek->o_pointMap() : o_NULL,
+                             cds->neknek ? cds->neknek->o_U() : o_NULL,
+                             cds->neknek ? cds->neknek->o_S() : o_NULL,
                              *(cds->o_usrwrk),
                              o_Si);
       if (sweep == 0) {
