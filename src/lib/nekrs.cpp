@@ -24,17 +24,22 @@ namespace fs = std::filesystem;
 // extern variable from nrssys.hpp
 platform_t *platform;
 
+namespace {
+
 static nrs_t *nrs;
 static setupAide options;
 
 static int rank, size;
 static MPI_Comm commg, comm;
 
+static double currDt;
 static double lastOutputTime = 0;
 static int firstOutfld = 1;
 static int enforceLastStep = 0;
 static int enforceOutputStep = 0;
 static bool initialized = false;
+
+}
 
 namespace nekrs {
 
@@ -494,7 +499,11 @@ void resetTimer(const std::string &key) { platform->timer.reset(key); }
 
 int exitValue() { return platform->exitValue; }
 
-void initStep(double time, double dt, int tstep) { timeStepper::initStep(nrs, time, dt, tstep); }
+void initStep(double time, double dt, int tstep)
+{ 
+  timeStepper::initStep(nrs, time, dt, tstep);
+  currDt = dt;
+}
 
 bool runStep(std::function<bool(int)> convergenceCheck, int corrector)
 {
@@ -520,7 +529,7 @@ bool runStep(int corrector)
 double finishStep()
 {
   timeStepper::finishStep(nrs);
-  return nrs->timePrevious + setPrecision(nrs->dt[0], std::numeric_limits<decltype(nrs->dt[0])>::digits10 + 1);
+  return nrs->timePrevious + setPrecision(currDt, std::numeric_limits<decltype(nrs->dt[0])>::digits10 + 1);
 }
 
 bool stepConverged() { return nrs->timeStepConverged; }

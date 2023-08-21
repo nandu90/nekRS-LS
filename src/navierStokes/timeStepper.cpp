@@ -9,6 +9,7 @@
 #include "subCycling.hpp"
 #include "udf.hpp"
 #include "bcMap.hpp"
+#include "applyDirichlet.hpp"
 #include "bdry.hpp"
 #include "Urst.hpp"
 

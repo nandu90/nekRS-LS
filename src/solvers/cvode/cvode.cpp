@@ -744,7 +744,7 @@ void cvode_t::applyDirichlet(double time)
                              mesh->o_vmapM,
                              mesh->o_EToB,
                              cds->o_EToB + is * cds->EToBOffset,
-                             cds->o_Ue,
+                             cds->o_U,
                              o_diff_i,
                              o_rho_i,
                              cds->neknek ? cds->neknek->o_pointMap : o_NULL,
