@@ -702,9 +702,15 @@ void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *par, s
 
   std::string absoluteTol;
   if (par->extract(parScope, "absolutetol", absoluteTol)) {
+    bool issueError = false;
     std::string solver;
-    par->extract(parScope, "solver", solver);
-    if (solver != "cvode" && solver != "none") {
+    if (par->extract(parScope, "solver", solver)) {
+      issueError |= (solver != "cvode" && solver != "none");
+    } else {
+      solver = options.getArgs(parSectionName + "SOLVER");
+      issueError |= !options.compareArgs(parSectionName + "SOLVER", "CVODE");
+    }
+    if (issueError) {
       append_error("absoluteTol is only supported for solver=cvode");
     }
     options.setArgs(parSectionName + "CVODE ABSOLUTE TOLERANCE", absoluteTol);
@@ -1153,19 +1159,26 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
 
   options.setArgs(parSectionName + "MAXIMUM ITERATIONS", std::to_string(maxIter));
 
-  options.setArgs(parSectionName + "SOLVER", "PCG");
-  if (options.compareArgs(parSectionName + "PRECONDITIONER", "JACOBI")) {
-    options.setArgs(parSectionName + "SOLVER", "PCG+COMBINED");
-  }
+  std::string noop;
+  bool applyDefault = (options.getArgs(parSectionName + "SOLVER", noop) == 0);
 
-  if (parScope == "pressure") {
-    options.setArgs(parSectionName + "SOLVER", "PGMRES+FLEXIBLE");
-  }
-  if (parScope == "mesh")
-    options.setArgs(parSectionName + "SOLVER", "NONE");
+  if (applyDefault) {
+    options.setArgs(parSectionName + "SOLVER", "PCG");
+    if (options.compareArgs(parSectionName + "PRECONDITIONER", "JACOBI")) {
+      options.setArgs(parSectionName + "SOLVER", "PCG+COMBINED");
+    }
 
-  if (parScope == "velocity" || parScope == "mesh")
-    options.setArgs(parSectionName + "BLOCK SOLVER", "TRUE");
+    if (parScope == "pressure") {
+      options.setArgs(parSectionName + "SOLVER", "PGMRES+FLEXIBLE");
+    }
+    if (parScope == "mesh") {
+      options.setArgs(parSectionName + "SOLVER", "NONE");
+    }
+
+    if (parScope == "velocity" || parScope == "mesh") {
+      options.setArgs(parSectionName + "BLOCK SOLVER", "TRUE");
+    }
+  }
 
   std::string p_solver;
   if (!par->extract(parScope, "solver", p_solver))
@@ -2302,7 +2315,6 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
       options.setArgs("SCALAR" + sid + " SOLVER", "CVODE");
     }
 
-    options.setArgs("SCALAR" + sid + " SOLVER", "PCG");
     options.setArgs("SCALAR" + sid + " ELLIPTIC COEFF FIELD", "TRUE");
 
     parseInitialGuess(rank, options, par, parScope);
