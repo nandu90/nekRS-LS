@@ -200,10 +200,10 @@ static std::vector<std::string> scalarKeys = {
 
 static std::vector<std::string> cvodeKeys = {
     {"relativetol"},
-    {"absolutetol"},
     {"epslin"},
     {"gstype"},
     {"sigscale"},
+    {"maxOrder"},
     {"maxSteps"},
     {"jtvrecycleproperties"},
     {"sharedrho"},
