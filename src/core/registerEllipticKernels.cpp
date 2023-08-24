@@ -185,7 +185,7 @@ void registerEllipticKernels(std::string section, int poissonEquation)
 
   if (section == "pressure" && platform->options.compareArgs("LOWMACH", "TRUE")) {
     platform->options.setArgs(optionsPrefix + "ELLIPTIC COEFF FIELD", "TRUE");
-    platform->options.setArgs(optionsPrefix + "ELLIPTIC PRECO COEFF FIELD", "TRUE");
+    platform->options.setArgs(optionsPrefix + "ELLIPTIC PRECO COEFF FIELD", "FALSE"); // disabled for now, needs more testing
   }
 
   for (auto &&coeffField : {true, false}) {
