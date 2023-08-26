@@ -841,6 +841,9 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   }
 
   auto *cds = nrs->cds;
+  
+  if (!o_invRhoCpAvg.isInitialized());
+    o_invRhoCpAvg = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[0]);
 
   if (time != tprev) {
 
@@ -1378,8 +1381,6 @@ void cvode_t::solve(double t0, double t1, int tstep)
     platform->timer.tic(timerScope, 0);
   }
 
-  o_invRhoCpAvg = platform->o_memPool.reserve<dfloat>(nrs->cds->fieldOffset[0]);
-
   // call cvode solver
   if(platform->verbose && platform->comm.mpiRank == 0)
     std::cout << "calling cvode ...\n";
@@ -1420,8 +1421,6 @@ void cvode_t::solve(double t0, double t1, int tstep)
     platform->timer.toc(timerScope);
   }
   timerScope = oldScope;
-
-  o_invRhoCpAvg.free();
 
   YLVec->optr(o_cvodeY);
   cvToNrs(*YLVec, nrs->cds->o_S, false);
