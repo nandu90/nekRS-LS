@@ -553,11 +553,13 @@ void cvode_t::initialize()
   platform->options.getArgs("CVODE MAX STEPS", mxsteps);
   retval = CVodeSetMaxNumSteps(this->cvodeMem, mxsteps);
 
-  if (!platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER").empty()) {
-    int maxOrder;
-    platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER", maxOrder);
-    retval = CVodeSetMaxOrd(this->cvodeMem, maxOrder);
-  }
+  if (platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER").empty())
+    platform->options.setArgs("CVODE MAX TIMESTEPPER ORDER", "3");
+
+  int maxOrder;
+  platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER", maxOrder);
+  retval = CVodeSetMaxOrd(this->cvodeMem, maxOrder);
+  check_retval(&retval, "CVodeSetMaxOrd", 1);
 
   // non-linear convergence factor
   double epsNl = 0.1;
@@ -578,6 +580,9 @@ void cvode_t::initialize()
   // set user data as
   retval = CVodeSetUserData(this->cvodeMem, this);
   check_retval(&retval, "CVodeSetUserData", 1);
+
+  if (platform->comm.mpiRank != 0)
+    CVodeSetErrFile(this->cvodeMem, NULL); 
 
   resetCounters();
 
@@ -1119,11 +1124,12 @@ void cvode_t::makeq(double time)
     flops *= Nscalar;
     platform->flopCounter->add("scalarFilterRT", flops);
 
-    if (detailedTimersEnabled) {
-      platform->timer.tic(timerScope + "::advection", 0);
-    }
 
     if (platform->options.compareArgs("ADVECTION", "TRUE")) {
+      if (detailedTimersEnabled) {
+        platform->timer.tic(timerScope + "::advection", 0);
+      }
+
       int applyLMM = 1;
       if (chtPass) {
         applyLMM = 0;
@@ -1170,6 +1176,10 @@ void cvode_t::makeq(double time)
         platform->linAlg->axmyMany(mesh->Nlocal, Nscalar, nrs->fieldOffset, 0, 1.0, mesh->o_LMM, o_FS_start);
       }
 
+      if (detailedTimersEnabled) {
+        platform->timer.toc(timerScope + "::advection");
+      }
+
       timeStepper::advectionFlops(cds->mesh[scalarStart], Nscalar);
     } else {
       auto o_FS_start = o_FS + cds->fieldOffsetScan[scalarStart];
@@ -1177,7 +1187,6 @@ void cvode_t::makeq(double time)
     }
 
     if (detailedTimersEnabled) {
-      platform->timer.toc(timerScope + "::advection");
       platform->timer.tic(timerScope + "::neumannBC", 0);
     }
 
@@ -1380,11 +1389,12 @@ void cvode_t::solve(double t0, double t1, int tstep)
 
   // restart if needed
   if (retval != CV_SUCCESS) {
+    const auto maxRestarts = 5;
     int cnt = 0;
     while (retval != CV_SUCCESS) {
       cnt++;
       if (platform->comm.mpiRank == 0) {
-        std::cout << "Restarting CVODE integrator ...\n";
+        std::cout << "restarting CVODE ...\n";
       }
       retval = CVodeReInit(cvodeMem, t, cvodeY);
       check_retval(&retval, "CVodeReInit", 1);
@@ -1394,9 +1404,9 @@ void cvode_t::solve(double t0, double t1, int tstep)
       retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
       updateCounters();
 
-      if(cnt > 20) {
+      if(cnt > maxRestarts) {
         if (platform->comm.mpiRank == 0) {
-          std::cout << "Giving up ...\n";
+          std::cout << "giving up ...\n";
         }
       }
     }
