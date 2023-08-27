@@ -194,6 +194,8 @@ cvode_t::cvode_t(nrs_t *_nrs)
     platform->copyDfloatToPfloatKernel(mesh->Nelements * mesh->Np * mesh->Nvgeo, mesh->o_vgeo, o_vgeoPfloat);
   }
 
+  o_invRhoCpAvg = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[0]);
+
   if (platform->comm.mpiRank == 0) {
     std::cout << "done\n";
   }
@@ -842,9 +844,6 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
   auto *cds = nrs->cds;
   
-  if (!o_invRhoCpAvg.isInitialized());
-    o_invRhoCpAvg = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[0]);
-
   if (time != tprev) {
 
     if (detailedTimersEnabled) {

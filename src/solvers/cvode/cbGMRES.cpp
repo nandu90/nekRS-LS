@@ -175,7 +175,7 @@ static void setup(N_Vector x, N_Vector b, N_Vector xcor, N_Vector vtemp,
 
 
 /* two pass (iterative) classical Gram-Schmidt */
-static void CGS2(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory& o_omega)  
+static void CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory& o_omega)  
 {
   auto stemp = (sunrealtype *) h_stemp.ptr(); 
 
@@ -187,6 +187,7 @@ static void CGS2(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory
 
   for (int iter = 0; iter < nIterMax; iter++) {
     if(((*new_vk_norm) * Kthres < vk_norm0) || iter == 0) {
+      platform->timer.tic(timerName + "solve::cvode::linearSolve::cgs", 0);
       innerProdMulti(k, o_V, o_omega, platform->comm.mpiComm, stemp); 
   
       for (int i=0; i < k; i++) {
@@ -200,6 +201,7 @@ static void CGS2(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory
       linearCombination(k+1, o_stemp, o_V, o_omega, o_omega);
 
       *new_vk_norm = SUNRsqrt(platform->linAlg->innerProd(N, o_omega, o_omega, platform->comm.mpiComm));
+      platform->timer.toc(timerName + "solve::cvode::linearSolve::cgs");
 #if 0
       if(platform->comm.mpiRank == 0) {
         std::cout << "vk_norm: " << *new_vk_norm <<  ", " << vk_norm0 << std::endl;
@@ -333,9 +335,7 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
     platform->linAlg->axmy(N, ONE, o_s1, o_vtemp2);
 
     /* Orthogonalize vtemp2 (V[l+1]) against previous V[i] */
-    platform->timer.tic(timerName + "solve::cvode::linearSolve::cgs2", 0);
-    CGS2(Hes, l_plus_1, l_max, &(Hes[l_plus_1][l]), o_vtemp2);
-    platform->timer.toc(timerName + "solve::cvode::linearSolve::cgs2");
+    CGSI(Hes, l_plus_1, l_max, &(Hes[l_plus_1][l]), o_vtemp2);
 
     /* Update the QR factorization of Hes */
     if(SUNQRfact(krydim, Hes, givens, l) != 0 ) {
