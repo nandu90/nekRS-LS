@@ -33,6 +33,7 @@ public:
       std::function<void(nrs_t *nrs, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)>;
   using userPostNrsToCv_t = std::function<void(nrs_t *nrs,  LVector_t<dfloat> & o_LField, bool isYdot)>;
   using userPostCvToNrs_t = std::function<void(nrs_t *nrs, occa::memory o_EField, bool isYdot)>;
+  using userMakeq_t = std::function<void(nrs_t *nrs, double time)>;
 
   cvode_t(nrs_t *nrs);
   ~cvode_t();
@@ -46,6 +47,9 @@ public:
 
   void setUserPostCvToNrs(userPostCvToNrs_t _userPostCvToNrs) { userPostCvToNrs = _userPostCvToNrs; }
   void setUserPostNrsToCv(userPostNrsToCv_t _userPostNrsToCv) { userPostNrsToCv = _userPostNrsToCv; }
+  void setUserMakeq(userMakeq_t _userMakeq) { userMakeq = _userMakeq; }
+
+  void setQthermalFSCache(const occa::memory& o_qthermalFSCache_) { o_qthermalFSCache = o_qthermalFSCache_; }
 
   void printInfo(bool printVerboseInfo);
 
@@ -169,6 +173,7 @@ private:
   userLocalPointSource_t userLocalPointSource;
   userPostCvToNrs_t userPostCvToNrs;
   userPostNrsToCv_t userPostNrsToCv;
+  userMakeq_t userMakeq;
 
   void makeq(double time);
 
@@ -183,6 +188,8 @@ private:
   dfloat _g0;
 
   dlong Nscalar;
+
+  occa::memory o_qthermalFSCache;
 
   occa::memory o_invRhoCpAvg;
 

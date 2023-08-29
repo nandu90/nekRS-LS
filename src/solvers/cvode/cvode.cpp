@@ -950,20 +950,25 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
     if (chtCVODE) {
       auto mesh = cds->mesh[0];
+      // TODO: fuse all ops into one kernel
       o_invRhoCpAvg.copyFrom(cds->o_rho);
       platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_invRhoCpAvg);
       oogs::startFinish(o_invRhoCpAvg, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, cds->gshT);
       platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_invRhoCpAvg);
       platform->linAlg->ady(mesh->Nlocal, 1.0, o_invRhoCpAvg);
     } else {
-      platform->linAlg->adyz(mesh->Nlocal, 1.0, cds->o_rho, o_invRhoCpAvg);
+      platform->linAlg->adyz(mesh->Nlocal, 1.0, cds->o_rho + cds->fieldOffsetScan[minCvodeScalarId], o_invRhoCpAvg);
     }
 
     platform->timer.toc(timerScope + "::evaluateProperties");
   }
 
   platform->linAlg->fill(cds->fieldOffsetSum, 0.0, cds->o_FS);
-  makeq(time);
+  if(userMakeq) {
+    userMakeq(nrs, time);
+  } else {
+    makeq(time);
+  }
 
   auto applyOgsOperation = [&](auto ogsFunc) {
     if (chtCVODE) {
@@ -1002,12 +1007,14 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
     platform->timer.tic(timerScope + "::fusedAddRhoDiv", 0);
   }
 
-  // (o_FS + userLocalPointSource) / rho
+  // add pointsource and weight by inverse assemabled mass matrix and devide by "rho" 
   if (chtCVODE) {
+    auto mesh = cds->mesh[0];
+    platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, cds->o_FS);
     if (userLocalPointSource) {
-      platform->linAlg->axpby(cds->mesh[0]->Nlocal, 1.0, this->o_pointSource, 1.0, cds->o_FS);
+      platform->linAlg->axpby(mesh->Nlocal, 1.0, this->o_pointSource, 1.0, cds->o_FS);
     }
-    platform->linAlg->axmy(cds->mesh[0]->Nlocal, 1.0, o_invRhoCpAvg, cds->o_FS);
+    platform->linAlg->axmy(mesh->Nlocal, 1.0, o_invRhoCpAvg, cds->o_FS);
   }
   if (!chtCVODE || (chtCVODE && this->Nscalar > 1)) {
     dlong startScalar = minCvodeScalarId;
@@ -1025,9 +1032,11 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
     }
 
     const int useFieldRho = !sharedRho;
-    this->fusedAddRhoDivKernel(cds->meshV->Nlocal,
+    auto mesh = cds->meshV;
+    this->fusedAddRhoDivKernel(mesh->Nlocal,
                                numScalars,
                                nrs->fieldOffset,
+                               mesh->o_invLMM, 
                                useFieldRho,
                                o_rho_start,
                                o_ptSource_start,
@@ -1045,14 +1054,14 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
         platform->timer.tic(timerScope + "::dp0thdt", 0);
       }
  
-      // evaluate dp0thdt (evaluate together with divergence)
+      // evaluate dp0thdt
       if (!(isJacobianEvaluation() && recycleProperties)) {
         if (detailedTimersEnabled) {
           platform->timer.tic(timerScope + "::dp0thdt::udfDiv", 0);
         }
         cds->cvode->setTimerScope(timerScope + "::dp0thdt::udfDiv");
  
-        platform->linAlg->fill(mesh->Nlocal, 0.0, nrs->o_div);
+        platform->linAlg->fill(nrs->meshV->Nlocal, 0.0, nrs->o_div);
         udf.div(nrs, time, nrs->o_div);
  
         cds->cvode->setTimerScope(timerScope);
@@ -1060,7 +1069,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
           platform->timer.toc(timerScope + "::dp0thdt::udfDiv");
       }
  
-      platform->linAlg->axpby(mesh->Nlocal, nrs->dp0thdt * nrs->alpha0Ref, o_invRhoCpAvg, 1.0, cds->o_FS); 
+      platform->linAlg->axpby(cds->mesh[0]->Nlocal, nrs->dp0thdt * nrs->alpha0Ref, o_invRhoCpAvg, 1.0, cds->o_FS); 
  
       if (detailedTimersEnabled) {
         platform->timer.toc(timerScope + "::dp0thdt");
@@ -1086,7 +1095,6 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
 void cvode_t::makeq(double time)
 {
-
   const auto timerScopeSave = timerScope;
   timerScope = timerScopeSave + "::makeq";
   platform->timer.tic(timerScope, 0);
@@ -1094,21 +1102,15 @@ void cvode_t::makeq(double time)
   auto *cds = nrs->cds;
   auto o_FS = nrs->cds->o_FS;
 
-  bool useRelativeVelocity = platform->options.compareArgs("MOVING MESH", "TRUE");
+  const bool useRelativeVelocity = platform->options.compareArgs("MOVING MESH", "TRUE");
   auto &o_Urst = useRelativeVelocity ? cds->o_relUrst : cds->o_Urst;
 
-  if (udf.sEqnSource) {
-    const auto makeQScope = timerScope;
-    // ensure that user/application forward the correct base timer
-    timerScope = makeQScope + "::udfSEqnSource";
-    platform->timer.tic(timerScope, 0);
-    udf.sEqnSource(nrs, time, cds->o_S, o_FS);
-    platform->timer.toc(timerScope);
-    timerScope = makeQScope;
-  }
-
-  auto applyTerms = [&](mesh_t *mesh, dlong scalarStart, dlong Nscalar, bool chtPass) {
+  auto applyTerms = [&](mesh_t *mesh, const dlong scalarStart, const dlong Nscalar) {
     if (cds->applyFilter) {
+      if (detailedTimersEnabled) {
+        platform->timer.tic(timerScope + "::filterRT", 0);
+      }
+
       cds->filterRTKernel(cds->meshV->Nelements,
                           scalarStart,
                           Nscalar,
@@ -1119,80 +1121,39 @@ void cvode_t::makeq(double time)
                           cds->o_rho,
                           cds->o_S,
                           o_FS);
-    }
-
-    double flops = 6 * mesh->Np * mesh->Nq + 4 * mesh->Np;
-    flops *= static_cast<double>(mesh->Nelements);
-    flops *= Nscalar;
-    platform->flopCounter->add("scalarFilterRT", flops);
-
-
-    if (platform->options.compareArgs("ADVECTION", "TRUE")) {
-      if (detailedTimersEnabled) {
-        platform->timer.tic(timerScope + "::advection", 0);
-      }
-
-      int applyLMM = 1;
-      if (chtPass) {
-        applyLMM = 0;
-      }
-
-      if (platform->options.compareArgs("CVODE ADVECTION TYPE", "CUBATURE")) {
-        cds->strongAdvectionCubatureVolumeKernel(cds->meshV->Nelements,
-                                                 Nscalar,
-                                                 applyLMM,
-                                                 mesh->o_LMM,
-                                                 mesh->o_vgeo,
-                                                 mesh->o_cubDiffInterpT,
-                                                 mesh->o_cubInterpT,
-                                                 mesh->o_cubProjectT,
-                                                 cds->o_compute + scalarStart,
-                                                 cds->o_fieldOffsetScan + scalarStart,
-                                                 cds->vFieldOffset,
-                                                 cds->vCubatureOffset,
-                                                 cds->o_S,
-                                                 o_Urst,
-                                                 cds->o_rho,
-                                                 o_FS);
-      } else {
-        cds->strongAdvectionVolumeKernel(cds->meshV->Nelements,
-                                         Nscalar,
-                                         applyLMM,
-                                         mesh->o_LMM,
-                                         mesh->o_vgeo,
-                                         mesh->o_D,
-                                         cds->o_compute + scalarStart,
-                                         cds->o_fieldOffsetScan + scalarStart,
-                                         cds->vFieldOffset,
-                                         cds->o_S,
-                                         o_Urst,
-                                         cds->o_rho,
-                                         o_FS);
-      }
-
-      // During a CHT pass, the LMM term is not applied in the advection kernels as
-      // the advection term is only defined in the V-mesh portion.
-      // Therefore, apply the LMM term here over the entire T-mesh.
-      if (chtPass) {
-        auto o_FS_start = o_FS + cds->fieldOffsetScan[scalarStart];
-        platform->linAlg->axmyMany(mesh->Nlocal, Nscalar, nrs->fieldOffset, 0, 1.0, mesh->o_LMM, o_FS_start);
-      }
 
       if (detailedTimersEnabled) {
-        platform->timer.toc(timerScope + "::advection");
+        platform->timer.toc(timerScope + "::filterRT");
       }
-
-      timeStepper::advectionFlops(cds->mesh[scalarStart], Nscalar);
-    } else {
-      auto o_FS_start = o_FS + cds->fieldOffsetScan[scalarStart];
-      platform->linAlg->axmyMany(mesh->Nlocal, Nscalar, nrs->fieldOffset, 0, 1.0, mesh->o_LMM, o_FS_start);
     }
+
+    if (detailedTimersEnabled) {
+      platform->timer.tic(timerScope + "::weakLaplacian", 0);
+    }
+
+    // weight o_FS on input and add Laplacian term 
+    weakLaplacianKernel(mesh->Nelements,
+                        Nscalar,
+                        cds->o_fieldOffsetScan + scalarStart,
+                        mesh->o_ggeo,
+                        mesh->o_D,
+                        cds->o_diff,
+                        cds->o_S,
+                        o_FS);
+
+    if (detailedTimersEnabled) {
+      platform->timer.toc(timerScope + "::weakLaplacian");
+    }
+
+    // store intermediate result for later reuse in qthermal
+//    if (!(isJacobianEvaluation() && recycleProperties) && o_qthermalFSCache.isInitialized()) {
+      o_qthermalFSCache.copyFrom(o_FS + cds->fieldOffsetScan[scalarStart], Nscalar*nrs->fieldOffset);
+//    }
 
     if (detailedTimersEnabled) {
       platform->timer.tic(timerScope + "::neumannBC", 0);
     }
 
-    // weak Laplacian + boundary terms
     cds->neumannBCKernel(mesh->Nelements,
                          Nscalar,
                          mesh->o_sgeo,
@@ -1216,42 +1177,74 @@ void cvode_t::makeq(double time)
 
     if (detailedTimersEnabled) {
       platform->timer.toc(timerScope + "::neumannBC");
-      platform->timer.tic(timerScope + "::weakLaplacian", 0);
     }
 
-    weakLaplacianKernel(mesh->Nelements,
-                        Nscalar,
-                        cds->o_fieldOffsetScan + scalarStart,
-                        mesh->o_ggeo,
-                        mesh->o_invLMM,
-                        mesh->o_D,
-                        cds->o_diff,
-                        cds->o_S,
-                        o_FS);
+    if (platform->options.compareArgs("ADVECTION", "TRUE")) {
+      if (detailedTimersEnabled) {
+        platform->timer.tic(timerScope + "::advection", 0);
+      }
+      const int weighted = true;
 
-    if (detailedTimersEnabled) {
-      platform->timer.toc(timerScope + "::weakLaplacian");
+      if (platform->options.compareArgs("CVODE ADVECTION TYPE", "CUBATURE")) {
+        cds->strongAdvectionCubatureVolumeKernel(cds->meshV->Nelements,
+                                                 Nscalar,
+                                                 weighted,
+                                                 mesh->o_vgeo,
+                                                 mesh->o_cubDiffInterpT,
+                                                 mesh->o_cubInterpT,
+                                                 mesh->o_cubProjectT,
+                                                 cds->o_compute + scalarStart,
+                                                 cds->o_fieldOffsetScan + scalarStart,
+                                                 cds->vFieldOffset,
+                                                 cds->vCubatureOffset,
+                                                 cds->o_S,
+                                                 o_Urst,
+                                                 cds->o_rho,
+                                                 o_FS);
+      } else {
+        cds->strongAdvectionVolumeKernel(cds->meshV->Nelements,
+                                         Nscalar,
+                                         weighted,
+                                         mesh->o_vgeo,
+                                         mesh->o_D,
+                                         cds->o_compute + scalarStart,
+                                         cds->o_fieldOffsetScan + scalarStart,
+                                         cds->vFieldOffset,
+                                         cds->o_S,
+                                         o_Urst,
+                                         cds->o_rho,
+                                         o_FS);
+      }
+
+      if (detailedTimersEnabled) {
+        platform->timer.toc(timerScope + "::advection");
+      }
+
+      timeStepper::advectionFlops(cds->mesh[scalarStart], Nscalar);
     }
   };
 
-  const bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
-  if (chtCVODE) {
-    applyTerms(cds->mesh[0], 0, 1, true);
+  if (udf.sEqnSource) {
+    const auto makeQScope = timerScope;
+    timerScope = makeQScope + "::udfSEqnSource";
+    platform->timer.tic(timerScope, 0);
+    udf.sEqnSource(nrs, time, cds->o_S, o_FS);
+    platform->timer.toc(timerScope);
+    timerScope = makeQScope;
   }
 
+  const bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
+  if (chtCVODE) {
+    applyTerms(cds->mesh[0], 0, 1);
+  }
   if (!chtCVODE || (chtCVODE && this->Nscalar > 1)) {
-
-    // Starting scalar id and number of scalars to process in this block
-    // note, in non-CHT cases, this is just the number of CVODE scalars.
-    // In CHT cases where the temperature is solved via CVODE,
-    // this is one less than the number of CVODE scalars.
     dlong startScalar = minCvodeScalarId;
     dlong numScalars = this->Nscalar;
     if (chtCVODE) {
       startScalar++;
       numScalars--;
     }
-    applyTerms(cds->meshV, startScalar, numScalars, false);
+    applyTerms(cds->meshV, startScalar, numScalars);
   }
 
   platform->timer.toc(timerScope);
@@ -1404,11 +1397,8 @@ void cvode_t::solve(double t0, double t1, int tstep)
       retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
       updateCounters();
 
-      if(cnt > maxRestarts) {
-        if (platform->comm.mpiRank == 0) {
-          std::cout << "giving up ...\n";
-        }
-      }
+      nrsCheck(cnt > maxRestarts, platform->comm.mpiComm, EXIT_FAILURE, "%s", 
+               "Reached maximum number allowed of CVODE restarts! Giving up ...\n");
     }
   }
   if(platform->verbose && platform->comm.mpiRank == 0)
