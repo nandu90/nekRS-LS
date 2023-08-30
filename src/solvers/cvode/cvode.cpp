@@ -233,8 +233,6 @@ int cvode_t::cvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector 
   const realtype sig = sigScale / N_VWrmsNorm_MPIManyVector(v, ytemp);
   const realtype siginv = 1.0 / sig;
 
-  std::cout << "sig = " << sig << std::endl;
-
   N_VLinearSum(sig, v, 1.0, y, ytemp);
   this->jtvRhs(t, o_ytemp, o_Jv);
   N_VLinearSum(siginv, Jv, -siginv, fy, Jv);
@@ -258,8 +256,8 @@ int cvode_t::jtv(double t, const occa::memory& o_v, const occa::memory& o_y, con
   if (detailedTimersEnabled)
     platform->timer.tic(timerName + "solve::cvode::linearSolve::jtv", 0);
 
-  const auto norm = sqrt(platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_v, platform->comm.mpiComm) / this->nEqTotal);
-  const auto sig = sigScale / norm;
+  const auto v_wrms = sqrt(platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_v, platform->comm.mpiComm) / this->nEqTotal);
+  const auto sig = sigScale / v_wrms;
   const auto siginv = 1.0 / sig;
 
   platform->linAlg->axpbyz(this->nEq, sig, o_v, 1.0, o_y, o_work);
@@ -1146,9 +1144,9 @@ void cvode_t::makeq(double time)
     }
 
     // store intermediate result for later reuse in qthermal
-//    if (!(isJacobianEvaluation() && recycleProperties) && o_qthermalFSCache.isInitialized()) {
+    if (!(isJacobianEvaluation() && recycleProperties) && o_qthermalFSCache.isInitialized()) {
       o_qthermalFSCache.copyFrom(o_FS + cds->fieldOffsetScan[scalarStart], Nscalar*nrs->fieldOffset);
-//    }
+    }
 
     if (detailedTimersEnabled) {
       platform->timer.tic(timerScope + "::neumannBC", 0);
