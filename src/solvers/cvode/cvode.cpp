@@ -188,7 +188,7 @@ cvode_t::cvode_t(nrs_t *_nrs)
            "%s\n",
            "CVODE MIXED PRECISION JTV = TRUE not supported yet");
 
-  {
+  if (mixedPrecisionJtvEnabled) {
     auto mesh = cds->mesh[0];
     o_vgeoPfloat = platform->device.malloc<pfloat>(mesh->Nelements * mesh->Np * mesh->Nvgeo);
     platform->copyDfloatToPfloatKernel(mesh->Nelements * mesh->Np * mesh->Nvgeo, mesh->o_vgeo, o_vgeoPfloat);
@@ -943,8 +943,8 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
   if (!(isJacobianEvaluation() && recycleProperties)) {
     platform->timer.tic(timerScope + "::evaluateProperties", 0);
-
     evaluateProperties(nrs, time);
+    platform->timer.toc(timerScope + "::evaluateProperties");
 
     if (chtCVODE) {
       auto mesh = cds->mesh[0];
@@ -957,8 +957,6 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
     } else {
       platform->linAlg->adyz(mesh->Nlocal, 1.0, cds->o_rho + cds->fieldOffsetScan[minCvodeScalarId], o_invRhoCpAvg);
     }
-
-    platform->timer.toc(timerScope + "::evaluateProperties");
   }
 
   platform->linAlg->fill(cds->fieldOffsetSum, 0.0, cds->o_FS);
@@ -1075,17 +1073,17 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
     }
   }
 
-  if (detailedTimersEnabled) {
-    platform->timer.tic(timerScope + "::maskDirichlet", 0);
-  }
-
   auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[minCvodeScalarId];
   if (this->Nmasked > 0) {
-    nrs->maskKernel(this->Nmasked, this->o_maskIds, o_FS_start);
-  }
+    if (detailedTimersEnabled) {
+      platform->timer.tic(timerScope + "::maskDirichlet", 0);
+    }
 
-  if (detailedTimersEnabled) {
-    platform->timer.toc(timerScope + "::maskDirichlet");
+    nrs->maskKernel(this->Nmasked, this->o_maskIds, o_FS_start);
+
+    if (detailedTimersEnabled) {
+      platform->timer.toc(timerScope + "::maskDirichlet");
+    }
   }
 
   nrsToCv(cds->o_FS, o_ydot, true);
@@ -1396,7 +1394,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
       updateCounters();
 
       nrsCheck(cnt > maxRestarts, platform->comm.mpiComm, EXIT_FAILURE, "%s", 
-               "Reached maximum number allowed of CVODE restarts! Giving up ...\n");
+               "Reached maximum number of allowed CVODE restarts! Giving up ...\n");
     }
   }
   if(platform->verbose && platform->comm.mpiRank == 0)
