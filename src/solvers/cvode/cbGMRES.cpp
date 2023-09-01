@@ -152,7 +152,6 @@ void cbGMRESSetup(SUNLinearSolver S)
   innerProdMultiKernel = kernels.get(prefix + "innerProdMulti");
 
   N = N_VGetLocalLength(xcor); 
-  std::cout << "CVODE N: " << N << std::endl;
 
   const int Nblock = (N + BLOCKSIZE - 1) / BLOCKSIZE;
   const size_t Nbytes = (l_max+1) * Nblock * sizeof(dfloat);
