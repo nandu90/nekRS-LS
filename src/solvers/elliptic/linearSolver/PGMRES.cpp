@@ -36,14 +36,6 @@ GmresData::GmresData(elliptic_t *elliptic)
         elliptic->options.getArgs("PGMRES RESTART", _nRestartVectors);
         return _nRestartVectors;
       }()),
-      flexible([&]() 
-      {
-        if (elliptic->options.compareArgs("SOLVER", "FLEXIBLE"))
-          return 1;
-        return 0;
-      }()),
-      o_V(platform->device.malloc<dfloat>((size_t)elliptic->fieldOffset * elliptic->Nfields * nRestartVectors)),
-      o_Z(platform->device.malloc<dfloat>((size_t)elliptic->fieldOffset * elliptic->Nfields * ((flexible) ? nRestartVectors : 1))),
       o_y(platform->device.malloc<dfloat>(nRestartVectors)),
       H((dfloat *)calloc((nRestartVectors + 1) * (nRestartVectors + 1), sizeof(dfloat))),
       sn((dfloat *)calloc(nRestartVectors, sizeof(dfloat))),
@@ -113,6 +105,12 @@ void gmresUpdate(elliptic_t *elliptic, occa::memory o_x, int gmresUpdateSize)
 }
 } // namespace
 
+void free(elliptic_t *elliptic)
+{ 
+  elliptic->gmresData->o_V.free();
+  elliptic->gmresData->o_Z.free();
+}
+
 // Ax=r
 int pgmres(elliptic_t *elliptic,
            const dfloat tol,
@@ -124,6 +122,14 @@ int pgmres(elliptic_t *elliptic,
 
   mesh_t *mesh = elliptic->mesh;
   linAlg_t &linAlg = *(platform->linAlg);
+
+  const int nRestartVectors = elliptic->gmresData->nRestartVectors;
+  const bool verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+  const bool serial = platform->device.mode() == "Serial" || platform->device.mode() == "OpenMP";
+  const int flexible = elliptic->options.compareArgs("SOLVER", "FLEXIBLE");
+
+  elliptic->gmresData->o_V = platform->device.malloc<dfloat>((size_t)elliptic->fieldOffset * elliptic->Nfields * nRestartVectors);
+  elliptic->gmresData->o_Z = platform->device.malloc<dfloat>((size_t)elliptic->fieldOffset * elliptic->Nfields * ((flexible) ? nRestartVectors : 1));
 
   auto &o_w = elliptic->o_p;
 
@@ -143,13 +149,6 @@ int pgmres(elliptic_t *elliptic,
   auto sn = elliptic->gmresData->sn;
   auto cs = elliptic->gmresData->cs;
   auto s = elliptic->gmresData->s;
-
-  const int nRestartVectors = elliptic->gmresData->nRestartVectors;
-
-  const int flexible = elliptic->options.compareArgs("SOLVER", "FLEXIBLE");
-
-  const bool verbose = platform->options.compareArgs("VERBOSE", "TRUE");
-  const bool serial = platform->device.mode() == "Serial" || platform->device.mode() == "OpenMP";
 
   const auto offset = elliptic->fieldOffset * elliptic->Nfields;
   const int Nblock = (mesh->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
@@ -348,9 +347,12 @@ int pgmres(elliptic_t *elliptic,
     error = nr * sqrt(elliptic->resNormFactor);
     rdotr = nr * sqrt(elliptic->resNormFactor);
     // exit if tolerance is reached
-    if (error <= TOL)
+    if (error <= TOL) {
+      free(elliptic);
       return iter;
+    }
   }
 
+  free(elliptic);
   return iter;
 }

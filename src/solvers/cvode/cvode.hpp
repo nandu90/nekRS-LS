@@ -34,6 +34,8 @@ public:
   using userPostNrsToCv_t = std::function<void(nrs_t *nrs,  LVector_t<dfloat> & o_LField, bool isYdot)>;
   using userPostCvToNrs_t = std::function<void(nrs_t *nrs, occa::memory o_EField, bool isYdot)>;
   using userMakeq_t = std::function<void(nrs_t *nrs, double time)>;
+  using userPreSolve_t = std::function<void(nrs_t *nrs)>;
+  using userPostSolve_t = std::function<void(nrs_t *nrs)>;
 
   cvode_t(nrs_t *nrs);
   ~cvode_t();
@@ -48,6 +50,9 @@ public:
   void setUserPostCvToNrs(userPostCvToNrs_t _userPostCvToNrs) { userPostCvToNrs = _userPostCvToNrs; }
   void setUserPostNrsToCv(userPostNrsToCv_t _userPostNrsToCv) { userPostNrsToCv = _userPostNrsToCv; }
   void setUserMakeq(userMakeq_t _userMakeq) { userMakeq = _userMakeq; }
+  void setUserPreSolve(userPreSolve_t _userPreSolve) { userPreSolve = _userPreSolve; }
+
+  void setUserPostSolve(userPostSolve_t _userPostSolve) { userPostSolve = _userPostSolve; }
 
   void setQthermalFSCache(const occa::memory& o_qthermalFSCache_) { o_qthermalFSCache = o_qthermalFSCache_; }
 
@@ -174,6 +179,8 @@ private:
   userPostCvToNrs_t userPostCvToNrs;
   userPostNrsToCv_t userPostNrsToCv;
   userMakeq_t userMakeq;
+  userPreSolve_t userPreSolve;
+  userPostSolve_t userPostSolve;
 
   void makeq(double time);
 

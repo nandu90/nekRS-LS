@@ -343,7 +343,7 @@ void cvode_t::initialize()
     platform->timer.tic(timerName + "solve::cvode::linearSolve", 0);
     int retVal;
     if(solverType == "CBGMRES") {
-      retVal = cbGMRES(S, x, b, tol);
+      retVal = cbGMRESSolve(S, x, b, tol);
     } else if (solverType == "GMRES"){
       retVal = SUNLinSolSolve_SPGMR(S, NULL, x, b, tol);
     }
@@ -513,6 +513,10 @@ void cvode_t::initialize()
     LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
     check_retval(&retval, "SUNLinSol_SPFGMR", 1);
     LS->ops->solve = fwdLinearSolve;
+
+    if(this->linearSolverType == "CBGMRES") {
+      cbGMRESSetup(LS);
+    }
   } else {
     nrsCheck(true,
              platform->comm.mpiComm,
@@ -1363,6 +1367,9 @@ void cvode_t::solve(double t0, double t1, int tstep)
     nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "Error calling CVodeSetMaxStep\n");
   }
 
+  if (userPreSolve)
+    userPreSolve(nrs); 
+
   const auto oldScope = timerScope;
   timerScope = oldScope + "::cvode";
   if (detailedTimersEnabled) {
@@ -1370,13 +1377,9 @@ void cvode_t::solve(double t0, double t1, int tstep)
   }
 
   // call cvode solver
-  if(platform->verbose && platform->comm.mpiRank == 0)
-    std::cout << "calling cvode ...\n";
   setPreviousCounters();
   retval = CVode(cvodeMem, t1, cvodeY, &t, CV_NORMAL);
   updateCounters();
-
-  // restart if needed
   if (retval != CV_SUCCESS) {
     const auto maxRestarts = 5;
     int cnt = 0;
@@ -1397,15 +1400,15 @@ void cvode_t::solve(double t0, double t1, int tstep)
                "Reached maximum number of allowed CVODE restarts! Giving up ...\n");
     }
   }
-  if(platform->verbose && platform->comm.mpiRank == 0)
-    std::cout << "done\n"; 
-
   nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "CVODE failed after restart\n");
 
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope);
   }
   timerScope = oldScope;
+
+  if (userPostSolve)
+    userPostSolve(nrs); 
 
   YLVec->optr(o_cvodeY);
   cvToNrs(*YLVec, nrs->cds->o_S, false);

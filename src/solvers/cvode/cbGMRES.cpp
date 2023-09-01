@@ -40,7 +40,6 @@ static occa::kernel innerProdMultiKernel;
 
 static dlong N;
 
-static N_Vector s2Inv;
 static N_Vector vtemp2;
 
 static occa::memory o_V;
@@ -132,9 +131,17 @@ static void innerProdMulti(const dlong NVec,
   }
 }
 
-static void setup(N_Vector x, N_Vector b, N_Vector xcor, N_Vector vtemp,
-                  N_Vector s1, N_Vector s2, N_Vector *V, int l_max)
+void cbGMRESSetup(SUNLinearSolver S)
 {
+  auto V            = SPGMR_CONTENT(S)->V;
+  auto l_max        = SPGMR_CONTENT(S)->maxl;
+  auto Hes          = SPGMR_CONTENT(S)->Hes;
+  auto givens       = SPGMR_CONTENT(S)->givens;
+  auto xcor         = SPGMR_CONTENT(S)->xcor;
+  auto vtemp        = SPGMR_CONTENT(S)->vtemp;
+  auto s1           = SPGMR_CONTENT(S)->s1;
+  auto s2           = SPGMR_CONTENT(S)->s2;
+
   static_assert(sizeof(realtype) == sizeof(dfloat), "realtype has to match dfloat!");
 
   auto &kernels = platform->kernels;
@@ -144,7 +151,8 @@ static void setup(N_Vector x, N_Vector b, N_Vector xcor, N_Vector vtemp,
   linearCombinationKernel = kernels.get(prefix + "linearCombination");
   innerProdMultiKernel = kernels.get(prefix + "innerProdMulti");
 
-  N = N_VGetLocalLength(x); 
+  N = N_VGetLocalLength(xcor); 
+  std::cout << "CVODE N: " << N << std::endl;
 
   const int Nblock = (N + BLOCKSIZE - 1) / BLOCKSIZE;
   const size_t Nbytes = (l_max+1) * Nblock * sizeof(dfloat);
@@ -152,17 +160,7 @@ static void setup(N_Vector x, N_Vector b, N_Vector xcor, N_Vector vtemp,
   o_scratch = platform->device.malloc(Nbytes); 
   h_scratch = platform->device.mallocHost(o_scratch.size());
 
-  s2Inv = N_VClone(s2);
-  vtemp2 = N_VClone(vtemp);
-
-  o_b = getN_VectorMemory(sunrealtype, b);
-  o_x = getN_VectorMemory(sunrealtype, x);
-  o_xcor = getN_VectorMemory(sunrealtype, xcor);
-  o_vtemp = getN_VectorMemory(sunrealtype, vtemp);
-  o_vtemp2 = getN_VectorMemory(sunrealtype, vtemp2);
-  o_s1 = getN_VectorMemory(sunrealtype, s1);
-  o_s2 = getN_VectorMemory(sunrealtype, s2);
-  o_s2Inv = getN_VectorMemory(sunrealtype, s2Inv);
+  vtemp2 = xcor;
 
   o_yg = platform->device.malloc<sunrealtype>(l_max+1);
   h_yg = platform->device.mallocHost(o_yg.size());
@@ -213,11 +211,12 @@ static void CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory
 
 #define cbGMRESFinish(lastFlag)   \
 {                                 \
+  o_s2Inv.free();                 \
   o_V.free();                     \
   return lastFlag;                \
 }
 
-int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
+int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
 {
   /* local data and shortcut variables */
   N_Vector xcor, vtemp, s1, s2;
@@ -253,11 +252,18 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
 
   static int firstTime = 1;
   if (firstTime) {
-    setup(x, b, xcor, vtemp, s1, s2, SPGMR_CONTENT(S)->V, l_max); 
-    firstTime = 0; 
-  } 
+    o_b      = getN_VectorMemory(sunrealtype, b);
+    o_x      = getN_VectorMemory(sunrealtype, x);
+    o_s1     = getN_VectorMemory(sunrealtype, s1);
+    o_s2     = getN_VectorMemory(sunrealtype, s2);
+    o_xcor   = getN_VectorMemory(sunrealtype, xcor);
+    o_vtemp  = getN_VectorMemory(sunrealtype, vtemp);
+    o_vtemp2 = getN_VectorMemory(sunrealtype, vtemp2);
+    firstTime = 0;
+  }
 
-  o_V = platform->o_memPool.reserve<pfloat>((l_max+1) * N_VGetLocalLength(x));
+  o_s2Inv = platform->o_memPool.reserve<sunrealtype>(N); 
+  o_V = platform->o_memPool.reserve<pfloat>((l_max+1) * static_cast<size_t>(N));
 
   /* Initialize counters and convergence flag */
   *nli = 0;
@@ -365,7 +371,7 @@ int cbGMRES(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
   }
   yg[krydim] = ZERO;
 
-  /* Set xcor to  correction vector V_l y */
+  /* Set xcor to correction vector V_l y */
   o_yg.copyFrom(yg);
   linearCombination(krydim+1, o_yg, o_V, o_xcor, o_xcor);
 
