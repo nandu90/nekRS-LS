@@ -251,6 +251,7 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
 
   static int firstTime = 1;
   if (firstTime) {
+    cbGMRESSetup(S);
     o_b      = getN_VectorMemory(sunrealtype, b);
     o_x      = getN_VectorMemory(sunrealtype, x);
     o_s1     = getN_VectorMemory(sunrealtype, s1);

@@ -46,7 +46,6 @@ GmresData::GmresData(elliptic_t *elliptic)
 
   int Nblock = (elliptic->mesh->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
   const size_t N = nRestartVectors * Nblock;
-  // pinned scratch buffer
   {
     h_scratch = platform->device.mallocHost<dfloat>(N);
     scratch = (dfloat *)h_scratch.ptr();
@@ -128,8 +127,8 @@ int pgmres(elliptic_t *elliptic,
   const bool serial = platform->device.mode() == "Serial" || platform->device.mode() == "OpenMP";
   const int flexible = elliptic->options.compareArgs("SOLVER", "FLEXIBLE");
 
-  elliptic->gmresData->o_V = platform->device.malloc<dfloat>((size_t)elliptic->fieldOffset * elliptic->Nfields * nRestartVectors);
-  elliptic->gmresData->o_Z = platform->device.malloc<dfloat>((size_t)elliptic->fieldOffset * elliptic->Nfields * ((flexible) ? nRestartVectors : 1));
+  elliptic->gmresData->o_V = platform->o_memPool.reserve<dfloat>(static_cast<size_t>(elliptic->fieldOffset) * elliptic->Nfields * nRestartVectors);
+  elliptic->gmresData->o_Z = platform->o_memPool.reserve<dfloat>(static_cast<size_t>(elliptic->fieldOffset) * elliptic->Nfields * ((flexible) ? nRestartVectors : 1));
 
   auto &o_w = elliptic->o_p;
 

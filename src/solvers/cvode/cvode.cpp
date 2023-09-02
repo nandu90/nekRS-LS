@@ -513,10 +513,6 @@ void cvode_t::initialize()
     LS = SUNLinSol_SPGMR(cvodeY, PREC_NONE, nVectors, sunctx);
     check_retval(&retval, "SUNLinSol_SPFGMR", 1);
     LS->ops->solve = fwdLinearSolve;
-
-    if(this->linearSolverType == "CBGMRES") {
-      cbGMRESSetup(LS);
-    }
   } else {
     nrsCheck(true,
              platform->comm.mpiComm,
