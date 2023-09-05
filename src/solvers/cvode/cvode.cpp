@@ -1074,16 +1074,14 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   }
 
   auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[minCvodeScalarId];
+  if (detailedTimersEnabled) {
+    platform->timer.tic(timerScope + "::maskDirichlet", 0);
+  }
   if (this->Nmasked > 0) {
-    if (detailedTimersEnabled) {
-      platform->timer.tic(timerScope + "::maskDirichlet", 0);
-    }
-
     nrs->maskKernel(this->Nmasked, this->o_maskIds, o_FS_start);
-
-    if (detailedTimersEnabled) {
-      platform->timer.toc(timerScope + "::maskDirichlet");
-    }
+  }
+  if (detailedTimersEnabled) {
+    platform->timer.toc(timerScope + "::maskDirichlet");
   }
 
   nrsToCv(cds->o_FS, o_ydot, true);
