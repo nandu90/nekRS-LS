@@ -1316,6 +1316,9 @@ void cvode_t::solve(double t0, double t1, int tstep)
 
   bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
 
+  if (userPreSolve)
+    userPreSolve(nrs); 
+
   // lag solution state and update current state
   for (int s = nrs->nEXT; s > 1; s--) {
     const auto N = nrs->NVfields * nrs->fieldOffset;
@@ -1361,8 +1364,6 @@ void cvode_t::solve(double t0, double t1, int tstep)
     nrsCheck(retval < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s", "Error calling CVodeSetMaxStep\n");
   }
 
-  if (userPreSolve)
-    userPreSolve(nrs); 
 
   const auto oldScope = timerScope;
   timerScope = oldScope + "::cvode";
@@ -1401,10 +1402,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
   }
   timerScope = oldScope;
 
-  if (userPostSolve)
-    userPostSolve(nrs); 
-
-  YLVec->optr(o_cvodeY);
+   YLVec->optr(o_cvodeY);
   cvToNrs(*YLVec, nrs->cds->o_S, false);
 
   if (detailedTimersEnabled) {
@@ -1436,6 +1434,9 @@ void cvode_t::solve(double t0, double t1, int tstep)
 
   // compute scalar boundary condition at time t1
   this->applyDirichlet(t1);
+
+ if (userPostSolve)
+    userPostSolve(nrs); 
 
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope + "::restore");
