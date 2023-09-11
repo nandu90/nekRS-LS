@@ -989,9 +989,9 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
   applyOgsOperation(oogs::start);
 
-  if (userLocalPointSource) {
+  if (userLocalPointSourceL) {
     platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::localPointSource", 0);
-    userLocalPointSource(nrs, o_y, o_ydot);
+    userLocalPointSourceL(nrs, time, o_y, o_ydot);
     platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::localPointSource");
     cvToNrs(o_ydot, this->o_pointSource, true);
   }
@@ -1007,7 +1007,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   if (chtCVODE) {
     auto mesh = cds->mesh[0];
     platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, cds->o_FS);
-    if (userLocalPointSource) {
+    if (userLocalPointSourceL) {
       platform->linAlg->axpby(mesh->Nlocal, 1.0, this->o_pointSource, 1.0, cds->o_FS);
     }
     platform->linAlg->axmy(mesh->Nlocal, 1.0, o_invRhoCpAvg, cds->o_FS);
@@ -1023,7 +1023,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
     auto o_rho_start = cds->o_rho + cds->fieldOffsetScan[startScalar];
     occa::memory o_ptSource_start;
 
-    if (userLocalPointSource) {
+    if (userLocalPointSourceL) {
       o_ptSource_start = this->o_pointSource + cds->fieldOffsetScan[startScalar];
     }
 
@@ -1217,6 +1217,15 @@ void cvode_t::makeq(double time)
       timeStepper::advectionFlops(cds->mesh[scalarStart], Nscalar);
     }
   };
+
+  if (userLocalPointSourceE) {
+    const auto makeQScope = timerScope;
+    timerScope = makeQScope + "::udfSEqnSource";
+    platform->timer.tic(timerScope, 0);
+    userLocalPointSourceE(nrs, time, cds->o_S, o_FS);
+    platform->timer.toc(timerScope);
+    timerScope = makeQScope;
+  }
 
   if (udf.sEqnSource) {
     const auto makeQScope = timerScope;
@@ -1709,11 +1718,15 @@ std::string cvode_t::rhsTagName() const
   return this->isJacobianEvaluation() ? timerScope + "::linearSolve::jtv::rhs" : timerScope + "::rhs";
 }
 
-void cvode_t::setLocalPointSource(userLocalPointSource_t _userLocalPointSource)
+void cvode_t::setLocalPointSource(userLocalPointSourceE_t _userLocalPointSource)
 {
-  userLocalPointSource = _userLocalPointSource;
+    userLocalPointSourceE = _userLocalPointSource; 
+}
+void cvode_t::setLocalPointSource(userLocalPointSourceL_t _userLocalPointSource)
+{
+  userLocalPointSourceL = _userLocalPointSource;
 
-  if (o_pointSource.size() == 0) {
+  if (!o_pointSource.isInitialized()) {
     o_pointSource = platform->device.malloc<dfloat>(this->Nscalar * nrs->fieldOffset);
   }
 

@@ -29,8 +29,11 @@ public:
       void(nrs_t *nrs, double time, double t0, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)>;
   using userJacobian_t = std::function<
       void(nrs_t *nrs, double time, double t0, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)>;
-  using userLocalPointSource_t =
-      std::function<void(nrs_t *nrs, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)>;
+  using userLocalPointSourceL_t =
+      std::function<void(nrs_t *nrs, double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)>;
+  using userLocalPointSourceE_t =
+      std::function<void(nrs_t *nrs, double time, const occa::memory& o_y, occa::memory &_ydot)>;
+
   using userPostNrsToCv_t = std::function<void(nrs_t *nrs,  LVector_t<dfloat> & o_LField, bool isYdot)>;
   using userPostCvToNrs_t = std::function<void(nrs_t *nrs, occa::memory o_EField, bool isYdot)>;
   using userMakeq_t = std::function<void(nrs_t *nrs, double time)>;
@@ -45,7 +48,8 @@ public:
 
   void setRHS(userRHS_t _userRHS) { userRHS = _userRHS; }
   void setJacobian(userJacobian_t _userJacobian) { userJacobian = _userJacobian; }
-  void setLocalPointSource(userLocalPointSource_t _userLocalPointSource);
+  void setLocalPointSource(userLocalPointSourceL_t _userLocalPointSource);
+  void setLocalPointSource(userLocalPointSourceE_t _userLocalPointSource);
 
   void setUserPostCvToNrs(userPostCvToNrs_t _userPostCvToNrs) { userPostCvToNrs = _userPostCvToNrs; }
   void setUserPostNrsToCv(userPostNrsToCv_t _userPostNrsToCv) { userPostNrsToCv = _userPostNrsToCv; }
@@ -175,7 +179,9 @@ private:
   userRHS_t userRHS;
   userJacobian_t userJacobian;
 
-  userLocalPointSource_t userLocalPointSource;
+  userLocalPointSourceL_t userLocalPointSourceL;
+  userLocalPointSourceE_t userLocalPointSourceE;
+
   userPostCvToNrs_t userPostCvToNrs;
   userPostNrsToCv_t userPostNrsToCv;
   userMakeq_t userMakeq;
