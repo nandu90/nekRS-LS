@@ -1003,6 +1003,9 @@ void printInfo(nrs_t *nrs, double time, int tstep, bool printStepInfo, bool prin
     }
   }
 
+  if (nrs->cvode)
+    nrs->cvode->resetCounters();
+
   bool largeCFLCheck = (cfl > 30) && numberActiveFields(nrs);
 
   nrsCheck(largeCFLCheck || std::isnan(cfl) || std::isinf(cfl),

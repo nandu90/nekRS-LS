@@ -1530,7 +1530,7 @@ void cvode_t::printInfo(bool printVerboseInfo)
     scalars = ss.str();
   }
 
-  if (platform->comm.mpiRank == 0 && printVerboseInfo) {
+  if (printVerboseInfo) {
     std::ostringstream ss;
     ss << "" << scalars;
     ss << std::setfill(' ') << std::setw(lengthToColon - ss.str().length()) << " ";
@@ -1544,7 +1544,7 @@ void cvode_t::printInfo(bool printVerboseInfo)
            static_cast<float>(nni) / nsteps,
            nli,
            static_cast<float>(nli) / nni);
-  } else if (platform->comm.mpiRank == 0) {
+  } else {
     std::ostringstream ss;
     ss << "  " << scalars;
     printf("%s: %ld %ld %ld %ldf", ss.str().c_str(), nsteps, nrhs, nni, nli);

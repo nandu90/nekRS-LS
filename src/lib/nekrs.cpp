@@ -538,7 +538,7 @@ bool stepConverged() { return nrs->timeStepConverged; }
 
 int nrsFinalize(nrs_t *nrs)
 {
-  auto exitValue = nekrs::exitValue();
+  int exitValue = nekrs::exitValue();
   if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
     if (nrs->uSolver)
       delete nrs->uSolver;
@@ -564,8 +564,11 @@ int nrsFinalize(nrs_t *nrs)
     AMGXfinalize();
     nek::finalize();
   }
-
-  if (platform->comm.mpiRank == 0)
+ 
+  int rankGlobal;
+  MPI_Comm_rank(platform->comm.mpiCommParent, &rankGlobal);
+  MPI_Allreduce(MPI_IN_PLACE, &exitValue, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
+  if (rankGlobal == 0)
     std::cout << "finished with exit code " << exitValue << std::endl;
 
   return exitValue;
