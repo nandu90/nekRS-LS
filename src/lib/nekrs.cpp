@@ -429,24 +429,16 @@ void processUpdFile()
   MPI_Bcast(&fsize, 1, MPI_LONG_LONG_INT, 0, comm);
 
   if (fsize) {
-    exit(1);
-    if (rank == 0)
-      std::cout << "processing " << updFile << " ...\n";
+    std::string txt = "processing " + updFile + " ...\n";
 
     if (rank != 0)
       rbuf = new char[fsize];
+
     MPI_Bcast(rbuf, fsize, MPI_CHAR, 0, comm);
     std::stringstream is;
     is.write(rbuf, fsize);
     inipp::Ini ini;
     ini.parse(is, false);
-
-    std::string end;
-    ini.extract("", "end", end);
-    if (end == "true") {
-      enforceLastStep = 1;
-      platform->options.setArgs("END TIME", "-1");
-    }
 
     std::string checkpoint;
     ini.extract("", "checkpoint", checkpoint);
@@ -457,7 +449,7 @@ void processUpdFile()
     ini.extract("general", "endtime", endTime);
     if (!endTime.empty()) {
       if (rank == 0)
-        std::cout << "  set endTime = " << endTime << "\n";
+        txt += "  set endTime = " + endTime + "\n";
       platform->options.setArgs("END TIME", endTime);
     }
 
@@ -465,7 +457,7 @@ void processUpdFile()
     ini.extract("general", "numsteps", numSteps);
     if (!numSteps.empty()) {
       if (rank == 0)
-        std::cout << "  set numSteps = " << numSteps << "\n";
+        txt += "  set numSteps = " + numSteps + "\n";
       platform->options.setArgs("NUMBER TIMESTEPS", numSteps);
     }
 
@@ -473,9 +465,12 @@ void processUpdFile()
     ini.extract("general", "writeinterval", writeInterval);
     if (!writeInterval.empty()) {
       if (rank == 0)
-        std::cout << "  set writeInterval = " << writeInterval << "\n";
+        txt += "  set writeInterval = " + writeInterval + "\n";
       platform->options.setArgs("SOLUTION OUTPUT INTERVAL", writeInterval);
     }
+
+    if (rank == 0)
+      std::cout << txt; 
 
     delete[] rbuf;
   }
