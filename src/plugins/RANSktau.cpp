@@ -149,7 +149,7 @@ void RANSktau::updateSourceTerms()
   occa::memory o_FS = cds->o_FS + cds->fieldOffsetScan[kFieldIndex];
   occa::memory o_BFDiag = cds->o_BFDiag + cds->fieldOffsetScan[kFieldIndex];
 
-  postProcessing::strainRotationRate(nrs, true, true, o_SijOij);
+  postProcessing::strainRotationRate(nrs, true, true, nrs->o_U, o_SijOij);
 
   SijMag2OiOjSkKernel(mesh->Nelements * mesh->Np, nrs->fieldOffset, 1, o_SijOij, o_OiOjSk, o_SijMag2);
     
