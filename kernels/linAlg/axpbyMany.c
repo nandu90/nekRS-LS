@@ -22,7 +22,9 @@ SOFTWARE.
 extern "C" void FUNC(axpbyMany)(const dlong & N, const dlong & Nfields, const dlong & offset, const dfloat & alpha, const dfloat * __restrict__ cpu_a, 
                     const dfloat & beta, dfloat * __restrict__ cpu_b)
 {
+
   if(beta != 0) {
+
 #ifdef __NEKRS__OMP__
 #pragma omp parallel for
 #endif
@@ -32,7 +34,9 @@ extern "C" void FUNC(axpbyMany)(const dlong & N, const dlong & Nfields, const dl
         cpu_b[id] = alpha * cpu_a[id] + beta * cpu_b[id];
       }
     }
+
   } else {
+
 #ifdef __NEKRS__OMP__
 #pragma omp parallel for
 #endif
@@ -42,5 +46,7 @@ extern "C" void FUNC(axpbyMany)(const dlong & N, const dlong & Nfields, const dl
         cpu_b[id] = alpha * cpu_a[id];
       }
     }
+
   }
+
 }
