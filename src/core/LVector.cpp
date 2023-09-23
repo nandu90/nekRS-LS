@@ -294,8 +294,8 @@ template <typename FPType> void LVector_t<FPType>::fieldOffsets(const std::vecto
 
   // check that each fieldOffset is at least as large as the corresponding Nlocal
   std::ostringstream errLogger;
-  for (int fld = 0; fld < this->nFields(); ++fld) {
-    if (fieldOffsets[fld] < this->Nlocal(fld)) {
+  for (int fld = 1; fld < this->nFields(); ++fld) {
+    if (fieldOffsets[fld] < this->Nlocal(fld - 1)) {
       errLogger << "LVector_t::offsets offsets[" << fld << "] = " << fieldOffsets[fld]
                 << ", while expecting at least " << this->Nlocal(fld) << "!\n";
     }
