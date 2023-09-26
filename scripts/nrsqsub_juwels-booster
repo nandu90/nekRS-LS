@@ -89,6 +89,8 @@ echo "module load GCC OpenMPI CUDA CMake " >>$SFILE
 echo "module list" >>$SFILE
 
 echo "nvidia-smi" >>$SFILE
+echo "export UCX_RNDV_THRESH=1024" >>$SFILE
+echo "export UCX_RC_TM_ENABLE=y" >>$SFILE
 echo "ucx_info -f" >>$SFILE
 
 echo "ulimit -s unlimited " >>$SFILE
