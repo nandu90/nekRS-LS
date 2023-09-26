@@ -570,8 +570,9 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   }
 
   const auto threshold = (sizeof(dfloat) == sizeof(double))
-                         ? 1e-8 : 1e-5;
+                         ? 2e-12 : 1e-5;
   for (auto &&err : {linfErrUx, linfErrUy, linfErrUz}) {
+    std::cout << err << std::endl;
     if (err > threshold) {
       CIFAIL;
     }
