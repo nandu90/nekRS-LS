@@ -65,7 +65,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
                              bool isScalar,
                              int verbosity,
                              T NtestsOrTargetTime,
-                             bool requiresBenchmark)
+                             bool runAutotuner)
 {
   if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
     Nelements = 1;
@@ -188,7 +188,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
     kernelVariants.push_back(8);
   }
 
-  if (kernelVariants.size() == 1 || !requiresBenchmark) {
+  if ((kernelVariants.size() == 1 && !platform->serial) || !runAutotuner) {
     auto newProps = props;
     if (!platform->serial && dealias)
       newProps["defines/p_knl"] = kernelVariants.front();
@@ -205,13 +205,13 @@ occa::kernel benchmarkAdvsub(int Nfields,
 
   const auto wordSize = sizeof(dfloat);
 
-  auto invLMM = randomVector<dfloat>(fieldOffset * nEXT);
-  auto cubD = randomVector<dfloat>(cubNq * cubNq);
-  auto NU = randomVector<dfloat>(Nfields * fieldOffset);
-  auto conv = randomVector<dfloat>(NVfields * cubatureOffset * nEXT);
-  auto cubInterpT = randomVector<dfloat>(Nq * cubNq);
-  auto Ud = randomVector<dfloat>(Nfields * fieldOffset);
-  auto BdivW = randomVector<dfloat>(fieldOffset * nEXT);
+  auto invLMM = randomVector<dfloat>(fieldOffset * nEXT, 0, 1, true);
+  auto cubD = randomVector<dfloat>(cubNq * cubNq, 0, 1, true);
+  auto NU = randomVector<dfloat>(Nfields * fieldOffset, 0, 1, true);
+  auto conv = randomVector<dfloat>(NVfields * cubatureOffset * nEXT, 0, 1, true);
+  auto cubInterpT = randomVector<dfloat>(Nq * cubNq, 0, 1, true);
+  auto Ud = randomVector<dfloat>(Nfields * fieldOffset, 0, 1, true);
+  auto BdivW = randomVector<dfloat>(fieldOffset * nEXT, 0, 1, true);
 
   // elementList[e] = e
   std::vector<dlong> elementList(Nelements);
@@ -287,26 +287,11 @@ occa::kernel benchmarkAdvsub(int Nfields,
     kernelRunner(kernel);
     o_NU.copyTo(results.data(), results.size() * sizeof(dfloat));
 
-    const auto tol = 1000. * std::numeric_limits<dfloat>::epsilon();
-    double err = 0;
-    for (auto i = 0; i < results.size(); ++i) {
-      const auto refValue = std::abs(referenceResults[i]);
-      const auto denom = refValue > tol ? refValue : 1.0;
-      const auto absDiff = std::abs(results[i] - referenceResults[i]);
-
-      // ignore values that are already near machine epsilon
-      if(absDiff > tol){
-        const auto relDiff = absDiff / denom;
-        err = std::max(err, (double) relDiff);
-      }
-    }
-    MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
-
-    if (err > tol) {
+    const auto err = maxRelErr<dfloat>(referenceResults, results, platform->comm.mpiComm);
+    if (err > 1000 * std::numeric_limits<dfloat>::epsilon()) {
       if (platform->comm.mpiRank == 0 && verbosity > 1) {
-        std::cout << "advSub: Ignore kernel " << kernelVariant 
-                  << " because error of " << err
-                  << " is too large compared to reference\n";
+        std::cout << "advSub: Ignore version " << kernelVariant 
+                  << " as correctness check failed with " << err << std::endl;
       }
 
       // pass un-initialized kernel to skip this kernel variant
@@ -418,7 +403,7 @@ template occa::kernel benchmarkAdvsub<int>(int Nfields,
                                            bool isScalar,
                                            int verbosity,
                                            int Ntests,
-                                           bool requiresBenchmark);
+                                           bool runAutotuner);
 
 template occa::kernel benchmarkAdvsub<double>(int Nfields,
                                               int Nelements,
@@ -429,4 +414,4 @@ template occa::kernel benchmarkAdvsub<double>(int Nfields,
                                               bool isScalar,
                                               int verbosity,
                                               double targetTime,
-                                              bool requiresBenchmark);
+                                              bool runAutotuner);
