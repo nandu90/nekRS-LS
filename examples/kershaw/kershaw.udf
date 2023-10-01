@@ -37,6 +37,7 @@ void runBenchmarks(nrs_t *nrs)
   }
   if (runBP6) {
     benchmarks.push_back("BP6");
+    benchmarks.push_back("BP6_PCGC");
   }
 
   if (platform->comm.mpiRank == 0) {
@@ -76,6 +77,17 @@ void runBenchmarks(nrs_t *nrs)
       solver->options.setArgs("PRECONDITIONER", "NONE");
       solver->options.setArgs("BLOCK SOLVER", "TRUE");
       solver->options.setArgs("SOLVER", "PCG");
+      solver->options.setArgs("MAXIMUM ITERATIONS", "1000");
+      solver->options.setArgs("SOLVER TOLERANCE", to_string_f(1e-15));
+      ellipticPreconditionerSetup(solver, solver->ogs);
+    }
+    if (benchmark == "BP6_PCGC") {
+      solver = nrs->uvwSolver;
+
+      Nrep = bp6NReps;
+      solver->options.setArgs("PRECONDITIONER", "JACOBI");
+      solver->options.setArgs("BLOCK SOLVER", "TRUE");
+      solver->options.setArgs("SOLVER", "PCG+COMBINED");
       solver->options.setArgs("MAXIMUM ITERATIONS", "1000");
       solver->options.setArgs("SOLVER TOLERANCE", to_string_f(1e-15));
       ellipticPreconditionerSetup(solver, solver->ogs);
