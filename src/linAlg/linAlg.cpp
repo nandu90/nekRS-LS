@@ -97,7 +97,7 @@ void linAlg_t::runTimers()
     }
   };
 
-  for (int i = 1; i < 11; i++) {
+  for (int i: {1,3}) {
     run(i);
   }
 
