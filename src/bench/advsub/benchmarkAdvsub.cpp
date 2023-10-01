@@ -156,7 +156,6 @@ occa::kernel benchmarkAdvsub(int Nfields,
     fileName = oklpath + "/cds/" + kernelName + ext;
   }
 
-  // currently lacking a native implementation of the non-dealiased kernel
   if (!dealias) {
     fileName = oklpath + "/nrs/" + kernelName + ".okl";
     if (isScalar) {
@@ -165,41 +164,41 @@ occa::kernel benchmarkAdvsub(int Nfields,
   }
 
   std::vector<int> kernelVariants = {0};
-  if (!platform->serial && dealias && !isScalar) {
-
-   std::vector<int> kernelSearchSpace = { 6, 7, 8, 9, 16 };
-    for (auto i : kernelSearchSpace) {
-      // v12 requires cubNq <=13
-      if (i == 11 && cubNq > 13)
-        continue;
-
-      // v14 requires cubNq <=12
-      if (i == 14 && cubNq > 12)
-        continue;
-
-      // v14 requires cubNq <=12
-      if (i == 16 && cubNq > 14)
-        continue;
-
-      kernelVariants.push_back(i);
+  if (!platform->serial && dealias) {
+    if (!isScalar) {
+ 
+     std::vector<int> kernelSearchSpace = { 6, 7, 8, 9, 16 };
+      for (auto i : kernelSearchSpace) {
+        // v12 requires cubNq <=13
+        if (i == 11 && cubNq > 13)
+          continue;
+ 
+        // v14 requires cubNq <=12
+        if (i == 14 && cubNq > 12)
+          continue;
+ 
+        // v14 requires cubNq <=12
+        if (i == 16 && cubNq > 14)
+          continue;
+ 
+        kernelVariants.push_back(i);
+      }
+    }
+    else {
+      kernelVariants.push_back(8);
     }
   }
-  else if (!platform->serial && dealias && isScalar) {
-    kernelVariants.push_back(8);
-  }
 
-  if ((kernelVariants.size() == 1 && !platform->serial) || !runAutotuner) {
+  if (!runAutotuner) {
     auto newProps = props;
-    if (!platform->serial && dealias)
-      newProps["defines/p_knl"] = kernelVariants.front();
+    newProps["defines/p_knl"] = kernelVariants.front();
     return platform->device.buildKernel(fileName, newProps, true);
   }
 
   occa::kernel referenceKernel;
   {
     auto newProps = props;
-    if (!platform->serial && dealias)
-      newProps["defines/p_knl"] = kernelVariants.front();
+    newProps["defines/p_knl"] = kernelVariants.front();
     referenceKernel = platform->device.buildKernel(fileName, newProps, true);
   }
 
@@ -270,8 +269,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
 
   auto advSubKernelBuilder = [&](int kernelVariant) {
     auto newProps = props;
-    if (!platform->serial && dealias)
-      newProps["defines/p_knl"] = kernelVariant;
+    newProps["defines/p_knl"] = kernelVariant;
 
     auto kernel = platform->device.buildKernel(fileName, newProps, true);
     if (platform->options.compareArgs("BUILD ONLY", "TRUE"))

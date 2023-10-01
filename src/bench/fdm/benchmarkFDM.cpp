@@ -93,11 +93,9 @@ occa::kernel benchmarkFDM(int Nelements,
 
     const std::string oklpath(getenv("NEKRS_KERNEL_DIR"));
 
-    // only a single choice, no need to run benchmark
-    if ((kernelVariants.size() == 1 && !platform->serial) || !runAutotuner) {
+    if (!runAutotuner) {
       auto newProps = props;
-      if (!platform->serial)
-        newProps["defines/p_knl"] = kernelVariants.front();
+      newProps["defines/p_knl"] = kernelVariants.front();
 
       const std::string kernelName = "fusedFDM";
       const std::string ext = platform->serial ? ".c" : ".okl";
@@ -130,8 +128,7 @@ occa::kernel benchmarkFDM(int Nelements,
     occa::kernel referenceKernel;
     {
       auto newProps = props;
-      if (!platform->serial)
-        newProps["defines/p_knl"] = kernelVariants.front();
+      newProps["defines/p_knl"] = kernelVariants.front();
 
       const std::string kernelName = "fusedFDM";
       const std::string ext = platform->serial ? ".c" : ".okl";
@@ -149,8 +146,7 @@ occa::kernel benchmarkFDM(int Nelements,
 
     auto fdmKernelBuilder = [&](int kernelVariant) {
       auto newProps = props;
-      if (!platform->serial)
-        newProps["defines/p_knl"] = kernelVariant;
+      newProps["defines/p_knl"] = kernelVariant;
 
       const std::string kernelName = "fusedFDM";
       const std::string ext = platform->serial ? ".c" : ".okl";
