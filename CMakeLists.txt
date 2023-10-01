@@ -151,7 +151,7 @@ set(ENABLE_HYPRE_GPU OFF CACHE BOOL "Enable HYPRE GPU support")
 set(NEKRS_GPU_MPI ON CACHE BOOL "Enable GPU aware MPI")
 set(ENABLE_CVODE OFF CACHE BOOL "Enable CVODE support")
 
-set(NEKRS_USE_DFLOAT_FLOAT OFF CACHE BOOL "use dfloat = float")
+set(NEKRS_BUILD_FLOAT ON CACHE BOOL "Build dfloat = float version")
 
 ###############################################################################
 # Set compiler flags                                                          #
@@ -272,11 +272,6 @@ if (ENABLE_CVODE)
   set(BUILD_TESTING OFF)
   set(BUILD_SHARED_LIBS ON)
 
-  if(NEKRS_USE_DFLOAT_FLOAT)
-    set(SUNDIALS_PRECISION "single")
-  endif()
-
-
   add_subdirectory(3rd_party/cvode)
 
   # restore default
@@ -294,14 +289,26 @@ include(config/nrs.cmake)
 
 # Link dependencies
 target_link_libraries(nekrs-lib PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs ${GSLIB} blas lapack ${CMAKE_DL_LIBS})
+if (NEKRS_BUILD_FLOAT)
+  target_link_libraries(nekrs-lib-fp32 PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs ${GSLIB} blas lapack ${CMAKE_DL_LIBS})
+endif()
+
 if(OpenMP_FOUND)
-target_link_libraries(nekrs-lib PUBLIC OpenMP::OpenMP_CXX)
+  target_link_libraries(nekrs-lib PUBLIC OpenMP::OpenMP_CXX)
+  if (NEKRS_BUILD_FLOAT)
+    target_link_libraries(nekrs-lib-fp32 PUBLIC OpenMP::OpenMP_CXX)
+  endif()
 endif()
 
 if(ENABLE_AMGX AND OCCA_CUDA_ENABLED)
   target_compile_definitions(nekrs-lib PUBLIC -DENABLE_AMGX)
   target_link_libraries(nekrs-lib PUBLIC amgxsh amgx)
   target_include_directories(nekrs-lib PUBLIC 3rd_party/AMGX/base/include 3rd_party/AMGX/core/include)
+  if (NEKRS_BUILD_FLOAT)
+    target_compile_definitions(nekrs-lib-fp32 PUBLIC -DENABLE_AMGX)
+    target_link_libraries(nekrs-lib-fp32 PUBLIC amgxsh amgx)
+    target_include_directories(nekrs-lib-fp32 PUBLIC 3rd_party/AMGX/base/include 3rd_party/AMGX/core/include)
+  endif()
 endif()
 
 if (ENABLE_CVODE)
@@ -317,6 +324,9 @@ if (ENABLE_CVODE)
 endif()
 
 target_link_libraries(nekrs-bin PRIVATE nekrs-lib)
+if (NEKRS_BUILD_FLOAT)
+  target_link_libraries(nekrs-bin-fp32 PRIVATE nekrs-lib-fp32)
+endif()
 
 ###############################################################################
 # install
@@ -356,6 +366,15 @@ install(
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
 )
+
+if (NEKRS_BUILD_FLOAT)
+  install(
+    TARGETS nekrs-lib-fp32 nekrs-bin-fp32
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+  )
+endif()
 
 # Trailing slash prevents parent directory from being copied
 install(DIRECTORY scripts/ DESTINATION bin
