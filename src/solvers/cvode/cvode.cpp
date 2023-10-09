@@ -194,7 +194,7 @@ cvode_t::cvode_t(nrs_t *_nrs)
     platform->copyDfloatToPfloatKernel(mesh->Nelements * mesh->Np * mesh->Nvgeo, mesh->o_vgeo, o_vgeoPfloat);
   }
 
-  o_invRhoCpAvg = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[0]);
+  o_rhoCpAvg = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[0]);
 
   if (platform->comm.mpiRank == 0) {
     std::cout << "done\n";
@@ -530,16 +530,18 @@ void cvode_t::initialize()
     platform->options.setArgs("CVODE GS TYPE", "CLASSICAL");
 
   if (linearSolverType.find("GMRES") !=std::string::npos) {
-    if(platform->options.compareArgs("CVODE GS TYPE", "CLASSICAL")) {
+    std::string gsType;
+    platform->options.getArgs("CVODE GS TYPE", gsType);
+    if(gsType.find("CLASSICAL") != std::string::npos) {
       SUNLinSol_SPGMRSetGSType(LS, SUN_CLASSICAL_GS);
       check_retval(&retval, "SUNLinSol_SPGMRSetGSType", 1);
-    } else if (platform->options.compareArgs("CVODE GS TYPE", "MODIFIED")) {
+    } else if (gsType == "MODIFIED") {
       nrsCheck(this->linearSolverType == "CBGMRES", 
                platform->comm.mpiComm, EXIT_FAILURE, "%s",
                "CVODE GS TYPE MODIFIED not available for CBGMRES!\n");
     } else {
-      nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s",
-               "Invalid CVODE GS TYPE!\n");
+      nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "Invalid CVODE GS TYPE %s!\n",
+               gsType);
     }
   }
 
@@ -690,6 +692,7 @@ void cvode_t::applyDirichlet(double time)
   // extrapolate masked Dirichlet values to current time state
   // NOTE: this can only be applied after the extrapolation order is reached
   // to avoid introducing CVODE convergence issues in the first few time steps
+#if 1
   if (this->isRhsEvaluation() && (this->externalTStep > nrs->nEXT)) {
 
     if (this->Nmasked == 0) {
@@ -707,6 +710,7 @@ void cvode_t::applyDirichlet(double time)
                                      cds->o_S + this->minCvodeScalarId * nrs->fieldOffset);
     return;
   }
+#endif
 
   // lower than any other possible Dirichlet value
   static constexpr dfloat TINY = -1e30;
@@ -946,24 +950,20 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
     evaluateProperties(nrs, time);
     platform->timer.toc(timerScope + "::evaluateProperties");
 
+    o_rhoCpAvg.copyFrom(cds->o_rho);
     if (chtCVODE) {
-      auto mesh = cds->mesh[0];
-      // TODO: fuse all ops into one kernel
-      o_invRhoCpAvg.copyFrom(cds->o_rho);
-      platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_invRhoCpAvg);
-      oogs::startFinish(o_invRhoCpAvg, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, cds->gshT);
-      platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_invRhoCpAvg);
-      platform->linAlg->ady(mesh->Nlocal, 1.0, o_invRhoCpAvg);
-    } else {
-      platform->linAlg->adyz(mesh->Nlocal, 1.0, cds->o_rho + cds->fieldOffsetScan[minCvodeScalarId], o_invRhoCpAvg);
+      auto mesh = cds->mesh[minCvodeScalarId];
+      platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_rhoCpAvg);
+      oogs::startFinish(o_rhoCpAvg, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, cds->gshT);
+      platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_rhoCpAvg);
     }
   }
 
   platform->linAlg->fill(cds->fieldOffsetSum, 0.0, cds->o_FS);
   if(userMakeq) {
-    userMakeq(nrs, time);
+    userMakeq(nrs, time, cds->o_FS);
   } else {
-    makeq(time);
+    makeq(time, cds->o_FS);
   }
 
   auto applyOgsOperation = [&](auto ogsFunc) {
@@ -989,10 +989,15 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
   applyOgsOperation(oogs::start);
 
-  if (userLocalPointSourceL) {
-    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::localPointSource", 0);
+  if (userLocalPointSourceE) {
+    const auto makeQScope = timerScope;
+    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::userLocalPointSourceE", 0);
+    userLocalPointSourceE(nrs, time, cds->o_S, this->o_pointSource);
+    platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::userLocalPointSourceE");
+  } else if (userLocalPointSourceL) {
+    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::userLocalPointSourceL", 0);
     userLocalPointSourceL(nrs, time, o_y, o_ydot);
-    platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::localPointSource");
+    platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::userLocalPointSourceL");
     cvToNrs(o_ydot, this->o_pointSource, true);
   }
 
@@ -1000,85 +1005,81 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint");
-    platform->timer.tic(timerScope + "::fusedAddRhoDiv", 0);
   }
 
-  // add pointsource and weight by inverse assemabled mass matrix and devide by "rho" 
-  if (chtCVODE) {
-    auto mesh = cds->mesh[0];
-    platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, cds->o_FS);
-    if (userLocalPointSourceL) {
-      platform->linAlg->axpby(mesh->Nlocal, 1.0, this->o_pointSource, 1.0, cds->o_FS);
-    }
-    platform->linAlg->axmy(mesh->Nlocal, 1.0, o_invRhoCpAvg, cds->o_FS);
-  }
-  if (!chtCVODE || (chtCVODE && this->Nscalar > 1)) {
-    dlong startScalar = minCvodeScalarId;
-    dlong numScalars = this->Nscalar;
-    if (chtCVODE) {
-      startScalar++;
-      numScalars--;
-    }
-    auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[startScalar];
-    auto o_rho_start = cds->o_rho + cds->fieldOffsetScan[startScalar];
-    occa::memory o_ptSource_start;
+  // evaluate p0th + dp0thdt and update p-dependent quantities like "rho"
+  auto addDpdtTerm = false;
+  if (nrs->pSolver) {
+    if (platform->options.compareArgs("LOWMACH", "TRUE") && nrs->pSolver->allNeumann) {
+      addDpdtTerm = true;
 
-    if (userLocalPointSourceL) {
-      o_ptSource_start = this->o_pointSource + cds->fieldOffsetScan[startScalar];
+      if (!(isJacobianEvaluation() && recycleProperties)) {
+        if (detailedTimersEnabled) {
+          platform->timer.tic(timerScope + "::dp0thdt", 0);
+        }
+        cds->cvode->setTimerScope(timerScope + "::dp0thdt");
+ 
+        udf.div(nrs, time, nrs->o_div);
+
+        o_rhoCpAvg.copyFrom(cds->o_rho);
+        if (chtCVODE) {
+          auto mesh = cds->mesh[minCvodeScalarId];
+          platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_rhoCpAvg);
+          oogs::startFinish(o_rhoCpAvg, 1, nrs->fieldOffset, ogsDfloat, ogsAdd, cds->gshT);
+          platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_rhoCpAvg);
+        }
+ 
+        // do not re-evalute convection + filtering term (multiplied by rho) 
+        // effect is condidered to be neglibible  
+
+        cds->cvode->setTimerScope(timerScope);
+        if (detailedTimersEnabled)
+          platform->timer.toc(timerScope + "::dp0thdt");
+      }
+    }
+  }
+
+  // add pointsource and weight by inverse assembled mass matrix and divide by "rho" 
+  {
+    if (detailedTimersEnabled) {
+      platform->timer.tic(timerScope + "::fusedAddRhoDiv", 0);
+    }
+
+    const auto startScalar = minCvodeScalarId;
+    auto o_FS = cds->o_FS + cds->fieldOffsetScan[startScalar];
+    auto o_rho = cds->o_rho + cds->fieldOffsetScan[startScalar];
+
+    occa::memory o_ptSource;
+    if (this->o_pointSource.isInitialized()) {
+      o_ptSource = this->o_pointSource + cds->fieldOffsetScan[startScalar];
     }
 
     const int useFieldRho = !sharedRho;
-    auto mesh = cds->meshV;
-    this->fusedAddRhoDivKernel(mesh->Nlocal,
-                               numScalars,
+    this->fusedAddRhoDivKernel(cds->mesh[0]->Nlocal,
+                               cds->meshV->Nlocal,
+                               this->Nscalar,
                                nrs->fieldOffset,
-                               mesh->o_invLMM, 
+                               cds->mesh[0]->o_invLMM,
+                               cds->meshV->o_invLMM, 
                                useFieldRho,
-                               o_rho_start,
-                               o_ptSource_start,
-                               o_FS_start);
-  }
+                               o_rhoCpAvg,
+                               o_rho,
+                               o_ptSource,
+                               (addDpdtTerm) ? nrs->dp0thdt * nrs->alpha0Ref : static_cast<dfloat>(0.0),
+                               o_FS);
 
-  if (detailedTimersEnabled) {
-    platform->timer.toc(timerScope + "::fusedAddRhoDiv");
-  }
-
-  // add dpdt term to temperature eqn
-  if (nrs->pSolver) {
-    if (platform->options.compareArgs("LOWMACH", "TRUE") && nrs->pSolver->allNeumann) {
-      if (detailedTimersEnabled) {
-        platform->timer.tic(timerScope + "::dp0thdt", 0);
-      }
- 
-      // evaluate dp0thdt
-      if (!(isJacobianEvaluation() && recycleProperties)) {
-        if (detailedTimersEnabled) {
-          platform->timer.tic(timerScope + "::dp0thdt::udfDiv", 0);
-        }
-        cds->cvode->setTimerScope(timerScope + "::dp0thdt::udfDiv");
- 
-        platform->linAlg->fill(nrs->meshV->Nlocal, 0.0, nrs->o_div);
-        udf.div(nrs, time, nrs->o_div);
- 
-        cds->cvode->setTimerScope(timerScope);
-        if (detailedTimersEnabled)
-          platform->timer.toc(timerScope + "::dp0thdt::udfDiv");
-      }
- 
-      platform->linAlg->axpby(cds->mesh[0]->Nlocal, nrs->dp0thdt * nrs->alpha0Ref, o_invRhoCpAvg, 1.0, cds->o_FS); 
- 
-      if (detailedTimersEnabled) {
-        platform->timer.toc(timerScope + "::dp0thdt");
-      }
+    if (detailedTimersEnabled) {
+      platform->timer.toc(timerScope + "::fusedAddRhoDiv");
     }
   }
 
-  auto o_FS_start = cds->o_FS + cds->fieldOffsetScan[minCvodeScalarId];
+  // zero out RHS for unknowns using a Dirichlet BC
   if (detailedTimersEnabled) {
     platform->timer.tic(timerScope + "::maskDirichlet", 0);
   }
   if (this->Nmasked > 0) {
-    nrs->maskKernel(this->Nmasked, this->o_maskIds, o_FS_start);
+    auto o_FS = cds->o_FS + cds->fieldOffsetScan[minCvodeScalarId];
+    nrs->maskKernel(this->Nmasked, this->o_maskIds, o_FS);
   }
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope + "::maskDirichlet");
@@ -1087,40 +1088,18 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   nrsToCv(cds->o_FS, o_ydot, true);
 }
 
-void cvode_t::makeq(double time)
+void cvode_t::makeq(double time, occa::memory& o_FS)
 {
   const auto timerScopeSave = timerScope;
   timerScope = timerScopeSave + "::makeq";
   platform->timer.tic(timerScope, 0);
 
   auto *cds = nrs->cds;
-  auto o_FS = nrs->cds->o_FS;
 
   const bool useRelativeVelocity = platform->options.compareArgs("MOVING MESH", "TRUE");
   auto &o_Urst = useRelativeVelocity ? cds->o_relUrst : cds->o_Urst;
 
   auto applyTerms = [&](mesh_t *mesh, const dlong scalarStart, const dlong Nscalar) {
-    if (cds->applyFilter) {
-      if (detailedTimersEnabled) {
-        platform->timer.tic(timerScope + "::filterRT", 0);
-      }
-
-      cds->filterRTKernel(cds->meshV->Nelements,
-                          scalarStart,
-                          Nscalar,
-                          nrs->fieldOffset,
-                          cds->o_applyFilterRT,
-                          cds->o_filterRT,
-                          cds->o_filterS,
-                          cds->o_rho,
-                          cds->o_S,
-                          o_FS);
-
-      if (detailedTimersEnabled) {
-        platform->timer.toc(timerScope + "::filterRT");
-      }
-    }
-
     if (detailedTimersEnabled) {
       platform->timer.tic(timerScope + "::weakLaplacian", 0);
     }
@@ -1173,6 +1152,27 @@ void cvode_t::makeq(double time)
       platform->timer.toc(timerScope + "::neumannBC");
     }
 
+    if (cds->applyFilter) {
+      if (detailedTimersEnabled) {
+        platform->timer.tic(timerScope + "::filterRT", 0);
+      }
+
+      cds->filterRTKernel(cds->meshV->Nelements,
+                          scalarStart,
+                          Nscalar,
+                          nrs->fieldOffset,
+                          cds->o_applyFilterRT,
+                          cds->o_filterRT,
+                          cds->o_filterS,
+                          cds->o_rho,
+                          cds->o_S,
+                          o_FS);
+
+      if (detailedTimersEnabled) {
+        platform->timer.toc(timerScope + "::filterRT");
+      }
+    }
+
     if (platform->options.compareArgs("ADVECTION", "TRUE")) {
       if (detailedTimersEnabled) {
         platform->timer.tic(timerScope + "::advection", 0);
@@ -1218,15 +1218,6 @@ void cvode_t::makeq(double time)
     }
   };
 
-  if (userLocalPointSourceE) {
-    const auto makeQScope = timerScope;
-    timerScope = makeQScope + "::udfSEqnSource";
-    platform->timer.tic(timerScope, 0);
-    userLocalPointSourceE(nrs, time, cds->o_S, o_FS);
-    platform->timer.toc(timerScope);
-    timerScope = makeQScope;
-  }
-
   if (udf.sEqnSource) {
     const auto makeQScope = timerScope;
     timerScope = makeQScope + "::udfSEqnSource";
@@ -1236,6 +1227,7 @@ void cvode_t::makeq(double time)
     timerScope = makeQScope;
   }
 
+#if 1
   const bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
   if (chtCVODE) {
     applyTerms(cds->mesh[0], 0, 1);
@@ -1249,6 +1241,7 @@ void cvode_t::makeq(double time)
     }
     applyTerms(cds->meshV, startScalar, numScalars);
   }
+#endif
 
   platform->timer.toc(timerScope);
   timerScope = timerScopeSave;
@@ -1720,15 +1713,19 @@ std::string cvode_t::rhsTagName() const
 
 void cvode_t::setLocalPointSource(userLocalPointSourceE_t _userLocalPointSource)
 {
-    userLocalPointSourceE = _userLocalPointSource; 
+  userLocalPointSourceE = _userLocalPointSource; 
+
+  nrsCheck(!o_pointSource.isInitialized(), platform->comm.mpiComm, EXIT_FAILURE, "%s",
+           "o_pointSource not initialized!\n");
+
+  this->fusedAddRhoDivKernel = platform->kernels.get("cvode_t::fusedAddRhoDiv");
 }
 void cvode_t::setLocalPointSource(userLocalPointSourceL_t _userLocalPointSource)
 {
   userLocalPointSourceL = _userLocalPointSource;
 
-  if (!o_pointSource.isInitialized()) {
-    o_pointSource = platform->device.malloc<dfloat>(this->Nscalar * nrs->fieldOffset);
-  }
+  nrsCheck(!o_pointSource.isInitialized(), platform->comm.mpiComm, EXIT_FAILURE, "%s",
+           "o_pointSource not initialized!\n");
 
   this->fusedAddRhoDivKernel = platform->kernels.get("cvode_t::fusedAddRhoDiv");
 }

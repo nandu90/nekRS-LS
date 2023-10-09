@@ -36,7 +36,7 @@ public:
 
   using userPostNrsToCv_t = std::function<void(nrs_t *nrs,  LVector_t<dfloat> & o_LField, bool isYdot)>;
   using userPostCvToNrs_t = std::function<void(nrs_t *nrs, occa::memory o_EField, bool isYdot)>;
-  using userMakeq_t = std::function<void(nrs_t *nrs, double time)>;
+  using userMakeq_t = std::function<void(nrs_t *nrs, double time, occa::memory& o_FS)>;
   using userPreSolve_t = std::function<void(nrs_t *nrs)>;
   using userPostSolve_t = std::function<void(nrs_t *nrs)>;
 
@@ -188,7 +188,7 @@ private:
   userPreSolve_t userPreSolve;
   userPostSolve_t userPostSolve;
 
-  void makeq(double time);
+  void makeq(double time, occa::memory& o_FS);
 
   static constexpr int maxTimestepperOrder = 3;
   std::array<dfloat, maxTimestepperOrder> _coeffBDF;
@@ -204,7 +204,7 @@ private:
 
   occa::memory o_qthermalFSCache;
 
-  occa::memory o_invRhoCpAvg;
+  occa::memory o_rhoCpAvg;
 
   occa::memory o_coeffExt;
 
