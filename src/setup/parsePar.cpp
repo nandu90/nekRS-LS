@@ -601,8 +601,6 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
       options.setArgs("CVODE GS TYPE", "CLASSICAL");
     } else if (gstype == "classical1") {
       options.setArgs("CVODE GS TYPE", "CLASSICAL1");
-    } else if (gstype == "classical2") {
-      options.setArgs("CVODE GS TYPE", "CLASSICAL2");
     } else if (gstype == "modified") {
       options.setArgs("CVODE GS TYPE", "MODIFIED");
     } else {
