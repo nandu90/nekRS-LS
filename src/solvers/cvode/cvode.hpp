@@ -58,8 +58,6 @@ public:
 
   void setUserPostSolve(userPostSolve_t _userPostSolve) { userPostSolve = _userPostSolve; }
 
-  void setQthermalFSCache(const occa::memory& o_qthermalFSCache_) { o_qthermalFSCache = o_qthermalFSCache_; }
-
   void printInfo(bool printVerboseInfo);
 
   bool isRhsEvaluation() const { return rhsEval; }
@@ -201,8 +199,6 @@ private:
   dfloat _g0;
 
   dlong Nscalar;
-
-  occa::memory o_qthermalFSCache;
 
   occa::memory o_rhoCpAvg;
 

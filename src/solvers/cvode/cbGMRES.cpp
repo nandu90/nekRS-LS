@@ -1,14 +1,8 @@
 /*
  * -----------------------------------------------------------------
  * Clone of CVODE's SPGMR solver with some modifications;
- * - mixed precision (basis in reduced precision pfloat)
- * - no restarts
- * - no preconditioning
- * - always scale and cache s2Inv 
  * -----------------------------------------------------------------
  */
-
-// - make Kthre user parameter
 
 #ifdef ENABLE_CVODE
 
@@ -135,7 +129,7 @@ static void innerProdMulti(const dlong NVec,
   }
 }
 
-static void CGS1(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory& o_omega)  
+static int CGS1(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory& o_omega)  
 {
   platform->timer.tic(timerName + "solve::cvode::linearSolve::cgs", 0);
 
@@ -158,28 +152,25 @@ static void CGS1(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory
   o_stemp.copyFrom(stemp, k+1);
   linearCombination(k+1, o_stemp, o_V, o_omega, o_omega);
 
-  const auto arg = omegaDotp - sTempSqrSum;  
-  if (arg > 0) {
-    *new_vk_norm  = SUNRsqrt(arg);
-  } else {
-    *new_vk_norm = SUNRsqrt(platform->linAlg->innerProd(N, o_omega, o_omega, platform->comm.mpiComm));
-  }
+  platform->timer.toc(timerName + "solve::cvode::linearSolve::cgs");
 
+  const auto arg = omegaDotp - sTempSqrSum;  
+  if (arg <= 0) return 1;
+  *new_vk_norm  = SUNRsqrt(arg);
 #if 0
   if (platform->comm.mpiRank == 0) {
     std::cout << "CGS1: vk_norm= " << *new_vk_norm << std::endl;
   }
 #endif
 
-  platform->timer.toc(timerName + "solve::cvode::linearSolve::cgs");
+  return 0;
 }
 
 /* two pass (iterative) classical Gram-Schmidt */
-static void CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory& o_omega)  
+static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory& o_omega)  
 {
   if (useCGS1) {
-    CGS1(h, k ,p, new_vk_norm, o_omega);
-    return;
+    return CGS1(h, k ,p, new_vk_norm, o_omega);
   }
 
   auto stemp = (sunrealtype *) h_stemp.ptr(); 
@@ -215,6 +206,8 @@ static void CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory
 #endif
     }
   }
+
+  return 0;
 }
 
 #define cbGMRESFinish(lastFlag)   \
@@ -396,7 +389,11 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
     platform->linAlg->axmy(N, ONE, o_s1, o_vtemp2);
 
     /* Orthogonalize vtemp2 (V[l+1]) against previous V[i] */
-    CGSI(Hes, l_plus_1, l_max, &(Hes[l_plus_1][l]), o_vtemp2);
+    if(CGSI(Hes, l_plus_1, l_max, &(Hes[l_plus_1][l]), o_vtemp2) != 0) {
+      *zeroguess  = SUNFALSE;
+      LASTFLAG(S) = SUNLS_GS_FAIL;
+      cbGMRESFinish(LASTFLAG(S));
+    }
 
     /* Update the QR factorization of Hes */
     if(SUNQRfact(krydim, Hes, givens, l) != 0 ) {

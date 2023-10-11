@@ -690,9 +690,6 @@ void cvode_t::setupDirichletMask()
 void cvode_t::applyDirichlet(double time)
 {
   // extrapolate masked Dirichlet values to current time state
-  // NOTE: this can only be applied after the extrapolation order is reached
-  // to avoid introducing CVODE convergence issues in the first few time steps
-#if 1
   if (this->isRhsEvaluation() && (this->externalTStep > nrs->nEXT)) {
 
     if (this->Nmasked == 0) {
@@ -710,7 +707,6 @@ void cvode_t::applyDirichlet(double time)
                                      cds->o_S + this->minCvodeScalarId * nrs->fieldOffset);
     return;
   }
-#endif
 
   // lower than any other possible Dirichlet value
   static constexpr dfloat TINY = -1e30;
@@ -1116,11 +1112,6 @@ void cvode_t::makeq(double time, occa::memory& o_FS)
 
     if (detailedTimersEnabled) {
       platform->timer.toc(timerScope + "::weakLaplacian");
-    }
-
-    // store intermediate result for later reuse in qthermal
-    if (!(isJacobianEvaluation() && recycleProperties) && o_qthermalFSCache.isInitialized()) {
-      o_qthermalFSCache.copyFrom(o_FS + cds->fieldOffsetScan[scalarStart], Nscalar*nrs->fieldOffset);
     }
 
     if (detailedTimersEnabled) {
