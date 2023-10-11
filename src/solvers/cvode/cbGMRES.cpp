@@ -158,7 +158,7 @@ static void CGS1(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory
   o_stemp.copyFrom(stemp, k+1);
   linearCombination(k+1, o_stemp, o_V, o_omega, o_omega);
 
-  const auto arg = omegaDotp*omegaDotp - sTempSqrSum;  
+  const auto arg = omegaDotp - sTempSqrSum;  
   if (arg > 0) {
     *new_vk_norm  = SUNRsqrt(arg);
   } else {
