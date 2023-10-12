@@ -88,7 +88,7 @@ void linAlg_t::runTimers()
       auto elapsedMax = 0.0;
       MPI_Allreduce(&elapsed, &elapsedMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
       if (platform->comm.mpiRank == 0)
-        printf("(avg local: %.3es / %.3eGB/s)\n", elapsedMax, 3*fields*Nlocal*sizeof(dfloat)/elapsedMax/1e9);
+        printf("(avg local: %.3es / %.3eGB/s)\n", elapsedMax, (1 + 2*fields)*Nlocal*sizeof(dfloat)/elapsedMax/1e9);
     }
     else {
       if (platform->comm.mpiRank == 0) {
