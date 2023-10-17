@@ -195,11 +195,20 @@ set_external_flags("C")
 set_external_flags("CXX")
 set_external_flags("Fortran")
 
-set(BSYMBOLIC_FLAG "LINKER:-Bsymbolic LINKER:-Bsymbolic-functions")
-check_linker_flag(C ${BSYMBOLIC_FLAG} Allowed_LD_Flag_BSYMBOLIC)
+set(BSYMBOLIC_FLAG1 "${CMAKE_C_LINKER_WRAPPER_FLAG}-Bsymbolic")
+check_linker_flag(C ${BSYMBOLIC_FLAG1} Allowed_LD_Flag_BSYMBOLIC)
 if(NOT Allowed_LD_Flag_BSYMBOLIC OR APPLE)
-  set(BSYMBOLIC_FLAG "")
+  set(BSYMBOLIC_FLAG1 "")
 endif()
+
+set(BSYMBOLIC_FLAG2 "${CMAKE_C_LINKER_WRAPPER_FLAG}-Bsymbolic-functions")
+check_linker_flag(C ${BSYMBOLIC_FLAG2} Allowed_LD_Flag_BSYMBOLIC_FUNCTIONS)
+if(NOT Allowed_LD_Flag_BSYMBOLIC_FUNCTIONS OR APPLE)
+  set(BSYMBOLIC_FLAG2 "")
+endif()
+
+set(BSYMBOLIC_FLAG "${BSYMBOLIC_FLAG1} ${BSYMBOLIC_FLAG2}")
+message("-- BSYMBOLIC_FLAG: ${BSYMBOLIC_FLAG}")
 
 ################################################################################
 
