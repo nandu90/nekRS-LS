@@ -397,7 +397,7 @@ bool runStep(nrs_t *nrs, std::function<bool(int)> convergenceCheck, int stage)
     lagFields(nrs);
   }
 
-  applyDirichlet(nrs, timeNew);
+  applyDirichlet(nrs, timeNew); // actual + extrapolated solution
 
   if (nrs->Nscalar) {
     scalarSolve(nrs, timeNew, cds->o_S, stage);

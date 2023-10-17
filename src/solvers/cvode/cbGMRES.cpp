@@ -131,7 +131,7 @@ static void innerProdMulti(const dlong NVec,
 
 static int CGS1(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory& o_omega)  
 {
-  platform->timer.tic(timerName + "solve::cvode::linearSolve::cgs", 0);
+  platform->timer.tic(timerName + "solve::cvode::linearSolve::cgs1", 0);
 
   auto stemp = (sunrealtype *) h_stemp.ptr(); 
   const int k_minus_1 = k - 1;
@@ -152,7 +152,7 @@ static int CGS1(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory&
   o_stemp.copyFrom(stemp, k+1);
   linearCombination(k+1, o_stemp, o_V, o_omega, o_omega);
 
-  platform->timer.toc(timerName + "solve::cvode::linearSolve::cgs");
+  platform->timer.toc(timerName + "solve::cvode::linearSolve::cgs1");
 
   const auto arg = omegaDotp - sTempSqrSum;  
   if (arg <= 0) return 1;
@@ -183,7 +183,7 @@ static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory&
 
   for (int iter = 0; iter < nIterMax; iter++) {
     if(((*new_vk_norm) * Kthres < vk_norm0) || iter == 0) {
-      platform->timer.tic(timerName + "solve::cvode::linearSolve::cgs", 0);
+      platform->timer.tic(timerName + "solve::cvode::linearSolve::cgsi", 0);
       innerProdMulti(k+1, o_V, o_omega, platform->comm.mpiComm, stemp); 
       vk_norm0 = SUNRsqrt(stemp[k]);    
 
@@ -198,7 +198,7 @@ static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory&
       linearCombination(k+1, o_stemp, o_V, o_omega, o_omega);
 
       *new_vk_norm = SUNRsqrt(platform->linAlg->innerProd(N, o_omega, o_omega, platform->comm.mpiComm));
-      platform->timer.toc(timerName + "solve::cvode::linearSolve::cgs");
+      platform->timer.toc(timerName + "solve::cvode::linearSolve::cgsi");
 #if 0
       if(platform->comm.mpiRank == 0) {
         std::cout << "CGSI: vk_norm= " << *new_vk_norm <<  ", " << vk_norm0 << std::endl;

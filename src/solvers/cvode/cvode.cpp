@@ -25,6 +25,8 @@
 #include "sundials/sundials_math.h"
 #include "cvode/cvode.h"
 
+#include <sunnonlinsol/sunnonlinsol_fixedpoint.h>
+
 #include "nvector/nvector_serial.h"
 #include "nvector/nvector_mpiplusx.h"
 
@@ -447,7 +449,9 @@ void cvode_t::initialize()
              "Invalid CVODE INTEGRATOR!\n");
   }
 
+
   this->cvodeMem = CVodeCreate(integrator, sunctx);
+
 
   auto T0 = 0.0;
   platform->options.getArgs("START TIME", T0);
@@ -495,6 +499,13 @@ void cvode_t::initialize()
 
   if (platform->options.getArgs("CVODE STOP TIME").empty())
     platform->options.setArgs("CVODE STOP TIME", "TRUE");
+
+
+#if 0
+  auto nls = SUNNonlinSol_FixedPoint(this->cvodeY, 10, sunctx);
+  SUNNonlinSolSetDamping_FixedPoint(nls, 0.1);
+  CVodeSetNonlinearSolver(this->cvodeMem, nls);
+#endif
 
   if (platform->options.getArgs("CVODE SOLVER").empty())
     platform->options.setArgs("CVODE SOLVER", "GMRES");
@@ -1425,16 +1436,17 @@ void cvode_t::solve(double t0, double t1, int tstep)
     }
   }
 
-  // compute scalar boundary condition at time t1
+  // enforce boundary condition on final solution
   this->applyDirichlet(t1);
 
- if (userPostSolve)
+  if (userPostSolve)
     userPostSolve(nrs); 
 
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope + "::restore");
   }
   platform->timer.toc(timerScope);
+
 #endif
 }
 
