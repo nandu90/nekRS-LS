@@ -76,6 +76,7 @@ public:
   void rhs(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot);
   void jtvRhs(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot);
   dlong numEquations() const { return nEq; }
+  int numScalars() const { return Nscalar; } 
 
   bool mixedPrecisionJtv() const { return mixedPrecisionJtvEnabled; }
 
@@ -86,6 +87,8 @@ public:
 
   void updateCounters();
   void resetCounters();
+
+
 
   long numSteps() const;
   long numRHSEvals() const;
@@ -198,7 +201,7 @@ private:
 
   dfloat _g0;
 
-  dlong Nscalar;
+  int Nscalar;
 
   occa::memory o_rhoCpAvg;
 

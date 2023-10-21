@@ -306,7 +306,7 @@ void initStep(nrs_t *nrs, double time, dfloat dt, int tstep)
     }
   }
 
-  computeUrst(nrs);
+  computeUrst(nrs, movingMesh && nrs->Nsubsteps, platform->options.compareArgs("ADVECTION TYPE", "CUBATURE"));
 
   if (nrs->Nscalar) {
     if (cds->anyEllipticSolver) {

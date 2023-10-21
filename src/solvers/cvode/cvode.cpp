@@ -913,15 +913,15 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
       }
       mesh->o_coeffAB.copyFrom(mesh->coeffAB, mesh->nAB);
 
-      // restore mesh coordinates prior to integration
+      // restore prior to integration in move
       {
         mesh->o_x.copyFrom(this->o_xyz0, mesh->Nlocal, 0, 0 * nrs->fieldOffset);
         mesh->o_y.copyFrom(this->o_xyz0, mesh->Nlocal, 0, 1 * nrs->fieldOffset);
         mesh->o_z.copyFrom(this->o_xyz0, mesh->Nlocal, 0, 2 * nrs->fieldOffset);
+        mesh->o_U.copyFrom(this->o_meshU, nrs->NVfields*nrs->fieldOffset);
       }
 
       mesh->move();
-
       nrs->extrapolateKernel(mesh->Nlocal,
                              nrs->NVfields,
                              extOrder,
@@ -931,7 +931,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
                              mesh->o_U);
     }
 
-    computeUrst(nrs, true);
+    computeUrst(nrs, movingMesh, platform->options.compareArgs("CVODE ADVECTION TYPE", "CUBATURE"));
 
     if (detailedTimersEnabled) {
       platform->timer.toc(timerScope + "::extrapolate");
@@ -1103,9 +1103,6 @@ void cvode_t::makeq(double time, occa::memory& o_FS)
 
   auto *cds = nrs->cds;
 
-  const bool useRelativeVelocity = platform->options.compareArgs("MOVING MESH", "TRUE");
-  auto &o_Urst = useRelativeVelocity ? cds->o_relUrst : cds->o_Urst;
-
   auto applyTerms = [&](mesh_t *mesh, const dlong scalarStart, const dlong Nscalar) {
     if (detailedTimersEnabled) {
       platform->timer.tic(timerScope + "::weakLaplacian", 0);
@@ -1180,6 +1177,8 @@ void cvode_t::makeq(double time, occa::memory& o_FS)
         platform->timer.tic(timerScope + "::advection", 0);
       }
       const int weighted = true;
+      const bool useRelativeVelocity = platform->options.compareArgs("MOVING MESH", "TRUE");
+      auto &o_Urst = useRelativeVelocity ? cds->o_relUrst : cds->o_Urst;
 
       if (platform->options.compareArgs("CVODE ADVECTION TYPE", "CUBATURE")) {
         cds->strongAdvectionCubatureVolumeKernel(cds->meshV->Nelements,
@@ -1229,7 +1228,6 @@ void cvode_t::makeq(double time, occa::memory& o_FS)
     timerScope = makeQScope;
   }
 
-#if 1
   const bool chtCVODE = nrs->cht && cds->cvodeSolve[0];
   if (chtCVODE) {
     applyTerms(cds->mesh[0], 0, 1);
@@ -1243,7 +1241,6 @@ void cvode_t::makeq(double time, occa::memory& o_FS)
     }
     applyTerms(cds->meshV, startScalar, numScalars);
   }
-#endif
 
   platform->timer.toc(timerScope);
   timerScope = timerScopeSave;
@@ -1426,7 +1423,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
     mesh->update();
   }
 
-  computeUrst(nrs, false);
+  computeUrst(nrs, movingMesh && nrs->Nsubsteps, platform->options.compareArgs("ADVECTION TYPE", "CUBATURE"));
 
   nrs->p0the = p0theSave;
 
