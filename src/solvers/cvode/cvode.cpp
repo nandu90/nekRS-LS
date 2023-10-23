@@ -89,10 +89,10 @@ cvode_t::cvode_t(nrs_t *_nrs)
 
   o_coeffExt = platform->device.malloc<dfloat>(maxTimestepperOrder);
 
-  o_U = platform->device.malloc<dfloat>(nrs->nEXT * nrs->NVfields * nrs->fieldOffset);
+  o_U0 = platform->device.malloc<dfloat>(nrs->nEXT * nrs->NVfields * nrs->fieldOffset);
 
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
-    o_meshU = platform->device.malloc<dfloat>(nrs->nEXT * nrs->NVfields * nrs->fieldOffset);
+    o_meshU0 = platform->device.malloc<dfloat>(nrs->nEXT * nrs->NVfields * nrs->fieldOffset);
     o_xyz0 = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset);
   }
 
@@ -898,7 +898,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
                            extOrder,
                            nrs->fieldOffset,
                            o_coeffExt,
-                           this->o_U,
+                           this->o_U0,
                            nrs->o_U);
 
     if (movingMesh) {
@@ -915,10 +915,10 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
 
       // restore prior to integration in move
       {
-        mesh->o_x.copyFrom(this->o_xyz0, mesh->Nlocal, 0, 0 * nrs->fieldOffset);
-        mesh->o_y.copyFrom(this->o_xyz0, mesh->Nlocal, 0, 1 * nrs->fieldOffset);
-        mesh->o_z.copyFrom(this->o_xyz0, mesh->Nlocal, 0, 2 * nrs->fieldOffset);
-        mesh->o_U.copyFrom(this->o_meshU, nrs->NVfields*nrs->fieldOffset);
+        mesh->o_x.copyFrom(o_xyz0, mesh->Nlocal, 0, 0 * nrs->fieldOffset);
+        mesh->o_y.copyFrom(o_xyz0, mesh->Nlocal, 0, 1 * nrs->fieldOffset);
+        mesh->o_z.copyFrom(o_xyz0, mesh->Nlocal, 0, 2 * nrs->fieldOffset);
+        mesh->o_U.copyFrom(o_meshU0, nrs->NVfields*nrs->fieldOffset);
       }
 
       mesh->move();
@@ -927,7 +927,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
                              extOrder,
                              nrs->fieldOffset,
                              o_coeffExt,
-                             this->o_meshU,
+                             o_meshU0,
                              mesh->o_U);
     }
 
@@ -991,41 +991,39 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
   };
 
   if (detailedTimersEnabled) {
-    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint", 0);
+    platform->timer.tic(timerScope + "::gatherScatterAndLocalPointSource", 0);
   }
 
   applyOgsOperation(oogs::start);
 
   if (userLocalPointSourceE) {
-    const auto makeQScope = timerScope;
-    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::userLocalPointSourceE", 0);
+    platform->timer.tic(timerScope + "::gatherScatterAndLocalPointSource::pointSourceE", 0);
     userLocalPointSourceE(nrs, time, cds->o_S, this->o_pointSource);
-    platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::userLocalPointSourceE");
+    platform->timer.toc(timerScope + "::gatherScatterAndLocalPointSource::pointSourceE");
   } else if (userLocalPointSourceL) {
-    platform->timer.tic(timerScope + "::gatherScatterAndLocalPoint::userLocalPointSourceL", 0);
+    platform->timer.tic(timerScope + "::gatherScatterAndLocalPointSource::pointSourceL", 0);
     userLocalPointSourceL(nrs, time, o_y, o_ydot);
-    platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint::userLocalPointSourceL");
+    platform->timer.toc(timerScope + "::gatherScatterAndLocalPointSource::pointSourceL");
     cvToNrs(o_ydot, this->o_pointSource, true);
   }
 
   applyOgsOperation(oogs::finish);
 
   if (detailedTimersEnabled) {
-    platform->timer.toc(timerScope + "::gatherScatterAndLocalPoint");
+    platform->timer.toc(timerScope + "::gatherScatterAndLocalPointSource");
   }
 
   // evaluate p0th + dp0thdt and update p-dependent quantities like "rho"
   auto addDpdtTerm = false;
-  if (nrs->pSolver) {
-    if (platform->options.compareArgs("LOWMACH", "TRUE") && nrs->pSolver->allNeumann) {
+  if (nrs->pSolver && platform->options.compareArgs("LOWMACH", "TRUE")) {
+    if (nrs->pSolver->allNeumann) {
       addDpdtTerm = true;
 
       if (!(isJacobianEvaluation() && recycleProperties)) {
         if (detailedTimersEnabled) {
           platform->timer.tic(timerScope + "::dp0thdt", 0);
         }
-        cds->cvode->setTimerScope(timerScope + "::dp0thdt");
- 
+
         udf.div(nrs, time, nrs->o_div);
 
         o_rhoCpAvg.copyFrom(cds->o_rho);
@@ -1036,12 +1034,12 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
           platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_rhoCpAvg);
         }
  
-        // do not re-evalute convection + filtering term (multiplied by rho) 
+        // do not re-evaluate convection + filtering term (if rho has changed) 
         // effect is condidered to be neglibible  
 
-        cds->cvode->setTimerScope(timerScope);
-        if (detailedTimersEnabled)
+        if (detailedTimersEnabled) {
           platform->timer.toc(timerScope + "::dp0thdt");
+        }
       }
     }
   }
@@ -1323,9 +1321,9 @@ void cvode_t::solve(double t0, double t1, int tstep)
   // lag solution state and update current state
   for (int s = nrs->nEXT; s > 1; s--) {
     const auto N = nrs->NVfields * nrs->fieldOffset;
-    o_U.copyFrom(o_U, N, (s - 1) * N, (s - 2) * N);
+    o_U0.copyFrom(o_U0, N, (s - 1) * N, (s - 2) * N);
   }
-  o_U.copyFrom(nrs->o_U, nrs->NVfields * nrs->fieldOffset);
+  o_U0.copyFrom(nrs->o_U, nrs->NVfields * nrs->fieldOffset);
 
   const auto p0theSave = nrs->p0the;
 
@@ -1333,9 +1331,9 @@ void cvode_t::solve(double t0, double t1, int tstep)
 
     for (int s = nrs->nEXT; s > 1; s--) {
       const auto N = nrs->NVfields * nrs->fieldOffset;
-      o_meshU.copyFrom(o_meshU, N, (s - 1) * N, (s - 2) * N);
+      o_meshU0.copyFrom(o_meshU0, N, (s - 1) * N, (s - 2) * N);
     }
-    o_meshU.copyFrom(mesh->o_U, nrs->NVfields * nrs->fieldOffset);
+    o_meshU0.copyFrom(mesh->o_U, nrs->NVfields * nrs->fieldOffset);
 
     o_xyz0.copyFrom(mesh->o_x, mesh->Nlocal, 0 * nrs->fieldOffset, 0);
     o_xyz0.copyFrom(mesh->o_y, mesh->Nlocal, 1 * nrs->fieldOffset, 0);
@@ -1411,14 +1409,14 @@ void cvode_t::solve(double t0, double t1, int tstep)
   }
 
   // restore previous state
-  nrs->o_U.copyFrom(o_U, nrs->NVfields * nrs->fieldOffset);
+  nrs->o_U.copyFrom(o_U0, nrs->NVfields * nrs->fieldOffset);
 
   if (movingMesh) {
     mesh->o_x.copyFrom(o_xyz0, mesh->Nlocal, 0, 0 * nrs->fieldOffset);
     mesh->o_y.copyFrom(o_xyz0, mesh->Nlocal, 0, 1 * nrs->fieldOffset);
     mesh->o_z.copyFrom(o_xyz0, mesh->Nlocal, 0, 2 * nrs->fieldOffset);
 
-    mesh->o_U.copyFrom(this->o_meshU, nrs->NVfields * nrs->fieldOffset);
+    mesh->o_U.copyFrom(o_meshU0, nrs->NVfields * nrs->fieldOffset);
 
     mesh->update();
   }

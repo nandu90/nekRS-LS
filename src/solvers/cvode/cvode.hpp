@@ -170,8 +170,8 @@ private:
   bool isInitialized = false;
 
   double tprev = std::numeric_limits<double>::max();
-  occa::memory o_U;     // CVODE is responsible for correctly handling the fluid velocity state
-  occa::memory o_meshU; // CVODE is responsible for correctly handling the mesh velocity state
+  occa::memory o_U0;
+  occa::memory o_meshU0;
   occa::memory o_xyz0;
 
   void setupDirichletMask();
