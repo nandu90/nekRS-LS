@@ -1174,14 +1174,15 @@ void cvode_t::makeq(double time, occa::memory& o_FS)
       if (detailedTimersEnabled) {
         platform->timer.tic(timerScope + "::advection", 0);
       }
-      const int weighted = true;
+      const auto weighted = true;
       const bool useRelativeVelocity = platform->options.compareArgs("MOVING MESH", "TRUE");
       auto &o_Urst = useRelativeVelocity ? cds->o_relUrst : cds->o_Urst;
 
       if (platform->options.compareArgs("CVODE ADVECTION TYPE", "CUBATURE")) {
         cds->strongAdvectionCubatureVolumeKernel(cds->meshV->Nelements,
                                                  Nscalar,
-                                                 weighted,
+                                                 static_cast<int>(weighted),
+                                                 static_cast<int>(false), // shared rho
                                                  mesh->o_vgeo,
                                                  mesh->o_cubDiffInterpT,
                                                  mesh->o_cubInterpT,

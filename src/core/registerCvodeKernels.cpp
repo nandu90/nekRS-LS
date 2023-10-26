@@ -77,6 +77,7 @@ void registerCvodeKernels(occa::properties kernelInfoBC)
   std::string derivDataFile = std::string(getenv("NEKRS_KERNEL_DIR")) + "/mesh/constantGLLDifferentiationMatrices.h";
 
   weakLaplacianKernelInfo["includes"] += derivDataFile.c_str();
+  weakLaplacianKernelInfo["defines/p_weightInputAdd"] = 1;
   kernelName = "weakLaplacianHex3D";
   fileName = oklpath + kernelName + ".okl";
 
