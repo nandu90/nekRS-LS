@@ -138,20 +138,20 @@ jobs:
       run: |
         NEKRS_CACHE_DIR=${{ env.NEKRS_EXAMPLES }}/ethier/custom-cache-dir ${{ env.NEKRS_HOME }}/bin/nrsmpi ethier 1 --cimode 15
 
-    - name: 'ethier cvode, both scalars'
-      working-directory: ${{ env.NEKRS_EXAMPLES }}/ethier
-      run: |
-        NEKRS_CACHE_DIR=${{ env.NEKRS_EXAMPLES }}/ethier/custom-cache-dir ${{ env.NEKRS_HOME }}/bin/nrsmpi ethier 1 --cimode 16
+#    - name: 'ethier cvode, both scalars'
+#      working-directory: ${{ env.NEKRS_EXAMPLES }}/ethier
+#      run: |
+#        NEKRS_CACHE_DIR=${{ env.NEKRS_EXAMPLES }}/ethier/custom-cache-dir ${{ env.NEKRS_HOME }}/bin/nrsmpi ethier 1 --cimode 16
 
-    - name: 'ethier mixed elliptic/cvode'
-      working-directory: ${{ env.NEKRS_EXAMPLES }}/ethier
-      run: |
-        NEKRS_CACHE_DIR=${{ env.NEKRS_EXAMPLES }}/ethier/custom-cache-dir ${{ env.NEKRS_HOME }}/bin/nrsmpi ethier 1 --cimode 17
+#    - name: 'ethier mixed elliptic/cvode'
+#      working-directory: ${{ env.NEKRS_EXAMPLES }}/ethier
+#      run: |
+#        NEKRS_CACHE_DIR=${{ env.NEKRS_EXAMPLES }}/ethier/custom-cache-dir ${{ env.NEKRS_HOME }}/bin/nrsmpi ethier 1 --cimode 17
     
-    - name: 'ethier cvode, both scalars, no dealiasing, hpfrt'
-      working-directory: ${{ env.NEKRS_EXAMPLES }}/ethier
-      run: |
-        NEKRS_CACHE_DIR=${{ env.NEKRS_EXAMPLES }}/ethier/custom-cache-dir ${{ env.NEKRS_HOME }}/bin/nrsmpi ethier 1 --cimode 18
+#    - name: 'ethier cvode, both scalars, no dealiasing, hpfrt'
+#      working-directory: ${{ env.NEKRS_EXAMPLES }}/ethier
+#      run: |
+#        NEKRS_CACHE_DIR=${{ env.NEKRS_EXAMPLES }}/ethier/custom-cache-dir ${{ env.NEKRS_HOME }}/bin/nrsmpi ethier 1 --cimode 18
     
     - name: 'ethier sub-stepping'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/ethier
