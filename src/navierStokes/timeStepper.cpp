@@ -564,6 +564,7 @@ void makeq(nrs_t *nrs, double time, int tstep, occa::memory o_FS, occa::memory o
           cds->strongAdvectionCubatureVolumeKernel(cds->meshV->Nelements,
                                                    1,
                                                    0, /* weighted */
+                                                   0, /* sharedRho */
                                                    mesh->o_vgeo,
                                                    mesh->o_cubDiffInterpT,
                                                    mesh->o_cubInterpT,
