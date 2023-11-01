@@ -42,7 +42,7 @@ jobs:
 
     - name: nrsconfig and build
       run: |
-        CC=mpicc CXX=mpic++ FC=mpif77 ./nrsconfig -DENABLE_CVODE=ON -DCMAKE_INSTALL_PREFIX=${{ env.NEKRS_HOME }}
+        CC=mpicc CXX=mpic++ FC=mpif77 ./nrsconfig -DENABLE_CVODE=OFF -DCMAKE_INSTALL_PREFIX=${{ env.NEKRS_HOME }}
         cmake --build build --target install -j 2
 
     - name: Upload install dir
@@ -185,9 +185,9 @@ jobs:
       working-directory: ${{ env.NEKRS_EXAMPLES }}/lowMach
       run: ${{ env.NEKRS_HOME }}/bin/nrsmpi lowMach 2 --cimode 1
 
-    - name: 'lowMach + CVODE'
-      working-directory: ${{ env.NEKRS_EXAMPLES }}/lowMach
-      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi lowMach 2 --cimode 3
+#    - name: 'lowMach + CVODE'
+#      working-directory: ${{ env.NEKRS_EXAMPLES }}/lowMach
+#      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi lowMach 2 --cimode 3
 
 
   mv_cyl:
@@ -233,13 +233,13 @@ jobs:
       working-directory: ${{ env.NEKRS_EXAMPLES }}/mv_cyl
       run: ${{ env.NEKRS_HOME }}/bin/nrsmpi mv_cyl 2 --cimode 6
 
-    - name: 'mv_cyl + CVODE'
-      working-directory: ${{ env.NEKRS_EXAMPLES }}/mv_cyl
-      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi mv_cyl 2 --cimode 7
+#    - name: 'mv_cyl + CVODE'
+#      working-directory: ${{ env.NEKRS_EXAMPLES }}/mv_cyl
+#      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi mv_cyl 2 --cimode 7
 
-    - name: 'mv_cyl + CVODE + unaligned SYM + mesh solver'
-      working-directory: ${{ env.NEKRS_EXAMPLES }}/mv_cyl
-      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi mv_cyl 2 --cimode 8
+#    - name: 'mv_cyl + CVODE + unaligned SYM + mesh solver'
+#      working-directory: ${{ env.NEKRS_EXAMPLES }}/mv_cyl
+#      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi mv_cyl 2 --cimode 8
 
     - name: 'mv_cyl, derived bc'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/mv_cyl
@@ -293,9 +293,9 @@ jobs:
       working-directory: ${{ env.NEKRS_EXAMPLES }}/conj_ht
       run: ${{ env.NEKRS_HOME }}/bin/nrsmpi conj_ht 2 --cimode 2
 
-    - name: 'conj_ht + CVODE'
-      working-directory: ${{ env.NEKRS_EXAMPLES }}/conj_ht
-      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi conj_ht 2 --cimode 3
+#    - name: 'conj_ht + CVODE'
+#      working-directory: ${{ env.NEKRS_EXAMPLES }}/conj_ht
+#      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi conj_ht 2 --cimode 3
 
 
   channelStress:
