@@ -252,19 +252,22 @@ int cvode_t::cvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector 
 }
 
 // Jv = [f(y + v*sig) - f(y)]/sig, where sig = sigScale / ||v||_WRMS, 
-int cvode_t::jtv(double t, const occa::memory& o_v, const occa::memory& o_y, const occa::memory& o_fy, 
-                 occa::memory& o_work, occa::memory& o_Jv) 
+int cvode_t::jtv(double t, const occa::memory& o_v, const occa::memory& o_y, const occa::memory& o_fy,
+                 occa::memory& o_work, occa::memory& o_Jv)
 {
   if (detailedTimersEnabled)
     platform->timer.tic(timerName + "solve::cvode::linearSolve::jtv", 0);
 
-  const auto v_wrms = sqrt(platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_v, platform->comm.mpiComm) / this->nEqTotal);
-  const auto sig = sigScale / v_wrms;
-  const auto siginv = 1.0 / sig;
+  static dfloat sig;
+  if (platform->options.compareArgs("CVODE UPDATE SIGMA", "TRUE")) {
+    const auto v_wrms = sqrt(platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_v, platform->comm.mpiComm) / this->nEqTotal);
+    sig = sigScale / v_wrms;
+    platform->options.setArgs("CVODE UPDATE SIGMA", "FALSE");
+  }
 
   platform->linAlg->axpbyz(this->nEq, sig, o_v, 1.0, o_y, o_work);
   this->jtvRhs(t, o_work, o_Jv);
-  platform->linAlg->axpbyz(this->nEq, siginv, o_Jv, -siginv,  o_fy, o_Jv);
+  platform->linAlg->axpbyz(this->nEq, 1/sig, o_Jv, -1/sig,  o_fy, o_Jv);
 
   if (detailedTimersEnabled)
     platform->timer.toc(timerName + "solve::cvode::linearSolve::jtv");
@@ -340,6 +343,7 @@ void cvode_t::initialize()
   auto fwdLinearSolve = [](SUNLinearSolver S, SUNMatrix A, N_Vector x, N_Vector b, realtype tol) {
     const std::string timerName = "cvode_t::";
     std::string solverType;
+    platform->options.setArgs("CVODE UPDATE SIGMA", "TRUE");
     platform->options.getArgs("CVODE SOLVER", solverType);
  
     platform->timer.tic(timerName + "solve::cvode::linearSolve", 0);
