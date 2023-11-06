@@ -3,9 +3,9 @@
 ## What is new? 
 
 * Interpolation based velocity recycling
-* Build time option (`-DNEKRS_USE_DFLOAT_FLOAT=ON`) to run solver using FP32
-* combinedPCG
-* multi session nek-nek
+* Run solver in FP32
+* CombinedPCG
+* Multi session nek-nek
 * Various bug fixes
 
 ## Good to know
@@ -23,7 +23,7 @@
 ## Known Bugs / Restrictions
 
 * Code is not fully optimized on CPUs in general and Intel GPUs
-* [485](https://github.com/Nek5000/Nek5000/issues/485)
+* [485](https://github.com/Nek5000/nekRS/issues/485)
 * [729](https://github.com/Nek5000/Nek5000/issues/759)
 * [258](https://github.com/Nek5000/nekRS/issues/258)
 
