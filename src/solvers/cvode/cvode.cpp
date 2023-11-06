@@ -96,10 +96,10 @@ cvode_t::cvode_t(nrs_t *_nrs)
     o_xyz0 = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset);
   }
 
-  if (platform->options.getArgs("CVODE RECYCLE PROPERTIES").empty()) {
-    platform->options.setArgs("CVODE RECYCLE PROPERTIES", "TRUE");
+  if (platform->options.getArgs("CVODE JTV RECYCLE PROPERTIES").empty()) {
+    platform->options.setArgs("CVODE JTV RECYCLE PROPERTIES", "TRUE");
   }
-  recycleProperties = platform->options.compareArgs("CVODE RECYCLE PROPERTIES", "TRUE");
+  recycleProperties = platform->options.compareArgs("CVODE JTV RECYCLE PROPERTIES", "TRUE");
 
   this->scalarIds = std::vector<dlong>();
   this->cvodeScalarIds = std::vector<dlong>(cds->NSfields, -1);
@@ -520,7 +520,7 @@ void cvode_t::initialize()
 
   if (this->linearSolverType.find("GMRES") != std::string::npos) {
     if (platform->options.getArgs("CVODE GMRES BASIS VECTORS").empty())
-      platform->options.setArgs("CVODE GMRES BASIS VECTORS", "10");
+      platform->options.setArgs("CVODE GMRES BASIS VECTORS", "8");
 
     int nVectors;
     platform->options.getArgs("CVODE GMRES BASIS VECTORS", nVectors);

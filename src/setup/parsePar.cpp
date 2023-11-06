@@ -594,7 +594,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
     options.setArgs("CVODE MAX TIMESTEPPER ORDER", std::to_string(maxOrder));
   }
 
-  options.setArgs("CVODE GS TYPE", "CLASSICAL");
+  options.setArgs("CVODE GS TYPE", "CLASSICAL1");
   std::string gstype;
   if (par->extract(parScope, "gstype", gstype)) {
     if (gstype == "classical") {
@@ -630,10 +630,10 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   if (par->extract(parScope, "jtvrecycleproperties", recyclePropsStr)) {
     recycleProps = checkForTrue(recyclePropsStr);
     if (recycleProps) {
-      options.setArgs("CVODE RECYCLE PROPERTIES", "TRUE");
+      options.setArgs("CVODE JTV RECYCLE PROPERTIES", "TRUE");
     }
     else {
-      options.setArgs("CVODE RECYCLE PROPERTIES", "FALSE");
+      options.setArgs("CVODE JTV RECYCLE PROPERTIES", "FALSE");
     }
   }
 
