@@ -129,54 +129,13 @@ static void innerProdMulti(const dlong NVec,
   }
 }
 
-static int CGS1(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory& o_omega)  
-{
-  platform->timer.tic(timerName + "solve::cvode::linearSolve::cgs1", 0);
-
-  auto stemp = (sunrealtype *) h_stemp.ptr(); 
-  const int k_minus_1 = k - 1;
-
-  innerProdMulti(k+1, o_V, o_omega, platform->comm.mpiComm, stemp); 
-
-  dfloat sTempSqrSum = 0;
-  for (int i=0; i < k; i++) {
-    sTempSqrSum += stemp[i] * stemp[i];
-    h[i][k_minus_1] = stemp[i];
-   
-    stemp[i] = -stemp[i];
-  }
-  const dfloat omegaDotp = stemp[k];
-
-  // o_omega = stemp_[k] * o_omega + sum (o_stemp_[i] * o_v[i]) for i = 1 ... k-1 
-  stemp[k] = ONE;
-  o_stemp.copyFrom(stemp, k+1);
-  linearCombination(k+1, o_stemp, o_V, o_omega, o_omega);
-
-  platform->timer.toc(timerName + "solve::cvode::linearSolve::cgs1");
-
-  const auto arg = omegaDotp - sTempSqrSum;  
-  if (arg <= 0) return 1;
-  *new_vk_norm  = SUNRsqrt(arg);
-#if 0
-  if (platform->comm.mpiRank == 0) {
-    std::cout << "CGS1: vk_norm= " << *new_vk_norm << std::endl;
-  }
-#endif
-
-  return 0;
-}
-
-/* two pass (iterative) classical Gram-Schmidt */
+/* iterative classical Gram-Schmidt */
 static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory& o_omega)  
 {
-  if (useCGS1) {
-    return CGS1(h, k ,p, new_vk_norm, o_omega);
-  }
-
   auto stemp = (sunrealtype *) h_stemp.ptr(); 
 
   const int k_minus_1 = k - 1;
-  const int nIterMax = 2;
+  const int nIterMax = (useCGS1) ? 1 : 2;
   const realtype Kthres = 100;
 
   realtype vk_norm0; 
@@ -185,23 +144,35 @@ static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory&
     if(((*new_vk_norm) * Kthres < vk_norm0) || iter == 0) {
       platform->timer.tic(timerName + "solve::cvode::linearSolve::cgsi", 0);
       innerProdMulti(k+1, o_V, o_omega, platform->comm.mpiComm, stemp); 
-      vk_norm0 = SUNRsqrt(stemp[k]);    
+      const dfloat omegaDotp = stemp[k];
+      vk_norm0 = SUNRsqrt(omegaDotp);    
 
+      dfloat sTempSqrSum = 0;
       for (int i=0; i < k; i++) {
+        sTempSqrSum += stemp[i] * stemp[i];
         h[i][k_minus_1] = (iter > 0) ? h[i][k_minus_1] + stemp[i] : stemp[i];
         stemp[i] = -stemp[i];
       }
-  
+
       // o_omega = stemp_[k] * o_omega + sum (o_stemp_[i] * o_v[i]) for i = 1 ... k-1 
       stemp[k] = ONE;
       o_stemp.copyFrom(stemp, k+1);
       linearCombination(k+1, o_stemp, o_V, o_omega, o_omega);
 
+#if 1
+      const auto arg = omegaDotp - sTempSqrSum;  
+      if (arg <= 0) {
+        return 1;
+      }
+      *new_vk_norm  = SUNRsqrt(arg);
+#else
       *new_vk_norm = SUNRsqrt(platform->linAlg->innerProd(N, o_omega, o_omega, platform->comm.mpiComm));
       platform->timer.toc(timerName + "solve::cvode::linearSolve::cgsi");
+#endif
+
 #if 0
       if(platform->comm.mpiRank == 0) {
-        std::cout << "CGSI: vk_norm= " << *new_vk_norm <<  ", " << vk_norm0 << std::endl;
+        std::cout << "CGSI: vk_norm0/vk_norm= " << vk_norm0/(*new_vk_norm) << ", iter=" << iter << std::endl;
       }
 #endif
     }
@@ -391,7 +362,7 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
     /* Orthogonalize vtemp2 (V[l+1]) against previous V[i] */
     if(CGSI(Hes, l_plus_1, l_max, &(Hes[l_plus_1][l]), o_vtemp2) != 0) {
       *zeroguess  = SUNFALSE;
-      LASTFLAG(S) = SUNLS_GS_FAIL;
+      LASTFLAG(S) = SUNLS_CONV_FAIL;
       cbGMRESFinish(LASTFLAG(S));
     }
 

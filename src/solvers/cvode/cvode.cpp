@@ -1048,7 +1048,7 @@ void cvode_t::defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,
     }
   }
 
-  // add pointsource and weight by inverse assembled mass matrix and divide by "rho" 
+  // weight FS by inverse assembled mass matrix, add pointSource and finally divide by "rho" 
   {
     if (detailedTimersEnabled) {
       platform->timer.tic(timerScope + "::fusedAddRhoDiv", 0);
