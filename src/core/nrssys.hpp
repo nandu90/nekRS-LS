@@ -117,6 +117,8 @@ extern platform_t* platform;
 
 namespace {
 
+constexpr double targetTimeBenchmark{0.2};
+
 constexpr unsigned int BLOCKSIZE = 256;
 constexpr unsigned int ALIGN_SIZE = 1024;
 constexpr unsigned int NSCALAR_MAX = 100;

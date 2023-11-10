@@ -293,8 +293,7 @@ add_subdirectory(3rd_party/lapack)
 # nek5000 dependencies
 include(config/nek5000.cmake)
 
-# nrs
-include(config/nrs.cmake)
+include(config/nekrs.cmake)
 
 # Link dependencies
 target_link_libraries(nekrs-lib PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs ${GSLIB} blas lapack ${CMAKE_DL_LIBS})

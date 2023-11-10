@@ -13,11 +13,11 @@
 #include "fldFile.hpp"
 #include "randomVector.hpp"
 
+void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs);
+
 std::vector<std::string> fieldsToSolve(setupAide &options);
 
 struct nrs_t {
-
-  static constexpr double targetTimeBenchmark{0.2};
 
   bool multiSession;
 

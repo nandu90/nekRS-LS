@@ -984,7 +984,7 @@ void printInfo(nrs_t *nrs, double time, int tstep, bool printStepInfo, bool prin
     }
 
     if (printStepInfo) {
-      printf("step= %d  t= %.8e  dt=%.1e  C= %.2f", tstep, time, nrs->dt[0], cfl);
+      printf("step= %d  t= %.8e  dt=%.1e  C= %.3f", tstep, time, nrs->dt[0], cfl);
     }
 
     if (!verboseInfo) {

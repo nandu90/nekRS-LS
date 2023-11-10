@@ -215,7 +215,7 @@ void registerEllipticKernels(std::string section, int poissonEquation)
                                 Nfields,
                                 stressForm,
                                 verbosity,
-                                elliptic_t::targetTimeBenchmark,
+                                targetTimeBenchmark,
                                 platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true,
                                 "");
     platform->kernels.add(prefix + _kernelName, axKernel);

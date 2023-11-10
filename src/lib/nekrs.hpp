@@ -7,11 +7,17 @@
 
 namespace nekrs
 {
-void setup(MPI_Comm commg_in, MPI_Comm comm_in,
-           int buildOnly, int commSizeTarget,
-           int ciMode, inipp::Ini *par,
-           std::string casename, std::string _backend, std::string _deviceID,
-           int _nSessions, int _sessionID,
+void setup(MPI_Comm commg_in,
+           MPI_Comm comm_in,
+           int buildOnly,
+           int commSizeTarget,
+           int ciMode,
+           const std::map<std::string, std::map<std::string, std::string>>& parKeyValuePairs,
+           std::string casename,
+           std::string _backend,
+           std::string _deviceID,
+           int nSessions,
+           int sessionID,
            int debug);
 void copyFromNek(double time, int tstep);
 void udfExecuteStep(double time, int tstep, int isOutputStep);

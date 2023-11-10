@@ -40,9 +40,9 @@ jobs:
         sudo apt -y update
         sudo apt install -y mpich libmpich-dev
 
-    - name: nrsconfig and build
+    - name: config and build
       run: |
-        CC=mpicc CXX=mpic++ FC=mpif77 ./nrsconfig -DENABLE_CVODE=OFF -DCMAKE_INSTALL_PREFIX=${{ env.NEKRS_HOME }}
+        CC=mpicc CXX=mpic++ FC=mpif77 ./configure -DENABLE_CVODE=OFF -DCMAKE_INSTALL_PREFIX=${{ env.NEKRS_HOME }}
         cmake --build build --target install -j 2
 
     - name: Upload install dir

@@ -215,15 +215,15 @@ occa::kernel benchmarkAdvsub(int Nfields,
   // elementList[e] = e
   std::vector<dlong> elementList(Nelements);
   std::iota(elementList.begin(), elementList.end(), 0);
-  auto o_elementList = platform->device.malloc(Nelements * sizeof(dlong), elementList.data());
+  auto o_elementList = platform->device.malloc(elementList.size() * sizeof(dlong), elementList.data());
 
-  auto o_invLMM = platform->device.malloc((nEXT * wordSize) * fieldOffset, invLMM.data());
-  auto o_cubD = platform->device.malloc(cubNq * cubNq * wordSize, cubD.data());
-  auto o_NU = platform->device.malloc((Nfields * wordSize) * fieldOffset, NU.data());
-  auto o_conv = platform->device.malloc((NVfields * nEXT * wordSize) * cubatureOffset, conv.data());
-  auto o_cubInterpT = platform->device.malloc(Nq * cubNq * wordSize, cubInterpT.data());
-  auto o_Ud = platform->device.malloc((Nfields * wordSize) * fieldOffset, Ud.data());
-  auto o_BdivW = platform->device.malloc((nEXT * wordSize) * fieldOffset, BdivW.data());
+  auto o_invLMM = platform->device.malloc(invLMM.size() * wordSize, invLMM.data());
+  auto o_cubD = platform->device.malloc(cubD.size() * wordSize, cubD.data());
+  auto o_NU = platform->device.malloc(NU.size() * wordSize, NU.data());
+  auto o_conv = platform->device.malloc(conv.size() * wordSize, conv.data());
+  auto o_cubInterpT = platform->device.malloc(cubInterpT.size() * wordSize, cubInterpT.data());
+  auto o_Ud = platform->device.malloc(Ud.size() * wordSize, Ud.data());
+  auto o_BdivW = platform->device.malloc(BdivW.size() * wordSize, BdivW.data());
 
   // popular cubD, cubInterpT with correct data
   readCubDMatrixKernel(o_cubD);
@@ -276,14 +276,14 @@ occa::kernel benchmarkAdvsub(int Nfields,
       return kernel;
 
     // perform correctness check
-    std::vector<dfloat> referenceResults(Nfields * fieldOffset);
-    std::vector<dfloat> results(Nfields * fieldOffset);
+    std::vector<dfloat> referenceResults(NU.size());
+    std::vector<dfloat> results(NU.size());
 
     kernelRunner(referenceKernel);
-    o_NU.copyTo(referenceResults.data(), referenceResults.size() * sizeof(dfloat));
+    o_NU.copyTo(referenceResults.data());
 
     kernelRunner(kernel);
-    o_NU.copyTo(results.data(), results.size() * sizeof(dfloat));
+    o_NU.copyTo(results.data());
 
     const auto err = maxRelErr<dfloat>(referenceResults, results, platform->comm.mpiComm);
     if (err > 500 * std::numeric_limits<dfloat>::epsilon()) {

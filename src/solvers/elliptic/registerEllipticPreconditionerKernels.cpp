@@ -59,7 +59,7 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
                                 Nfields,
                                 false, // no stress formulation in preconditioner
                                 verbosity,
-                                elliptic_t::targetTimeBenchmark,
+                                targetTimeBenchmark,
                                 platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true,
                                 kernelSuffix);
 
@@ -205,7 +205,7 @@ void registerSchwarzKernels(const std::string &section, int N)
                                   sizeof(pfloat),
                                   useRAS,
                                   verbosity,
-                                  elliptic_t::targetTimeBenchmark,
+                                  targetTimeBenchmark,
                                   platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true,
                                   suffix);
     platform->kernels.add("fusedFDM" + suffix, fdmKernel);

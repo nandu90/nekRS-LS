@@ -2,12 +2,11 @@
 #include <filesystem>
 #include <functional>
 #include "nrs.hpp"
-#include "setup.hpp"
 #include "nekInterfaceAdapter.hpp"
 #include "printHeader.hpp"
 #include "udf.hpp"
 #include "bcMap.hpp"
-#include "parParser.hpp"
+#include "parsePar.hpp"
 #include "re2Reader.hpp"
 #include "configReader.hpp"
 #include "re2Reader.hpp"
@@ -135,7 +134,7 @@ void setup(MPI_Comm commg_in,
            int buildOnly,
            int commSizeTarget,
            int ciMode,
-           inipp::Ini *par,
+           const std::map<std::string, std::map<std::string, std::string>>& parKeyValuePairs,
            std::string casename,
            std::string _backend,
            std::string _deviceID,
@@ -161,6 +160,8 @@ void setup(MPI_Comm commg_in,
   configRead(comm);
 
   auto options = setDefaultSettings(casename);
+  static auto par = new inipp::Ini();
+  par->sections = parKeyValuePairs;
   parsePar(par, comm, *options);
 
   if(nSessions > 1) {

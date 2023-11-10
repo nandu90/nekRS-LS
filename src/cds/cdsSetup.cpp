@@ -1,3 +1,8 @@
+#include "cds.hpp"
+#include "lowPassFilter.hpp"
+#include "avm.hpp"
+#include "bcMap.hpp"
+
 cds_t *cdsSetup(nrs_t *nrs, setupAide options)
 {
   const std::string section = "cds-";

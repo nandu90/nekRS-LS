@@ -12,6 +12,7 @@
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
 
 ## Breaking Changes
+* `nrsconfig` was renamed to `configure`
 * `occa::memory::o_mempool` was removed instead use `auto foo = platform->o_memPool.reserve<T>(N)`
 * `occa::memory` objects (with a few exceptions) are typed now  
 * `occa::memory::slice, occa::memory::copyFrom, occa::memory::copyTo` are type aware (use words not bytes)

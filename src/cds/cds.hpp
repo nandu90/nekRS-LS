@@ -1,17 +1,11 @@
 #ifndef CDS_H
 #define CDS_H
 
-#include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "nrssys.hpp"
 #include "mesh3D.h"
 #include "elliptic.h"
 #include "neknek.hpp"
 #include "cvode.hpp"
-#include <vector>
 
 struct cds_t {
   static constexpr double targetTimeBenchmark{0.2};
@@ -118,6 +112,9 @@ struct cds_t {
   occa::properties *kernelInfo;
 };
 
+#include "nrs.hpp"
+
+cds_t *cdsSetup(nrs_t *nrs, setupAide options);
 occa::memory cdsSolve(int i, cds_t *cds, double time, int stage);
 
 #endif

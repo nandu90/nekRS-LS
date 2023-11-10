@@ -7,7 +7,7 @@
 #include "avm.hpp"
 #include "re2Reader.hpp"
 
-#include "cdsSetup.cpp"
+#include "cds.hpp"
 
 std::vector<std::string> fieldsToSolve(setupAide &options)
 {

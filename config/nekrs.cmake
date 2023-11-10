@@ -14,25 +14,25 @@ set(NRS_SRC
     src/utils/parallelSort.cpp
     src/utils/tinyexpr.c
     src/utils/setupAide.cpp
-    src/core/numberActiveFields.cpp
     src/core/printHeader.cpp
-    src/navierStokes/cfl.cpp
     src/regularization/lowPassFilter.cpp
     src/regularization/avm.cpp
     src/bdry/bcMap.cpp
     src/core/compileKernels.cpp
-    src/setup/setup.cpp
     src/bdry/alignment.cpp
-    src/core/registerNrsKernels.cpp
-    src/core/registerNekNekKernels.cpp
-    src/core/registerPostProcessingKernels.cpp
-    src/core/registerEllipticKernels.cpp
-    src/core/registerEllipticPreconditionerKernels.cpp
-    src/core/registerCdsKernels.cpp
-    src/core/registerLinAlgKernels.cpp
-    src/core/registerMeshKernels.cpp
+    src/neknek/registerNekNekKernels.cpp
+    src/postProcessing/registerPostProcessingKernels.cpp
+    src/solvers/elliptic/registerEllipticKernels.cpp
+    src/solvers/elliptic/registerEllipticPreconditionerKernels.cpp
+    src/cds/registerCdsKernels.cpp
+    src/linAlg/registerLinAlgKernels.cpp
+    src/mesh/registerMeshKernels.cpp
     src/core/LVector.cpp
     src/bdry/createEToBV.cpp
+    src/navierStokes/registerNrsKernels.cpp
+    src/navierStokes/numberActiveFields.cpp
+    src/navierStokes/cfl.cpp
+    src/navierStokes/nrsSetup.cpp
     src/navierStokes/applyDirichlet.cpp
     src/navierStokes/timeStepper.cpp
     src/navierStokes/evaluateProperties.cpp
@@ -40,6 +40,7 @@ set(NRS_SRC
     src/navierStokes/tombo.cpp
     src/navierStokes/constantFlowRate.cpp
     src/navierStokes/Urst.cpp
+    src/cds/cdsSetup.cpp
     src/cds/cdsSolve.cpp
     src/setup/parsePar.cpp
     src/io/re2Reader.cpp
@@ -72,7 +73,7 @@ set(NRS_SRC
     src/postProcessing/strainRotationRate.cpp
     src/postProcessing/viscousDrag.cpp
     src/postProcessing/Qcriterion.cpp
-    src/core/registerCvodeKernels.cpp
+    src/solvers/cvode/registerCvodeKernels.cpp
     src/solvers/cvode/cvode.cpp
     src/solvers/cvode/cbGMRES.cpp
     ${BENCH_SOURCES}

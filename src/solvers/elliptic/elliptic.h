@@ -72,8 +72,6 @@ struct GmresData{
 
 struct elliptic_t
 {
-  static constexpr double targetTimeBenchmark {0.2};
-
   int elementType = 12;      // number of edges (3=tri, 4=quad, 6=tet, 12=hex)
   int blockSolver = 0;
   int Nfields = 1;
