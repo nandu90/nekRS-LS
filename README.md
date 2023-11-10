@@ -56,7 +56,7 @@ To build and install the code run:
 ```sh
 CC=mpicc CXX=mpic++ FC=mpif77 ./configure [-DCMAKE_INSTALL_PREFIX=$HOME/.local/nekrs]
 ```
-Build settings can be customized through CMake options passed to `nrsconfig`. 
+Build settings can be customized through CMake options passed to `configure`. 
 Please remove the previous build and installation directory in case of an update. 
 
 ## Setting the Enviroment
