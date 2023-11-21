@@ -29,8 +29,6 @@ namespace {
 
 static const std::string timerName = "cvode_t::";
 
-bool useCGS1 = false;
-
 static occa::kernel axmyzKernel;
 static occa::kernel axpbyKernel;
 static occa::kernel linearCombinationKernel;
@@ -135,7 +133,7 @@ static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory&
   auto stemp = (sunrealtype *) h_stemp.ptr(); 
 
   const int k_minus_1 = k - 1;
-  const int nIterMax = (useCGS1) ? 1 : 2;
+  const int nIterMax = 2;
   const realtype Kthres = 100;
 
   realtype vk_norm0; 
@@ -167,11 +165,11 @@ static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory&
       *new_vk_norm  = SUNRsqrt(arg);
 #else
       *new_vk_norm = SUNRsqrt(platform->linAlg->innerProd(N, o_omega, o_omega, platform->comm.mpiComm));
-      platform->timer.toc(timerName + "solve::cvode::linearSolve::cgsi");
 #endif
+      platform->timer.toc(timerName + "solve::cvode::linearSolve::cgsi");
 
 #if 0
-      if(platform->comm.mpiRank == 0) {
+      if(platform->comm.mpiRank == 0 && platform->verbose) {
         std::cout << "CGSI: vk_norm0/vk_norm= " << vk_norm0/(*new_vk_norm) << ", iter=" << iter << std::endl;
       }
 #endif
@@ -227,10 +225,6 @@ void cbGMRESSetup(SUNLinearSolver S)
   h_stemp = platform->device.mallocHost(o_stemp.size());
 
   N_VDestroyVectorArray(V, l_max+1);
-
-  if (platform->options.compareArgs("CVODE GS TYPE", "CLASSICAL1")) {
-    useCGS1 = true;
-  } 
 }
 
 

@@ -251,7 +251,7 @@ int cvode_t::cvodeJtv(N_Vector v, N_Vector Jv, realtype t, N_Vector y, N_Vector 
 #endif
 }
 
-// Jv = [f(y + v*sig) - f(y)]/sig, where sig = sigScale / ||v||_WRMS, 
+// Jv = [f(y + v*sig) - f(y)]/sig, where sig = sigBar / ||v||_WRMS, 
 int cvode_t::jtv(double t, const occa::memory& o_v, const occa::memory& o_y, const occa::memory& o_fy,
                  occa::memory& o_work, occa::memory& o_Jv)
 {
@@ -261,10 +261,26 @@ int cvode_t::jtv(double t, const occa::memory& o_v, const occa::memory& o_y, con
   static dfloat sig;
   if (platform->options.compareArgs("CVODE UPDATE SIGMA", "TRUE")) {
     const auto v_wrms = sqrt(platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_v, platform->comm.mpiComm) / this->nEqTotal);
-    sig = sigScale / v_wrms;
+
+    auto sigBar = [&]()
+    {
+      if (this->sigScale > 0) {
+        return this->sigScale;
+      }
+
+      const auto y_wrms = sqrt(platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_y, platform->comm.mpiComm) / this->nEqTotal);
+      const auto sig = sqrt( (1+y_wrms) * std::numeric_limits<dfloat>::epsilon() ) / v_wrms ;
+      if (platform->verbose && platform->comm.mpiRank == 0) {
+        std::cout << "sigma= " << sig << std::endl;
+      }
+      return sig;
+    };
+
+    sig = sigBar() / v_wrms;
     platform->options.setArgs("CVODE UPDATE SIGMA", "FALSE");
   }
 
+  // first-order DQ
   platform->linAlg->axpbyz(this->nEq, sig, o_v, 1.0, o_y, o_work);
   this->jtvRhs(t, o_work, o_Jv);
   platform->linAlg->axpbyz(this->nEq, 1/sig, o_Jv, -1/sig,  o_fy, o_Jv);
@@ -483,10 +499,11 @@ void cvode_t::initialize()
 
   this->o_absTol = platform->device.malloc<dfloat>(this->Nscalar, absTols.data());
 
-  if (platform->options.getArgs("CVODE SIGMA SCALE").empty())
-    platform->options.setArgs("CVODE SIGMA SCALE", "1.0");
-
-  platform->options.getArgs("CVODE SIGMA SCALE", this->sigScale);
+  if (platform->options.getArgs("CVODE DQ SIGMA").empty()) {
+    this->sigScale = -1;
+  } else {
+    platform->options.getArgs("CVODE DQ SIGMA", this->sigScale);
+  }
 
   check_retval((void *)this->cvodeMem, "CVodeCreate", 0);
   retval = CVodeInit(this->cvodeMem, fwdCvodeRHS, T0, this->cvodeY);

@@ -202,7 +202,7 @@ static std::vector<std::string> cvodeKeys = {
     {"relativetol"},
     {"epslin"},
     {"gstype"},
-    {"sigscale"},
+    {"dqsigma"},
     {"maxOrder"},
     {"maxSteps"},
     {"jtvrecycleproperties"},
@@ -594,13 +594,11 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
     options.setArgs("CVODE MAX TIMESTEPPER ORDER", std::to_string(maxOrder));
   }
 
-  options.setArgs("CVODE GS TYPE", "CLASSICAL1");
+  options.setArgs("CVODE GS TYPE", "CLASSICAL");
   std::string gstype;
   if (par->extract(parScope, "gstype", gstype)) {
     if (gstype == "classical") {
       options.setArgs("CVODE GS TYPE", "CLASSICAL");
-    } else if (gstype == "classical1") {
-      options.setArgs("CVODE GS TYPE", "CLASSICAL1");
     } else if (gstype == "modified") {
       options.setArgs("CVODE GS TYPE", "MODIFIED");
     } else {
@@ -611,8 +609,8 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   upperCase(integrator);
   options.setArgs("CVODE INTEGRATOR", integrator);
 
-  if (par->extract(parScope, "sigscale", sigScale)) {
-    options.setArgs("CVODE SIGMA SCALE", to_string_f(sigScale));
+  if (par->extract(parScope, "dqsigma", sigScale)) {
+    options.setArgs("CVODE DQ SIGMA", to_string_f(sigScale));
   }
 
   bool dealiasing = options.compareArgs("ADVECTION TYPE", "CUBATURE") ? true : false;

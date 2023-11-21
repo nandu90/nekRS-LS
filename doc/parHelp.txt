@@ -214,13 +214,13 @@ configFile                  <string>                                   AmgX JSON
 [CVODE]
 solver                      cbGMRES [D], GMRES                         linear solver
                               +nVector=<int>                           dimension of Krylov space
-gsType                      classical, classical1 [D], modified
+gsType                      classical [D], modified
 relativeTol                 <float>                                    relative tolerance
                             1e-4 [D]
 epsLin                      <float>                                    ratio between linear and nonlinear tolerances
                             0.5 [D]
-sigScale                    <float>                                    scaling coeff for Jv difference quotient 
-                            1.0 [D]
+dqSigma                     <float>                                    step size for Jv difference quotient 
+                            automatic [D]
 maxSteps                    <int>
 sharedRho                   true, false [D]                            use same "density" field for all but the first scalar
 jtvRecycleProperties        true [D], false                            recycle property (freeze) evaluation for Jv
