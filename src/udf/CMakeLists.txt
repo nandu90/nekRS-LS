@@ -28,13 +28,14 @@ set(INCLUDE_DIRS
   ${NEKRS_INSTALL_DIR}/include/utils
   ${NEKRS_INSTALL_DIR}/include/setup
   ${NEKRS_INSTALL_DIR}/include/udf
-  ${NEKRS_INSTALL_DIR}/include/bdry
+  ${NEKRS_INSTALL_DIR}/include/solvers/nrs
   ${NEKRS_INSTALL_DIR}/include/setup
   ${NEKRS_INSTALL_DIR}/include/navierStokes
   ${NEKRS_INSTALL_DIR}/include/solvers/elliptic
   ${NEKRS_INSTALL_DIR}/include/solvers/cvode
   ${NEKRS_INSTALL_DIR}/include/nekInterface
-  ${NEKRS_INSTALL_DIR}/include/cds
+  ${NEKRS_INSTALL_DIR}/include/solvers/nrs/cds
+  ${NEKRS_INSTALL_DIR}/include/solvers/nrs/bdry
   ${NEKRS_INSTALL_DIR}/include/linAlg
   ${NEKRS_INSTALL_DIR}/include/neknek
   ${NEKRS_INSTALL_DIR}/include/pointInterpolation

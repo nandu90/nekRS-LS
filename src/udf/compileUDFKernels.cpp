@@ -24,7 +24,7 @@ occa::properties compileUDFKernels()
     std::cout << "loading udf kernels ... " << std::endl;
 
   occa::properties kernelInfoBC = kernelInfo;
-  const std::string bcDataFile = installDir + "/include/bdry/bcData.h";
+  const std::string bcDataFile = installDir + "/include/solvers/nrs/bdry/bcData.h";
   kernelInfoBC["includes"] += bcDataFile.c_str();
 
   kernelInfoBC["okl/include_paths"].asArray();

@@ -4,7 +4,7 @@
   / __ \ / _ \ / //_// /_/ /\__ \ 
  / / / //  __// ,<  / _, _/___/ / 
 /_/ /_/ \___//_/|_|/_/ |_|/____/  
-COPYRIGHT (c) 2019-2023 UCHICAGO ARGONNE, LLC
+COPYRIGHT (c) 2019-2024 UCHICAGO ARGONNE, LLC
 ```
 
 [![Build Status](https://travis-ci.com/Nek5000/nekRS.svg?branch=master)](https://travis-ci.com/Nek5000/nekRS)
@@ -54,7 +54,7 @@ provides an early preview of the next upcoming release (do not use in a producti
 To build and install the code run:
 
 ```sh
-CC=mpicc CXX=mpic++ FC=mpif77 ./configure [-DCMAKE_INSTALL_PREFIX=$HOME/.local/nekrs]
+CC=mpicc CXX=mpic++ FC=mpif77 ./build.sh [-DCMAKE_INSTALL_PREFIX=$HOME/.local/nekrs]
 ```
 Build settings can be customized through CMake options passed to `configure`. 
 Please remove the previous build and installation directory in case of an update. 

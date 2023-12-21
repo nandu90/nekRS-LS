@@ -5,8 +5,8 @@ include(config/gslib.cmake)
 
 set(NRS_SRC 
     src/lib/nekrs.cpp
-    src/io/writeFld.cpp
-    src/io/fileUtils.cpp
+    src/core/io/writeFld.cpp
+    src/utils/fileUtils.cpp
     src/utils/sha1.cpp
     src/utils/inipp.cpp
     src/utils/unifdef.c
@@ -17,33 +17,33 @@ set(NRS_SRC
     src/core/printHeader.cpp
     src/regularization/lowPassFilter.cpp
     src/regularization/avm.cpp
-    src/bdry/bcMap.cpp
+    src/nrs/bdry/bcMap.cpp
     src/core/compileKernels.cpp
-    src/bdry/alignment.cpp
+    src/nrs/bdry/alignment.cpp
     src/neknek/registerNekNekKernels.cpp
     src/postProcessing/registerPostProcessingKernels.cpp
     src/solvers/elliptic/registerEllipticKernels.cpp
     src/solvers/elliptic/registerEllipticPreconditionerKernels.cpp
-    src/cds/registerCdsKernels.cpp
+    src/nrs/cds/registerCdsKernels.cpp
     src/linAlg/registerLinAlgKernels.cpp
     src/mesh/registerMeshKernels.cpp
     src/core/LVector.cpp
-    src/bdry/createEToBV.cpp
-    src/navierStokes/registerNrsKernels.cpp
-    src/navierStokes/numberActiveFields.cpp
-    src/navierStokes/cfl.cpp
-    src/navierStokes/nrsSetup.cpp
-    src/navierStokes/applyDirichlet.cpp
-    src/navierStokes/timeStepper.cpp
-    src/navierStokes/evaluateProperties.cpp
-    src/navierStokes/subCycling.cpp
-    src/navierStokes/tombo.cpp
-    src/navierStokes/constantFlowRate.cpp
-    src/navierStokes/Urst.cpp
-    src/cds/cdsSetup.cpp
-    src/cds/cdsSolve.cpp
+    src/nrs/bdry/createEToBV.cpp
+    src/nrs/registerNrsKernels.cpp
+    src/nrs/numberActiveFields.cpp
+    src/nrs/cfl.cpp
+    src/nrs/nrsSetup.cpp
+    src/nrs/applyDirichlet.cpp
+    src/nrs/timeStepper.cpp
+    src/nrs/evaluateProperties.cpp
+    src/nrs/subCycling.cpp
+    src/nrs/tombo.cpp
+    src/nrs/constantFlowRate.cpp
+    src/nrs/Urst.cpp
+    src/nrs/cds/cdsSetup.cpp
+    src/nrs/cds/cdsSolve.cpp
     src/setup/parsePar.cpp
-    src/io/re2Reader.cpp
+    src/core/io/re2Reader.cpp
     src/setup/configReader.cpp
     src/core/timer.cpp
     src/core/platform.cpp
@@ -86,17 +86,17 @@ set(NRS_SRC
 set(NRS_INCLUDE
     src
     src/setup
-    src/bdry
+    src/nrs/bdry
     src/core
     src/utils
     src/lib
-    src/io
+    src/core/io
     src/udf
     src/regularization
     src/linAlg
-    src/navierStokes
+    src/nrs
     src/neknek
-    src/cds
+    src/nrs/cds
     src/pointInterpolation/findpts
     src/postProcessing
     src/pointInterpolation

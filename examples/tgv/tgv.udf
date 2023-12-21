@@ -46,6 +46,7 @@ void printDiagnostics(nrs_t *nrs, double time, int tstep)
 
     auto o_magCurlU = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
     magSqr(mesh->Nlocal, nrs->fieldOffset, o_curlU, o_magCurlU);
+
     return scale * platform->linAlg->innerProd(mesh->Nlocal,
                        o_magCurlU,
                        mesh->o_LMM,
