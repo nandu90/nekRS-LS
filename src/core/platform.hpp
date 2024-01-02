@@ -40,7 +40,7 @@ public:
   device_t device;
   occa::properties kernelInfo;
   timer::timer_t timer;
-  occa::experimental::memoryPool o_memPool;
+  occa::memoryPool o_memPool;
   kernelRequestManager_t kernels;
   inipp::Ini *par;
   bool serial;

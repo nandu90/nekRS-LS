@@ -8,7 +8,7 @@
 {
   for (dlong element = 0; element < Nelements; ++element; @outer(0)) {
 
-#ifdef smXX
+#if defined(smXX) || defined(XeHPC)
 #pragma unroll p_Nq
 #endif
     for (int k = 0; k < p_Nq; ++k) {

@@ -11,6 +11,9 @@
 #endif
                          @ restrict pfloat *u)
 {
+#if defined(XeHPC) && (p_Nq < 5)
+  @simd_length(16)
+#endif
   for (dlong my_elem = 0; my_elem < Nelements; ++my_elem; @outer) {
     @shared pfloat S_x_e[p_Nq_e][p_Nq_e];
     @shared pfloat S_y_e[p_Nq_e][p_Nq_e];

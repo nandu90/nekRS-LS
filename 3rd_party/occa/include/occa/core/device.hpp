@@ -282,6 +282,21 @@ namespace occa {
      */
     const occa::json& properties() const;
 
+    /**
+     * @startDoc{arch}
+     *
+     * Description:
+     *   Returns a string describing some architecture information of a device.
+     *   The string's contents may vary between backends, even on the same
+     *   physical device
+     *
+     * Returns:
+     *   The architecture version string of a device, such as 'gfx900' or 'sm_70'
+     *
+     * @endDoc
+     */
+    const std::string& arch() const;
+
     const occa::json& kernelProperties() const;
     occa::json kernelProperties(const occa::json &additionalProps) const;
 
@@ -727,23 +742,23 @@ namespace occa {
      *
      * @endDoc
      */
-    experimental::memoryPool createMemoryPool(const occa::json &props = occa::json());
+    memoryPool createMemoryPool(const occa::json &props = occa::json());
 
     //  |===============================
 
     /**
      * @startDoc{unwrap}
-     * 
+     *
      * Description:
      *   Retreives the mode-specific object associated with this [[device]].
      *   The lifetime of the returned object is the same as this device.
-     *   Destruction of the returned object during this device's lifetime results in undefined behavior.   
-     *  
+     *   Destruction of the returned object during this device's lifetime results in undefined behavior.
+     *
      *   > An OCCA application is responsible for correctly converting the returned `void*` pointer to the corresponding mode-specific device type.
-     *   
+     *
      * Returns:
      *   A pointer to the mode-specific object associated with this device.
-     * 
+     *
      * @endDoc
     */
     void* unwrap();

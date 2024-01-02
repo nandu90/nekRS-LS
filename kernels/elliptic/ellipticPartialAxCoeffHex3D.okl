@@ -12,6 +12,9 @@
                                        @ restrict const dfloat *q,
                                        @ restrict dfloat *Aq)
 {
+#if defined(XeHPC) && (!defined(FP32) || (p_Nq < 7))
+  @simd_length(16)
+#endif
   for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
 
 #if defined(FP32) && defined(gfxXX)
@@ -176,7 +179,9 @@
                                        @ restrict const dfloat *q,
                                        @ restrict dfloat *Aq)
 {
-
+#if defined(XeHPC) && (!defined(FP32) || (p_Nq < 7))
+  @simd_length(16)
+#endif
   for (dlong e = 0; e < Nelements; e++; @outer(0)) {
 
     @shared dfloat s_D[p_Nq][p_Nq + p_pad];
@@ -219,8 +224,7 @@
     }
 
     // Layer by layer
-#ifdef smXX
-// only force some type of unrolling in CUDA mode
+#if defined(smXX) || defined(XeHPC)
 #pragma unroll p_Nq
 #endif
     for (int k = 0; k < p_Nq; k++) {
@@ -398,7 +402,6 @@
 #endif
 
 #if p_knl == 2
-
 @kernel void ellipticPartialAxCoeffHex3D_v2(const dlong Nelements,
                                        const dlong offset,
                                        const dlong loffset,
@@ -411,7 +414,9 @@
                                        @ restrict const dfloat *q,
                                        @ restrict dfloat *Aq)
 {
-
+#if defined(XeHPC) && !defined(FP32)
+  @simd_length(16)
+#endif
   for (dlong eo = 0; eo < Nelements; eo += p_NelementsPerBlk; @outer(0)) {
 
     @shared dfloat s_D[p_Nq][p_Nq + p_pad];
@@ -462,8 +467,7 @@
     }
 
     // Layer by layer
-#ifdef smXX
-// only force some type of unrolling in CUDA mode
+#if defined(smXX) || defined(XeHPC)
 #pragma unroll p_Nq
 #endif
 #ifdef gfxXX
@@ -914,8 +918,7 @@
     }
 
     // Layer by layer
-#ifdef smXX
-// only force some type of unrolling in CUDA mode
+#if defined(smXX) || defined(XeHPC)
 #pragma unroll p_Nq
 #endif
 #ifdef gfxXX
@@ -1105,7 +1108,7 @@
     }
 
     // Layer by layer
-#ifdef smXX
+#if defined(smXX) || defined(XeHPC)
 // only force some type of unrolling in CUDA mode
 #pragma unroll p_Nq
 #endif
@@ -1297,7 +1300,9 @@
                                        @ restrict const dfloat *q,
                                        @ restrict dfloat *Aq)
 {
-
+#if defined(XeHPC) && (!defined(FP32) || (p_Nq < 7))
+  @simd_length(16)
+#endif
   for (dlong e = 0; e < Nelements; e++; @outer(0)) {
 
     @shared dfloat s_D[p_Nq][p_Nq + p_pad];
@@ -1340,8 +1345,7 @@
     }
 
     // Layer by layer
-#ifdef smXX
-// only force some type of unrolling in CUDA mode
+#if defined(smXX) || defined(XeHPC)
 #pragma unroll p_Nq
 #endif
     for (int k = 0; k < p_Nq; k++) {
@@ -1454,7 +1458,9 @@
                                        @restrict const dfloat *q,
                                        @restrict dfloat *Aq)
 {
-
+#if defined(XeHPC) && (p_Nq < 7)
+  @simd_length(16)
+#endif
   for (dlong e = 0; e < Nelements; e++; @outer(0)) {
 #if (p_Nq % 2 == 0)
     @shared dfloat s_D[p_Nq][p_Nq + 1];

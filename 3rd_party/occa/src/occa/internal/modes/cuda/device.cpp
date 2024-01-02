@@ -59,24 +59,8 @@ namespace occa {
       kernelProps["compiler"] = compiler;
       kernelProps["compiler_flags"] = compilerFlags;
 
-#if CUDA_VERSION < 5000
-      OCCA_CUDA_ERROR("Device: Getting CUDA device arch",
-                      cuDeviceComputeCapability(&archMajorVersion,
-                                                &archMinorVersion,
-                                                cuDevice));
-#else
-      OCCA_CUDA_ERROR("Device: Getting CUDA device major version",
-                      cuDeviceGetAttribute(&archMajorVersion,
-                                           CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
-                                           cuDevice));
-      OCCA_CUDA_ERROR("Device: Getting CUDA device minor version",
-                      cuDeviceGetAttribute(&archMinorVersion,
-                                           CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
-                                           cuDevice));
-#endif
-
-      archMajorVersion = kernelProps.get("arch/major", archMajorVersion);
-      archMinorVersion = kernelProps.get("arch/minor", archMinorVersion);
+      getDeviceArchVersion(cuDevice, archMajorVersion, archMinorVersion);
+      arch = getDeviceArch(cuDevice);
     }
 
     device::~device() {
@@ -107,7 +91,8 @@ namespace occa {
       return (
         occa::hash(props["compiler"])
         ^ props["compiler_flags"]
-        ^ props["compiler_env_script"]
+        ^ props["kernel/include_occa"]
+        ^ props["kernel/link_occa"]
       );
     }
 
@@ -259,9 +244,11 @@ namespace occa {
     void device::setArchCompilerFlags(const occa::json &kernelProps,
                                       std::string &compilerFlags) {
       if (compilerFlags.find("-arch=sm_") == std::string::npos) {
+        int majorVersion = kernelProps.get("arch/major", archMajorVersion);
+        int minorVersion = kernelProps.get("arch/minor", archMinorVersion);
         compilerFlags += " -arch=sm_";
-        compilerFlags += std::to_string(archMajorVersion);
-        compilerFlags += std::to_string(archMinorVersion);
+        compilerFlags += std::to_string(majorVersion);
+        compilerFlags += std::to_string(minorVersion);
       }
     }
 
@@ -287,6 +274,9 @@ namespace occa {
         sys::addCompilerLibraryFlags(compilerFlags);
       }
 
+      const bool includeOcca = kernelProps.get("kernel/include_occa", false);
+      const bool linkOcca    = kernelProps.get("kernel/link_occa", false);
+
       //---[ Compiling Command ]--------
       std::stringstream command;
       command << allProps["compiler"]
@@ -295,10 +285,15 @@ namespace occa {
 #if (OCCA_OS == OCCA_WINDOWS_OS)
               << " -D OCCA_OS=OCCA_WINDOWS_OS -D _MSC_VER=1800"
 #endif
-              << " -I"        << env::OCCA_DIR << "include"
-              << " -I"        << env::OCCA_INSTALL_DIR << "include"
-              << " -L"        << env::OCCA_INSTALL_DIR << "lib -locca"
-              << " -x cu " << sourceFilename
+          ;
+      if (includeOcca) {
+        command << " -I"        << env::OCCA_DIR << "include"
+                << " -I"        << env::OCCA_INSTALL_DIR << "include";
+      }
+      if (linkOcca) {
+        command << " -L"        << env::OCCA_INSTALL_DIR << "lib -locca";
+      }
+      command << " -x cu " << sourceFilename
               << " -o "    << binaryFilename
               << " 2>&1";
 
@@ -323,7 +318,7 @@ namespace occa {
       } else if (verbose) {
           io::stdout << "Output:\n\n" << commandOutput << "\n";
       }
-      
+
       io::sync(binaryFilename);
     }
 

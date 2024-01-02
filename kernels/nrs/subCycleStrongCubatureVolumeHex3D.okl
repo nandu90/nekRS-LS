@@ -96,7 +96,7 @@
       }
     }
 
-#ifdef smXX
+#if defined(smXX) || defined(XeHPC)
 #pragma unroll p_Nq
 #else
 #pragma nounroll
@@ -230,7 +230,7 @@
     }
 
     // now project back in t
-#ifdef smXX
+#if defined(smXX) || defined(XeHPC)
 #pragma unroll p_Nq
 #endif
     for (int c = 0; c < p_Nq; ++c) {

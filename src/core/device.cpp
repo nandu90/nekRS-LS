@@ -142,6 +142,8 @@ occa::kernel device_t::buildKernel(const std::string &fileName,
       propsWithSuffix["defines/smXX"] = 1;
     if (this->mode() == "HIP")
       propsWithSuffix["defines/gfxXX"] = 1;
+    if (this->mode() == "dpcpp")
+      propsWithSuffix["defines/XeHPC"] = 1;
 
     const std::string floatingPointType = static_cast<std::string>(propsWithSuffix["defines/dfloat"]);
 

@@ -20,7 +20,7 @@
 
     @shared dfloat s_D[p_Nq][p_Nq];
 
-#ifdef smXX
+#ifdef defined(smXX) || defined(XeHPC)
 #pragma unroll p_Nq
 #endif
     for (int k = 0; k < p_Nq; ++k) {

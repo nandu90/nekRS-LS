@@ -149,6 +149,10 @@ occa::kernel benchmarkAdvsub(int Nfields,
     kernelName = "subCycleStrongVolumeHex3D";
   }
 
+  if (platform->device.mode() == "dpcpp") {
+    props["simd_length"] = 16; 
+  }
+
   const std::string ext = (platform->device.mode() == "Serial") ? ".c" : ".okl";
   fileName = oklpath + "/nrs/" + kernelName + ext;
 

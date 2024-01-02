@@ -45,7 +45,7 @@
     @exclusive dfloat r_SWy[p_Nq];
     @exclusive dfloat r_SWz[p_Nq];
 
-#ifdef smXX
+#if defined(smXX) || defined(XeHPC)
 #pragma unroll
 #endif
     for (int k = 0; k < p_Nq; ++k) {

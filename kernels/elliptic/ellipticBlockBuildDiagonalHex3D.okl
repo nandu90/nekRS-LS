@@ -44,7 +44,7 @@
     @exclusive dfloat s_Gtt[p_Nq];
     @exclusive dfloat s_lambdat[p_MaxNFields][p_Nq];
 
-#ifdef smXX
+#if defined(smXX) || defined(XeHPC)
 #pragma unroll p_Nq
 #endif
     for (int k = 0; k < p_Nq; ++k) {
