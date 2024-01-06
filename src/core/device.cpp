@@ -134,9 +134,13 @@ occa::kernel device_t::buildKernel(const std::string &fileName,
 
   if (fileName.find(".okl") != std::string::npos) {
     occa::properties propsWithSuffix = props;
+    propsWithSuffix["includes"].asArray();
     propsWithSuffix["kernelNameSuffix"] = suffix;
 
     propsWithSuffix["defines/__okl__"] = 1;
+
+    if (this->mode() == "Serial")
+      propsWithSuffix["includes"] += "math.h";
 
     if (this->mode() == "CUDA")
       propsWithSuffix["defines/smXX"] = 1;
@@ -167,6 +171,11 @@ occa::kernel device_t::buildKernel(const std::string &fileName,
     };
 
     occa::properties propsWithSuffix = props;
+    propsWithSuffix["includes"].asArray();
+
+    if (this->mode() == "Serial")
+      propsWithSuffix["includes"] += "math.h";
+
     propsWithSuffix["defines/SUFFIX"] = suffix;
     propsWithSuffix["defines/TOKEN_PASTE_(a,b)"] = std::string("a##b");
     propsWithSuffix["defines/TOKEN_PASTE(a,b)"] = std::string("TOKEN_PASTE_(a,b)");
