@@ -91,7 +91,7 @@ void testDirection(nrs_t *nrs, std::string dir)
   for (int fld = 0; fld < nrs->NVfields; ++fld) {
     setField(nrs, o_fields, fld);
   }
-  postProcessing::planarAvg(nrs, dir, NELGX, NELGY, NELGZ, nrs->NVfields, o_fields);
+  planarAvg(mesh, dir, NELGX, NELGY, NELGZ, nrs->NVfields, nrs->fieldOffset, o_fields);
 
   if (dir == "x") {
     platform->linAlg->fill(mesh->Nlocal, 0.0, o_refFields);
@@ -139,12 +139,14 @@ void testFusedPlanarAvg(nrs_t *nrs, std::string dir)
   const auto firstDir = dir.substr(0, 1);
   const auto secondDir = dir.substr(1);
 
-  // (1) x, z == z, x, e.g.
-  postProcessing::planarAvg(nrs, firstDir, NELGX, NELGY, NELGZ, nrs->NVfields, o_fields);
-  postProcessing::planarAvg(nrs, secondDir, NELGX, NELGY, NELGZ, nrs->NVfields, o_fields);
+  auto *mesh = nrs->meshV;
 
-  postProcessing::planarAvg(nrs, secondDir, NELGX, NELGY, NELGZ, nrs->NVfields, o_refFields);
-  postProcessing::planarAvg(nrs, firstDir, NELGX, NELGY, NELGZ, nrs->NVfields, o_refFields);
+  // (1) x, z == z, x, e.g.
+  planarAvg(mesh, firstDir, NELGX, NELGY, NELGZ, nrs->NVfields, nrs->fieldOffset, o_fields);
+  planarAvg(mesh, secondDir, NELGX, NELGY, NELGZ, nrs->NVfields, nrs->fieldOffset, o_fields);
+
+  planarAvg(mesh, secondDir, NELGX, NELGY, NELGZ, nrs->NVfields, nrs->fieldOffset, o_refFields);
+  planarAvg(mesh, firstDir, NELGX, NELGY, NELGZ, nrs->NVfields, nrs->fieldOffset, o_refFields);
 
   const auto tol = 50. * std::numeric_limits<dfloat>::epsilon();
 
@@ -160,10 +162,10 @@ void testFusedPlanarAvg(nrs_t *nrs, std::string dir)
   }
   o_refFields.copyFrom(o_fields, nrs->NVfields * nrs->fieldOffset);
 
-  postProcessing::planarAvg(nrs, dir, NELGX, NELGY, NELGZ, nrs->NVfields, o_fields);
+  planarAvg(mesh, dir, NELGX, NELGY, NELGZ, nrs->NVfields, nrs->fieldOffset, o_fields);
 
-  postProcessing::planarAvg(nrs, firstDir, NELGX, NELGY, NELGZ, nrs->NVfields, o_refFields);
-  postProcessing::planarAvg(nrs, secondDir, NELGX, NELGY, NELGZ, nrs->NVfields, o_refFields);
+  planarAvg(mesh, firstDir, NELGX, NELGY, NELGZ, nrs->NVfields, nrs->fieldOffset, o_refFields);
+  planarAvg(mesh, secondDir, NELGX, NELGY, NELGZ, nrs->NVfields, nrs->fieldOffset, o_refFields);
 
   LInfError = computeLInfError(nrs, o_fields, o_refFields);
   if (LInfError > tol) {
@@ -177,10 +179,10 @@ void testFusedPlanarAvg(nrs_t *nrs, std::string dir)
   }
   o_refFields.copyFrom(o_fields, nrs->NVfields * nrs->fieldOffset);
 
-  postProcessing::planarAvg(nrs, secondDir + firstDir, NELGX, NELGY, NELGZ, nrs->NVfields, o_fields);
+  planarAvg(mesh, secondDir + firstDir, NELGX, NELGY, NELGZ, nrs->NVfields, nrs->fieldOffset, o_fields);
 
-  postProcessing::planarAvg(nrs, firstDir, NELGX, NELGY, NELGZ, nrs->NVfields, o_refFields);
-  postProcessing::planarAvg(nrs, secondDir, NELGX, NELGY, NELGZ, nrs->NVfields, o_refFields);
+  planarAvg(mesh, firstDir, NELGX, NELGY, NELGZ, nrs->NVfields, nrs->fieldOffset, o_refFields);
+  planarAvg(mesh, secondDir, NELGX, NELGY, NELGZ, nrs->NVfields, nrs->fieldOffset, o_refFields);
 
   LInfError = computeLInfError(nrs, o_fields, o_refFields);
   if (LInfError > tol) {
@@ -237,8 +239,7 @@ void ciTestDistance(nrs_t *nrs)
 
   if (maxRelErr > tol) {
     CIFAIL;
-    nrsFinalize(nrs);
-    exit(platform->exitValue);
+    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 }
 

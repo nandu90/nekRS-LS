@@ -382,8 +382,7 @@ void ciTestParticles(nrs_t *nrs, lpm_t *particles, occa::kernel exactUVWPKernel,
       std::cout << "Unexpected number of particles" << std::endl;
     }
     CIFAIL;
-    nrsFinalize(nrs);
-    exit(platform->exitValue);
+    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 
   auto relTol = 1e-7;
@@ -454,8 +453,7 @@ void ciTestParticles(nrs_t *nrs, lpm_t *particles, occa::kernel exactUVWPKernel,
       std::cout << "Particle integration error too large!\n";
     }
     CIFAIL;
-    nrsFinalize(nrs);
-    exit(platform->exitValue);
+    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 }
 
@@ -592,10 +590,7 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   }
 
   // Test failed -- exit
-  if (platform->exitValue) {
-    nrsFinalize(nrs);
-    exit(platform->exitValue);
-  }
+  nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 
   for (int n = 0; n < nRandomInterp; ++n) {
     o_UeRand[n].free();
@@ -732,11 +727,7 @@ void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
     CIFAIL;
   
   // Test failed -- exit
-  if (platform->exitValue) {
-    nrsFinalize(nrs);
-    exit(platform->exitValue);
-  }
-
+  nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 }
 
 void ciTestSurfaceIntegral(nrs_t *nrs)
@@ -767,10 +758,7 @@ void ciTestSurfaceIntegral(nrs_t *nrs)
     }
   }
 
-  if (platform->exitValue) {
-    nrsFinalize(nrs);
-    exit(platform->exitValue);
-  }
+  nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 }
 
 void ciTestDistance(nrs_t *nrs)
@@ -817,12 +805,7 @@ void ciTestDistance(nrs_t *nrs)
     CIFAIL;
   }
 
-  if (platform->exitValue) {
-    nrsFinalize(nrs);
-    exit(platform->exitValue);
-  }
-
-
+  nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 }
 
 dfloat sum(dfloat const *const array, const int size, MPI_Comm comm)
@@ -961,10 +944,7 @@ void ciTestLinAlg(nrs_t *nrs, const int N)
     o_wt.free();
   }
 
-  if (platform->exitValue) {
-    nrsFinalize(nrs);
-    exit(platform->exitValue);
-  }
+  nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 }
 
 void ciTestErrors(nrs_t *nrs,
@@ -997,8 +977,7 @@ void ciTestErrors(nrs_t *nrs,
       }
       CIFAIL;
 #if 0
-      nrsFinalize(nrs);
-      exit(platform->exitValue);
+      nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 #endif
     }
   }
@@ -1273,8 +1252,7 @@ void ciTestErrors(nrs_t *nrs,
         fflush(stdout);
       }
       CIFAIL;
-      nrsFinalize(nrs);
-      exit(platform->exitValue);
+      nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", ""); 
     }
 
     // check flop count
@@ -1292,8 +1270,7 @@ void ciTestErrors(nrs_t *nrs,
         fflush(stdout);
       }
       CIFAIL;
-      nrsFinalize(nrs);
-      exit(platform->exitValue);
+      nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
   }
   if (ciMode == 8) {
@@ -1305,8 +1282,7 @@ void ciTestErrors(nrs_t *nrs,
     if (errSteps > 2) {
       CIFAIL;
     }
-    nrsFinalize(nrs);
-    exit(platform->exitValue);
+    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 
   if (ciMode == 5 || ciMode == 6) {
@@ -1315,8 +1291,7 @@ void ciTestErrors(nrs_t *nrs,
         printf("Unable to test moving mesh in ethier. Please re-run the case with mv_ethier!\n");
       }
       (CIFAIL);
-      nrsFinalize(nrs);
-      exit(platform->exitValue);
+      nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
   }
 

@@ -1,12 +1,6 @@
-//
-// nekRS User Defined File
-//
-
-#include "udf.hpp"
 #include "plugins/lpm.hpp"
 
 #include "ci.inc"
-#include <vector>
 #include "randomVector.hpp"
 #include "linspaceVector.hpp"
 

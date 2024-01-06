@@ -1,4 +1,3 @@
-#include "udf.hpp"
 #include "plugins/tavg.hpp"
 
 static occa::memory o_work;
@@ -158,7 +157,7 @@ void planarAverage(nrs_t *nrs)
   gradY(mesh->Nelements, mesh->o_vgeo, mesh->o_D, nrs->fieldOffset, mesh->o_invLMM, o_work, o_ddyAvg);
   oogs::startFinish(o_ddyAvg, 3, nrs->fieldOffset, ogsDfloat, ogsAdd, nrs->gsh);
 
-  postProcessing::planarAvg(nrs, "xz", NUMBER_ELEMENTS_X, NUMBER_ELEMENTS_Y, NUMBER_ELEMENTS_Z, 6, o_work);
+  planarAvg(mesh, "xz", NUMBER_ELEMENTS_X, NUMBER_ELEMENTS_Y, NUMBER_ELEMENTS_Z, 6, nrs->fieldOffset, o_work);
 }
 
 void userf(nrs_t *nrs, double time, occa::memory o_U, occa::memory o_FU)
@@ -229,13 +228,14 @@ void writeStatistics(nrs_t *nrs, double time, int tstep, const std::string& fnam
                   3 * nrs->fieldOffset ,
                   6 * nrs->fieldOffset );
 
-  postProcessing::planarAvg(nrs, 
-                            "xz", 
-                            NUMBER_ELEMENTS_X, 
-                            NUMBER_ELEMENTS_Y, 
-                            NUMBER_ELEMENTS_Z, 
-                            Nfields, 
-                            o_work);
+  planarAvg(mesh, 
+            "xz", 
+            NUMBER_ELEMENTS_X, 
+            NUMBER_ELEMENTS_Y, 
+            NUMBER_ELEMENTS_Z, 
+            Nfields,
+            nrs->fieldOffset, 
+            o_work);
 
   interpolator->eval(Nfields, 
                      nrs->fieldOffset, 

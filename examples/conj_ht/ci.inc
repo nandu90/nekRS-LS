@@ -91,12 +91,8 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, int tstep)
       std::cout << std::endl;
     }
 
-    // Test failed -- exit
     CIFAIL;
-    if (platform->exitValue) {
-      nrsFinalize(nrs);
-      exit(platform->exitValue);
-    }
+    nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 }
 

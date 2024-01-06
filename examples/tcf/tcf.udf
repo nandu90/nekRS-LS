@@ -1,5 +1,3 @@
-#include "udf.hpp"
-
 #ifdef __okl__
 
 void velocityDirichletConditions(bcData *bc)

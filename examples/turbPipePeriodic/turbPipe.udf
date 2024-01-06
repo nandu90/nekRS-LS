@@ -1,8 +1,3 @@
-//
-// nekRS User Defined File
-//
-#include "udf.hpp"
-
 static dfloat Re_tau;
 static dfloat zLength;
 static dfloat dt0;

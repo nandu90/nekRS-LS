@@ -1,7 +1,3 @@
-//
-// nekRS User Defined File
-//
-#include "udf.hpp"
 #include "plugins/tavg.hpp"
 
 #ifdef __okl__
