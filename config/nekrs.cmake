@@ -15,13 +15,13 @@ set(NRS_SRC
     src/utils/tinyexpr.c
     src/utils/setupAide.cpp
     src/core/printHeader.cpp
-    src/regularization/lowPassFilter.cpp
-    src/regularization/avm.cpp
+    src/nrs/regularization/lowPassFilter.cpp
+    src/nrs/regularization/avm.cpp
     src/nrs/bdry/bcMap.cpp
     src/core/compileKernels.cpp
     src/nrs/bdry/alignment.cpp
     src/neknek/registerNekNekKernels.cpp
-    src/postProcessing/registerPostProcessingKernels.cpp
+    src/nrs/postProcessing/registerPostProcessingKernels.cpp
     src/solvers/elliptic/registerEllipticKernels.cpp
     src/solvers/elliptic/registerEllipticPreconditionerKernels.cpp
     src/nrs/cds/registerCdsKernels.cpp
@@ -42,9 +42,9 @@ set(NRS_SRC
     src/nrs/Urst.cpp
     src/nrs/cds/cdsSetup.cpp
     src/nrs/cds/cdsSolve.cpp
-    src/setup/parsePar.cpp
+    src/core/io/parsePar.cpp
     src/core/io/re2Reader.cpp
-    src/setup/configReader.cpp
+    src/core/io/configReader.cpp
     src/core/timer.cpp
     src/core/platform.cpp
     src/core/comm.cpp
@@ -69,10 +69,9 @@ set(NRS_SRC
     src/udf/udf.cpp
     src/udf/compileUDFKernels.cpp
     src/nekInterface/nekInterfaceAdapter.cpp
-    src/postProcessing/planarAvg.cpp
-    src/postProcessing/strainRotationRate.cpp
-    src/postProcessing/viscousDrag.cpp
-    src/postProcessing/Qcriterion.cpp
+    src/nrs/postProcessing/strainRotationRate.cpp
+    src/nrs/postProcessing/viscousDrag.cpp
+    src/nrs/postProcessing/Qcriterion.cpp
     src/solvers/cvode/registerCvodeKernels.cpp
     src/solvers/cvode/cvode.cpp
     src/solvers/cvode/cbGMRES.cpp
@@ -85,23 +84,21 @@ set(NRS_SRC
 
 set(NRS_INCLUDE
     src
-    src/setup
     src/nrs/bdry
     src/core
     src/utils
     src/lib
     src/core/io
     src/udf
-    src/regularization
+    src/nrs/regularization
     src/linAlg
     src/nrs
     src/neknek
     src/nrs/cds
     src/pointInterpolation/findpts
-    src/postProcessing
+    src/nrs/postProcessing
     src/pointInterpolation
     src/solvers/cvode
-    src/lns
     ${BENCH_SOURCE_DIR}
     ${BENCH_SOURCE_DIR}/core
     ${BENCH_SOURCE_DIR}/fdm

@@ -82,5 +82,20 @@ void registerMeshKernels(occa::properties kernelInfoBC)
       fileName = oklpath + "/core/" + kernelName + ".okl";
       platform->kernels.add(meshPrefix + kernelName, fileName, meshKernelInfo);
     }
+
+
+    for (const std::string dir : {"XY", "XZ", "YZ"}) {
+      auto props = kernelInfo;
+      props["includes"].asArray();
+      props["includes"] += oklpath + "/mesh/planarAveraging.h";
+
+      kernelName = "gatherPlanarValues" + dir;
+      fileName = oklpath + "/mesh/" + kernelName + ".okl";
+      platform->kernels.add(kernelName, fileName, props);
+ 
+      kernelName = "scatterPlanarValues" + dir;
+      fileName = oklpath + "/mesh/" + kernelName + ".okl";
+      platform->kernels.add(kernelName, fileName, props);
+    }
   }
 }

@@ -45,15 +45,15 @@ void registerCdsKernels(occa::properties kernelInfoBC)
   meshProps += meshKernelProperties(N);
   {
     kernelName = "relativeMassHighestMode";
-    fileName = oklpath + "/cds/regularization/" + kernelName + ".okl";
+    fileName = oklpath + "/nrs/cds/regularization/" + kernelName + ".okl";
     platform->kernels.add(kernelName, fileName, meshProps);
 
     kernelName = "computeMaxVisc";
-    fileName = oklpath + "/cds/regularization/" + kernelName + ".okl";
+    fileName = oklpath + "/nrs/cds/regularization/" + kernelName + ".okl";
     platform->kernels.add(kernelName, fileName, meshProps);
 
     kernelName = "interpolateP1";
-    fileName = oklpath + "/cds/regularization/" + kernelName + ".okl";
+    fileName = oklpath + "/nrs/cds/regularization/" + kernelName + ".okl";
     platform->kernels.add(kernelName, fileName, meshProps);
 
     {
@@ -71,18 +71,18 @@ void registerCdsKernels(occa::properties kernelInfoBC)
       prop["includes"] += diffInterpDataFile.c_str();
 
       kernelName = "strongAdvectionVolume" + suffix;
-      fileName = oklpath + "/cds/" + kernelName + ".okl";
+      fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
       platform->kernels.add(section + kernelName, fileName, prop);
 
       if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
         kernelName = "strongAdvectionCubatureVolume" + suffix;
-        fileName = oklpath + "/cds/" + kernelName + ".okl";
+        fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
         platform->kernels.add(section + kernelName, fileName, prop);
       }
     }
 
     kernelName = "advectMeshVelocityHex3D";
-    fileName = oklpath + "/cds/" + kernelName + ".okl";
+    fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, meshProps);
 
     kernelName = "maskCopy";
@@ -105,15 +105,15 @@ void registerCdsKernels(occa::properties kernelInfoBC)
         prop["defines/p_SUBCYCLING"] = 0;
 
       kernelName = "sumMakef";
-      fileName = oklpath + "/cds/" + kernelName + ".okl";
+      fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
       platform->kernels.add(section + kernelName, fileName, prop);
     }
 
     kernelName = "neumannBC" + suffix;
-    fileName = oklpath + "/cds/" + kernelName + ".okl";
+    fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, kernelInfoBC);
     kernelName = "dirichletBC";
-    fileName = oklpath + "/cds/" + kernelName + ".okl";
+    fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, kernelInfoBC);
 
     kernelName = "setEllipticCoeff";
@@ -121,7 +121,7 @@ void registerCdsKernels(occa::properties kernelInfoBC)
     platform->kernels.add(section + kernelName, fileName, kernelInfo);
 
     kernelName = "filterRT" + suffix;
-    fileName = oklpath + "/cds/regularization/" + kernelName + ".okl";
+    fileName = oklpath + "/nrs/cds/regularization/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, meshProps);
 
     kernelName = "nStagesSum3";
@@ -166,7 +166,7 @@ void registerCdsKernels(occa::properties kernelInfoBC)
       }
 
       kernelName = "subCycleStrongVolume" + suffix;
-      fileName = oklpath + "/cds/" + kernelName + ".okl";
+      fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
       platform->kernels.add(section + kernelName, fileName, prop);
     }
   }

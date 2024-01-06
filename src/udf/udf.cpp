@@ -320,6 +320,7 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
         {
           std::ofstream f(udfFileCache, std::ios::trunc);
           f << "#include \"udf.hpp\"" << std::endl
+            << "#include \"udfHelper.hpp\"" << std::endl
             << "#include \"udfAutoLoadKernel.hpp\"" << std::endl
             << "#include \"" << udfFile << "\"" << std::endl;
 

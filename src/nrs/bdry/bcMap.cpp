@@ -160,7 +160,7 @@ static void v_setup(std::string field, std::vector<std::string> slist)
       key = "zerozvalue/zerogradient";
       foundAligned++;
     }
-    if (key.compare("sym") == 0) {
+    if (key.compare("slip") == 0 || key.compare("sym") == 0) {
       key = "zeronvalue/zerogradient";
       foundUnaligned++;
     }
@@ -177,7 +177,7 @@ static void v_setup(std::string field, std::vector<std::string> slist)
       key = "zerozvalue/codedfixedgradient";
       foundAligned++;
     }
-    if (key.compare("shl") == 0) {
+    if (key.compare("traction") == 0 || key.compare("shl") == 0) {
       key = "zeronvalue/codedfixedgradient";
       foundUnaligned++;
     }

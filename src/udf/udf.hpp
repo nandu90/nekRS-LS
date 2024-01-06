@@ -1,27 +1,12 @@
 #if !defined(nekrs_udf_hpp_)
 #define nekrs_udf_hpp_
 
-#define ins_t nrs_t
-
 #include "nrs.hpp"
 #include "nekInterfaceAdapter.hpp"
 #include "bcMap.hpp"
 #include "constantFlowRate.hpp"
 #include "postProcessing.hpp"
 #include <functional>
-
-#define CIPASS                                                                                               \
-{                                                                                                            \
-if (platform->comm.mpiRank == 0)                                                                             \
-printf("TESTS passed \n");                                                                                   \
-platform->exitValue = 0;                                                                                     \
-}
-#define CIFAIL                                                                                               \
-{                                                                                                            \
-if (platform->comm.mpiRank == 0)                                                                             \
-printf("TESTS failed!\n");                                                                                   \
-platform->exitValue += 1;                                                                                    \
-}
 
 extern "C" {
 void UDF_Setup0(MPI_Comm comm, setupAide &options);

@@ -299,6 +299,8 @@ void meshHaloExchangeBlocking(mesh_t* mesh,
                               void* sendBuffer, // temporary buffer
                               void* recvBuffer);
 
+void planarAvg(mesh_t *mesh, const std::string& dir, int NELGX, int NELGY, int NELGZ, int nflds, dlong offset, occa::memory& o_avg);
+
 // print out parallel partition i
 void meshPartitionStatistics(mesh_t* mesh);
 

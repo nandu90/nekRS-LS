@@ -1,4 +1,4 @@
-# Release v23.1
+# Release v24.0
 
 ## What is new? 
 
@@ -7,6 +7,7 @@
 * CombinedPCG
 * Multi session nek-nek
 * Various bug fixes
+* Add support for Intel GPUs
 
 ## Good to know
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
@@ -20,6 +21,8 @@
 * [udf] API argument `time` is `double` instead of `dfloat` 
 * nek::userchk is no longer called automatically during setup 
 * processing of `nekrs.upd` is triggered by SIGUSR2 instead of every N-steps
+* namespace `postProcessing` was removed
+* planarAvg takes `mesh_t *mesh` instead of `nrs_t *nrs`
 
 ## Known Bugs / Restrictions
 

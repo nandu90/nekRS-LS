@@ -22,22 +22,10 @@ void registerPostProcessingKernels()
   std::string kernelName, fileName;
 
   kernelName = "drag";
-  fileName = oklpath + "/postProcessing/" + kernelName + ".okl";
+  fileName = oklpath + "/nrs/postProcessing/" + kernelName + ".okl";
   platform->kernels.add(kernelName, fileName, kernelInfo);
 
   kernelName = "Qcriterion";
-  fileName = oklpath + "/postProcessing/" + kernelName + ".okl";
+  fileName = oklpath + "/nrs/postProcessing/" + kernelName + ".okl";
   platform->kernels.add(kernelName, fileName, kernelInfo);
-
-  kernelInfo["includes"] += oklpath + "/postProcessing/planarAveraging.h";
-
-  for (const std::string dir : {"XY", "XZ", "YZ"}) {
-    kernelName = "gatherPlanarValues" + dir;
-    fileName = oklpath + "/postProcessing/" + kernelName + ".okl";
-    platform->kernels.add(kernelName, fileName, kernelInfo);
-
-    kernelName = "scatterPlanarValues" + dir;
-    fileName = oklpath + "/postProcessing/" + kernelName + ".okl";
-    platform->kernels.add(kernelName, fileName, kernelInfo);
-  }
 }

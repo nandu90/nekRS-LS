@@ -1,8 +1,7 @@
-#include "nrs.hpp"
 #include "platform.hpp"
 #include "linAlg.hpp"
+#include "mesh.h"
 #include "nekInterfaceAdapter.hpp"
-#include "postProcessing.hpp"
 #include <numeric>
 #include <algorithm>
 
@@ -19,9 +18,8 @@ void get_exyz(int& ex, int& ey, int& ez,int eg, int nelx, int nely)
   ez = 1 + (eg-1)/(nelx*nely);
 }
 
-oogs_t *gtpp_gs_setup(nrs_t *nrs, int nelgx, int nelgy, int nelgz, std::string dir)
+oogs_t *gtpp_gs_setup(mesh_t *mesh, int nelgx, int nelgy, int nelgz, std::string dir)
 {
-  mesh_t* mesh = nrs->meshV;
   const auto nelgxy = nelgx*nelgy;
   const auto nelgyz = nelgy*nelgz;
   const auto nelgzx = nelgz*nelgx;
@@ -80,11 +78,11 @@ oogs_t *gtpp_gs_setup(nrs_t *nrs, int nelgx, int nelgy, int nelgz, std::string d
 
   auto ogsh = ogsSetup(mesh->Nlocal, ids, platform->comm.mpiComm, 1, platform->device.occaDevice());
   free(ids);
-  auto oogsh = oogs::setup(ogsh, 6, nrs->fieldOffset, ogsDfloat, NULL, OOGS_AUTO);
+  auto oogsh = oogs::setup(ogsh, 6, /* dummy */ mesh->Nlocal, ogsDfloat, NULL, OOGS_AUTO);
   return oogsh;
 }
 
-void fusedPlanarAvg(nrs_t *nrs, const std::string & direction, int NELGX, int NELGY, int NELGZ, int nflds, occa::memory o_avg)
+void fusedPlanarAvg(mesh_t *mesh, const std::string & direction, int NELGX, int NELGY, int NELGZ, int nflds, dlong fldOffset, occa::memory o_avg)
 {
   static bool issueWarning = true;
 
@@ -97,13 +95,12 @@ void fusedPlanarAvg(nrs_t *nrs, const std::string & direction, int NELGX, int NE
 
     const auto firstDir = direction.substr(0, 1);
     const auto secondDir = direction.substr(1);
-    postProcessing::planarAvg(nrs, firstDir, NELGX, NELGY, NELGZ, nflds, o_avg);
-    postProcessing::planarAvg(nrs, secondDir, NELGX, NELGY, NELGZ, nflds, o_avg);
+    planarAvg(mesh, firstDir, NELGX, NELGY, NELGZ, nflds, fldOffset, o_avg);
+    planarAvg(mesh, secondDir, NELGX, NELGY, NELGZ, nflds, fldOffset, o_avg);
 
     return;
   }
 
-  const auto * mesh = nrs->meshV;
   static occa::memory o_locToGlobE;
 
   int elemDir = -1;
@@ -141,7 +138,7 @@ void fusedPlanarAvg(nrs_t *nrs, const std::string & direction, int NELGX, int NE
 
   gatherPlanarValuesKernel(mesh->Nelements,
     nflds,
-    nrs->fieldOffset,
+    fldOffset,
     NELGX,
     NELGY,
     NELGZ,
@@ -153,7 +150,7 @@ void fusedPlanarAvg(nrs_t *nrs, const std::string & direction, int NELGX, int NE
 
   scatterPlanarValuesKernel(mesh->Nelements,
     nflds,
-    nrs->fieldOffset,
+    fldOffset,
     NELGX,
     NELGY,
     NELGZ,
@@ -165,10 +162,8 @@ void fusedPlanarAvg(nrs_t *nrs, const std::string & direction, int NELGX, int NE
 } // namespace
 
 
-void postProcessing::planarAvg(nrs_t *nrs, const std::string& dir, int NELGX, int NELGY, int NELGZ, int nflds, occa::memory o_avg)
+void planarAvg(mesh_t *mesh, const std::string& dir, int NELGX, int NELGY, int NELGZ, int nflds, dlong fldOffset, occa::memory& o_avg)
 {
-  mesh_t* mesh = nrs->meshV;
-
   static occa::memory o_avgWeight_x;
   static occa::memory o_avgWeight_y;
   static occa::memory o_avgWeight_z;
@@ -206,33 +201,33 @@ void postProcessing::planarAvg(nrs_t *nrs, const std::string& dir, int NELGX, in
   if(!gsh && o_wghts.size() == 0) {
 
     if(dir == "x"){
-      oogs_x = gtpp_gs_setup(nrs, NELGX, NELGY, NELGZ, "x"); 
+      oogs_x = gtpp_gs_setup(mesh, NELGX, NELGY, NELGZ, "x"); 
       gsh = oogs_x;
-      o_avgWeight_x = platform->device.malloc<dfloat>(nrs->fieldOffset);
+      o_avgWeight_x = platform->device.malloc<dfloat>(mesh->Nlocal);
       o_wghts = o_avgWeight_x;
     }
     else if(dir == "y"){
-      oogs_y = gtpp_gs_setup(nrs, NELGX, NELGY, NELGZ, "y");
+      oogs_y = gtpp_gs_setup(mesh, NELGX, NELGY, NELGZ, "y");
       gsh = oogs_y;
-      o_avgWeight_y = platform->device.malloc<dfloat>(nrs->fieldOffset);
+      o_avgWeight_y = platform->device.malloc<dfloat>(mesh->Nlocal);
       o_wghts = o_avgWeight_y;
     }
     else if(dir == "z"){
-      oogs_z = gtpp_gs_setup(nrs, NELGX*NELGY, 1, NELGZ, "z");
+      oogs_z = gtpp_gs_setup(mesh, NELGX*NELGY, 1, NELGZ, "z");
       gsh = oogs_z;
-      o_avgWeight_z = platform->device.malloc<dfloat>(nrs->fieldOffset);
+      o_avgWeight_z = platform->device.malloc<dfloat>(mesh->Nlocal);
       o_wghts = o_avgWeight_z;
     }
     else if(dir == "xy" || dir == "yx"){
-      o_avgWeight_xy = platform->device.malloc<dfloat>(nrs->fieldOffset);
+      o_avgWeight_xy = platform->device.malloc<dfloat>(mesh->Nlocal);
       o_wghts = o_avgWeight_xy;
     }
     else if(dir == "xz" || dir == "zx"){
-      o_avgWeight_xz = platform->device.malloc<dfloat>(nrs->fieldOffset);
+      o_avgWeight_xz = platform->device.malloc<dfloat>(mesh->Nlocal);
       o_wghts = o_avgWeight_xz;
     }
     else if(dir == "yz" || dir == "zy"){
-      o_avgWeight_yz = platform->device.malloc<dfloat>(nrs->fieldOffset);
+      o_avgWeight_yz = platform->device.malloc<dfloat>(mesh->Nlocal);
       o_wghts = o_avgWeight_yz;
     }
     else{
@@ -241,7 +236,7 @@ void postProcessing::planarAvg(nrs_t *nrs, const std::string& dir, int NELGX, in
 
     o_wghts.copyFrom(mesh->o_LMM);
     if(dir.length() > 1){
-      fusedPlanarAvg(nrs, dir, NELGX, NELGY, NELGZ, 1, o_wghts);
+      fusedPlanarAvg(mesh, dir, NELGX, NELGY, NELGZ, 1, fldOffset, o_wghts);
     } else {
       oogs::startFinish(o_wghts, 1, mesh->Nlocal, ogsDfloat, ogsAdd, gsh);
     }
@@ -251,13 +246,13 @@ void postProcessing::planarAvg(nrs_t *nrs, const std::string& dir, int NELGX, in
   }
 
   for(int ifld = 0; ifld < nflds; ifld++) {
-    auto o_wrk = o_avg.slice(ifld*nrs->fieldOffset, nrs->fieldOffset);
+    auto o_wrk = o_avg.slice(ifld*fldOffset, fldOffset);
     platform->linAlg->axmy(mesh->Nlocal, 1, o_wghts, o_wrk);
   } 
 
   if(dir.length() > 1){
-    fusedPlanarAvg(nrs, dir, NELGX, NELGY, NELGZ, nflds, o_avg);
+    fusedPlanarAvg(mesh, dir, NELGX, NELGY, NELGZ, nflds, fldOffset, o_avg);
   } else {
-    oogs::startFinish(o_avg, nflds, nrs->fieldOffset, ogsDfloat, ogsAdd, gsh);
+    oogs::startFinish(o_avg, nflds, fldOffset, ogsDfloat, ogsAdd, gsh);
   }
 } 
