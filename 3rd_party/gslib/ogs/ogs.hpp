@@ -137,6 +137,7 @@ SOFTWARE.
 
 //#define OGS_ENABLE_TIMER
 
+
 typedef std::function<occa::kernel(const std::string &fileName,
                                    const std::string &kernelName,
                                    const occa::properties &props)> ogsBuildKernel_t;
@@ -294,5 +295,7 @@ void sync_recv(int val);
 void destroy(oogs_t *h);
 
 }
+
+namespace qqt = oogs;
 
 #endif
