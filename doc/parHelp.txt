@@ -127,20 +127,22 @@ smootherType                Jacobi
 boundaryTypeMap             <...>, <...>, ...                          boundary type for each boundary ID
 
                             none                                       not used or internal 
-                            zeroValue                                  zero Dirichlet (wall)
-                            codedFixedValue                            user specified Dirichlet (inlet)
-                            zeroXValue/zeroGradient                    symmetry x-normal plane
-                            zeroYValue/zeroGradient                    symmetry y-normal plane
-                            zeroZValue/zeroGradient                    symmetry z-normal plane
-                            zeroNValue/zeroGradient                    unaligned symmetry
-                            zeroXValue/codedFixedGradient              traction x-normal plane
-                            zeroYValue/codedFixedGradient              traction y-normal plane
-                            zeroZValue/codedFixedGradient              traction z-normal plane
-                            zeroNValue/codedFixedGradient              unaligned traction
-                            zeroXYValue/fixedGradient             
-                            zeroYZValue/fixedGradient             
-                            zeroXZValue/fixedGradient         
-                            fixedGradient                              open boundary (outflow), pr*n
+                            zeroValue                                  zero Dirichlet (w, wall)
+                            codedFixedValue                            user specified Dirichlet (v, t, inlet)
+                            interpolation                              interpolated fixed value in overlap (int)
+                            zeroXValue/zeroGradient                    symmetry x-normal plane (slipx, symx)
+                            zeroYValue/zeroGradient                    symmetry y-normal plane (slipy, symy)
+                            zeroZValue/zeroGradient                    symmetry z-normal plane (slipz, symz)
+                            zeroNValue/zeroGradient                    unaligned symmetry (slip, sym)
+                            zeroXValue/codedFixedGradient              traction x-normal plane (tractionx, shlx)
+                            zeroYValue/codedFixedGradient              traction y-normal plane (tractiony, shly)
+                            zeroZValue/codedFixedGradient              traction z-normal plane (tractionz, shlz)
+                            zeroNValue/codedFixedGradient              unaligned traction (traction, shl)
+                            zeroXYValue/fixedGradient                  (onx) 
+                            zeroYZValue/fixedGradient                  (ony)
+                            zeroXZValue/fixedGradient                  (onz)
+                            zeroGradient                               (i, insulated, o, outlet, outflow) 
+                            fixedGradient                              (f, flux, o, outlet, outflow)
 
 regularization                                                         
                             hpfrt                                      HPF stabilization
