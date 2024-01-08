@@ -7,7 +7,8 @@
 #include "flopCounter.hpp"
 #include "fileUtils.hpp"
 
-namespace {
+namespace
+{
 
 static void compileDummyKernel(platform_t &plat)
 {
@@ -40,66 +41,75 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   setenv("OCCA_MEM_BYTE_ALIGN", std::to_string(ALIGN_SIZE).c_str(), 1);
 
   cacheLocal = 0;
-  if(getenv("NEKRS_CACHE_LOCAL"))
+  if (getenv("NEKRS_CACHE_LOCAL")) {
     cacheLocal = std::stoi(getenv("NEKRS_CACHE_LOCAL"));
+  }
 
   cacheBcast = 0;
-  if(getenv("NEKRS_CACHE_BCAST"))
+  if (getenv("NEKRS_CACHE_BCAST")) {
     cacheBcast = std::stoi(getenv("NEKRS_CACHE_BCAST"));
+  }
 
-  // build-only mode has to use cacheBcast as well otherwise include paths 
-  // change triggering a re-build 
+  // build-only mode has to use cacheBcast as well otherwise include paths
+  // change triggering a re-build
 #if 0
   if (options.compareArgs("BUILD ONLY", "TRUE"))
     cacheBcast = 0;
 #endif
 
-  nrsCheck(cacheLocal && cacheBcast,
-           _comm, EXIT_FAILURE, 
-           "%s\n", "NEKRS_CACHE_LOCAL=1 and NEKRS_CACHE_BCAST=1 is incompatible!");
+  nekrsCheck(cacheLocal && cacheBcast,
+             _comm,
+             EXIT_FAILURE,
+             "%s\n",
+             "NEKRS_CACHE_LOCAL=1 and NEKRS_CACHE_BCAST=1 is incompatible!");
 
   oogs::gpu_mpi(std::stoi(getenv("NEKRS_GPU_MPI")));
 
-  if(getenv("OOGS_SYNC_RECV"))
+  if (getenv("OOGS_SYNC_RECV")) {
     oogs::sync_recv(std::stoi(getenv("OOGS_SYNC_RECV")));
+  }
 
   verbose = options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
 
   timer.enableSync();
-  if (options.compareArgs("ENABLE TIMER SYNC", "FALSE"))
+  if (options.compareArgs("ENABLE TIMER SYNC", "FALSE")) {
     timer.disableSync();
+  }
 
   flopCounter = std::make_unique<flopCounter_t>();
 
   tmpDir = "/";
 
-  // bcast install dir 
-  if(cacheBcast || cacheLocal) {
-    if(getenv("NEKRS_LOCAL_TMP_DIR")) { 
+  // bcast install dir
+  if (cacheBcast || cacheLocal) {
+    if (getenv("NEKRS_LOCAL_TMP_DIR")) {
       tmpDir = getenv("NEKRS_LOCAL_TMP_DIR");
     } else {
-      nrsAbort(_comm, EXIT_FAILURE, "%s\n", "NEKRS_LOCAL_TMP_DIR undefined!");
+      nekrsAbort(_comm, EXIT_FAILURE, "%s\n", "NEKRS_LOCAL_TMP_DIR undefined!");
     }
 
     int rankLocal;
     MPI_Comm_rank(comm.mpiCommLocal, &rankLocal);
 
-    if(rankLocal == 0)
-      nrsCheck(!fs::exists(tmpDir), MPI_COMM_SELF, EXIT_FAILURE,
-               "Cannot find NEKRS_LOCAL_TMP_DIR %s\n", tmpDir.c_str());
-  
-    auto nSessions = 1; 
+    if (rankLocal == 0) {
+      nekrsCheck(!fs::exists(tmpDir),
+                 MPI_COMM_SELF,
+                 EXIT_FAILURE,
+                 "Cannot find NEKRS_LOCAL_TMP_DIR %s\n",
+                 tmpDir.c_str());
+    }
+
+    auto nSessions = 1;
     options.getArgs("NEKNEK NUMBER OF SESSIONS", nSessions);
-    if(nSessions > 1) {
-      auto sessionID = 0; 
+    if (nSessions > 1) {
+      auto sessionID = 0;
       options.getArgs("NEKNEK SESSION ID", sessionID);
 
-      tmpDir = fs::path(tmpDir) / fs::path(std::string("nrs_") + std::to_string(sessionID)); 
+      tmpDir = fs::path(tmpDir) / fs::path(std::string("nrs_") + std::to_string(sessionID));
 
-      if(rankLocal == 0) {
+      if (rankLocal == 0) {
         fs::create_directory(tmpDir);
-        nrsCheck(!fs::exists(tmpDir), MPI_COMM_SELF, EXIT_FAILURE,
-                 "Cannot create %s\n", tmpDir.c_str());
+        nekrsCheck(!fs::exists(tmpDir), MPI_COMM_SELF, EXIT_FAILURE, "Cannot create %s\n", tmpDir.c_str());
       }
     }
 
@@ -112,7 +122,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
                         fs::path("gatherScatter"),
                         fs::path("3rd_party"),
                         fs::path("kernels")}) {
-      
+
       fileBcast(srcPath / entry, NEKRS_HOME_NEW, comm.mpiComm, verbose);
     }
     setenv("NEKRS_HOME", std::string(NEKRS_HOME_NEW).c_str(), 1);
@@ -122,15 +132,18 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 
   {
     int rankLocal = rank;
-    if(cacheLocal)
+    if (cacheLocal) {
       MPI_Comm_rank(comm.mpiCommLocal, &rankLocal);
- 
-    if(rankLocal == 0) {
+    }
+
+    if (rankLocal == 0) {
       std::string cache_dir;
       cache_dir.assign(getenv("NEKRS_CACHE_DIR"));
       mkdir(cache_dir.c_str(), S_IRWXU);
     }
   }
+
+  kernelInfo["includes"].asArray();
 
   // Disables the automatic insertion of barriers
   // between separate OKL inner loop blocks.
@@ -162,6 +175,10 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   }
 
   serial = device.mode() == "Serial" || device.mode() == "OpenMP";
+
+  if (serial) {
+    kernelInfo["includes"] += "math.h";
+  }
 
   const std::string extension = serial ? ".c" : ".okl";
 

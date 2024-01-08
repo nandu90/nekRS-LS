@@ -25,9 +25,9 @@ SOFTWARE.
 */
 
 #ifndef DETERMG_HPP
-#define DETERMG_HPP 
+#define DETERMG_HPP
 
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "defines.hpp"
 
 std::vector<int> determineMGLevels(std::string section);

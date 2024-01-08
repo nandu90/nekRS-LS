@@ -34,11 +34,14 @@
 // #define DEBUG
 #define TIMERS
 
-static dfloat update(elliptic_t* elliptic,
-                     const occa::memory &o_p, const occa::memory &o_Ap, const dfloat alpha,
-                     occa::memory &o_x, occa::memory &o_r)
+static dfloat update(elliptic_t *elliptic,
+                     const occa::memory &o_p,
+                     const occa::memory &o_Ap,
+                     const dfloat alpha,
+                     occa::memory &o_x,
+                     occa::memory &o_r)
 {
-  mesh_t* mesh = elliptic->mesh;
+  mesh_t *mesh = elliptic->mesh;
 
   const bool serial = platform->serial;
 
@@ -54,30 +57,24 @@ static dfloat update(elliptic_t* elliptic,
 
   dfloat rdotr1 = 0;
 #ifdef ELLIPTIC_ENABLE_TIMER
-    //platform->timer.tic("dotp",1);
+  // platform->timer.tic("dotp",1);
 #endif
-  if(serial) {
+  if (serial) {
     rdotr1 = *((dfloat *)elliptic->o_tmpHostScalars.ptr());
   } else {
     const dlong Nblock = (mesh->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
     elliptic->o_tmpHostScalars.copyTo(elliptic->tmpHostScalars, Nblock);
-    for(int n = 0; n < Nblock; ++n)
+    for (int n = 0; n < Nblock; ++n) {
       rdotr1 += elliptic->tmpHostScalars[n];
+    }
   }
 
   // x <= x + alpha*p
-  platform->linAlg->axpbyMany(
-    mesh->Nlocal,
-    elliptic->Nfields,
-    elliptic->fieldOffset,
-    alpha,
-    o_p,
-    1.0,
-    o_x);
+  platform->linAlg->axpbyMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, alpha, o_p, 1.0, o_x);
 
   MPI_Allreduce(MPI_IN_PLACE, &rdotr1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
 #ifdef ELLIPTIC_ENABLE_TIMER
-    //platform->timer.toc("dotp");
+  // platform->timer.toc("dotp");
 #endif
 
   platform->flopCounter->add(elliptic->name + " ellipticUpdatePC",
@@ -232,11 +229,11 @@ static int standardPCG(elliptic_t *elliptic,
     printf("rdotr: %.15e\n", rdotr);
 #endif
     if (platform->comm.mpiRank == 0) {
-      nrsCheck(std::isnan(rdotr),
-               MPI_COMM_SELF,
-               EXIT_FAILURE,
-               "%s\n",
-               "Detected invalid resiual norm while running linear solver!");
+      nekrsCheck(std::isnan(rdotr),
+                 MPI_COMM_SELF,
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "Detected invalid resiual norm while running linear solver!");
     }
 
     if (verbose && (platform->comm.mpiRank == 0)) {
@@ -255,8 +252,8 @@ static int combinedPCG(elliptic_t *elliptic,
                        occa::memory &o_r,
                        occa::memory &o_x)
 {
-  mesh_t* mesh = elliptic->mesh;
-  setupAide& options = elliptic->options;
+  mesh_t *mesh = elliptic->mesh;
+  setupAide &options = elliptic->options;
   auto &precon = elliptic->precon;
 
   const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
@@ -274,7 +271,7 @@ static int combinedPCG(elliptic_t *elliptic,
 
   /*aux variables */
   auto &o_v = elliptic->o_v;
-  auto &o_p  = elliptic->o_p;
+  auto &o_p = elliptic->o_p;
   auto &o_z = elliptic->o_z;
   auto &o_Minv = (preco) ? precon->o_invDiagA : o_null;
   auto &o_Ap = elliptic->o_Ap;
@@ -282,7 +279,7 @@ static int combinedPCG(elliptic_t *elliptic,
   platform->linAlg->fill(elliptic->Nfields * elliptic->fieldOffset, 0.0, o_p);
   platform->linAlg->fill(elliptic->Nfields * elliptic->fieldOffset, 0.0, o_v);
 
-  if(platform->comm.mpiRank == 0 && verbose) {
+  if (platform->comm.mpiRank == 0 && verbose) {
     printf("PCGC ");
     printf("%s: initial res norm %.15e WE NEED TO GET TO %e \n", elliptic->name.c_str(), rdotr, tol);
   }
@@ -344,11 +341,11 @@ static int combinedPCG(elliptic_t *elliptic,
     printf("rdotr: %.15e\n", rdotr);
 #endif
     if (platform->comm.mpiRank == 0) {
-      nrsCheck(std::isnan(rdotr),
-               MPI_COMM_SELF,
-               EXIT_FAILURE,
-               "%s\n",
-               "Detected invalid resiual norm while running linear solver!");
+      nekrsCheck(std::isnan(rdotr),
+                 MPI_COMM_SELF,
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "Detected invalid resiual norm while running linear solver!");
     }
     if (verbose && (platform->comm.mpiRank == 0)) {
       printf("it %d r norm %.15e\n", iter, rdotr);
@@ -380,8 +377,7 @@ static int combinedPCG(elliptic_t *elliptic,
     printf("beta: %.15e\n", betakm1);
 #endif
 
-  }
-  while (rdotr > tol && iter < MAXIT);
+  } while (rdotr > tol && iter < MAXIT);
 
   return iter;
 }

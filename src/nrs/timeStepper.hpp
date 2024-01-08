@@ -10,7 +10,6 @@ void adjustDt(nrs_t *nrs, int tstep);
 void initStep(nrs_t *nrs, double time, dfloat dt, int tstep);
 bool runStep(nrs_t *nrs, std::function<bool(int)> convergenceCheck, int stage);
 void finishStep(nrs_t *nrs);
-void advectionFlops(mesh_t *mesh, int Nfields);
 
 void setDt(nrs_t *nrs, dfloat dt, int tstep);
 void makef(nrs_t* nrs, double time, int tstep, occa::memory o_FU, occa::memory o_BF);

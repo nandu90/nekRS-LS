@@ -12,7 +12,7 @@
 #include "sundials_context_impl.h"
 #include "sundials_logger_impl.h"
 
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "platform.hpp"
 #include "linAlg.hpp"
 
@@ -20,12 +20,13 @@
 #include "getN_VectorMemory.hpp"
 
 #define ZERO RCONST(0.0)
-#define ONE  RCONST(1.0)
+#define ONE RCONST(1.0)
 
-#define SPGMR_CONTENT(S)  ( (SUNLinearSolverContent_SPGMR)(S->content) )
-#define LASTFLAG(S)       ( SPGMR_CONTENT(S)->last_flag )
+#define SPGMR_CONTENT(S) ((SUNLinearSolverContent_SPGMR)(S->content))
+#define LASTFLAG(S) (SPGMR_CONTENT(S)->last_flag)
 
-namespace {
+namespace
+{
 
 static const std::string timerName = "cvode_t::";
 
@@ -66,7 +67,7 @@ static void axmyz(const dfloat alpha,
                   occa::memory &o_z,
                   const dlong xOffset = 0)
 {
-  axmyzKernel(N, xOffset*N, alpha, o_x, o_y, o_z);
+  axmyzKernel(N, xOffset * N, alpha, o_x, o_y, o_z);
 }
 
 // o_y[n] = beta*o_y[n] + alpha*o_x[n]
@@ -77,10 +78,10 @@ static void axpby(const dfloat alpha,
                   const dlong xOffset = 0,
                   const dlong yOffset = 0)
 {
-  axpbyKernel(N, xOffset*N, yOffset*N, alpha, o_x, beta, o_y);
+  axpbyKernel(N, xOffset * N, yOffset * N, alpha, o_x, beta, o_y);
 }
 
-// o_z[n] = y_{Nfields} * c_{Nfields} + \sum_{i=0}^{Nfields-1} c_i * x_i 
+// o_z[n] = y_{Nfields} * c_{Nfields} + \sum_{i=0}^{Nfields-1} c_i * x_i
 static void linearCombination(const dlong Nfields,
                               const occa::memory &o_coeff,
                               const occa::memory &o_x,
@@ -99,7 +100,7 @@ static void innerProdMulti(const dlong NVec,
 {
   const int Nblock = (N + BLOCKSIZE - 1) / BLOCKSIZE;
   const size_t Nbytes = NVec * Nblock * sizeof(dfloat);
-  auto scratch = (sunrealtype *) h_scratch.ptr();
+  auto scratch = (sunrealtype *)h_scratch.ptr();
 
   {
     innerProdMultiKernel(Nblock,
@@ -128,41 +129,41 @@ static void innerProdMulti(const dlong NVec,
 }
 
 /* iterative classical Gram-Schmidt */
-static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory& o_omega)  
+static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory &o_omega)
 {
-  auto stemp = (sunrealtype *) h_stemp.ptr(); 
+  auto stemp = (sunrealtype *)h_stemp.ptr();
 
   const int k_minus_1 = k - 1;
   const int nIterMax = 2;
   const realtype Kthres = 100;
 
-  realtype vk_norm0; 
+  realtype vk_norm0;
 
   for (int iter = 0; iter < nIterMax; iter++) {
-    if(((*new_vk_norm) * Kthres < vk_norm0) || iter == 0) {
+    if (((*new_vk_norm) * Kthres < vk_norm0) || iter == 0) {
       platform->timer.tic(timerName + "solve::cvode::linearSolve::cgsi", 0);
-      innerProdMulti(k+1, o_V, o_omega, platform->comm.mpiComm, stemp); 
+      innerProdMulti(k + 1, o_V, o_omega, platform->comm.mpiComm, stemp);
       const dfloat omegaDotp = stemp[k];
-      vk_norm0 = SUNRsqrt(omegaDotp);    
+      vk_norm0 = SUNRsqrt(omegaDotp);
 
       dfloat sTempSqrSum = 0;
-      for (int i=0; i < k; i++) {
+      for (int i = 0; i < k; i++) {
         sTempSqrSum += stemp[i] * stemp[i];
         h[i][k_minus_1] = (iter > 0) ? h[i][k_minus_1] + stemp[i] : stemp[i];
         stemp[i] = -stemp[i];
       }
 
-      // o_omega = stemp_[k] * o_omega + sum (o_stemp_[i] * o_v[i]) for i = 1 ... k-1 
+      // o_omega = stemp_[k] * o_omega + sum (o_stemp_[i] * o_v[i]) for i = 1 ... k-1
       stemp[k] = ONE;
-      o_stemp.copyFrom(stemp, k+1);
-      linearCombination(k+1, o_stemp, o_V, o_omega, o_omega);
+      o_stemp.copyFrom(stemp, k + 1);
+      linearCombination(k + 1, o_stemp, o_V, o_omega, o_omega);
 
 #if 1
-      const auto arg = omegaDotp - sTempSqrSum;  
+      const auto arg = omegaDotp - sTempSqrSum;
       if (arg <= 0) {
         return 1;
       }
-      *new_vk_norm  = SUNRsqrt(arg);
+      *new_vk_norm = SUNRsqrt(arg);
 #else
       *new_vk_norm = SUNRsqrt(platform->linAlg->innerProd(N, o_omega, o_omega, platform->comm.mpiComm));
 #endif
@@ -179,25 +180,25 @@ static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory&
   return 0;
 }
 
-#define cbGMRESFinish(lastFlag)   \
-{                                 \
-  o_s2Inv.free();                 \
-  o_V.free();                     \
-  return lastFlag;                \
+#define cbGMRESFinish(lastFlag)                                                                              \
+{                                                                                                            \
+o_s2Inv.free();                                                                                              \
+o_V.free();                                                                                                  \
+return lastFlag;                                                                                             \
 }
 
-}
+} // namespace
 
 void cbGMRESSetup(SUNLinearSolver S)
 {
-  auto V            = SPGMR_CONTENT(S)->V;
-  auto l_max        = SPGMR_CONTENT(S)->maxl;
-  auto Hes          = SPGMR_CONTENT(S)->Hes;
-  auto givens       = SPGMR_CONTENT(S)->givens;
-  auto xcor         = SPGMR_CONTENT(S)->xcor;
-  auto vtemp        = SPGMR_CONTENT(S)->vtemp;
-  auto s1           = SPGMR_CONTENT(S)->s1;
-  auto s2           = SPGMR_CONTENT(S)->s2;
+  auto V = SPGMR_CONTENT(S)->V;
+  auto l_max = SPGMR_CONTENT(S)->maxl;
+  auto Hes = SPGMR_CONTENT(S)->Hes;
+  auto givens = SPGMR_CONTENT(S)->givens;
+  auto xcor = SPGMR_CONTENT(S)->xcor;
+  auto vtemp = SPGMR_CONTENT(S)->vtemp;
+  auto s1 = SPGMR_CONTENT(S)->s1;
+  auto s2 = SPGMR_CONTENT(S)->s2;
 
   static_assert(sizeof(realtype) == sizeof(dfloat), "realtype has to match dfloat!");
 
@@ -208,25 +209,24 @@ void cbGMRESSetup(SUNLinearSolver S)
   linearCombinationKernel = kernels.get(prefix + "linearCombination");
   innerProdMultiKernel = kernels.get(prefix + "innerProdMulti");
 
-  N = N_VGetLocalLength(xcor); 
+  N = N_VGetLocalLength(xcor);
 
   const int Nblock = (N + BLOCKSIZE - 1) / BLOCKSIZE;
-  const size_t Nbytes = (l_max+1) * Nblock * sizeof(dfloat);
+  const size_t Nbytes = (l_max + 1) * Nblock * sizeof(dfloat);
 
-  o_scratch = platform->device.malloc(Nbytes); 
-  h_scratch = platform->device.mallocHost(o_scratch.size());
+  o_scratch = platform->device.malloc(Nbytes);
+  h_scratch = platform->device.mallocHost(o_scratch.byte_size());
 
   vtemp2 = xcor;
 
-  o_yg = platform->device.malloc<sunrealtype>(l_max+1);
-  h_yg = platform->device.mallocHost(o_yg.size());
+  o_yg = platform->device.malloc<sunrealtype>(l_max + 1);
+  h_yg = platform->device.mallocHost(o_yg.byte_size());
 
-  o_stemp = platform->device.malloc<sunrealtype>(l_max+1);
-  h_stemp = platform->device.mallocHost(o_stemp.size());
+  o_stemp = platform->device.malloc<sunrealtype>(l_max + 1);
+  h_stemp = platform->device.mallocHost(o_stemp.byte_size());
 
-  N_VDestroyVectorArray(V, l_max+1);
+  N_VDestroyVectorArray(V, l_max + 1);
 }
-
 
 int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
 {
@@ -246,37 +246,39 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
   krydim = 0;
 
   /* Make local shorcuts to solver variables. */
-  if (S == NULL) return(SUNLS_MEM_NULL);
-  l_max        = SPGMR_CONTENT(S)->maxl;
-  Hes          = SPGMR_CONTENT(S)->Hes;
-  givens       = SPGMR_CONTENT(S)->givens;
-  xcor         = SPGMR_CONTENT(S)->xcor;
-  vtemp        = SPGMR_CONTENT(S)->vtemp;
-  s1           = SPGMR_CONTENT(S)->s1;
-  s2           = SPGMR_CONTENT(S)->s2;
+  if (S == NULL) {
+    return (SUNLS_MEM_NULL);
+  }
+  l_max = SPGMR_CONTENT(S)->maxl;
+  Hes = SPGMR_CONTENT(S)->Hes;
+  givens = SPGMR_CONTENT(S)->givens;
+  xcor = SPGMR_CONTENT(S)->xcor;
+  vtemp = SPGMR_CONTENT(S)->vtemp;
+  s1 = SPGMR_CONTENT(S)->s1;
+  s2 = SPGMR_CONTENT(S)->s2;
 
-  A_data       = SPGMR_CONTENT(S)->ATData;
-  P_data       = SPGMR_CONTENT(S)->PData;
-  atimes       = SPGMR_CONTENT(S)->ATimes;
-  zeroguess    = &(SPGMR_CONTENT(S)->zeroguess);
-  nli          = &(SPGMR_CONTENT(S)->numiters);
-  res_norm     = &(SPGMR_CONTENT(S)->resnorm);
+  A_data = SPGMR_CONTENT(S)->ATData;
+  P_data = SPGMR_CONTENT(S)->PData;
+  atimes = SPGMR_CONTENT(S)->ATimes;
+  zeroguess = &(SPGMR_CONTENT(S)->zeroguess);
+  nli = &(SPGMR_CONTENT(S)->numiters);
+  res_norm = &(SPGMR_CONTENT(S)->resnorm);
 
   static int firstTime = 1;
   if (firstTime) {
     cbGMRESSetup(S);
-    o_b      = getN_VectorMemory(sunrealtype, b);
-    o_x      = getN_VectorMemory(sunrealtype, x);
-    o_s1     = getN_VectorMemory(sunrealtype, s1);
-    o_s2     = getN_VectorMemory(sunrealtype, s2);
-    o_xcor   = getN_VectorMemory(sunrealtype, xcor);
-    o_vtemp  = getN_VectorMemory(sunrealtype, vtemp);
+    o_b = getN_VectorMemory(sunrealtype, b);
+    o_x = getN_VectorMemory(sunrealtype, x);
+    o_s1 = getN_VectorMemory(sunrealtype, s1);
+    o_s2 = getN_VectorMemory(sunrealtype, s2);
+    o_xcor = getN_VectorMemory(sunrealtype, xcor);
+    o_vtemp = getN_VectorMemory(sunrealtype, vtemp);
     o_vtemp2 = getN_VectorMemory(sunrealtype, vtemp2);
     firstTime = 0;
   }
 
-  o_s2Inv = platform->o_memPool.reserve<sunrealtype>(N); 
-  o_V = platform->o_memPool.reserve<pfloat>((l_max+1) * static_cast<size_t>(N));
+  o_s2Inv = platform->o_memPool.reserve<sunrealtype>(N);
+  o_V = platform->o_memPool.reserve<pfloat>((l_max + 1) * static_cast<size_t>(N));
 
   /* Initialize counters and convergence flag */
   *nli = 0;
@@ -284,7 +286,7 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
 
   /* Check if Atimes function has been set */
   if (atimes == NULL) {
-    *zeroguess  = SUNFALSE;
+    *zeroguess = SUNFALSE;
     LASTFLAG(S) = SUNLS_ATIMES_NULL;
     cbGMRESFinish(LASTFLAG(S));
   }
@@ -294,13 +296,12 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
 
   /* Set V[0] to initial (unscaled) residual r_0 = b - A*x_0 */
   if (*zeroguess) {
-    o_vtemp.copyFrom(o_b, o_b.length());  
+    o_vtemp.copyFrom(o_b, o_b.length());
   } else {
     ier = atimes(A_data, x, vtemp);
     if (ier != 0) {
-      *zeroguess  = SUNFALSE;
-      LASTFLAG(S) = (ier < 0) ?
-        SUNLS_ATIMES_FAIL_UNREC : SUNLS_ATIMES_FAIL_REC;
+      *zeroguess = SUNFALSE;
+      LASTFLAG(S) = (ier < 0) ? SUNLS_ATIMES_FAIL_UNREC : SUNLS_ATIMES_FAIL_REC;
       cbGMRESFinish(LASTFLAG(S));
     }
 
@@ -310,11 +311,11 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
   /* Set r_norm = beta to L2 norm of V[0] = s1 r_0, and return if small */
   platform->linAlg->axmy(N, ONE, o_s1, o_vtemp);
 
-  realtype rdotr = platform->linAlg->innerProd(N, o_vtemp, o_vtemp, platform->comm.mpiComm); 
+  realtype rdotr = platform->linAlg->innerProd(N, o_vtemp, o_vtemp, platform->comm.mpiComm);
   *res_norm = r_norm = beta = SUNRsqrt(rdotr);
 
   if (r_norm <= delta) {
-    *zeroguess  = SUNFALSE;
+    *zeroguess = SUNFALSE;
     LASTFLAG(S) = SUNLS_SUCCESS;
     cbGMRESFinish(LASTFLAG(S));
   }
@@ -323,18 +324,18 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
   rho = beta;
 
   /* Initialize the Hessenberg matrix Hes and Givens rotation product */
-  for (i=0; i<=l_max; i++) {
-    for (j=0; j<l_max; j++) {
+  for (i = 0; i <= l_max; i++) {
+    for (j = 0; j < l_max; j++) {
       Hes[i][j] = ZERO;
     }
   }
   rotation_product = ONE;
 
   /* Set V[0] and normalize */
-  axpby(ONE/r_norm, o_vtemp, ZERO, o_V);
+  axpby(ONE / r_norm, o_vtemp, ZERO, o_V);
 
   /* Inner loop: generate Krylov sequence and Arnoldi basis */
-  for (l=0; l<l_max; l++) {
+  for (l = 0; l < l_max; l++) {
     (*nli)++;
     krydim = l_plus_1 = l + 1;
 
@@ -344,9 +345,8 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
     /* Apply A: V[l+1] = A s2_inv V[l] */
     ier = atimes(A_data, vtemp, vtemp2);
     if (ier != 0) {
-      *zeroguess  = SUNFALSE;
-      LASTFLAG(S) = (ier < 0) ?
-        SUNLS_ATIMES_FAIL_UNREC : SUNLS_ATIMES_FAIL_REC;
+      *zeroguess = SUNFALSE;
+      LASTFLAG(S) = (ier < 0) ? SUNLS_ATIMES_FAIL_UNREC : SUNLS_ATIMES_FAIL_REC;
       cbGMRESFinish(LASTFLAG(S));
     }
 
@@ -354,35 +354,40 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
     platform->linAlg->axmy(N, ONE, o_s1, o_vtemp2);
 
     /* Orthogonalize vtemp2 (V[l+1]) against previous V[i] */
-    if(CGSI(Hes, l_plus_1, l_max, &(Hes[l_plus_1][l]), o_vtemp2) != 0) {
-      *zeroguess  = SUNFALSE;
+    if (CGSI(Hes, l_plus_1, l_max, &(Hes[l_plus_1][l]), o_vtemp2) != 0) {
+      *zeroguess = SUNFALSE;
       LASTFLAG(S) = SUNLS_CONV_FAIL;
       cbGMRESFinish(LASTFLAG(S));
     }
 
     /* Update the QR factorization of Hes */
-    if(SUNQRfact(krydim, Hes, givens, l) != 0 ) {
-      *zeroguess  = SUNFALSE;
+    if (SUNQRfact(krydim, Hes, givens, l) != 0) {
+      *zeroguess = SUNFALSE;
       LASTFLAG(S) = SUNLS_QRFACT_FAIL;
       cbGMRESFinish(LASTFLAG(S));
     }
 
     /* Update residual norm estimate; break if convergence test passes */
-    rotation_product *= givens[2*l+1];
-    *res_norm = rho = SUNRabs(rotation_product*r_norm);
-    if (rho <= delta) { converged = SUNTRUE; break; }
+    rotation_product *= givens[2 * l + 1];
+    *res_norm = rho = SUNRabs(rotation_product * r_norm);
+    if (rho <= delta) {
+      converged = SUNTRUE;
+      break;
+    }
 
     /* Set V[l+1] and normalize with norm value from the Gram-Schmidt routine */
-    axpby(ONE/Hes[l_plus_1][l], o_vtemp2, ZERO, o_V, ZERO, l_plus_1);
+    axpby(ONE / Hes[l_plus_1][l], o_vtemp2, ZERO, o_V, ZERO, l_plus_1);
   }
   /* Inner loop is done.  Compute the new correction vector xcor */
 
   /* Construct g, then solve for y */
-  auto yg = (sunrealtype *) h_yg.ptr();
+  auto yg = (sunrealtype *)h_yg.ptr();
   yg[0] = r_norm;
-  for (i=1; i<=krydim; i++) yg[i]=ZERO;
+  for (i = 1; i <= krydim; i++) {
+    yg[i] = ZERO;
+  }
   if (SUNQRsol(krydim, Hes, givens, yg) != 0) {
-    *zeroguess  = SUNFALSE;
+    *zeroguess = SUNFALSE;
     LASTFLAG(S) = SUNLS_QRSOL_FAIL;
     cbGMRESFinish(LASTFLAG(S));
   }
@@ -390,7 +395,7 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
 
   /* Set xcor to correction vector V_l y */
   o_yg.copyFrom(yg);
-  linearCombination(krydim+1, o_yg, o_V, o_xcor, o_xcor);
+  linearCombination(krydim + 1, o_yg, o_V, o_xcor, o_xcor);
 
   /* Add unscaled xcor to initial x to get final solution x, and return */
   if (converged || rho < beta) {
@@ -401,12 +406,12 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
       platform->linAlg->axpby(N, ONE, o_xcor, ONE, o_x);
     }
 
-    *zeroguess  = SUNFALSE;
+    *zeroguess = SUNFALSE;
     LASTFLAG(S) = (converged) ? SUNLS_SUCCESS : SUNLS_RES_REDUCED;
     cbGMRESFinish(LASTFLAG(S));
   }
 
-  *zeroguess  = SUNFALSE;
+  *zeroguess = SUNFALSE;
   LASTFLAG(S) = SUNLS_CONV_FAIL;
   cbGMRESFinish(LASTFLAG(S));
 }

@@ -49,12 +49,14 @@ struct ElementLengths {
   dfloat *length_right_y;
   dfloat *length_right_z;
 };
+
 struct FDMOperators {
   dfloat *Sx;
   dfloat *Sy;
   dfloat *Sz;
   dfloat *D;
 };
+
 void harmonic_mean_element_length(ElementLengths *lengths, elliptic_t *elliptic)
 {
   mesh_t *mesh = elliptic->mesh;
@@ -78,7 +80,7 @@ void harmonic_mean_element_length(ElementLengths *lengths, elliptic_t *elliptic)
     /** r **/
     double lr2 = 0.0;
     double wsum = 0.0;
-    for (int k = start; k < nx; ++k)
+    for (int k = start; k < nx; ++k) {
       for (int j = start; j < nx; ++j) {
         const dlong i2jk = i2 + j * Nq + k * Nq * Nq + elem_offset;
         const dlong i1jk = i1 + j * Nq + k * Nq * Nq + elem_offset;
@@ -90,13 +92,14 @@ void harmonic_mean_element_length(ElementLengths *lengths, elliptic_t *elliptic)
         lr2 += weight / denom;
         wsum += weight;
       }
+    }
     lr2 /= wsum;
     lengths->length_middle_x[e] = 1.0 / sqrt(lr2);
 
     /** s **/
     double ls2 = 0.0;
     wsum = 0.0;
-    for (int k = start; k < nx; ++k)
+    for (int k = start; k < nx; ++k) {
       for (int i = start; i < nx; ++i) {
         const dlong ij2k = i + j2 * Nq + k * Nq * Nq + elem_offset;
         const dlong ij1k = i + j1 * Nq + k * Nq * Nq + elem_offset;
@@ -108,13 +111,14 @@ void harmonic_mean_element_length(ElementLengths *lengths, elliptic_t *elliptic)
         ls2 += weight / denom;
         wsum += weight;
       }
+    }
     ls2 /= wsum;
     lengths->length_middle_y[e] = 1.0 / sqrt(ls2);
 
     /** t **/
     double lt2 = 0.0;
     wsum = 0.0;
-    for (int j = start; j < nx; ++j)
+    for (int j = start; j < nx; ++j) {
       for (int i = start; i < nx; ++i) {
         const dlong ijk2 = i + j * Nq + k2 * Nq * Nq + elem_offset;
         const dlong ijk1 = i + j * Nq + k1 * Nq * Nq + elem_offset;
@@ -126,6 +130,7 @@ void harmonic_mean_element_length(ElementLengths *lengths, elliptic_t *elliptic)
         lt2 += weight / denom;
         wsum += weight;
       }
+    }
     lt2 /= wsum;
     lengths->length_middle_z[e] = 1.0 / sqrt(lt2);
   }
@@ -204,7 +209,7 @@ void compute_element_lengths(ElementLengths *lengths, elliptic_t *elliptic)
       txt << "}\n";
       return txt.str();
     };
-    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, errTxt().c_str(), "");
+    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, errTxt().c_str(), "");
   }
 
   // In Nq == 2 case, there are no interior points to use for obtaining
@@ -223,12 +228,13 @@ void compute_element_lengths(ElementLengths *lengths, elliptic_t *elliptic)
   }
 
   dfloat *l = (dfloat *)calloc(mesh->Np * Nelements, sizeof(dfloat));
-  for (unsigned i = 0; i < mesh->Np * Nelements; ++i)
+  for (unsigned i = 0; i < mesh->Np * Nelements; ++i) {
     l[i] = 0.0;
+  }
 
   for (dlong e = 0; e < Nelements; ++e) {
     const dlong elem_offset = Nq * Nq * Nq * e;
-    for (int j = 1; j < N; ++j)
+    for (int j = 1; j < N; ++j) {
       for (int k = 1; k < N; ++k) {
         l[k * Nq + j * Nq * Nq + elem_offset] = lengths->length_middle_x[e];
         l[Nq - 1 + k * Nq + j * Nq * Nq + elem_offset] = lengths->length_middle_x[e];
@@ -237,6 +243,7 @@ void compute_element_lengths(ElementLengths *lengths, elliptic_t *elliptic)
         l[k + j * Nq + elem_offset] = lengths->length_middle_z[e];
         l[k + j * Nq + (Nq - 1) * Nq * Nq + elem_offset] = lengths->length_middle_z[e];
       }
+    }
   }
 
   ogsGatherScatter(l, dfloatString, ogsAdd, mesh->ogs);
@@ -252,25 +259,31 @@ void compute_element_lengths(ElementLengths *lengths, elliptic_t *elliptic)
   }
   for (dlong e = 0; e < Nelements; ++e) {
     double length = lengths->length_left_x[e];
-    if (std::abs(length) < tol || length < -tol)
+    if (std::abs(length) < tol || length < -tol) {
       lengths->length_left_x[e] = lengths->length_middle_x[e];
+    }
     length = lengths->length_left_y[e];
-    if (std::abs(length) < tol || length < -tol)
+    if (std::abs(length) < tol || length < -tol) {
       lengths->length_left_y[e] = lengths->length_middle_y[e];
+    }
     length = lengths->length_left_z[e];
-    if (std::abs(length) < tol || length < -tol)
+    if (std::abs(length) < tol || length < -tol) {
       lengths->length_left_z[e] = lengths->length_middle_z[e];
+    }
   }
   for (dlong e = 0; e < Nelements; ++e) {
     double length = lengths->length_right_x[e];
-    if (std::abs(length) < tol || length < -tol)
+    if (std::abs(length) < tol || length < -tol) {
       lengths->length_right_x[e] = lengths->length_middle_x[e];
+    }
     length = lengths->length_right_y[e];
-    if (std::abs(length) < tol || length < -tol)
+    if (std::abs(length) < tol || length < -tol) {
       lengths->length_right_y[e] = lengths->length_middle_y[e];
+    }
     length = lengths->length_right_z[e];
-    if (std::abs(length) < tol || length < -tol)
+    if (std::abs(length) < tol || length < -tol) {
       lengths->length_right_z[e] = lengths->length_middle_z[e];
+    }
   }
   free(l);
 }
@@ -301,8 +314,9 @@ void compute_element_boundary_conditions(int *lbr,
 
 void row_zero(dfloat *S, const int nl, const int offset)
 {
-  for (int i = 0; i < nl; ++i)
+  for (int i = 0; i < nl; ++i) {
     S[offset + nl * i] = 0.0;
+  }
 }
 
 void compute_1d_stiffness_matrix(dfloat *a,
@@ -321,46 +335,56 @@ void compute_1d_stiffness_matrix(dfloat *a,
   const int nl = n + 3;
   dfloat *ah = (dfloat *)calloc((n + 1) * (n + 1), sizeof(dfloat));
   dfloat *tmp = (dfloat *)calloc((n + 1) * (n + 1), sizeof(dfloat));
-  for (int i = 0; i < n + 1; ++i)
-    for (int j = 0; j < n + 1; ++j)
+  for (int i = 0; i < n + 1; ++i) {
+    for (int j = 0; j < n + 1; ++j) {
       tmp[i * (n + 1) + j] = elliptic->mesh->D[i * (n + 1) + j];
-  for (int i = 0; i < n + 1; ++i)
-    for (int j = 0; j < n + 1; ++j)
+    }
+  }
+  for (int i = 0; i < n + 1; ++i) {
+    for (int j = 0; j < n + 1; ++j) {
       tmp[i * (n + 1) + j] *= elliptic->mesh->gllw[i];
+    }
+  }
   // A = D^T B D
-  for (int i = 0; i < n + 1; ++i)
+  for (int i = 0; i < n + 1; ++i) {
     for (int j = 0; j < n + 1; ++j) {
       double aij = 0.0;
-      for (int k = 0; k < n + 1; ++k)
+      for (int k = 0; k < n + 1; ++k) {
         aij += elliptic->mesh->D[k * (n + 1) + i] * tmp[k * (n + 1) + j];
+      }
       ah[i + j * (n + 1)] = aij;
     }
+  }
 
 #define ah(i, j) ah[(i) + (n + 1) * (j)]
 #define a(id1, id2) a[(id1) + nl * (id2)]
   int i0 = 0;
-  if (lbc == 1)
+  if (lbc == 1) {
     i0 = 1;
+  }
   int i1 = n;
-  if (rbc == 1)
+  if (rbc == 1) {
     i1 = n - 1;
+  }
 
-  for (unsigned int i = 0; i < nl * nl; ++i)
+  for (unsigned int i = 0; i < nl * nl; ++i) {
     a[i] = 0.0;
+  }
   double fac = 2.0 / lm;
   a(1, 1) = 1.0;
   a(n + 1, n + 1) = 1.0;
-  for (int j = i0; j <= i1; ++j)
-    for (int i = i0; i <= i1; ++i)
+  for (int j = i0; j <= i1; ++j) {
+    for (int i = i0; i <= i1; ++i) {
       a(i + 1, j + 1) = fac * ah(i, j);
+    }
+  }
   if (lbc == 0) {
     fac = 2.0 / ll;
     a(0, 0) = fac * ah(n - 1, n - 1);
     a(1, 0) = fac * ah(n, n - 1);
     a(0, 1) = fac * ah(n - 1, n);
     a(1, 1) = a(1, 1) + fac * ah(n, n);
-  }
-  else {
+  } else {
     a(0, 0) = 1.0;
   }
   if (rbc == 0) {
@@ -369,8 +393,7 @@ void compute_1d_stiffness_matrix(dfloat *a,
     a(n + 2, n + 1) = fac * ah(1, 0);
     a(n + 1, n + 2) = fac * ah(0, 1);
     a(n + 2, n + 2) = fac * ah(1, 1);
-  }
-  else {
+  } else {
     a(n + 2, n + 2) = 1.0;
   }
 #undef a
@@ -393,34 +416,36 @@ void compute_1d_mass_matrix(dfloat *b,
 #define bh(i) elliptic->mesh->gllw[i]
 #define b(id1, id2) b[(id1) + nl * (id2)]
   int i0 = 0;
-  if (lbc == 1)
+  if (lbc == 1) {
     i0 = 1;
+  }
   int i1 = n;
-  if (rbc == 1)
+  if (rbc == 1) {
     i1 = n - 1;
+  }
 
-  for (unsigned int i = 0; i < nl * nl; ++i)
+  for (unsigned int i = 0; i < nl * nl; ++i) {
     b[i] = 0.0;
+  }
 
   double fac = 0.5 * lm;
   b(1, 1) = 1.0;
   b(n + 1, n + 1) = 1.0;
-  for (int i = i0; i <= i1; ++i)
+  for (int i = i0; i <= i1; ++i) {
     b(i + 1, i + 1) = fac * bh(i);
+  }
   if (lbc == 0) {
     fac = 0.5 * ll;
     b(0, 0) = fac * bh(n - 1);
     b(1, 1) = b(1, 1) + fac * bh(n);
-  }
-  else {
+  } else {
     b(0, 0) = 1.0;
   }
   if (rbc == 0) {
     fac = 0.5 * lr;
     b(n + 1, n + 1) = b(n + 1, n + 1) + fac * bh(0);
     b(n + 2, n + 2) = fac * bh(1);
-  }
-  else {
+  } else {
     b(n + 2, n + 2) = 1.0;
   }
 #undef b
@@ -440,6 +465,7 @@ void dsygv_(int *ITYPE,
             int *LWORK,
             int *INFO);
 }
+
 void solve_generalized_ev(dfloat *a, dfloat *b, dfloat *lam, int n)
 {
   int info = 0;
@@ -456,31 +482,49 @@ void solve_generalized_ev(dfloat *a, dfloat *b, dfloat *lam, int n)
   }
 
   std::vector<double> a_double(worksize);
-  for(int i = 0; i < a_double.size(); i++) a_double[i] = a[i];
+  for (int i = 0; i < a_double.size(); i++) {
+    a_double[i] = a[i];
+  }
   std::vector<double> b_double(worksize);
-  for(int i = 0; i < b_double.size(); i++) b_double[i] = b[i];
+  for (int i = 0; i < b_double.size(); i++) {
+    b_double[i] = b[i];
+  }
   std::vector<double> work(worksize);
   std::vector<double> lam_double(n);
 
-  dsygv_(&itype, &JOBZ, &UPLO, &n, a_double.data(), &n, b_double.data(), 
-         &n, lam_double.data(), work.data(), &worksize, &info);
+  dsygv_(&itype,
+         &JOBZ,
+         &UPLO,
+         &n,
+         a_double.data(),
+         &n,
+         b_double.data(),
+         &n,
+         lam_double.data(),
+         work.data(),
+         &worksize,
+         &info);
 
-  for(int i = 0; i < a_double.size(); i++) a[i] = a_double[i];
-  for(int i = 0; i < b_double.size(); i++) b[i] = b_double[i];
-  for(int i = 0; i < lam_double.size(); i++) lam[i] = lam_double[i];
+  for (int i = 0; i < a_double.size(); i++) {
+    a[i] = a_double[i];
+  }
+  for (int i = 0; i < b_double.size(); i++) {
+    b[i] = b_double[i];
+  }
+  for (int i = 0; i < lam_double.size(); i++) {
+    lam[i] = lam_double[i];
+  }
 
   if (info != 0) {
     std::ostringstream err_logger;
     err_logger << "Error encountered in solve_generalized_ev!\n";
     if (info < 0) {
       err_logger << "Argument " << -info << " had an illegal value!\n";
-    }
-    else {
+    } else {
       if (info <= n) {
         err_logger << "DSYEV failed to converge, as i off-diagonal elements of an intermediate tridiagonal "
                       "form did not converge to zero\n";
-      }
-      else {
+      } else {
         info -= n;
         err_logger << "The leading minor of order " << info << " of B is not positive definite.\n"
                    << "The factorization of B could not be completed and no eigenvalues/eigenvectors were "
@@ -491,14 +535,16 @@ void solve_generalized_ev(dfloat *a, dfloat *b, dfloat *lam, int n)
     // dump the operators
     err_logger << "B:\n";
     for (int i = 0; i < n; ++i) {
-      for (int j = 0; j < n; ++j)
+      for (int j = 0; j < n; ++j) {
         err_logger << b_copy[i * n + j] << "\t";
+      }
       err_logger << "\n";
     }
     err_logger << "A:\n";
     for (int i = 0; i < n; ++i) {
-      for (int j = 0; j < n; ++j)
+      for (int j = 0; j < n; ++j) {
         err_logger << a_copy[i * n + j] << "\t";
+      }
       err_logger << "\n";
     }
     throw std::runtime_error(err_logger.str().c_str());
@@ -524,8 +570,7 @@ void compute_1d_matrices(dfloat *S,
   compute_1d_mass_matrix(b, lbc, rbc, ll, lm, lr, e, elliptic);
   try {
     solve_generalized_ev(S, b, lam, nl);
-  }
-  catch (std::exception &failure) {
+  } catch (std::exception &failure) {
     auto errTxt = [&]() {
       std::stringstream txt;
       txt << "Encountered error:\n";
@@ -533,21 +578,26 @@ void compute_1d_matrices(dfloat *S,
       txt << "Direction " << direction << "\n";
       txt << "e = " << e << "\n";
       txt << "lbc = " << lbc << ", rbc = " << rbc << "\n";
-      for (int iface = 0; iface < 6; ++iface)
+      for (int iface = 0; iface < 6; ++iface) {
         txt << "EToB[iface] = " << elliptic->EToB[6 * e + iface] << "\n";
+      }
 
       return txt.str();
     };
-    nrsAbort(MPI_COMM_SELF, EXIT_FAILURE, errTxt().c_str(), "");
+    nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, errTxt().c_str(), "");
   }
-  if (lbc > 0)
+  if (lbc > 0) {
     row_zero(S, nl, 0);
-  if (lbc == 1)
+  }
+  if (lbc == 1) {
     row_zero(S, nl, 1);
-  if (rbc > 0)
+  }
+  if (rbc > 0) {
     row_zero(S, nl, nl - 1);
-  if (rbc == 1)
+  }
+  if (rbc == 1) {
     row_zero(S, nl, nl - 2);
+  }
   free(b);
 }
 
@@ -606,7 +656,7 @@ void gen_operators(FDMOperators *op, ElementLengths *lengths, elliptic_t *ellipt
                         "t",
                         Nq_e);
     // store the transposes
-    for (int i = 0; i < Nq_e; ++i)
+    for (int i = 0; i < Nq_e; ++i) {
       for (int j = 0; j < Nq_e; ++j) {
         const int elem_offset = Nq_e * Nq_e * e;
         const int ij = i + j * Nq_e;
@@ -615,17 +665,21 @@ void gen_operators(FDMOperators *op, ElementLengths *lengths, elliptic_t *ellipt
         op->Sy[elem_offset + ij] = Sy[ji];
         op->Sz[elem_offset + ij] = Sz[ji];
       }
+    }
     unsigned l = 0;
-    for (int k = 0; k < Nq_e; ++k)
-      for (int j = 0; j < Nq_e; ++j)
+    for (int k = 0; k < Nq_e; ++k) {
+      for (int j = 0; j < Nq_e; ++j) {
         for (int i = 0; i < Nq_e; ++i) {
           const double diag = lr[i] + ls[j] + lt[k];
-          if (diag > eps)
+          if (diag > eps) {
             df(l, e) = 1.0 / diag;
-          else
+          } else {
             df(l, e) = 0.0;
+          }
           l += 1;
         }
+      }
+    }
   }
 #undef df
   free(lr);
@@ -685,8 +739,9 @@ mesh_t *create_extended_mesh(elliptic_t *elliptic, hlong *maskedGlobalIds)
   // make a node-wise bc flag using the gsop (prioritize Dirichlet boundaries over Neumann)
   int *mapB = (int *)calloc(mesh->Nelements * mesh->Np, sizeof(int));
   for (dlong e = 0; e < mesh->Nelements; e++) {
-    for (int n = 0; n < mesh->Np; n++)
+    for (int n = 0; n < mesh->Np; n++) {
       mapB[n + e * mesh->Np] = bigNum;
+    }
     for (int f = 0; f < mesh->Nfaces; f++) {
       const int bc = elliptic->EToB[f + e * mesh->Nfaces];
       if (bc > 0) {
@@ -704,33 +759,40 @@ mesh_t *create_extended_mesh(elliptic_t *elliptic, hlong *maskedGlobalIds)
   for (dlong n = 0; n < mesh->Nelements * mesh->Np; n++) {
     const dlong node = n % mesh->Np;
     bool isEdgeNode = false;
-    for (int edge = 0; edge < mesh->NedgeNodes; ++edge)
-      if (mesh->edgeNodes[edge] == node)
+    for (int edge = 0; edge < mesh->NedgeNodes; ++edge) {
+      if (mesh->edgeNodes[edge] == node) {
         isEdgeNode = true;
-    if (isEdgeNode)
+      }
+    }
+    if (isEdgeNode) {
       Nmasked++;
-    else if (mapB[n] == bigNum)
+    } else if (mapB[n] == bigNum) {
       mapB[n] = 0.;
-    else if (mapB[n] == DIRICHLET)
+    } else if (mapB[n] == DIRICHLET) {
       Nmasked++;
+    }
   }
   dlong *maskIds = (dlong *)calloc(Nmasked, sizeof(dlong));
   Nmasked = 0;
   for (dlong n = 0; n < mesh->Nelements * mesh->Np; n++) {
     const dlong node = n % mesh->Np;
     bool isEdgeNode = false;
-    for (int edge = 0; edge < mesh->NedgeNodes; ++edge)
-      if (mesh->edgeNodes[edge] == node)
+    for (int edge = 0; edge < mesh->NedgeNodes; ++edge) {
+      if (mesh->edgeNodes[edge] == node) {
         isEdgeNode = true;
-    if (mapB[n] == DIRICHLET)
+      }
+    }
+    if (mapB[n] == DIRICHLET) {
       maskIds[Nmasked++] = n;
-    else if (isEdgeNode)
+    } else if (isEdgeNode) {
       maskIds[Nmasked++] = n;
+    }
   }
   // make a masked version of the global id numbering
   memcpy(maskedGlobalIds, mesh->globalIds, mesh->Nlocal * sizeof(hlong));
-  for (dlong n = 0; n < Nmasked; n++)
+  for (dlong n = 0; n < Nmasked; n++) {
     maskedGlobalIds[maskIds[n]] = 0;
+  }
 
   free(mapB);
   free(maskIds);
@@ -746,11 +808,15 @@ void to_reg(pfloat *arr1, pfloat *arr2, mesh_t *mesh)
   const int nx_e = mesh->Nq + 2;
 #define arr1(r, s, t, e) (arr1[((r) + nx * ((s) + nx * ((t) + nx * (e))))])
 #define arr2(r, s, t, e) (arr2[((r + 1) + nx_e * ((s + 1) + nx_e * ((t + 1) + nx_e * (e))))])
-  for (dlong ie = 0; ie < Nelements; ++ie)
-    for (int k = 0; k < nx; ++k)
-      for (int j = 0; j < nx; ++j)
-        for (int i = 0; i < nx; ++i)
+  for (dlong ie = 0; ie < Nelements; ++ie) {
+    for (int k = 0; k < nx; ++k) {
+      for (int j = 0; j < nx; ++j) {
+        for (int i = 0; i < nx; ++i) {
           arr1(i, j, k, ie) = arr2(i, j, k, ie);
+        }
+      }
+    }
+  }
 
 #undef arr1
 #undef arr2
@@ -771,21 +837,24 @@ void extrude(pfloat *arr1,
 #define arr1(r, s, t, e) (arr1[((r) + nx * ((s) + nx * ((t) + nx * (e))))])
 #define arr2(r, s, t, e) (arr2[((r) + nx * ((s) + nx * ((t) + nx * (e))))])
   for (dlong ie = 0; ie < Nelements; ++ie) {
-    for (int k = i0; k < i1; ++k)
+    for (int k = i0; k < i1; ++k) {
       for (int j = i0; j < i1; ++j) {
         arr1(l1, j, k, ie) = f1 * arr1(l1, j, k, ie) + f2 * arr2(l2, j, k, ie);
         arr1(nx - l1 - 1, j, k, ie) = f1 * arr1(nx - l1 - 1, j, k, ie) + f2 * arr2(nx - l2 - 1, j, k, ie);
       }
-    for (int k = i0; k < i1; ++k)
+    }
+    for (int k = i0; k < i1; ++k) {
       for (int i = i0; i < i1; ++i) {
         arr1(i, l1, k, ie) = f1 * arr1(i, l1, k, ie) + f2 * arr2(i, l2, k, ie);
         arr1(i, nx - l1 - 1, k, ie) = f1 * arr1(i, nx - l1 - 1, k, ie) + f2 * arr2(i, nx - l2 - 1, k, ie);
       }
-    for (int j = i0; j < i1; ++j)
+    }
+    for (int j = i0; j < i1; ++j) {
       for (int i = i0; i < i1; ++i) {
         arr1(i, j, l1, ie) = f1 * arr1(i, j, l1, ie) + f2 * arr2(i, j, l2, ie);
         arr1(i, j, nx - l1 - 1, ie) = f1 * arr1(i, j, nx - l1 - 1, ie) + f2 * arr2(i, j, nx - l2 - 1, ie);
       }
+    }
   }
 #undef arr1
 #undef arr2
@@ -820,8 +889,9 @@ void pMGLevel::generate_weights()
 
   oogs::startFinish(wts, 1, 0, ogsPfloat, ogsAdd, (oogs_t *)ogs);
 
-  for (dlong i = 0; i < weightSize; ++i)
+  for (dlong i = 0; i < weightSize; ++i) {
     wts[i] = 1.0 / wts[i];
+  }
 
   o_wts.copyFrom(wts, weightSize);
 
@@ -832,11 +902,11 @@ void pMGLevel::generate_weights()
 
 void pMGLevel::build(elliptic_t *pSolver)
 {
-  nrsCheck(elliptic->elementType != HEXAHEDRA,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s\n",
-           "Unsupported element type!");
+  nekrsCheck(elliptic->elementType != HEXAHEDRA,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "Unsupported element type!");
 
   const dlong Nelements = elliptic->mesh->Nelements;
   const int Nq = elliptic->mesh->Nq;
@@ -866,8 +936,9 @@ void pMGLevel::build(elliptic_t *pSolver)
     casted_Sy[i] = static_cast<pfloat>(op->Sy[i]);
     casted_Sz[i] = static_cast<pfloat>(op->Sz[i]);
   }
-  for (dlong i = 0; i < Np_e * Nelements; ++i)
+  for (dlong i = 0; i < Np_e * Nelements; ++i) {
     casted_D[i] = static_cast<pfloat>(op->D[i]);
+  }
   free(op->Sx);
   free(op->Sy);
   free(op->Sz);
@@ -891,8 +962,9 @@ void pMGLevel::build(elliptic_t *pSolver)
   o_Sz = platform->device.malloc<pfloat>(Nq_e * Nq_e * Nelements);
   o_invL = platform->device.malloc<pfloat>(Nlocal_e);
   o_work1 = platform->device.malloc<pfloat>(Nlocal_e);
-  if (!options.compareArgs("MULTIGRID SMOOTHER", "RAS"))
+  if (!options.compareArgs("MULTIGRID SMOOTHER", "RAS")) {
     o_work2 = platform->device.malloc<pfloat>(Nlocal_e);
+  }
   o_Sx.copyFrom(casted_Sx, Nq_e * Nq_e * Nelements);
   o_Sy.copyFrom(casted_Sy, Nq_e * Nq_e * Nelements);
   o_Sz.copyFrom(casted_Sz, Nq_e * Nq_e * Nelements);
@@ -921,8 +993,9 @@ void pMGLevel::build(elliptic_t *pSolver)
       MPI_Barrier(platform->comm.mpiComm);
       const double start = MPI_Wtime();
 
-      for (int test = 0; test < Nsamples; ++test)
+      for (int test = 0; test < Nsamples; ++test) {
         smoothSchwarz(o_u, o_Su, false);
+      }
 
       platform->device.finish();
       double elapsed = (MPI_Wtime() - start) / Nsamples;
@@ -940,7 +1013,7 @@ void pMGLevel::build(elliptic_t *pSolver)
 
       auto callback = [&]() {
         if (options.compareArgs("MULTIGRID SMOOTHER", "RAS")) {
-          if (mesh->NlocalGatherElements)
+          if (mesh->NlocalGatherElements) {
             fusedFDMKernel(mesh->NlocalGatherElements,
                            mesh->o_localGatherElementList,
                            o_Su,
@@ -950,9 +1023,9 @@ void pMGLevel::build(elliptic_t *pSolver)
                            o_invL,
                            elliptic->o_invDegree,
                            o_work1);
-        }
-        else {
-          if (mesh->NlocalGatherElements)
+          }
+        } else {
+          if (mesh->NlocalGatherElements) {
             fusedFDMKernel(mesh->NlocalGatherElements,
                            mesh->o_localGatherElementList,
                            o_work2,
@@ -961,6 +1034,7 @@ void pMGLevel::build(elliptic_t *pSolver)
                            o_Sz,
                            o_invL,
                            o_work1);
+          }
         }
       };
 
@@ -969,11 +1043,12 @@ void pMGLevel::build(elliptic_t *pSolver)
       if (options.compareArgs("MULTIGRID SMOOTHER", "RAS")) {
         auto maskedGlobalIds = (hlong *)calloc(mesh->Nlocal, sizeof(hlong));
         memcpy(maskedGlobalIds, mesh->globalIds, mesh->Nlocal * sizeof(hlong));
-        auto maskIds = (dlong *)std::malloc(elliptic->o_maskIds.size());
+        auto maskIds = (dlong *)std::malloc(elliptic->o_maskIds.byte_size());
         if (elliptic->Nmasked) {
           elliptic->o_maskIds.copyTo(maskIds);
-          for (dlong n = 0; n < elliptic->Nmasked; n++)
+          for (dlong n = 0; n < elliptic->Nmasked; n++) {
             maskedGlobalIds[maskIds[n]] = 0;
+          }
         }
 
         ogsOverlap = (void *)oogs::setup(Nelements * Np,
@@ -992,8 +1067,7 @@ void pMGLevel::build(elliptic_t *pSolver)
           ogsOverlap = nullptr;
           overlapEnabled = false;
         }
-      }
-      else {
+      } else {
         ogsExtOverlap = (void *)oogs::setup(Nelements * Np_e,
                                             maskedGlobalIdsExt,
                                             1,
@@ -1071,9 +1145,8 @@ void pMGLevel::smoothSchwarz(occa::memory &o_u, occa::memory &o_Su, bool xIsZero
                      o_invL,
                      elliptic->o_invDegree,
                      o_work1);
-    }
-    else {
-      if (mesh->NglobalGatherElements)
+    } else {
+      if (mesh->NglobalGatherElements) {
         fusedFDMKernel(mesh->NglobalGatherElements,
                        mesh->o_globalGatherElementList,
                        o_Su,
@@ -1083,11 +1156,12 @@ void pMGLevel::smoothSchwarz(occa::memory &o_u, occa::memory &o_Su, bool xIsZero
                        o_invL,
                        elliptic->o_invDegree,
                        o_work1);
+      }
     }
 
     oogs::start(o_Su, 1, 0, ogsDataTypeString, ogsAdd, ogsFdm);
 
-    if (overlap && mesh->NlocalGatherElements)
+    if (overlap && mesh->NlocalGatherElements) {
       fusedFDMKernel(mesh->NlocalGatherElements,
                      mesh->o_localGatherElementList,
                      o_Su,
@@ -1097,18 +1171,17 @@ void pMGLevel::smoothSchwarz(occa::memory &o_u, occa::memory &o_Su, bool xIsZero
                      o_invL,
                      elliptic->o_invDegree,
                      o_work1);
+    }
 
     oogs::finish(o_Su, 1, 0, ogsDataTypeString, ogsAdd, ogsFdm);
-  }
-  else {
+  } else {
     const int overlap = (ogsExtOverlap != nullptr) ? 1 : 0;
     oogs_t *ogsFdm = (overlap) ? (oogs_t *)ogsExtOverlap : (oogs_t *)ogsExt;
 
     if (!overlap) {
       fusedFDMKernel(Nelements, mesh->o_elementList, o_work2, o_Sx, o_Sy, o_Sz, o_invL, o_work1);
-    }
-    else {
-      if (mesh->NglobalGatherElements)
+    } else {
+      if (mesh->NglobalGatherElements) {
         fusedFDMKernel(mesh->NglobalGatherElements,
                        mesh->o_globalGatherElementList,
                        o_work2,
@@ -1117,12 +1190,13 @@ void pMGLevel::smoothSchwarz(occa::memory &o_u, occa::memory &o_Su, bool xIsZero
                        o_Sz,
                        o_invL,
                        o_work1);
+      }
     }
 
     oogs::start(o_work2, 1, 0, ogsDataTypeString, ogsAdd, ogsFdm);
 
     if (overlap) {
-      if (mesh->NlocalGatherElements)
+      if (mesh->NlocalGatherElements) {
         fusedFDMKernel(mesh->NlocalGatherElements,
                        mesh->o_localGatherElementList,
                        o_work2,
@@ -1131,6 +1205,7 @@ void pMGLevel::smoothSchwarz(occa::memory &o_u, occa::memory &o_Su, bool xIsZero
                        o_Sz,
                        o_invL,
                        o_work1);
+      }
     }
 
     oogs::finish(o_work2, 1, 0, ogsDataTypeString, ogsAdd, ogsFdm);
@@ -1146,8 +1221,8 @@ void pMGLevel::smoothSchwarz(occa::memory &o_u, occa::memory &o_Su, bool xIsZero
   const auto Npe = Nqe * Nqe * Nqe;
   const double flopsPerElem = 12 * Nqe * Npe + Npe;
   const double flops = static_cast<double>(mesh->Nelements) * flopsPerElem;
- 
-  const double factor = (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value)
-                        ? 0.5 : 1.0;
+
+  const double factor =
+      (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value) ? 0.5 : 1.0;
   platform->flopCounter->add(elliptic->name + " Schwarz, N=" + std::to_string(mesh->N), factor * flops);
 }

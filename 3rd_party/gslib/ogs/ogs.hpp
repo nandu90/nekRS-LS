@@ -297,5 +297,6 @@ void destroy(oogs_t *h);
 }
 
 namespace qqt = oogs;
+using qqt_t = oogs_t;
 
 #endif

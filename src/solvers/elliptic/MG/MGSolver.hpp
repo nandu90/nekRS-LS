@@ -29,7 +29,7 @@ SOFTWARE.
 
 #include <functional>
 
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "defines.hpp"
 
 #include "parseMultigridSchedule.hpp"
@@ -39,70 +39,71 @@ SOFTWARE.
 #include "hypreWrapperDevice.hpp"
 #include "AMGX.hpp"
 
-class MGSolver_t {
+class MGSolver_t
+{
 
 public:
-  class multigridLevel {
-  
+  class multigridLevel
+  {
+
   public:
     dlong Nrows, Ncols;
-  
+
     occa::memory o_x, o_rhs, o_res;
-  
+
     SmoothType smootherType;
-  
+
     MPI_Comm comm;
-  
+
     multigridLevel(dlong N, dlong M, MPI_Comm comm);
     virtual ~multigridLevel();
-  
-    virtual void Ax(occa::memory o_x, occa::memory o_Ax)=0;
-  
-    virtual void smooth(occa::memory o_rhs, occa::memory o_x, bool x_is_zero)=0;
-  
-    virtual void residual(occa::memory o_rhs, occa::memory o_x, occa::memory o_res)=0;
-  
-    virtual void coarsen(occa::memory o_x, occa::memory o_Cx)=0;
-  
-    virtual void prolongate(occa::memory o_x, occa::memory o_Px)=0;
-  
-    virtual void Report()=0;
+
+    virtual void Ax(occa::memory o_x, occa::memory o_Ax) = 0;
+
+    virtual void smooth(occa::memory o_rhs, occa::memory o_x, bool x_is_zero) = 0;
+
+    virtual void residual(occa::memory o_rhs, occa::memory o_x, occa::memory o_res) = 0;
+
+    virtual void coarsen(occa::memory o_x, occa::memory o_Cx) = 0;
+
+    virtual void prolongate(occa::memory o_x, occa::memory o_Px) = 0;
+
+    virtual void Report() = 0;
   };
 
-  class coarseLevel_t {
-  
+  class coarseLevel_t
+  {
+
   public:
     int N;
-  
+
     occa::memory h_xBuffer;
     occa::memory o_xBuffer;
     pfloat *xBuffer;
-  
+
     ogs_t *ogs;
     pfloat *Gx, *Sx;
     occa::memory h_Sx, h_Gx;
     occa::memory o_Sx, o_Gx;
-  
+
     pfloat *weight = NULL;
     occa::memory o_weight;
-  
+
     MPI_Comm comm;
     occa::device device;
-  
+
     setupAide options;
-  
+
     coarseLevel_t(setupAide options, MPI_Comm comm);
     ~coarseLevel_t();
 
-    void setupSolver(hlong* globalRowStarts, dlong nnz, hlong* Ai, hlong* Aj, dfloat* Avals, bool nullSpace);
-    void solve(occa::memory& o_rhs, occa::memory& o_x);
-    std::function<void(coarseLevel_t *, occa::memory&, occa::memory&)> solvePtr = nullptr;
- 
+    void setupSolver(hlong *globalRowStarts, dlong nnz, hlong *Ai, hlong *Aj, dfloat *Avals, bool nullSpace);
+    void solve(occa::memory &o_rhs, occa::memory &o_x);
+    std::function<void(coarseLevel_t *, occa::memory &, occa::memory &)> solvePtr = nullptr;
+
     void *boomerAMG = nullptr;
     AMGX_t *AMGX = nullptr;
-  
   };
-
 
   MPI_Comm comm;
   int rank, size;
@@ -122,8 +123,7 @@ public:
   bool additive;
   bool overlapCrsGridSolve;
 
-  MGSolver_t(occa::device otherdevice, MPI_Comm othercomm,
-           setupAide otheroptions);
+  MGSolver_t(occa::device otherdevice, MPI_Comm othercomm, setupAide otheroptions);
 
   ~MGSolver_t();
 
@@ -131,12 +131,9 @@ public:
 
   void Report();
 
-
 private:
   void runVcycle(int k);
   void runAdditiveVcycle();
-
-
 };
 
 #endif

@@ -1,4 +1,4 @@
-#include "plugins/tavg.hpp"
+#include "tavg.hpp"
 
 static occa::memory o_work;
 static occa::memory o_divTau;
@@ -114,7 +114,7 @@ void findUThetaTau(dfloat uWall, dfloat tempWall, dfloat &rLength, dfloat &uTau,
     rLength = KAPPA * GACC * thetaTau / uTau / uTau;
   } else { // find roots of utau1 and utau2
     const auto Det = sqrt(1 + 4 * RiBulk * (BETAH - BETAM));
-    nrsCheck(Det < 0, platform->comm.mpiComm, EXIT_FAILURE, "%s\b", "findUThetaTau: Det < 0!");
+    nekrsCheck(Det < 0, platform->comm.mpiComm, EXIT_FAILURE, "%s\b", "findUThetaTau: Det < 0!");
 
     const auto utau1 = (0.5 * (2 * brat - 1) * UmN / (brat - 1)) * (1 - Det / (2 * brat - 1));
     const auto utau2 = (0.5 * (2 * brat - 1) * UmN / (brat - 1)) * (1 + Det / (2 * brat - 1));
@@ -155,7 +155,7 @@ void planarAverage(nrs_t *nrs)
   // d<u,w,temp>/dy(y)
   auto o_ddyAvg = o_work.slice(3 * nrs->fieldOffset, 3 * nrs->fieldOffset);
   gradY(mesh->Nelements, mesh->o_vgeo, mesh->o_D, nrs->fieldOffset, mesh->o_invLMM, o_work, o_ddyAvg);
-  oogs::startFinish(o_ddyAvg, 3, nrs->fieldOffset, ogsDfloat, ogsAdd, nrs->gsh);
+  qqt::startFinish(o_ddyAvg, 3, nrs->fieldOffset, ogsDfloat, ogsAdd, nrs->qqt);
 
   planarAvg(mesh, "xz", NUMBER_ELEMENTS_X, NUMBER_ELEMENTS_Y, NUMBER_ELEMENTS_Z, 6, nrs->fieldOffset, o_work);
 }
@@ -435,7 +435,9 @@ void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
     }
   }
 
-  tavg::run(time);
+  if (nrs->timeStepConverged) {
+    tavg::run(time);
+  }
 
   planarAverage(nrs);
 
@@ -479,7 +481,7 @@ void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
             o_ddyAvg,
             o_divTau);
   o_visMF.free();
-  oogs::startFinish(o_divTau, 3, nrs->fieldOffset, ogsDfloat, ogsAdd, nrs->gsh);
+  qqt::startFinish(o_divTau, 3, nrs->fieldOffset, ogsDfloat, ogsAdd, nrs->qqt);
 
   if (nrs->isOutputStep) {
     if (platform->comm.mpiRank == 0) {

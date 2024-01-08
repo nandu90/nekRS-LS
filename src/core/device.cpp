@@ -1,25 +1,27 @@
 #include <unistd.h>
 #include <regex>
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "device.hpp"
 #include "platform.hpp"
 #include "fileUtils.hpp"
 
-namespace {
+namespace
+{
 
 void setOccaVars()
 {
   std::string cache_dir;
-  if(getenv("NEKRS_CACHE_DIR"))
+  if (getenv("NEKRS_CACHE_DIR")) {
     cache_dir.assign(getenv("NEKRS_CACHE_DIR"));
+  }
 
   if (!getenv("OCCA_CACHE_DIR")) {
-    const std::string path= cache_dir + "/occa/";
+    const std::string path = cache_dir + "/occa/";
     occa::env::OCCA_CACHE_DIR = path;
     setenv("OCCA_CACHE_DIR", path.c_str(), 1);
   }
 
-  if (!getenv("OCCA_DIR")){
+  if (!getenv("OCCA_DIR")) {
     occa::env::OCCA_DIR = std::string(getenv("NEKRS_HOME")) + "/";
     setenv("OCCA_DIR", occa::env::OCCA_DIR.c_str(), 1);
   }
@@ -68,8 +70,7 @@ bool atomicsAvailable(device_t &device, MPI_Comm comm)
   if (rank == 0) {
     try {
       atomicSupported = compileDummyAtomicKernel(device);
-    }
-    catch (std::exception &e) {
+    } catch (std::exception &e) {
       atomicSupported = 0;
     }
   }
@@ -86,8 +87,9 @@ occa::kernel device_t::buildNativeKernel(const std::string &fileName,
 {
   occa::properties nativeProperties = props;
   nativeProperties["okl/enabled"] = false;
-  if (this->mode() == "OpenMP")
+  if (this->mode() == "OpenMP") {
     nativeProperties["defines/__NEKRS__OMP__"] = 1;
+  }
   return _device.buildKernel(fileName, kernelName, nativeProperties);
 }
 
@@ -134,20 +136,23 @@ occa::kernel device_t::buildKernel(const std::string &fileName,
 
   if (fileName.find(".okl") != std::string::npos) {
     occa::properties propsWithSuffix = props;
-    propsWithSuffix["includes"].asArray();
     propsWithSuffix["kernelNameSuffix"] = suffix;
 
     propsWithSuffix["defines/__okl__"] = 1;
 
-    if (this->mode() == "Serial")
+    if (this->mode() == "Serial") {
       propsWithSuffix["includes"] += "math.h";
+    }
 
-    if (this->mode() == "CUDA")
+    if (this->mode() == "CUDA") {
       propsWithSuffix["defines/smXX"] = 1;
-    if (this->mode() == "HIP")
+    }
+    if (this->mode() == "HIP") {
       propsWithSuffix["defines/gfxXX"] = 1;
-    if (this->mode() == "dpcpp")
+    }
+    if (this->mode() == "dpcpp") {
       propsWithSuffix["defines/XeHPC"] = 1;
+    }
 
     const std::string floatingPointType = static_cast<std::string>(propsWithSuffix["defines/dfloat"]);
 
@@ -162,8 +167,7 @@ occa::kernel device_t::buildKernel(const std::string &fileName,
     };
 
     return _device.buildKernel(fileName, newKernelName, propsWithSuffix);
-  }
-  else {
+  } else {
     std::string newKernelName = kernelName;
     if (props.has("defines/p_knl")) {
       const int kernelVariant = static_cast<int>(props["defines/p_knl"]);
@@ -171,10 +175,10 @@ occa::kernel device_t::buildKernel(const std::string &fileName,
     };
 
     occa::properties propsWithSuffix = props;
-    propsWithSuffix["includes"].asArray();
 
-    if (this->mode() == "Serial")
+    if (this->mode() == "Serial") {
       propsWithSuffix["includes"] += "math.h";
+    }
 
     propsWithSuffix["defines/SUFFIX"] = suffix;
     propsWithSuffix["defines/TOKEN_PASTE_(a,b)"] = std::string("a##b");
@@ -195,21 +199,20 @@ occa::kernel device_t::buildKernel(const std::string &fileName,
   MPI_Comm localCommunicator = platform->cacheLocal ? _comm.mpiCommLocal : _comm.mpiComm;
 
   const auto OCCA_CACHE_DIR0 = std::string(occa::env::OCCA_CACHE_DIR);
-  const auto OCCA_CACHE_DIR = platform->cacheBcast ? 
-                              std::string(platform->tmpDir / fs::path("occa/")) :
-                              OCCA_CACHE_DIR0;
+  const auto OCCA_CACHE_DIR =
+      platform->cacheBcast ? std::string(platform->tmpDir / fs::path("occa/")) : OCCA_CACHE_DIR0;
 
   occa::kernel constructedKernel;
 
   // rank0 compiles + loads, then all other just load
   for (int pass = 0; pass < 2; ++pass) {
-    occa::env::OCCA_CACHE_DIR = (pass == 0) ? OCCA_CACHE_DIR0 : OCCA_CACHE_DIR; 
+    occa::env::OCCA_CACHE_DIR = (pass == 0) ? OCCA_CACHE_DIR0 : OCCA_CACHE_DIR;
     if ((pass == 0 && rank == 0) || (pass == 1 && rank != 0)) {
       constructedKernel = this->buildKernel(fileName, kernelName, props, suffix);
     }
 
-    if(pass == 0) {
-      if(platform->cacheBcast) {
+    if (pass == 0) {
+      if (platform->cacheBcast) {
         const auto srcPath = (fs::path(constructedKernel.binaryFilename()).parent_path());
         const auto dstPath = OCCA_CACHE_DIR / fs::path("cache/");
         fileBcast(srcPath, dstPath, _comm.mpiComm, platform->verbose);
@@ -224,8 +227,11 @@ occa::kernel device_t::buildKernel(const std::string &fileName,
   MPI_Allreduce(MPI_IN_PLACE, &isInitializedMin, 1, MPI_INT, MPI_MIN, _comm.mpiComm);
   int isInitializedMax = constructedKernel.isInitialized();
   MPI_Allreduce(MPI_IN_PLACE, &isInitializedMax, 1, MPI_INT, MPI_MAX, _comm.mpiComm);
-  nrsCheck(isInitializedMin != isInitializedMax,  _comm.mpiComm, EXIT_FAILURE,
-           "Kernel status of %s inconsistent across ranks\n", constructedKernel.name().c_str());
+  nekrsCheck(isInitializedMin != isInitializedMax,
+             _comm.mpiComm,
+             EXIT_FAILURE,
+             "Kernel status of %s inconsistent across ranks\n",
+             constructedKernel.name().c_str());
 
   return constructedKernel;
 }
@@ -239,22 +245,21 @@ occa::kernel device_t::buildKernel(const std::string &fullPath,
 
   if (buildRank0) {
     const auto OCCA_CACHE_DIR0 = std::string(occa::env::OCCA_CACHE_DIR);
-    const auto OCCA_CACHE_DIR = platform->cacheBcast ? 
-                                std::string(platform->tmpDir / fs::path("occa/")) :
-                                OCCA_CACHE_DIR0;
+    const auto OCCA_CACHE_DIR =
+        platform->cacheBcast ? std::string(platform->tmpDir / fs::path("occa/")) : OCCA_CACHE_DIR0;
 
     const int rank = platform->cacheLocal ? _comm.localRank : _comm.mpiRank;
     MPI_Comm localCommunicator = platform->cacheLocal ? _comm.mpiCommLocal : _comm.mpiComm;
 
     // rank0 compiles + loads, then all other just load
     for (int pass = 0; pass < 2; ++pass) {
-      occa::env::OCCA_CACHE_DIR = (pass == 0) ? OCCA_CACHE_DIR0 : OCCA_CACHE_DIR ;
+      occa::env::OCCA_CACHE_DIR = (pass == 0) ? OCCA_CACHE_DIR0 : OCCA_CACHE_DIR;
       if ((pass == 0 && rank == 0) || (pass == 1 && rank != 0)) {
         constructedKernel = this->buildKernel(fullPath, props, suffix);
       }
 
-      if(pass == 0) {
-        if(platform->cacheBcast) {
+      if (pass == 0) {
+        if (platform->cacheBcast) {
           const auto srcPath = (fs::path(constructedKernel.binaryFilename()).parent_path());
           const auto dstPath = OCCA_CACHE_DIR / fs::path("cache/");
           fileBcast(srcPath, dstPath, _comm.mpiComm, platform->verbose);
@@ -269,8 +274,11 @@ occa::kernel device_t::buildKernel(const std::string &fullPath,
     MPI_Allreduce(MPI_IN_PLACE, &isInitializedMin, 1, MPI_INT, MPI_MIN, _comm.mpiComm);
     int isInitializedMax = constructedKernel.isInitialized();
     MPI_Allreduce(MPI_IN_PLACE, &isInitializedMax, 1, MPI_INT, MPI_MAX, _comm.mpiComm);
-    nrsCheck(isInitializedMin != isInitializedMax,  _comm.mpiComm, EXIT_FAILURE,
-             "Kernel status of %s inconsistent across ranks\n", constructedKernel.name().c_str());
+    nekrsCheck(isInitializedMin != isInitializedMax,
+               _comm.mpiComm,
+               EXIT_FAILURE,
+               "Kernel status of %s inconsistent across ranks\n",
+               constructedKernel.name().c_str());
 
   } else {
     constructedKernel = this->buildKernel(fullPath, props, suffix);
@@ -315,7 +323,7 @@ occa::memory device_t::malloc(size_t Nbytes, const void *src, const occa::proper
   return o_returnValue;
 }
 
-occa::memory device_t::malloc(size_t Nword, size_t wordSize, const occa::memory& src)
+occa::memory device_t::malloc(size_t Nword, size_t wordSize, const occa::memory &src)
 {
   return _device.malloc(Nword * wordSize, src);
 }
@@ -338,8 +346,7 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
 
   if (options.compareArgs("DEVICE NUMBER", "LOCAL-RANK")) {
     device_id = _comm.localRank;
-  }
-  else {
+  } else {
     options.getArgs("DEVICE NUMBER", device_id);
   }
 
@@ -348,37 +355,30 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
   options.getArgs("THREAD MODEL", requestedOccaMode);
 
   if (strcasecmp(requestedOccaMode.c_str(), "CUDA") == 0) {
-    if(!getenv("CUDA_CACHE_DISABLE"))
+    if (!getenv("CUDA_CACHE_DISABLE")) {
       setenv("CUDA_CACHE_DISABLE", "1", 1);
+    }
     sprintf(deviceConfig, "{mode: 'CUDA', device_id: %d}", device_id);
-  }
-  else if (strcasecmp(requestedOccaMode.c_str(), "HIP") == 0) {
+  } else if (strcasecmp(requestedOccaMode.c_str(), "HIP") == 0) {
     sprintf(deviceConfig, "{mode: 'HIP', device_id: %d}", device_id);
-  }
-  else if(strcasecmp(requestedOccaMode.c_str(), "DPCPP") == 0) {
+  } else if (strcasecmp(requestedOccaMode.c_str(), "DPCPP") == 0) {
     int plat = 0;
     options.getArgs("PLATFORM NUMBER", plat);
     sprintf(deviceConfig, "{mode: 'dpcpp', device_id: %d, platform_id: %d}", device_id, plat);
-  }
-  else if (strcasecmp(requestedOccaMode.c_str(), "OPENCL") == 0) {
+  } else if (strcasecmp(requestedOccaMode.c_str(), "OPENCL") == 0) {
     int plat = 0;
     options.getArgs("PLATFORM NUMBER", plat);
     sprintf(deviceConfig, "{mode: 'OpenCL', device_id: %d, platform_id: %d}", device_id, plat);
-  }
-  else if (strcasecmp(requestedOccaMode.c_str(), "OPENMP") == 0) {
-    nrsCheck(true, _comm.mpiComm, EXIT_FAILURE,
-             "%s\n", "OpenMP backend currently not supported!"); 
+  } else if (strcasecmp(requestedOccaMode.c_str(), "OPENMP") == 0) {
+    nekrsCheck(true, _comm.mpiComm, EXIT_FAILURE, "%s\n", "OpenMP backend currently not supported!");
     sprintf(deviceConfig, "{mode: 'OpenMP'}");
-  }
-  else if (strcasecmp(requestedOccaMode.c_str(), "CPU") == 0 ||
-           strcasecmp(requestedOccaMode.c_str(), "SERIAL") == 0) {
+  } else if (strcasecmp(requestedOccaMode.c_str(), "CPU") == 0 ||
+             strcasecmp(requestedOccaMode.c_str(), "SERIAL") == 0) {
     sprintf(deviceConfig, "{mode: 'Serial'}");
     options.setArgs("THREAD MODEL", "SERIAL");
     options.getArgs("THREAD MODEL", requestedOccaMode);
-  }
-  else {
-    nrsCheck(true, _comm.mpiComm, EXIT_FAILURE,
-             "%s\n", "Invalid requested backend!"); 
+  } else {
+    nekrsCheck(true, _comm.mpiComm, EXIT_FAILURE, "%s\n", "Invalid requested backend!");
   }
 
 #if 1
@@ -392,16 +392,20 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
 #endif
   setOccaVars();
 
-  if (worldRank == 0)
+  if (worldRank == 0) {
     printf("Initializing device \n");
+  }
   this->_device.setup((std::string)deviceConfig);
 
-  if (worldRank == 0)
+  if (worldRank == 0) {
     std::cout << "active occa mode: " << this->mode() << "\n\n";
+  }
 
-  nrsCheck(strcasecmp(requestedOccaMode.c_str(), this->mode().c_str()) != 0, 
-           _comm.mpiComm, EXIT_FAILURE,
-           "%s\n", "Active occa mode does not match selected backend!"); 
+  nekrsCheck(strcasecmp(requestedOccaMode.c_str(), this->mode().c_str()) != 0,
+             _comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "Active occa mode does not match selected backend!");
 
   // overwrite compiler settings to ensure
   // compatability of libocca and kernelLauchner

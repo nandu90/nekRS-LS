@@ -1,4 +1,4 @@
-#include "plugins/lpm.hpp"
+#include "lpm.hpp"
 #include "linspaceVector.hpp"
 
 static dfloat Stk;
@@ -159,7 +159,7 @@ void addNewParticles(nrs_t *nrs, double time, int tstep)
 
   const auto NNewYPart = nPartAdd * particles->nDOFs();
   if (o_yNewPart.length() < NNewYPart) {
-    if (o_yNewPart.size()) {
+    if (o_yNewPart.byte_size()) {
       o_yNewPart.free();
     }
     o_yNewPart = platform->device.malloc<dfloat>(NNewYPart);
@@ -167,7 +167,7 @@ void addNewParticles(nrs_t *nrs, double time, int tstep)
 
   const auto NNewPropPart = nPartAdd * particles->nProps();
   if (o_propNewPart.length() < NNewPropPart) {
-    if (o_propNewPart.size()) {
+    if (o_propNewPart.byte_size()) {
       o_propNewPart.free();
     }
     o_propNewPart = platform->device.malloc<dfloat>(NNewPropPart);

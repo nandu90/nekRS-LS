@@ -1,6 +1,6 @@
 #include <nrs.hpp>
 
-int numberActiveFields(nrs_t* nrs)
+int nrs_t::numberActiveFields()
 {
   int Nscalar = 0;
   platform->options.getArgs("NUMBER OF SCALARS", Nscalar);

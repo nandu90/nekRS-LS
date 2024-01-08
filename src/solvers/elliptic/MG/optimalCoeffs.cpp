@@ -4,36 +4,41 @@
 std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
 {
   constexpr int maxChebyIterations = 16;
-  if (ChebyshevDegree == 0)
+  if (ChebyshevDegree == 0) {
     return {};
+  }
 
-  if (ChebyshevDegree == 1)
+  if (ChebyshevDegree == 1) {
     return {
         1.12500000000000,
     };
+  }
 
-  if (ChebyshevDegree == 2)
+  if (ChebyshevDegree == 2) {
     return {
         1.02387287570313,
         1.26408905371085,
     };
+  }
 
-  if (ChebyshevDegree == 3)
+  if (ChebyshevDegree == 3) {
     return {
         1.00842544782028,
         1.08867839208730,
         1.33753125909618,
     };
+  }
 
-  if (ChebyshevDegree == 4)
+  if (ChebyshevDegree == 4) {
     return {
         1.00391310427285,
         1.04035811188593,
         1.14863498546254,
         1.38268869241000,
     };
+  }
 
-  if (ChebyshevDegree == 5)
+  if (ChebyshevDegree == 5) {
     return {
         1.00212930146164,
         1.02173711549260,
@@ -41,8 +46,9 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.19810065292663,
         1.41322542791682,
     };
+  }
 
-  if (ChebyshevDegree == 6)
+  if (ChebyshevDegree == 6) {
     return {
         1.00128517255940,
         1.01304293035233,
@@ -51,8 +57,9 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.23829020218444,
         1.43524297106744,
     };
+  }
 
-  if (ChebyshevDegree == 7)
+  if (ChebyshevDegree == 7) {
     return {
         1.00083464397912,
         1.00843949430122,
@@ -62,8 +69,9 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.27116474046139,
         1.45186658649364,
     };
+  }
 
-  if (ChebyshevDegree == 8)
+  if (ChebyshevDegree == 8) {
     return {
         1.00057246631197,
         1.00577427662415,
@@ -74,8 +82,9 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.29838585382576,
         1.46486073151099,
     };
+  }
 
-  if (ChebyshevDegree == 9)
+  if (ChebyshevDegree == 9) {
     return {
         1.00040960072832,
         1.00412439506106,
@@ -87,8 +96,9 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.32121930716746,
         1.47529642820699,
     };
+  }
 
-  if (ChebyshevDegree == 10)
+  if (ChebyshevDegree == 10) {
     return {
         1.00030312229652,
         1.00304840660796,
@@ -101,8 +111,9 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.34060802024460,
         1.48386124407011,
     };
+  }
 
-  if (ChebyshevDegree == 11)
+  if (ChebyshevDegree == 11) {
     return {
         1.00023058595209,
         1.00231675024028,
@@ -116,8 +127,9 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.35725579919519,
         1.49101672564139,
     };
+  }
 
-  if (ChebyshevDegree == 12)
+  if (ChebyshevDegree == 12) {
     return {
         1.00017947200828,
         1.00180189139619,
@@ -132,8 +144,9 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.37169337969799,
         1.49708418575562,
     };
+  }
 
-  if (ChebyshevDegree == 13)
+  if (ChebyshevDegree == 13) {
     return {
         1.00014241921559,
         1.00142906932629,
@@ -149,8 +162,9 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.38432619380991,
         1.50229418757368,
     };
+  }
 
-  if (ChebyshevDegree == 14)
+  if (ChebyshevDegree == 14) {
     return {
         1.00011490538261,
         1.00115246376914,
@@ -167,8 +181,9 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.39546814053678,
         1.50681646209583,
     };
+  }
 
-  if (ChebyshevDegree == 15)
+  if (ChebyshevDegree == 15) {
     return {
         1.00009404750752,
         1.00094291696343,
@@ -186,8 +201,9 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.40536543893560,
         1.51077872501845,
     };
+  }
 
-  if (ChebyshevDegree == 16)
+  if (ChebyshevDegree == 16) {
     return {
         1.00007794828179,
         1.00078126847253,
@@ -206,10 +222,13 @@ std::vector<pfloat> optimalCoeffs(int ChebyshevDegree)
         1.41421360695576,
         1.51427891730346,
     };
+  }
 
-  nrsAbort(MPI_COMM_SELF, EXIT_FAILURE, 
-           "Error: maximum chebyshev iterations %d exceeded with requested iterations %d",
-           maxChebyIterations, ChebyshevDegree);
-  
+  nekrsAbort(MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "Error: maximum chebyshev iterations %d exceeded with requested iterations %d",
+             maxChebyIterations,
+             ChebyshevDegree);
+
   return {};
 }

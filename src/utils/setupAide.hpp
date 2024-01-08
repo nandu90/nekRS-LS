@@ -34,17 +34,18 @@ SOFTWARE.
 #include <string>
 #include <vector>
 
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include <map>
 
-class setupAide {
+class setupAide
+{
 private:
 public:
   setupAide(){};
   ~setupAide() = default;
 
-  setupAide(const setupAide&) = default;
-  setupAide& operator=(const setupAide&) = default;
+  setupAide(const setupAide &) = default;
+  setupAide &operator=(const setupAide &) = default;
 
   std::map<std::string, std::string> keyWordToDataMap;
 
@@ -54,24 +55,28 @@ public:
 
   void setArgs(std::string key, std::string value);
 
-  template <class T>
-  int getArgs(std::string, T&) const;
+  template <class T> int getArgs(std::string, T &) const;
 
-  template <class T>
-  int getArgs(std::string, std::vector<T>&) const;
+  template <class T> int getArgs(std::string, std::vector<T> &) const;
 
-  int getArgs(std::string, std::vector<std::string>&, std::string) const;
+  int getArgs(std::string, std::vector<std::string> &, std::string) const;
 
   int compareArgs(std::string key, std::string token) const;
 
-  auto begin() const { return keyWordToDataMap.begin(); }
-  auto end() const { return keyWordToDataMap.end(); }
+  auto begin() const
+  {
+    return keyWordToDataMap.begin();
+  }
 
-  friend std::ostream & operator << (std::ostream &out, const setupAide &aide);  
+  auto end() const
+  {
+    return keyWordToDataMap.end();
+  }
+
+  friend std::ostream &operator<<(std::ostream &out, const setupAide &aide);
 };
 
-#include<setupAide.tpp>
-
+#include <setupAide.tpp>
 
 #endif
 

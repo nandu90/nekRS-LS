@@ -2,7 +2,7 @@
 #define neknek_hpp_
 
 #include <mpi.h>
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "findpts.hpp"
 #include "pointInterpolation.hpp"
 #include <vector>
@@ -12,7 +12,8 @@ struct nrs_t;
 
 bool neknekCoupled();
 
-class neknek_t {
+class neknek_t
+{
 
 public:
   neknek_t(nrs_t *_nrs, dlong _nsessions, dlong _sessionID);

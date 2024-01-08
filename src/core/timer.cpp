@@ -9,8 +9,10 @@
 #include "ogs.hpp"
 #include "orderedMap.hpp"
 
-namespace timer {
-namespace {
+namespace timer
+{
+namespace
+{
 struct tagData {
   long long int count;
   double hostElapsed;
@@ -18,13 +20,18 @@ struct tagData {
   double startTime;
   occa::streamTag startTag;
 };
+
 orderedMap<std::string, tagData> m_;
 
 const int NEKRS_TIMER_INVALID_KEY = -1;
 const int NEKRS_TIMER_INVALID_METRIC = -2;
 
 int ifSync_;
-inline int ifSync() { return ifSync_; }
+
+inline int ifSync()
+{
+  return ifSync_;
+}
 
 int enable_sync_;
 
@@ -35,8 +42,9 @@ MPI_Comm comm_;
 
 inline void sync()
 {
-  if (enable_sync_)
+  if (enable_sync_) {
     MPI_Barrier(comm_);
+  }
 }
 
 double tElapsedTimeSolve = 0;
@@ -83,17 +91,22 @@ void timer_t::set(const std::string tag, double time, long long int count)
   m_[tag].startTime = time;
   auto it = m_.find(tag);
 
-  nrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE, 
-           "Invalid tag name %s\n", tag.c_str());
+  nekrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE, "Invalid tag name %s\n", tag.c_str());
 
   it->second.hostElapsed = time;
   it->second.deviceElapsed = it->second.hostElapsed;
   it->second.count = count;
 }
 
-void timer_t::enable() { enabled = 1; }
+void timer_t::enable()
+{
+  enabled = 1;
+}
 
-void timer_t::disable() { enabled = 0; }
+void timer_t::disable()
+{
+  enabled = 0;
+}
 
 void timer_t::reset()
 {
@@ -112,14 +125,20 @@ void timer_t::clear()
   ogsResetTime();
 }
 
-void timer_t::enableSync() { enable_sync_ = 1; }
+void timer_t::enableSync()
+{
+  enable_sync_ = 1;
+}
 
-void timer_t::disableSync() { enable_sync_ = 0; }
+void timer_t::disableSync()
+{
+  enable_sync_ = 0;
+}
 
 void timer_t::reset(const std::string tag)
 {
   std::map<std::string, tagData>::iterator it = m_.find(tag);
-  if(it != m_.end()) {
+  if (it != m_.end()) {
     it->second.startTime = 0;
     it->second.hostElapsed = 0;
     it->second.deviceElapsed = 0;
@@ -127,35 +146,42 @@ void timer_t::reset(const std::string tag)
   }
 }
 
-void timer_t::finalize() { reset(); }
+void timer_t::finalize()
+{
+  reset();
+}
 
 void timer_t::deviceTic(const std::string tag, int ifSync)
 {
-  if (!enabled)
+  if (!enabled) {
     return;
-  if (ifSync)
+  }
+  if (ifSync) {
     sync();
+  }
   m_[tag].startTag = device_.tagStream();
 }
 
 void timer_t::deviceTic(const std::string tag)
 {
-  if (!enabled)
+  if (!enabled) {
     return;
-  if (ifSync())
+  }
+  if (ifSync()) {
     sync();
+  }
   m_[tag].startTag = device_.tagStream();
 }
 
 void timer_t::deviceToc(const std::string tag)
 {
-  if (!enabled)
+  if (!enabled) {
     return;
+  }
   occa::streamTag stopTag = device_.tagStream();
 
   std::map<std::string, tagData>::iterator it = m_.find(tag);
-  nrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE,
-           "Invalid tag name %s\n", tag.c_str());
+  nekrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE, "Invalid tag name %s\n", tag.c_str());
 
   it->second.deviceElapsed += device_.timeBetween(it->second.startTag, stopTag);
   it->second.count++;
@@ -163,31 +189,35 @@ void timer_t::deviceToc(const std::string tag)
 
 void timer_t::hostTic(const std::string tag, int ifSync)
 {
-  if (!enabled)
+  if (!enabled) {
     return;
-  if (ifSync)
+  }
+  if (ifSync) {
     sync();
+  }
   m_[tag].startTime = MPI_Wtime();
 }
 
 void timer_t::hostTic(const std::string tag)
 {
-  if (!enabled)
+  if (!enabled) {
     return;
-  if (ifSync())
+  }
+  if (ifSync()) {
     sync();
+  }
   m_[tag].startTime = MPI_Wtime();
 }
 
 void timer_t::hostToc(const std::string tag)
 {
-  if (!enabled)
+  if (!enabled) {
     return;
+  }
   double stopTime = MPI_Wtime();
 
   auto it = m_.find(tag);
-  nrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE,
-           "Invalid tag name %s\n", tag.c_str());
+  nekrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE, "Invalid tag name %s\n", tag.c_str());
 
   it->second.hostElapsed += (stopTime - it->second.startTime);
   it->second.count++;
@@ -195,34 +225,38 @@ void timer_t::hostToc(const std::string tag)
 
 void timer_t::tic(const std::string tag, int ifSync)
 {
-  if (!enabled)
+  if (!enabled) {
     return;
-  if (ifSync)
+  }
+  if (ifSync) {
     sync();
+  }
   m_[tag].startTime = MPI_Wtime();
   m_[tag].startTag = device_.tagStream();
 }
 
 void timer_t::tic(const std::string tag)
 {
-  if (!enabled)
+  if (!enabled) {
     return;
-  if (ifSync())
+  }
+  if (ifSync()) {
     sync();
+  }
   m_[tag].startTime = MPI_Wtime();
   m_[tag].startTag = device_.tagStream();
 }
 
 void timer_t::toc(const std::string tag)
 {
-  if (!enabled)
+  if (!enabled) {
     return;
+  }
   auto stopTime = MPI_Wtime();
   auto stopTag = device_.tagStream();
 
   auto it = m_.find(tag);
-  nrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE,
-           "Invalid tag name %s\n", tag.c_str());
+  nekrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE, "Invalid tag name %s\n", tag.c_str());
 
   it->second.hostElapsed += (stopTime - it->second.startTime);
   it->second.deviceElapsed += device_.timeBetween(it->second.startTag, stopTag);
@@ -232,24 +266,27 @@ void timer_t::toc(const std::string tag)
 double timer_t::hostElapsed(const std::string tag)
 {
   auto it = m_.find(tag);
-  if (it == m_.end())
+  if (it == m_.end()) {
     return NEKRS_TIMER_INVALID_KEY;
+  }
   return it->second.hostElapsed;
 }
 
 double timer_t::deviceElapsed(const std::string tag)
 {
   auto it = m_.find(tag);
-  if (it == m_.end())
+  if (it == m_.end()) {
     return NEKRS_TIMER_INVALID_KEY;
+  }
   return it->second.deviceElapsed;
 }
 
 long long int timer_t::count(const std::string tag)
 {
   auto it = m_.find(tag);
-  if (it == m_.end())
+  if (it == m_.end()) {
     return NEKRS_TIMER_INVALID_KEY;
+  }
   return it->second.count;
 }
 
@@ -259,8 +296,9 @@ double timer_t::query(const std::string tag, const std::string metric)
   MPI_Comm_size(comm_, &size);
 
   auto it = m_.find(tag);
-  if (it == m_.end())
+  if (it == m_.end()) {
     return NEKRS_TIMER_INVALID_KEY;
+  }
   auto hostElapsed = it->second.hostElapsed;
   auto deviceElapsed = it->second.deviceElapsed;
   auto count = it->second.count;
@@ -322,10 +360,11 @@ void timer_t::printStatEntry(std::string name, double tTag, long long int nCalls
     if (rank == 0) {
       std::cout << name << tTag << "s"
                 << "  " << printPercentage(tTag, tElapsedTimeSolve);
-      if (child)
+      if (child) {
         std::cout << "  " << printPercentage(tTag, tNorm);
-      else
+      } else {
         std::cout << "      ";
+      }
       std::cout << "  " << nCalls << "\n";
     }
   }
@@ -342,10 +381,11 @@ void timer_t::printStatEntry(std::string name, std::string tag, std::string type
     if (rank == 0) {
       std::cout << name << tTag << "s"
                 << "  " << printPercentage(tTag, tElapsedTimeSolve);
-      if (child)
+      if (child) {
         std::cout << "  " << printPercentage(tTag, tNorm);
-      else
+      } else {
         std::cout << "      ";
+      }
       std::cout << "  " << nCalls << "\n";
     }
   }
@@ -360,10 +400,11 @@ void timer_t::printStatEntry(std::string name, double time, double tNorm)
     if (rank == 0) {
       std::cout << name << time << "s"
                 << "  " << printPercentage(time, tElapsedTimeSolve);
-      if (child)
+      if (child) {
         std::cout << "  " << printPercentage(time, tNorm);
-      else
+      } else {
         std::cout << "      ";
+      }
       std::cout << "\n";
     }
   }
@@ -395,20 +436,22 @@ void timer_t::printRunStat(int step)
 
   const double tElapsedTime = query("elapsed", "DEVICE:MAX");
 
-  if (rank == 0)
+  if (rank == 0) {
     std::cout << "\n>>> runtime statistics (step= " << step << "  totalElapsed= " << tElapsedTime << "s"
               << "):\n";
+  }
 
   std::cout.setf(std::ios::scientific);
   int outPrecisionSave = std::cout.precision();
   std::cout.precision(5);
 
-  if (rank == 0)
+  if (rank == 0) {
     std::cout << "name                    "
               << "time          "
               << "abs%  "
               << "rel%  "
               << "calls\n";
+  }
 
   tElapsedTimeSolve = query("elapsedStepSum", "DEVICE:MAX");
   const double tSetup = query("setup", "DEVICE:MAX");
@@ -418,19 +461,18 @@ void timer_t::printRunStat(int step)
 
   const double tScalarCvode = query("cvode_t::solve", "DEVICE:MAX");
 
-  bool printFlops = !platform->options.compareArgs("PRESSURE PRECONDITIONER", "SEMFEM") && 
-                    tScalarCvode < 0;
+  bool printFlops = !platform->options.compareArgs("PRESSURE PRECONDITIONER", "SEMFEM") && tScalarCvode < 0;
 
   const double flops =
       platform->flopCounter->get(platform->comm.mpiComm) / (tElapsedTimeSolve * platform->comm.mpiCommSize);
-
 
   printStatEntry("  solve                 ", tElapsedTimeSolve, tElapsedTimeSolve);
   if (tElapsedTimeSolve > 0 && rank == 0) {
     std::cout << "    min                 " << tMinSolveStep << "s\n";
     std::cout << "    max                 " << tMaxSolveStep << "s\n";
-    if (printFlops)
+    if (printFlops) {
       std::cout << "    flops/rank          " << flops << "\n";
+    }
   }
 
   auto lpmLocalKernelPredicate = [](const std::string &tag) {
@@ -470,7 +512,7 @@ void timer_t::printRunStat(int step)
   printStatEntry("        delete          ", "lpm_t::deleteParticles", "DEVICE:MAX", tlpm);
   printStatEntry("      lpm add           ", "lpm_t::addParticles", "DEVICE:MAX", tudf);
   printStatEntry("      lpm write         ", "lpm_t::write", "DEVICE:MAX", tudf);
-  
+
   const double tDiv = query("udfDiv", "DEVICE:MAX");
   printStatEntry("    udfDiv              ", "udfDiv", "DEVICE:MAX", tElapsedTimeSolve);
 
@@ -520,8 +562,9 @@ void timer_t::printRunStat(int step)
 
   for (int i = 15; i > 0; i--) {
     const std::string tag = "pressure preconditioner smoother N=" + std::to_string(i);
-    if (m_.find(tag) == m_.end())
+    if (m_.find(tag) == m_.end()) {
       continue;
+    }
     printStatEntry("        pMG smoother    ", tag, "DEVICE:MAX", tPressurePreco);
   }
 
@@ -534,7 +577,6 @@ void timer_t::printRunStat(int step)
   const double tScalar = query("scalarSolve", "DEVICE:MAX");
   printStatEntry("    scalarSolve         ", "scalarSolve", "DEVICE:MAX", tElapsedTimeSolve);
   printStatEntry("      rhs               ", "scalar rhs", "DEVICE:MAX", tScalar);
-  
 
   auto cvodeMakeQPredicate = [](const std::string &tag) {
     bool match = tag.find("cvode_t::") != std::string::npos && tag.find("makeq") != std::string::npos;
@@ -542,23 +584,25 @@ void timer_t::printRunStat(int step)
     return match && tag.find("makeq::") == std::string::npos;
   };
   auto [tMakeqCvode, nMakeqCvode] = sumAllMatchingTags(cvodeMakeQPredicate, "DEVICE:MAX");
-  
+
   auto cvodeUdfSEqnSourcePredicate = [](const std::string &tag) {
     bool match = tag.find("cvode_t::") != std::string::npos && tag.find("udfSEqnSource") != std::string::npos;
     // ensure children of the timer aren't doubly counted
     return match && tag.find("udfSEqnSource::") == std::string::npos;
   };
   auto [tSEqnSourceCvode, nSEqnSourceCvode] = sumAllMatchingTags(cvodeUdfSEqnSourcePredicate, "DEVICE:MAX");
-  
+
   auto cvodeLocalPointSourcePredicate = [](const std::string &tag) {
     bool match = tag.find("cvode_t::") != std::string::npos && tag.find("pointSource") != std::string::npos;
     // ensure children of the timer aren't doubly counted
     return match;
   };
-  auto [tLocalPointSource, nLocalPointSource] = sumAllMatchingTags(cvodeLocalPointSourcePredicate, "DEVICE:MAX");
-  
+  auto [tLocalPointSource, nLocalPointSource] =
+      sumAllMatchingTags(cvodeLocalPointSourcePredicate, "DEVICE:MAX");
+
   auto cvodePropertiesPredicate = [](const std::string &tag) {
-    bool match = tag.find("cvode_t::") != std::string::npos && tag.find("evaluateProperties") != std::string::npos;
+    bool match =
+        tag.find("cvode_t::") != std::string::npos && tag.find("evaluateProperties") != std::string::npos;
     // ensure children of the timer aren't doubly counted
     return match && tag.find("evaluateProperties::") == std::string::npos;
   };
@@ -573,14 +617,13 @@ void timer_t::printRunStat(int step)
   auto precoCallsScalars = 0.0;
   for (int is = 0; is < nScalar; is++) {
     std::string sid = scalarDigitStr(is);
-    precoTimeScalars += query("scalar" + sid + " preconditioner", "DEVICE:MAX"); 
+    precoTimeScalars += query("scalar" + sid + " preconditioner", "DEVICE:MAX");
     precoCallsScalars += count("scalar" + sid + " preconditioner");
-  }  
+  }
   set("scalar preconditioner", precoTimeScalars, precoCallsScalars);
 
   printStatEntry("      preconditioner    ", "scalar preconditioner", "DEVICE:MAX", tScalar);
   printStatEntry("      initial guess     ", "scalar proj", "DEVICE:MAX", tScalar);
-
 
   printStatEntry("    gsMPI               ", gsTime, tElapsedTimeSolve);
 
@@ -588,8 +631,9 @@ void timer_t::printRunStat(int step)
 
   printStatEntry("    dotp multi          ", "dotpMulti", "DEVICE:MAX", tElapsedTimeSolve);
 
-  if (rank == 0)
+  if (rank == 0) {
     std::cout << std::endl;
+  }
 
   std::cout.unsetf(std::ios::scientific);
   std::cout.precision(outPrecisionSave);
@@ -597,8 +641,9 @@ void timer_t::printRunStat(int step)
 
 void timer_t::printAll()
 {
-  if (platform->comm.mpiRank != 0)
+  if (platform->comm.mpiRank != 0) {
     return;
+  }
   std::cout << "Device timers: {\n";
   for (auto &&[name, data] : m_) {
     std::cout << "\t" << name << " " << data.deviceElapsed << ",\n";

@@ -1,4 +1,4 @@
-#include "plugins/RANSktau.hpp"
+#include "RANSktau.hpp"
 
 #include "ci.inc"
 

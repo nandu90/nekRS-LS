@@ -5,7 +5,6 @@
 #include "nekInterfaceAdapter.hpp"
 #include "bcMap.hpp"
 #include "constantFlowRate.hpp"
-#include "postProcessing.hpp"
 #include <functional>
 
 extern "C" {

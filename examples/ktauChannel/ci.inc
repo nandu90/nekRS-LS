@@ -2,7 +2,6 @@
 #include <vector>
 
 #include "constantFlowRate.hpp"
-#include "postProcessing.hpp"
 
 static int ciMode = 0;
 
@@ -60,9 +59,9 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
   occa::memory o_bidWall = platform->device.malloc<int>(bidWall.size(), bidWall.data());
 
   auto o_Sij = platform->o_memPool.reserve<dfloat>(2 * nrs->NVfields * nrs->fieldOffset);
-  postProcessing::strainRate(nrs, true, nrs->o_U, o_Sij);
+  nrs->strainRate(true, nrs->o_U, o_Sij);
 
-  const auto drag = postProcessing::viscousDrag(nrs, bidWall.size(), o_bidWall, o_Sij);
+  const auto drag = nrs->viscousDrag(bidWall.size(), o_bidWall, o_Sij);
   o_Sij.free();
 
   auto o_tmp = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);

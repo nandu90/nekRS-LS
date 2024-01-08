@@ -1,4 +1,4 @@
-#include "plugins/lowMach.hpp"
+#include "lowMach.hpp"
 #include "ci.inc"
 
 static dfloat P_DELTA;

@@ -27,20 +27,21 @@ SOFTWARE.
 #ifndef SEMFEMSOLVER_HPP
 #define SEMFEMSOLVER_HPP
 
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "elliptic.h"
 
 #include "hypreWrapper.hpp"
 #include "hypreWrapperDevice.hpp"
 #include "AMGX.hpp"
 
-class SEMFEMSolver_t {
+class SEMFEMSolver_t
+{
 
 public:
-  SEMFEMSolver_t(elliptic_t*);
+  SEMFEMSolver_t(elliptic_t *);
   ~SEMFEMSolver_t();
 
-  void run(occa::memory&, occa::memory&);
+  void run(occa::memory &, occa::memory &);
 
 private:
   dlong numRowsSEMFEM;
@@ -63,7 +64,7 @@ private:
     long long rowEnd;
     long long *dofMap;
   };
-  
+
   matrix_t *build(const int N_,
                   const int n_elem_,
                   occa::memory _o_x,
@@ -74,7 +75,6 @@ private:
                   hypreWrapper::IJ_t &hypreIJ,
                   MPI_Comm comm,
                   long long int *gatherGlobalNodes);
-
 };
 
 #endif

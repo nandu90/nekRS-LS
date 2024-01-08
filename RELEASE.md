@@ -23,6 +23,7 @@
 * processing of `nekrs.upd` is triggered by SIGUSR2 instead of every N-steps
 * namespace `postProcessing` was removed
 * planarAvg takes `mesh_t *mesh` instead of `nrs_t *nrs`
+* tavg::setup requires a list of fields on input (defined by user) 
 
 ## Known Bugs / Restrictions
 

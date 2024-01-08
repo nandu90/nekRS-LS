@@ -6,8 +6,8 @@ occa::memory meshSolve(nrs_t* nrs, double time, int stage)
   mesh_t *mesh = nrs->_mesh;
   linAlg_t* linAlg = platform->linAlg;
 
-  auto o_rhs = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
-  platform->linAlg->fill(nrs->NVfields * nrs->fieldOffset, 0, o_rhs);
+  auto o_rhs = platform->o_memPool.reserve<dfloat>(mesh->dim * nrs->fieldOffset);
+  platform->linAlg->fill(mesh->dim * nrs->fieldOffset, 0, o_rhs);
 
   platform->timer.tic("meshSolve", 1);
 
@@ -22,7 +22,7 @@ occa::memory meshSolve(nrs_t* nrs, double time, int stage)
     o_NULL,
     nrs->o_ellipticCoeff);
 
-  auto o_U = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
+  auto o_U = platform->o_memPool.reserve<dfloat>(mesh->dim * nrs->fieldOffset);
   if (platform->options.compareArgs("MESH INITIAL GUESS", "EXTRAPOLATION") && stage == 1)
     o_U.copyFrom(mesh->o_Ue);
   else

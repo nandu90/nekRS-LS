@@ -66,8 +66,7 @@ void noop_func(void) {}
 
 void check_error(const char *error)
 {
-  nrsCheck(error != NULL, MPI_COMM_SELF, EXIT_FAILURE,
-           "%s\n", error);
+  nekrsCheck(error != NULL, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", error);
 }
 
 static void map_m_to_n(double *a, int na, double *b, int nb)
@@ -83,7 +82,8 @@ static void map_m_to_n(double *a, int na, double *b, int nb)
   free(w);
 }
 
-namespace nek {
+namespace nek
+{
 void *ptr(const char *id)
 {
   void *ptr;
@@ -94,8 +94,7 @@ void *ptr(const char *id)
 
 void *scPtr(int id)
 {
-  nrsCheck(!id, MPI_COMM_SELF, EXIT_FAILURE,
-           "Accessing invalid index %d!\n", id); 
+  nekrsCheck(!id, MPI_COMM_SELF, EXIT_FAILURE, "Accessing invalid index %d!\n", id);
 
   void *ptr;
   (*nek_scptr_ptr)(&id, &ptr);
@@ -107,13 +106,16 @@ void outfld(const char *filename,
             int step,
             int coords,
             int FP64,
-            const occa::memory& o_uu,
-            const occa::memory& o_pp,
-            const occa::memory& o_ss,
+            const occa::memory &o_uu,
+            const occa::memory &o_pp,
+            const occa::memory &o_ss,
             int NSfields)
 {
-  nrsCheck(NSfields > nekData.ldimt, platform->comm.mpiComm, EXIT_FAILURE,
-           "Adjust ldimt in SIZE to %d and larger\n", NSfields);
+  nekrsCheck(NSfields > nekData.ldimt,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "Adjust ldimt in SIZE to %d and larger\n",
+             NSfields);
 
   occa::memory o_u, o_p, o_s;
   if (o_uu.isInitialized()) {
@@ -140,7 +142,7 @@ void outfld(const char *filename,
 
   // nek5000 writes all fields using nelt
   // note, nrs->fieldOffset >= nelt*nxyz
-  auto mesh = nrs->_mesh; 
+  auto mesh = nrs->_mesh;
   dlong Nlocal = mesh->Nelements * mesh->Np;
 
   // nek5000 uses lelv = lelt
@@ -157,10 +159,10 @@ void outfld(const char *filename,
     mesh->o_x.copyTo(tmp1.data(), Nlocal);
     mesh->o_y.copyTo(tmp2.data(), Nlocal);
     mesh->o_z.copyTo(tmp3.data(), Nlocal);
-    for(int i=0; i < Nlocal; i++) {
-      nekData.xm1[i] = tmp1[i];   
-      nekData.ym1[i] = tmp2[i];    
-      nekData.zm1[i] = tmp3[i];    
+    for (int i = 0; i < Nlocal; i++) {
+      nekData.xm1[i] = tmp1[i];
+      nekData.ym1[i] = tmp2[i];
+      nekData.zm1[i] = tmp3[i];
     }
     xo = 1;
   }
@@ -172,17 +174,17 @@ void outfld(const char *filename,
     o_vx.copyTo(tmp1.data(), Nlocal * sizeof(dfloat));
     o_vy.copyTo(tmp2.data(), Nlocal * sizeof(dfloat));
     o_vz.copyTo(tmp3.data(), Nlocal * sizeof(dfloat));
-    for(int i=0; i < Nlocal; i++) {
-      nekData.vx[i] = tmp1[i];   
-      nekData.vy[i] = tmp2[i];    
-      nekData.vz[i] = tmp3[i];    
+    for (int i = 0; i < Nlocal; i++) {
+      nekData.vx[i] = tmp1[i];
+      nekData.vy[i] = tmp2[i];
+      nekData.vz[i] = tmp3[i];
     }
     vo = 1;
   }
   if (o_p.isInitialized()) {
     o_p.copyTo(tmp1.data(), Nlocal * sizeof(dfloat));
-    for(int i=0; i < Nlocal; i++) {
-      nekData.pr[i] = tmp1[i];   
+    for (int i = 0; i < Nlocal; i++) {
+      nekData.pr[i] = tmp1[i];
     }
     po = 1;
   }
@@ -191,8 +193,8 @@ void outfld(const char *filename,
       occa::memory o_Si = o_s + (is * sizeof(dfloat)) * nrs->fieldOffset;
       o_Si.copyTo(tmp1.data(), Nlocal * sizeof(dfloat));
       auto Ti = nekData.t + is * nekFieldOffset;
-      for(int i=0; i < Nlocal; i++) {
-        Ti[i] = tmp1[i];   
+      for (int i = 0; i < Nlocal; i++) {
+        Ti[i] = tmp1[i];
       }
     }
     so = 1;
@@ -205,16 +207,22 @@ void outfld(const char *filename,
   platform->timer.toc("checkpointing");
 
   (*nek_restoresol_ptr)();
-  *(nekData.p0th) = p0thSave; 
+  *(nekData.p0th) = p0thSave;
 
   *(nekData.istep) = stepSave;
 }
 
-void uic(int ifield) { (*nek_uic_ptr)(&ifield); }
+void uic(int ifield)
+{
+  (*nek_uic_ptr)(&ifield);
+}
 
-void finalize() { (*nek_end_ptr)(); }
+void finalize()
+{
+  (*nek_end_ptr)();
+}
 
-void restartFromFile(const std::string& fileName)
+void restartFromFile(const std::string &fileName)
 {
   std::string str(fileName.size(), '\0');
   std::replace_copy(fileName.begin(), fileName.end(), str.begin(), '+', ' ');
@@ -227,31 +235,32 @@ void getIC(void)
   int Nscalar;
   options->getArgs("NUMBER OF SCALARS", Nscalar);
 
-  for (int ifield = 1; ifield <= 1+Nscalar; ifield++)
+  for (int ifield = 1; ifield <= 1 + Nscalar; ifield++) {
     uic(ifield);
+  }
 
   double startTime;
   copyFromNek(startTime);
-  platform->options.setArgs("START TIME", to_string_f(startTime));  
+  platform->options.setArgs("START TIME", to_string_f(startTime));
 }
 
 void xm1N(dfloat *_x, dfloat *_y, dfloat *_z, int N, dlong Nelements)
 {
-  const int Np = (N+1) * (N+1) * (N+1);
+  const int Np = (N + 1) * (N + 1) * (N + 1);
   const int nxyz = nekData.nx1 * nekData.nx1 * nekData.nx1;
 
-  auto x = (double*) calloc(Np, sizeof(double));
-  auto y = (double*) calloc(Np, sizeof(double));
-  auto z = (double*) calloc(Np, sizeof(double));
+  auto x = (double *)calloc(Np, sizeof(double));
+  auto y = (double *)calloc(Np, sizeof(double));
+  auto z = (double *)calloc(Np, sizeof(double));
 
-  for(dlong e = 0; e < Nelements; ++e) {
-    map_m_to_n(x, N+1, &nekData.xm1[e * nxyz], nekData.nx1); 
-    map_m_to_n(y, N+1, &nekData.ym1[e * nxyz], nekData.nx1);
-    map_m_to_n(z, N+1, &nekData.zm1[e * nxyz], nekData.nx1);
-    for(int i = 0; i < Np; i++) {
-      _x[i + e*Np] = x[i];
-      _y[i + e*Np] = y[i];
-      _z[i + e*Np] = z[i];
+  for (dlong e = 0; e < Nelements; ++e) {
+    map_m_to_n(x, N + 1, &nekData.xm1[e * nxyz], nekData.nx1);
+    map_m_to_n(y, N + 1, &nekData.ym1[e * nxyz], nekData.nx1);
+    map_m_to_n(z, N + 1, &nekData.zm1[e * nxyz], nekData.nx1);
+    for (int i = 0; i < Np; i++) {
+      _x[i + e * Np] = x[i];
+      _y[i + e * Np] = y[i];
+      _z[i + e * Np] = z[i];
     }
   }
   free(x);
@@ -265,14 +274,21 @@ int lglel(int e)
   return (*nek_lglel_ptr)(&ee) - 1;
 }
 
-void ifoutfld(int i) { (*nek_ifoutfld_ptr)(&i); }
+void ifoutfld(int i)
+{
+  (*nek_ifoutfld_ptr)(&i);
+}
 
-void setics(void) { (*nek_setics_ptr)(); }
+void setics(void)
+{
+  (*nek_setics_ptr)();
+}
 
 void userchk(void)
 {
-  if (rank == 0)
+  if (rank == 0) {
     printf("calling nek_userchk ...\n");
+  }
   (*userchk_ptr)();
 }
 } // namespace nek
@@ -291,27 +307,28 @@ DEFINE_USER_FUNC(userqtl)
 void set_usr_handles(const char *session_in, int verbose)
 {
   std::string cache_dir(getenv("NEKRS_CACHE_DIR"));
-  if (platform->cacheBcast)
+  if (platform->cacheBcast) {
     cache_dir = platform->tmpDir;
+  }
 
   const std::string lib = cache_dir + "/nek5000/lib" + session_in + ".so";
 
-  if(platform->comm.mpiRank == 0 && platform->verbose)
+  if (platform->comm.mpiRank == 0 && platform->verbose) {
     std::cout << "\nloading " << lib << std::endl;
+  }
   void *handle = dlopen(lib.c_str(), RTLD_NOW | RTLD_LOCAL);
 
-  nrsCheck(!handle, MPI_COMM_SELF, EXIT_FAILURE, 
-           "%s\n", dlerror());
+  nekrsCheck(!handle, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", dlerror());
 
   // check if we need to append an underscore
-  auto us = [handle]
-  { 
-    (void (*)(void))dlsym(handle, "usrdat_");
-    if(handle)
+  auto us = [handle] {
+    (void (*)(void)) dlsym(handle, "usrdat_");
+    if (handle) {
       return "_";
-    else
+    } else {
       return "";
-  } ();
+    }
+  }();
   dlerror(); /* Clear any existing error */
 
   char func[100];
@@ -390,9 +407,8 @@ if (!(postfix(s))) {                                                            
 postfix(s) = noop_func;                                                                                      \
 if (verbose)                                                                                                 \
 printf("Setting function " #s " to noop_func.\n");                                                           \
-}                                                                                                            \
-else if (verbose && rank == 0) {                                                                             \
-printf("Loading " #s"\n");                                                                                   \
+} else if (verbose && rank == 0) {                                                                           \
+printf("Loading " #s "\n");                                                                                  \
 }                                                                                                            \
 } while (0)
 
@@ -431,8 +447,7 @@ void mkSIZE(int lx1,
   // Read and generate the new size file.
   sprintf(line, "%s/core/SIZE.template", nek5000_dir.c_str());
   FILE *fp = fopen(line, "r");
-  nrsCheck(!fp, MPI_COMM_SELF, EXIT_FAILURE,
-           "Cannot open %s!\n", line); 
+  nekrsCheck(!fp, MPI_COMM_SELF, EXIT_FAILURE, "Cannot open %s!\n", line);
 
   char *sizeFile;
   {
@@ -448,36 +463,37 @@ void mkSIZE(int lx1,
 
   int count = 0;
   while (fgets(line, lineSize, fp) != NULL) {
-    if (strstr(line, "parameter (lx1=") != NULL)
+    if (strstr(line, "parameter (lx1=") != NULL) {
       sprintf(line, "      parameter (lx1=%d)\n", lx1);
-    else if (strstr(line, "parameter (lxd=") != NULL)
+    } else if (strstr(line, "parameter (lxd=") != NULL) {
       sprintf(line, "      parameter (lxd=%d)\n", lxd);
-    else if (strstr(line, "parameter (lelt=") != NULL)
+    } else if (strstr(line, "parameter (lelt=") != NULL) {
       sprintf(line, "      parameter (lelt=%d)\n", lelt);
-    else if (strstr(line, "parameter (lelg=") != NULL)
+    } else if (strstr(line, "parameter (lelg=") != NULL) {
       sprintf(line, "      parameter (lelg=%d)\n", lelg);
-    else if (strstr(line, "parameter (ldim=") != NULL)
+    } else if (strstr(line, "parameter (ldim=") != NULL) {
       sprintf(line, "      parameter (ldim=%d)\n", ldim);
-    else if (strstr(line, "parameter (lpmin=") != NULL)
+    } else if (strstr(line, "parameter (lpmin=") != NULL) {
       sprintf(line, "      parameter (lpmin=%d)\n", lpmin);
-    else if (strstr(line, "parameter (ldimt=") != NULL)
+    } else if (strstr(line, "parameter (ldimt=") != NULL) {
       sprintf(line, "      parameter (ldimt=%d)\n", ldimt);
-    else if (strstr(line, "parameter (mxprev=") != NULL)
+    } else if (strstr(line, "parameter (mxprev=") != NULL) {
       sprintf(line, "      parameter (mxprev=%d)\n", 1);
-    else if (strstr(line, "parameter (lgmres=") != NULL)
+    } else if (strstr(line, "parameter (lgmres=") != NULL) {
       sprintf(line, "      parameter (lgmres=%d)\n", 1);
-    else if (strstr(line, "parameter (lorder=") != NULL)
+    } else if (strstr(line, "parameter (lorder=") != NULL) {
       sprintf(line, "      parameter (lorder=%d)\n", 1);
-    else if (strstr(line, "parameter (lhis=") != NULL)
+    } else if (strstr(line, "parameter (lhis=") != NULL) {
       sprintf(line, "      parameter (lhis=%d)\n", 100000);
-    else if (strstr(line, "parameter (lelr=") != NULL)
+    } else if (strstr(line, "parameter (lelr=") != NULL) {
       sprintf(line, "      parameter (lelr=%d)\n", 128 * lelt);
-    else if (strstr(line, "parameter (lx1m=") != NULL)
+    } else if (strstr(line, "parameter (lx1m=") != NULL) {
       sprintf(line, "      parameter (lx1m=%d)\n", lx1m);
-    else if(strstr(line, "parameter (nsessmax=") != NULL)
+    } else if (strstr(line, "parameter (nsessmax=") != NULL) {
       sprintf(line, "      parameter (nsessmax=%d)\n", nsessmax);
-    else if(strstr(line, "parameter (maxobj=") != NULL)
+    } else if (strstr(line, "parameter (maxobj=") != NULL) {
       sprintf(line, "      parameter (maxobj=%d)\n", nMaxObj);
+    }
 
     strcpy(sizeFile + count, line);
     count += strlen(line);
@@ -496,32 +512,37 @@ void mkSIZE(int lx1,
       if (line.find("lelg=") != std::string::npos) {
         hlong oldval;
         sscanf(line.c_str(), "%*[^=]=%lld", &oldval);
-        if (oldval < lelg)
+        if (oldval < lelg) {
           writeSize = 1;
+        }
       }
       if (line.find("lelt=") != std::string::npos) {
         int oldval;
         sscanf(line.c_str(), "%*[^=]=%d", &oldval);
-        if (oldval < lelt)
+        if (oldval < lelt) {
           writeSize = 1;
+        }
       }
       if (line.find("lx1m=") != std::string::npos) {
         int oldval;
         sscanf(line.c_str(), "%*[^=]=%d", &oldval);
-        if (oldval < lx1m)
+        if (oldval < lx1m) {
           writeSize = 1;
+        }
       }
       if (line.find("lx1=") != std::string::npos) {
         int oldval;
         sscanf(line.c_str(), "%*[^=]=%d", &oldval);
-        if (oldval != lx1)
+        if (oldval != lx1) {
           writeSize = 1;
+        }
       }
       if (line.find("ldimt=") != std::string::npos) {
         int oldval;
         sscanf(line.c_str(), "%*[^=]=%d", &oldval);
-        if (oldval < ldimt)
+        if (oldval < ldimt) {
           writeSize = 1;
+        }
       }
     }
   }
@@ -532,12 +553,13 @@ void mkSIZE(int lx1,
     fputs(sizeFile, fp);
     fclose(fp);
     free(sizeFile);
-    if (verbose)
+    if (verbose) {
       printf("using new SIZE\n");
-  }
-  else {
-    if (verbose)
+    }
+  } else {
+    if (verbose) {
       printf("using existing SIZE file %s/SIZE\n", cache_dir);
+    }
   }
 
   fflush(stdout);
@@ -547,8 +569,9 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
 {
   int buildRank = rank;
   const bool buildNodeLocal = platform->cacheLocal;
-  if (buildNodeLocal)
+  if (buildNodeLocal) {
     MPI_Comm_rank(platform->comm.mpiCommLocal, &buildRank);
+  }
 
   const int verbose = options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
 
@@ -567,11 +590,12 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
     usrFileExists = fs::exists(usrFile) && fs::file_size(usrFile) > 0;
   }
   MPI_Bcast(&usrFileExists, 1, MPI_INT, 0, platform->comm.mpiComm);
-  if (!usrFileExists)
-    usrFile = nek5000_dir + "/core/zero.usr"; 
+  if (!usrFileExists) {
+    usrFile = nek5000_dir + "/core/zero.usr";
+  }
 
   int buildRequired = 0;
-  if(platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank == 0) {
     if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
       buildRequired = 1;
     } else if (isFileNewer(usrFile.c_str(), libFile.c_str())) {
@@ -595,31 +619,36 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
       re2::nelg(meshFile, nelgt, nelgv, MPI_COMM_SELF);
 
       int lelt = (nelgt / np) + 3;
-      if (lelt > nelgt)
+      if (lelt > nelgt) {
         lelt = nelgt;
+      }
 
       const std::string sizeFile = cache_dir + "/SIZE";
       mkSIZE(N + 1, 1, lelt, nelgt, ndim, np, ldimt, options, sizeFile.c_str());
 
-      if (buildRequired)
+      if (buildRequired) {
         copyFile(usrFile.c_str(), usrFileCache.c_str());
+      }
 
-      if (isFileNewer(sizeFile.c_str(), libFile.c_str()))
+      if (isFileNewer(sizeFile.c_str(), libFile.c_str())) {
         buildRequired = 1;
+      }
 
       if (buildRequired) {
         const double tStart = MPI_Wtime();
 
-        const std::string makeOutput = (rank == 0) ? cache_dir + "/make.out" : "/dev/null"; 
+        const std::string makeOutput = (rank == 0) ? cache_dir + "/make.out" : "/dev/null";
         const std::string case_dir(fs::current_path());
         const std::string include_dirs = "./ " + case_dir + " " + installDir + "/include/nrs/bdry";
         const std::string nekInterface_dir = installDir + "/nekInterface";
         std::string make_args = "-j8 ";
-        if (!verbose)
+        if (!verbose) {
           make_args += "-s ";
+        }
 
-        if (rank == 0)
+        if (rank == 0) {
           printf("building nekInterface for lx1=%d, lelt=%d and lelg=%d ... ", N + 1, lelt, nelgt);
+        }
 
         fflush(stdout);
 
@@ -644,10 +673,11 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
                 nekInterface_dir.c_str(),
                 std::string(">" + makeOutput + " 2>&1").c_str());
 
-        if (verbose && rank == 0)
+        if (verbose && rank == 0) {
           printf("\n%s\n", buf);
+        }
         if (system(buf)) {
-          if(rank == 0) {
+          if (rank == 0) {
             std::ifstream f(makeOutput);
             std::cerr << f.rdbuf();
           }
@@ -656,30 +686,39 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
         }
         fileSync(libFile.c_str());
 
-        if (rank == 0)
+        if (rank == 0) {
           printf("done (%gs)\n", MPI_Wtime() - tStart);
+        }
         fflush(stdout);
-      }
-      else {
-        if (rank == 0)
+      } else {
+        if (rank == 0) {
           printf("skip building nekInterface (SIZE requires no update)\n");
+        }
         fflush(stdout);
       }
     } // buildRank
 
-    if (platform->cacheBcast)
+    if (platform->cacheBcast) {
       fileBcast(cache_dir, platform->tmpDir, platform->comm.mpiComm, platform->verbose);
+    }
 
     return 0;
   }();
 
-  nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "");
+  nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "");
 }
 
-namespace nek {
-int bcmap(int bid, int ifld, int isMesh) { return (*nek_bcmap_ptr)(&bid, &ifld, &isMesh); }
+namespace nek
+{
+int bcmap(int bid, int ifld, int isMesh)
+{
+  return (*nek_bcmap_ptr)(&bid, &ifld, &isMesh);
+}
 
-void gen_bcmap() { (*nek_gen_bcmap_ptr)(); }
+void gen_bcmap()
+{
+  (*nek_gen_bcmap_ptr)();
+}
 
 void bootstrap()
 {
@@ -691,8 +730,9 @@ void bootstrap()
 
   int buildRank = rank;
   const bool buildNodeLocal = platform->cacheLocal;
-  if (buildNodeLocal)
+  if (buildNodeLocal) {
     MPI_Comm_rank(platform->comm.mpiCommLocal, &buildRank);
+  }
 
   int N;
   options->getArgs("POLYNOMIAL DEGREE", N);
@@ -752,7 +792,7 @@ int setup(nrs_t *nrs_in)
   auto scalarCompute = (int *)calloc(nscal, sizeof(int));
   {
     int cnt = 0;
-    for(int is = 0; is < nscal; is++) {
+    for (int is = 0; is < nscal; is++) {
       std::string sid = scalarDigitStr(is);
       if (options->compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
         scalarCompute[is] = -1;
@@ -764,17 +804,20 @@ int setup(nrs_t *nrs_in)
   std::string velocitySolver;
 
   int meshPartType = 3; // RCB+RSB
-  if (options->compareArgs("MESH PARTITIONER", "rcb"))
+  if (options->compareArgs("MESH PARTITIONER", "rcb")) {
     meshPartType = 2;
-  if (options->compareArgs("MESH PARTITIONER", "rcb+rsb"))
+  }
+  if (options->compareArgs("MESH PARTITIONER", "rcb+rsb")) {
     meshPartType = 3;
+  }
 
   double meshConTol = 0.2;
   options->getArgs("MESH CONNECTIVITY TOL", meshConTol);
 
   int nBcRead = 1; // at the very least we have to read the boundaryIDs
-  if (bcMap::useNekBCs())
+  if (bcMap::useNekBCs()) {
     nBcRead += nscalSolve;
+  }
 
   double rho;
   options->getArgs("DENSITY", rho);
@@ -791,7 +834,7 @@ int setup(nrs_t *nrs_in)
   int stressForm = 1; // avoid recompilation + bypass unligned SYM/SHL check
 
   // for now velocityExists is always true
-  int velocityExists = (options->getArgs("VELOCITY SOLVER").empty()) ? 0 : 1; 
+  int velocityExists = (options->getArgs("VELOCITY SOLVER").empty()) ? 0 : 1;
 
   (*nek_setup_ptr)(&velocityExists,
                    &nscal,
@@ -860,51 +903,64 @@ int setup(nrs_t *nrs_in)
   nekData.wz = (double *)ptr("wz");
 
   int cht = 0;
-  if (nekData.nelv != nekData.nelt && nscal)
+  if (nekData.nelv != nekData.nelt && nscal) {
     cht = 1;
+  }
 
-  if (bcMap::useNekBCs() && numberActiveFields(nrs) > 0) {
-    if (rank == 0)
+  if (bcMap::useNekBCs() && nrs->numberActiveFields() > 0) {
+    if (rank == 0) {
       printf("importing BCs from nek\n");
+    }
 
     gen_bcmap();
 
     if (nrs->flow) {
-      if (rank == 0) printf(" velocity\n");
+      if (rank == 0) {
+        printf(" velocity\n");
+      }
 
       int isTMesh = 0;
       int nIDs = (*nek_nbid_ptr)(&isTMesh);
       int *map = (int *)calloc(nIDs, sizeof(int));
-      for (int id = 0; id < nIDs; id++)
+      for (int id = 0; id < nIDs; id++) {
         map[id] = bcmap(id + 1, 1, 0);
+      }
       bcMap::setBcMap("velocity", map, nIDs);
 
       if (meshSolver) {
-        if (rank == 0) printf(" mesh\n");
-        for (int id = 0; id < nIDs; id++)
+        if (rank == 0) {
+          printf(" mesh\n");
+        }
+        for (int id = 0; id < nIDs; id++) {
           map[id] = bcmap(id + 1, 1, 1);
+        }
         bcMap::setBcMap("mesh", map, nIDs);
       }
 
       free(map);
     }
-    for(int is = 0; is < nscal; is++) {
+    for (int is = 0; is < nscal; is++) {
       std::string sid = scalarDigitStr(is);
 
-      if (options->compareArgs("SCALAR" + sid + " SOLVER", "NONE"))
+      if (options->compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
         continue;
+      }
 
-      if (rank == 0) printf(" scalar%02d\n", is);
+      if (rank == 0) {
+        printf(" scalar%02d\n", is);
+      }
 
       int isTMesh = 0;
-      if (cht && is == 0)
+      if (cht && is == 0) {
         isTMesh = 1;
+      }
       int nIDs = (*nek_nbid_ptr)(&isTMesh);
 
       int *map = (int *)calloc(nIDs, sizeof(int));
 
-      for (int id = 0; id < nIDs; id++)
+      for (int id = 0; id < nIDs; id++) {
         map[id] = bcmap(id + 1, is + 2, 0);
+      }
       bcMap::setBcMap("scalar" + sid, map, nIDs);
       free(map);
     }
@@ -926,7 +982,7 @@ static void updateMesh()
 {
   auto mesh = nrs->_mesh;
 
-  for(int i=0; i < mesh->Nlocal; i++) {
+  for (int i = 0; i < mesh->Nlocal; i++) {
     nekData.xm1[i] = mesh->x[i];
     nekData.ym1[i] = mesh->y[i];
     nekData.zm1[i] = mesh->z[i];
@@ -958,13 +1014,14 @@ void copyToNek(double time)
 
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     mesh_t *mesh = nrs->meshV;
-    if (nrs->cht)
+    if (nrs->cht) {
       mesh = nrs->cds->mesh[0];
+    }
     const dlong Nlocal = mesh->Nelements * mesh->Np;
     auto wx = mesh->U + 0 * nrs->fieldOffset;
     auto wy = mesh->U + 1 * nrs->fieldOffset;
     auto wz = mesh->U + 2 * nrs->fieldOffset;
-    for(int i = 0; i < Nlocal; i++) {
+    for (int i = 0; i < Nlocal; i++) {
       nekData.wx[i] = wx[i];
       nekData.wy[i] = wy[i];
       nekData.wz[i] = wz[i];
@@ -972,7 +1029,7 @@ void copyToNek(double time)
     updateMesh();
   }
 
-  for(int i = 0; i < Nlocal; i++) {
+  for (int i = 0; i < Nlocal; i++) {
     nekData.vx[i] = vx[i];
     nekData.vy[i] = vy[i];
     nekData.vz[i] = vz[i];
@@ -986,7 +1043,7 @@ void copyToNek(double time)
       const dlong Nlocal = mesh->Nelements * mesh->Np;
       auto Ti = nekData.t + is * nekFieldOffset;
       auto Si = nrs->cds->S + nrs->cds->fieldOffsetScan[is];
-      for(int i = 0; i < Nlocal; i++) {
+      for (int i = 0; i < Nlocal; i++) {
         Ti[i] = Si[i];
       }
     }
@@ -1002,8 +1059,9 @@ void ocopyToNek(void)
   }
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     mesh_t *mesh = nrs->meshV;
-    if (nrs->cht)
+    if (nrs->cht) {
       mesh = nrs->cds->mesh[0];
+    }
     mesh->o_U.copyTo(mesh->U);
     mesh->o_x.copyTo(mesh->x);
     mesh->o_y.copyTo(mesh->y);
@@ -1028,8 +1086,9 @@ void ocopyToNek(double time, int tstep)
   }
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     mesh_t *mesh = nrs->meshV;
-    if (nrs->cht)
+    if (nrs->cht) {
       mesh = nrs->cds->mesh[0];
+    }
     mesh->o_U.copyTo(mesh->U);
     mesh->o_x.copyTo(mesh->x);
     mesh->o_y.copyTo(mesh->y);
@@ -1054,8 +1113,9 @@ void ocopyFromNek(double &time)
   }
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     mesh_t *mesh = nrs->meshV;
-    if (nrs->cht)
+    if (nrs->cht) {
       mesh = nrs->cds->mesh[0];
+    }
     mesh->o_x.copyFrom(mesh->x);
     mesh->o_y.copyFrom(mesh->y);
     mesh->o_z.copyFrom(mesh->z);
@@ -1081,7 +1141,7 @@ void copyFromNek(double &time)
   auto vy = nrs->U + 1 * nrs->fieldOffset;
   auto vz = nrs->U + 2 * nrs->fieldOffset;
 
-  for(int i=0; i < Nlocal; i++) {
+  for (int i = 0; i < Nlocal; i++) {
     vx[i] = nekData.vx[i];
     vy[i] = nekData.vy[i];
     vz[i] = nekData.vz[i];
@@ -1089,8 +1149,9 @@ void copyFromNek(double &time)
 
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     mesh_t *mesh = nrs->meshV;
-    if (nrs->cht)
+    if (nrs->cht) {
       mesh = nrs->cds->mesh[0];
+    }
 
     const dlong Nlocal = mesh->Nelements * mesh->Np;
 
@@ -1098,7 +1159,7 @@ void copyFromNek(double &time)
     auto wy = mesh->U + 1 * nrs->fieldOffset;
     auto wz = mesh->U + 2 * nrs->fieldOffset;
 
-    for(int i=0; i < Nlocal; i++) {
+    for (int i = 0; i < Nlocal; i++) {
       wx[i] = nekData.wx[i];
       wy[i] = nekData.wy[i];
       wz[i] = nekData.wz[i];
@@ -1110,7 +1171,9 @@ void copyFromNek(double &time)
     recomputeGeometry();
   }
 
-  for(int i=0; i < Nlocal; i++) nrs->P[i] = nekData.pr[i]; 
+  for (int i = 0; i < Nlocal; i++) {
+    nrs->P[i] = nekData.pr[i];
+  }
 
   if (nrs->Nscalar) {
     const dlong nekFieldOffset = nekData.lelt * mesh->Np;
@@ -1120,12 +1183,17 @@ void copyFromNek(double &time)
       const dlong Nlocal = mesh->Nelements * mesh->Np;
       auto Ti = nekData.t + is * nekFieldOffset;
       auto Si = nrs->cds->S + nrs->cds->fieldOffsetScan[is];
-      for(int i=0; i < Nlocal; i++) Si[i] = Ti[i]; 
+      for (int i = 0; i < Nlocal; i++) {
+        Si[i] = Ti[i];
+      }
     }
   }
 }
 
-long long set_glo_num(int nx, int isTMesh) { return (*nek_set_vert_ptr)(&nx, &isTMesh); }
+long long set_glo_num(int nx, int isTMesh)
+{
+  return (*nek_set_vert_ptr)(&nx, &isTMesh);
+}
 
 void bdfCoeff(dfloat *g0, dfloat *coeff, dfloat *_dt, int order)
 {
@@ -1133,17 +1201,19 @@ void bdfCoeff(dfloat *g0, dfloat *coeff, dfloat *_dt, int order)
   double nekCoeff[4];
   (*nek_setbd_ptr)(nekCoeff, dt, &order);
   *g0 = nekCoeff[0];
-  for(int i=0; i < order; i++)
-    coeff[i] = nekCoeff[i+1];
+  for (int i = 0; i < order; i++) {
+    coeff[i] = nekCoeff[i + 1];
+  }
 }
 
-void extCoeff(dfloat *coeff, dfloat *_dt, int nAB, int nBDF) 
-{ 
+void extCoeff(dfloat *coeff, dfloat *_dt, int nAB, int nBDF)
+{
   double dt[3] = {_dt[0], _dt[1], _dt[2]};
   double nekCoeff[3];
-  (*nek_setabbd_ptr)(nekCoeff, dt, &nAB, &nBDF); 
-  for(int i=0; i < nAB; i++)
-    coeff[i] = nekCoeff[i] ;
+  (*nek_setabbd_ptr)(nekCoeff, dt, &nAB, &nBDF);
+  for (int i = 0; i < nAB; i++) {
+    coeff[i] = nekCoeff[i];
+  }
 }
 
 void coeffAB(dfloat *coeff, dfloat *_dt, int order)
@@ -1152,12 +1222,19 @@ void coeffAB(dfloat *coeff, dfloat *_dt, int order)
   double nekCoeff[3];
   int one = 1;
   (*nek_setabbd_ptr)(nekCoeff, dt, &order, &one);
-  for(int i=0; i < order; i++)
-    coeff[i] = nekCoeff[i]; 
+  for (int i = 0; i < order; i++) {
+    coeff[i] = nekCoeff[i];
+  }
 }
 
-void recomputeGeometry() { (*nek_updggeom_ptr)(); }
+void recomputeGeometry()
+{
+  (*nek_updggeom_ptr)();
+}
 
-void printMeshMetrics() { (*nek_meshmetrics_ptr)(); }
+void printMeshMetrics()
+{
+  (*nek_meshmetrics_ptr)();
+}
 
 } // namespace nek

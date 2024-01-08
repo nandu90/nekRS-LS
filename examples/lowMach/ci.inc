@@ -48,7 +48,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
 dfloat computeLInfError(nrs_t *nrs, occa::memory o_a, occa::memory o_b)
 {
   auto *mesh = nrs->meshV;
-  auto o_tmp = platform->device.malloc(o_a.size());
+  auto o_tmp = platform->device.malloc(o_a.byte_size());
   platform->linAlg->axpbyzMany(mesh->Nlocal, nrs->NVfields, nrs->fieldOffset, 1.0, o_a, -1.0, o_b, o_tmp);
 
   dfloat LInfError = 0.0;
@@ -239,7 +239,7 @@ void ciTestDistance(nrs_t *nrs)
 
   if (maxRelErr > tol) {
     CIFAIL;
-    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 }
 

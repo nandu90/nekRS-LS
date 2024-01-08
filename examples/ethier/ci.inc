@@ -148,7 +148,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
     options.setArgs("SUBCYCLING STEPS", std::string("0"));
     std::string casename = platform->options.getArgs("CASENAME");
-    nrsCheck(casename != "mv_ethier",
+    nekrsCheck(casename != "mv_ethier",
              platform->comm.mpiComm,
              EXIT_FAILURE,
              "Unexpected input file for CI mode %d\n",
@@ -159,7 +159,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
     std::string casename = platform->options.getArgs("CASENAME");
-    nrsCheck(casename != "mv_ethier",
+    nekrsCheck(casename != "mv_ethier",
              platform->comm.mpiComm,
              EXIT_FAILURE,
              "Unexpected input file for CI mode %d\n",
@@ -205,7 +205,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("VELOCITY SOLVER", "NONE");
 
     std::string casename = platform->options.getArgs("CASENAME");
-    nrsCheck(casename != "ethierScalar",
+    nekrsCheck(casename != "ethierScalar",
              platform->comm.mpiComm,
              EXIT_FAILURE,
              "Unexpected input file for CI mode %d\n",
@@ -382,7 +382,7 @@ void ciTestParticles(nrs_t *nrs, lpm_t *particles, occa::kernel exactUVWPKernel,
       std::cout << "Unexpected number of particles" << std::endl;
     }
     CIFAIL;
-    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 
   auto relTol = 1e-7;
@@ -453,7 +453,7 @@ void ciTestParticles(nrs_t *nrs, lpm_t *particles, occa::kernel exactUVWPKernel,
       std::cout << "Particle integration error too large!\n";
     }
     CIFAIL;
-    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 }
 
@@ -590,7 +590,7 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   }
 
   // Test failed -- exit
-  nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+  nekrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 
   for (int n = 0; n < nRandomInterp; ++n) {
     o_UeRand[n].free();
@@ -727,7 +727,7 @@ void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
     CIFAIL;
   
   // Test failed -- exit
-  nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+  nekrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 }
 
 void ciTestSurfaceIntegral(nrs_t *nrs)
@@ -758,7 +758,7 @@ void ciTestSurfaceIntegral(nrs_t *nrs)
     }
   }
 
-  nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+  nekrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 }
 
 void ciTestDistance(nrs_t *nrs)
@@ -805,7 +805,7 @@ void ciTestDistance(nrs_t *nrs)
     CIFAIL;
   }
 
-  nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+  nekrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 }
 
 dfloat sum(dfloat const *const array, const int size, MPI_Comm comm)
@@ -944,7 +944,7 @@ void ciTestLinAlg(nrs_t *nrs, const int N)
     o_wt.free();
   }
 
-  nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+  nekrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 }
 
 void ciTestErrors(nrs_t *nrs,
@@ -977,7 +977,7 @@ void ciTestErrors(nrs_t *nrs,
       }
       CIFAIL;
 #if 0
-      nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+      nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 #endif
     }
   }
@@ -1219,7 +1219,7 @@ void ciTestErrors(nrs_t *nrs,
     correct &= (nrs->uSolver != nullptr || nrs->uvwSolver != nullptr);
     correct &= (nrs->cds->solver[0] == nullptr);
     correct &= (nrs->cds->solver[1] != nullptr);
-    nrsCheck(!correct,
+    nekrsCheck(!correct,
              platform->comm.mpiComm,
              EXIT_FAILURE,
              "Unexpected solver configuration for CI mode %d\n",
@@ -1231,12 +1231,12 @@ void ciTestErrors(nrs_t *nrs,
     correct &= (nrs->uSolver == nullptr && nrs->uvwSolver == nullptr);
     correct &= (nrs->cds->solver[0] == nullptr);
     correct &= (nrs->cds->solver[1] != nullptr);
-    nrsCheck(!correct,
+    nekrsCheck(!correct,
              platform->comm.mpiComm,
              EXIT_FAILURE,
              "Unexpected solver configuration for CI mode %d\n",
              ciMode);
-    nrsCheck(nrs->flow, platform->comm.mpiComm, EXIT_FAILURE, "nrs->flow == true for CI mode %d\n", ciMode);
+    nekrsCheck(nrs->flow, platform->comm.mpiComm, EXIT_FAILURE, "nrs->flow == true for CI mode %d\n", ciMode);
   }
 
   if (ciMode == 4) {
@@ -1252,7 +1252,7 @@ void ciTestErrors(nrs_t *nrs,
         fflush(stdout);
       }
       CIFAIL;
-      nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", ""); 
+      nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", ""); 
     }
 
     // check flop count
@@ -1270,7 +1270,7 @@ void ciTestErrors(nrs_t *nrs,
         fflush(stdout);
       }
       CIFAIL;
-      nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+      nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
   }
   if (ciMode == 8) {
@@ -1282,7 +1282,7 @@ void ciTestErrors(nrs_t *nrs,
     if (errSteps > 2) {
       CIFAIL;
     }
-    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 
   if (ciMode == 5 || ciMode == 6) {
@@ -1291,7 +1291,7 @@ void ciTestErrors(nrs_t *nrs,
         printf("Unable to test moving mesh in ethier. Please re-run the case with mv_ethier!\n");
       }
       (CIFAIL);
-      nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+      nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
   }
 

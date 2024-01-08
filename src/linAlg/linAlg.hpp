@@ -27,7 +27,7 @@ SOFTWARE.
 #ifndef LINALG_HPP
 #define LINALG_HPP
 
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 
 #define USE_WEIGHTED_INNER_PROD_MULTI_DEVICE 0
 
@@ -332,17 +332,12 @@ public:
                     const occa::memory &o_a,
                     occa::memory &o_b);
 
-  void magSqrVector(const dlong N,
-                    const dlong fieldOffset,
-                    const occa::memory &o_u,
-                    occa::memory &o_mag);
+  void magSqrVector(const dlong N, const dlong fieldOffset, const occa::memory &o_u, occa::memory &o_mag);
 
-  void magSqrSymTensor(const dlong N,
-                       const dlong fieldOffset,
-                       const occa::memory &o_tensor,
-                       occa::memory &o_mag);
+  void
+  magSqrSymTensor(const dlong N, const dlong fieldOffset, const occa::memory &o_tensor, occa::memory &o_mag);
 
-  // o_y[n] = x_{Nfields} * coeff_{Nfields} + \sum_{i=0}^{Nfields-1} coeff_i * x_i 
+  // o_y[n] = x_{Nfields} * coeff_{Nfields} + \sum_{i=0}^{Nfields-1} coeff_i * x_i
   void linearCombination(const dlong N,
                          const dlong Nfields,
                          const dlong fieldOffset,
@@ -357,7 +352,6 @@ public:
                           const occa::memory &o_u,
                           const occa::memory &o_uRef,
                           MPI_Comm comm);
-
 
   occa::kernel fillKernel;
   occa::kernel pfillKernel;

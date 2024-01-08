@@ -1,5 +1,5 @@
 #include <filesystem>
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "compileKernels.hpp"
 #include "udf.hpp"
 
@@ -20,8 +20,9 @@ occa::properties compileUDFKernels()
 
   MPI_Barrier(platform->comm.mpiComm);
   const double tStart = MPI_Wtime();
-  if (platform->comm.mpiRank == 0)
+  if (platform->comm.mpiRank == 0) {
     std::cout << "loading udf kernels ... " << std::endl;
+  }
 
   occa::properties kernelInfoBC = kernelInfo;
   const std::string bcDataFile = installDir + "/include/nrs/bdry/bcData.h";
@@ -45,20 +46,24 @@ occa::properties compileUDFKernels()
 
   udf.autoloadPlugins(kernelInfo);
 
-  // just to bail out early in case included source doesn't compile 
+  // just to bail out early in case included source doesn't compile
   {
-   const std::string dummyKernelName = "compileUDFKernelsTest";
-   const std::string dummyKernelStr = std::string("@kernel void compileUDFKernelsTest(int N) {"
-                                                  "  for (int i = 0; i < N; ++i; @tile(64, @outer, @inner)) {}" "}");
+    const std::string dummyKernelName = "compileUDFKernelsTest";
+    const std::string dummyKernelStr =
+        std::string("@kernel void compileUDFKernelsTest(int N) {"
+                    "  for (int i = 0; i < N; ++i; @tile(64, @outer, @inner)) {}"
+                    "}");
 
-  if (platform->comm.mpiRank == 0)
-     platform->device.occaDevice().buildKernelFromString(dummyKernelStr, dummyKernelName, kernelInfo);
+    if (platform->comm.mpiRank == 0) {
+      platform->device.occaDevice().buildKernelFromString(dummyKernelStr, dummyKernelName, kernelInfo);
+    }
   }
 
   MPI_Barrier(platform->comm.mpiComm);
   const double loadTime = MPI_Wtime() - tStart;
-  if (platform->comm.mpiRank == 0)
+  if (platform->comm.mpiRank == 0) {
     printf("done (%gs)\n", loadTime);
+  }
   fflush(stdout);
 
   return kernelInfoBC;

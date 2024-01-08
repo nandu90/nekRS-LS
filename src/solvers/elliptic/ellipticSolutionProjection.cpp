@@ -44,8 +44,9 @@ void SolutionProjection::matvec(occa::memory &o_Ax,
 void SolutionProjection::updateProjectionSpace()
 {
 
-  if (numVecsProjection <= 0)
+  if (numVecsProjection <= 0) {
     return;
+  }
 
   double flopCount = 0.0;
 
@@ -86,7 +87,7 @@ void SolutionProjection::updateProjectionSpace()
                               o_alpha,
                               one,
                               o_xx);
-  if (type == ProjectionType::CLASSIC)
+  if (type == ProjectionType::CLASSIC) {
     multiScaledAddwOffsetKernel(Nlocal,
                                 numVecsProjection,
                                 Nfields * (numVecsProjection - 1) * fieldOffset,
@@ -94,13 +95,15 @@ void SolutionProjection::updateProjectionSpace()
                                 o_alpha,
                                 one,
                                 o_bb);
+  }
 
   flopCount += 3 * static_cast<double>(Nlocal) * Nfields * (numVecsProjection - 1);
   flopCount *= (type == ProjectionType::CLASSIC) ? 2 : 1;
 
   dfloat sumAlpha = 0;
-  for (int k = 0; k < numVecsProjection - 1; ++k)
+  for (int k = 0; k < numVecsProjection - 1; ++k) {
     sumAlpha += alpha[k] * alpha[k];
+  }
 
   dfloat norm_new = norm_orig - sumAlpha;
   // printf("norm_new:%g norm_orig:%g sumAlpha:%g\n", norm_new, norm_orig, sumAlpha);
@@ -116,17 +119,17 @@ void SolutionProjection::updateProjectionSpace()
                                 scale,
                                 o_xx,
                                 fieldOffset * Nfields * (numVecsProjection - 1));
-    if (type == ProjectionType::CLASSIC)
+    if (type == ProjectionType::CLASSIC) {
       platform->linAlg->scaleMany(Nlocal,
                                   Nfields,
                                   fieldOffset,
                                   scale,
                                   o_bb,
                                   fieldOffset * Nfields * (numVecsProjection - 1));
+    }
     flopCount += static_cast<double>(Nlocal) * Nfields;
     flopCount *= (type == ProjectionType::CLASSIC) ? 2 : 1;
-  }
-  else {
+  } else {
     if (platform->comm.mpiRank == 0) {
       std::cout << "solutionProjection " << solverName
                 << ": Discard new solution as it is linearly dependent!\n";
@@ -145,8 +148,9 @@ void SolutionProjection::computePreProjection(occa::memory &o_r)
   dfloat one = 1.0;
   dfloat zero = 0.0;
   dfloat mone = -1.0;
-  if (numVecsProjection <= 0)
+  if (numVecsProjection <= 0) {
     return;
+  }
 
 #if USE_WEIGHTED_INNER_PROD_MULTI_DEVICE
   platform->linAlg->weightedInnerProdMulti(Nlocal,
@@ -182,8 +186,7 @@ void SolutionProjection::computePreProjection(occa::memory &o_r)
     platform->linAlg->axpbyMany(Nlocal, Nfields, fieldOffset, mone, o_rtmp, one, o_r);
 
     flopCount += Nfields * (1 + 2 * (numVecsProjection - 1)) * static_cast<double>(Nlocal); // accumulation
-  }
-  else if (type == ProjectionType::ACONJ) {
+  } else if (type == ProjectionType::ACONJ) {
     matvec(o_bb, 0, o_xbar, 0);
     platform->linAlg->axpbyMany(Nlocal, Nfields, fieldOffset, mone, o_bb, one, o_r);
   }
@@ -200,18 +203,14 @@ void SolutionProjection::computePostProjection(occa::memory &o_x)
     // reset bases
     numVecsProjection = 1;
     o_xx.copyFrom(o_x, Nfields * fieldOffset);
-  }
-  else if (numVecsProjection == maxNumVecsProjection) {
+  } else if (numVecsProjection == maxNumVecsProjection) {
     numVecsProjection = 1;
     platform->linAlg->axpbyMany(Nlocal, Nfields, fieldOffset, one, o_xbar, one, o_x);
     o_xx.copyFrom(o_x, Nfields * fieldOffset);
-  }
-  else {
+  } else {
     numVecsProjection++;
     // xx[m-1] = x
-    o_xx.copyFrom(o_x,
-                  fieldOffset *  Nfields,
-                  fieldOffset * Nfields * (numVecsProjection - 1), 0);
+    o_xx.copyFrom(o_x, fieldOffset * Nfields, fieldOffset * Nfields * (numVecsProjection - 1), 0);
     // x = x + xbar
     platform->linAlg->axpbyMany(Nlocal, Nfields, fieldOffset, one, o_xbar, one, o_x);
   }
@@ -247,16 +246,17 @@ SolutionProjection::SolutionProjection(elliptic_t &elliptic,
   o_alpha = platform->device.malloc<dfloat>(maxNumVecsProjection);
   o_xbar = platform->device.malloc<dfloat>(Nfields * fieldOffset);
 
-  nrsCheck(Nfields * maxNumVecsProjection * static_cast<size_t>(fieldOffset) > std::numeric_limits<int>::max(),
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s\n",
-           "Nfields * maxNumVecsProjection * fieldOffset exceeds int limit!");
+  nekrsCheck(Nfields * maxNumVecsProjection * static_cast<size_t>(fieldOffset) >
+                 std::numeric_limits<int>::max(),
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "Nfields * maxNumVecsProjection * fieldOffset exceeds int limit!");
 
   o_xx = platform->device.malloc<dfloat>(Nfields * maxNumVecsProjection * fieldOffset);
-  o_bb = platform->device.malloc<dfloat>((type == ProjectionType::CLASSIC) ? 
-                                        Nfields * fieldOffset * maxNumVecsProjection :
-                                        Nfields * fieldOffset);
+  o_bb = platform->device.malloc<dfloat>((type == ProjectionType::CLASSIC)
+                                             ? Nfields * fieldOffset * maxNumVecsProjection
+                                             : Nfields * fieldOffset);
 
   const std::string sectionIdentifier = std::to_string(Nfields) + "-";
 
@@ -275,11 +275,13 @@ SolutionProjection::SolutionProjection(elliptic_t &elliptic,
 void SolutionProjection::pre(occa::memory &o_r)
 {
   ++timestep;
-  if (timestep < numTimeSteps)
+  if (timestep < numTimeSteps) {
     return;
+  }
 
-  if (numVecsProjection <= 0)
+  if (numVecsProjection <= 0) {
     return;
+  }
 
   prevNumVecsProjection = numVecsProjection;
   computePreProjection(o_r);
@@ -287,7 +289,8 @@ void SolutionProjection::pre(occa::memory &o_r)
 
 void SolutionProjection::post(occa::memory &o_x)
 {
-  if (timestep < numTimeSteps)
+  if (timestep < numTimeSteps) {
     return;
+  }
   computePostProjection(o_x);
 }

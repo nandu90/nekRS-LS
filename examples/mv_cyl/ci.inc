@@ -40,7 +40,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("MESH SOLVER TOLERANCE", "1e-6");
   }
   if (ciMode == 4) {
-    nrsAbort(comm, EXIT_FAILURE, "%s\n", "ciMode=4 not defined");
+    nekrsAbort(comm, EXIT_FAILURE, "%s\n", "ciMode=4 not defined");
   }
   if (ciMode == 5) {
     platform->par->set("casedata", "p_rot", 0.5);

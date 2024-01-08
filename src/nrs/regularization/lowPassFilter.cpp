@@ -88,11 +88,11 @@ void filterVandermonde1D(int N, int Np, double *r, double *V)
 
 occa::memory lowPassFilter(mesh_t *mesh, const dlong filterNc)
 {
-  nrsCheck(filterNc < 1,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "filterNc must be at least 1, but is set to %d\n",
-           filterNc);
+  nekrsCheck(filterNc < 1,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "filterNc must be at least 1, but is set to %d\n",
+             filterNc);
 
   // Construct Filter Function
   int Nmodes = mesh->N + 1; // N+1, 1D GLL points
@@ -105,8 +105,10 @@ occa::memory lowPassFilter(mesh_t *mesh, const dlong filterNc)
 
   // Construct Vandermonde Matrix
   {
-    auto r = (double*) malloc(mesh->Np * sizeof(double));
-    for(int i = 0; i < mesh->Np; i++) r[i] = mesh->r[i];
+    auto r = (double *)malloc(mesh->Np * sizeof(double));
+    for (int i = 0; i < mesh->Np; i++) {
+      r[i] = mesh->r[i];
+    }
     filterVandermonde1D(mesh->N, Nmodes, r, V);
     free(r);
   }
@@ -127,10 +129,10 @@ occa::memory lowPassFilter(mesh_t *mesh, const dlong filterNc)
   }
 
   dgetrf_(&N, &N, (double *)iV, &N, IPIV, &INFO);
-  nrsCheck(INFO, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "dgetrf failed");
+  nekrsCheck(INFO, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "dgetrf failed");
 
   dgetri_(&N, (double *)iV, &N, IPIV, (double *)WORK, &LWORK, &INFO);
-  nrsCheck(INFO, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "dgetri failed");
+  nekrsCheck(INFO, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "dgetri failed");
 
   // V*A*V^-1 in row major
   char TRANSA = 'T';
@@ -156,7 +158,7 @@ occa::memory lowPassFilter(mesh_t *mesh, const dlong filterNc)
   auto o_A = platform->device.malloc<dfloat>(Nmodes * Nmodes);
   {
     auto tmp = (dfloat *)calloc(Nmodes * Nmodes, sizeof(dfloat));
-    for(int i = 0; i < Nmodes * Nmodes; i++) {
+    for (int i = 0; i < Nmodes * Nmodes; i++) {
       tmp[i] = A[i];
     }
     o_A.copyFrom(tmp, o_A.length());

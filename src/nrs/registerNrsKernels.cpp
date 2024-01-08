@@ -40,8 +40,9 @@ void registerNrsKernels(occa::properties kernelInfoBC)
   platform->options.getArgs("BDF ORDER", nBDF);
   platform->options.getArgs("EXT ORDER", nEXT);
 
-  if (Nsubsteps)
+  if (Nsubsteps) {
     nEXT = nBDF;
+  }
 
   {
     kernelName = "nStagesSumMany";
@@ -64,9 +65,12 @@ void registerNrsKernels(occa::properties kernelInfoBC)
       int N;
       platform->options.getArgs("POLYNOMIAL DEGREE", N);
       const int Nq = N + 1;
-      nrsCheck(BLOCKSIZE < Nq * Nq, platform->comm.mpiComm, EXIT_FAILURE,
-               "computeFaceCentroid kernel requires BLOCKSIZE >= Nq * Nq\nBLOCKSIZE = %d, Nq*Nq = %d\n",
-               BLOCKSIZE, Nq * Nq);
+      nekrsCheck(BLOCKSIZE < Nq * Nq,
+                 platform->comm.mpiComm,
+                 EXIT_FAILURE,
+                 "computeFaceCentroid kernel requires BLOCKSIZE >= Nq * Nq\nBLOCKSIZE = %d, Nq*Nq = %d\n",
+                 BLOCKSIZE,
+                 Nq * Nq);
     }
     kernelName = "computeFaceCentroid";
     fileName = oklpath + "/nrs/" + kernelName + ".okl";
@@ -113,10 +117,11 @@ void registerNrsKernels(occa::properties kernelInfoBC)
       prop["defines/p_nEXT"] = nEXT;
       prop["defines/p_nBDF"] = nBDF;
       prop["defines/p_MovingMesh"] = movingMesh;
-      if (Nsubsteps)
+      if (Nsubsteps) {
         prop["defines/p_SUBCYCLING"] = 1;
-      else
+      } else {
         prop["defines/p_SUBCYCLING"] = 0;
+      }
 
       kernelName = "sumMakef";
       fileName = oklpath + "/nrs/" + kernelName + ".okl";
@@ -218,16 +223,17 @@ void registerNrsKernels(occa::properties kernelInfoBC)
       platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
 
       if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE") && Nsubsteps) {
-        auto subCycleKernel = benchmarkAdvsub(3,
-                                              NelemBenchmark,
-                                              Nq,
-                                              cubNq,
-                                              nEXT,
-                                              true,
-                                              false,
-                                              verbosity,
-                                              targetTimeBenchmark,
-                                              platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
+        auto subCycleKernel =
+            benchmarkAdvsub(3,
+                            NelemBenchmark,
+                            Nq,
+                            cubNq,
+                            nEXT,
+                            true,
+                            false,
+                            verbosity,
+                            targetTimeBenchmark,
+                            platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
 
         kernelName = "subCycleStrongCubatureVolume" + suffix;
         platform->kernels.add(section + kernelName, subCycleKernel);
@@ -270,9 +276,12 @@ void registerNrsKernels(occa::properties kernelInfoBC)
       int N;
       platform->options.getArgs("POLYNOMIAL DEGREE", N);
       const int Nq = N + 1;
-      nrsCheck(BLOCKSIZE < Nq * Nq, platform->comm.mpiComm, EXIT_FAILURE,
-               "CFL kernel requires BLOCKSIZE >= Nq * Nq\nBLOCKSIZE = %d, Nq*Nq = %d\n",
-               BLOCKSIZE, Nq * Nq);
+      nekrsCheck(BLOCKSIZE < Nq * Nq,
+                 platform->comm.mpiComm,
+                 EXIT_FAILURE,
+                 "CFL kernel requires BLOCKSIZE >= Nq * Nq\nBLOCKSIZE = %d, Nq*Nq = %d\n",
+                 BLOCKSIZE,
+                 Nq * Nq);
     }
 
     occa::properties cflProps = meshProps;
@@ -291,5 +300,48 @@ void registerNrsKernels(occa::properties kernelInfoBC)
     kernelName = "setEllipticCoeffPressure";
     fileName = oklpath + "/nrs/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, kernelInfo);
+  }
+
+  registerPostProcessingKernels();
+
+  int Nscalars;
+  platform->options.getArgs("NUMBER OF SCALARS", Nscalars);
+
+  if (Nscalars) {
+    registerCdsKernels(kernelInfoBC);
+    for (int is = 0; is < Nscalars; is++) {
+      std::string sid = scalarDigitStr(is);
+      const std::string section = "scalar" + sid;
+      const int poisson = 0;
+
+      if (!platform->options.compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
+        registerEllipticKernels(section, poisson);
+        registerEllipticPreconditionerKernels(section, poisson);
+      }
+    }
+  }
+
+  // scalar section is omitted as pressure section kernels are the same.
+  const std::vector<std::pair<std::string, int>> sections = {
+      {"pressure", 1},
+      {"velocity", 0},
+      {"mesh", 1},
+  };
+
+  std::string section;
+  int poissonEquation;
+  for (auto &&entry : sections) {
+    if ((entry.first == "velocity" || entry.first == "pressure") &&
+        platform->options.compareArgs("VELOCITY SOLVER", "NONE")) {
+      continue;
+    }
+
+    if (entry.first == "mesh" && platform->options.compareArgs("MESH SOLVER", "NONE")) {
+      continue;
+    }
+
+    std::tie(section, poissonEquation) = entry;
+    registerEllipticKernels(section, poissonEquation);
+    registerEllipticPreconditionerKernels(section, poissonEquation);
   }
 }

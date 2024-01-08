@@ -1,7 +1,7 @@
 #if !defined(nekrs_nekrs_hpp_)
 #define nekrs_nekrs_hpp_
 
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "mesh3D.h"
 #include "elliptic.h"
 #include "cds.hpp"
@@ -12,10 +12,6 @@
 #include "cvode.hpp"
 #include "fldFile.hpp"
 #include "randomVector.hpp"
-
-void nrsSetup(MPI_Comm comm, setupAide &options, nrs_t *nrs);
-
-std::vector<std::string> fieldsToSolve(setupAide &options);
 
 struct nrs_t {
 
@@ -39,6 +35,8 @@ struct nrs_t {
   cvode_t *cvode = nullptr;
 
   oogs_t *gsh = nullptr;
+  oogs_t *qqt = nullptr;
+
   oogs_t *gshMesh = nullptr;
 
   dlong ellipticWrkOffset;
@@ -183,14 +181,49 @@ struct nrs_t {
   occa::kernel initializeZeroNormalMaskKernel;
 
   occa::kernel applyZeroNormalMaskKernel;
+
+  nrs_t(MPI_Comm comm, bool ms, setupAide &options);
+
+  void finalize();
+
+  void evaluateProperties(const double timeNew);
+
+  int numberActiveFields();
+
+  dfloat viscousDrag(int nbID, const occa::memory &o_bID, occa::memory &o_Sij);
+
+  //       ( SO0          )         (     SO8  SO7)
+  // Sij = ( SO3  SO1     )  Oij =  (          SO6)
+  //       ( SO5  SO4  SO2)         (             )
+  void strainRotationRate(bool smooth, bool rotationRate, const occa::memory &o_U, occa::memory &o_SO);
+
+  void strainRate(bool smooth, const occa::memory &o_U, occa::memory &o_S);
+
+  void Qcriterion(const occa::memory &o_U, occa::memory &o_Q);
 };
 
-int nrsFinalize(nrs_t *nrs);
+static std::vector<std::string> nrsFieldsToSolve(setupAide &options)
+{
+  int Nscalar = 0;
+  options.getArgs("NUMBER OF SCALARS", Nscalar);
 
-void evaluateProperties(nrs_t *nrs, const double timeNew);
+  std::vector<std::string> fields;
 
-void compileKernels();
+  if (!options.compareArgs("MESH SOLVER", "NONE")) {
+    fields.push_back("mesh");
+  }
 
-int numberActiveFields(nrs_t *nrs);
+  if (!options.compareArgs("VELOCITY SOLVER", "NONE")) {
+    fields.push_back("velocity");
+  }
+
+  for (int i = 0; i < Nscalar; i++) {
+    const auto sid = scalarDigitStr(i);
+    if (!options.compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
+      fields.push_back("scalar" + sid);
+    }
+  }
+  return fields;
+}
 
 #endif

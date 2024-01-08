@@ -5,10 +5,9 @@
      Statistics can be obtained from runtime averages:
 
      <X>    := AVG(X)
-     <X'Y') := AVG(X*Y) - AVG(X)*AVG(Y)
+     <X'Y'> := AVG(X*Y) - AVG(X)*AVG(Y)
 */
 
-#include "nrs.hpp"
 #include "nekInterfaceAdapter.hpp"
 
 #include <vector>
@@ -19,8 +18,7 @@ typedef std::vector< std::vector<occa::memory> > fields;
 
 void buildKernel(occa::properties kernelInfo);
 void run(double time);
-void setup(nrs_t *nrs_, const fields& fields);
-void setup(nrs_t* nrs_);
+void setup(dlong fieldOffset, const fields& fields);
 void outfld();
 void outfld(int outXYZ, int FP64);
 void reset();

@@ -3,14 +3,15 @@
 
 #include <vector>
 #include <memory>
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "findpts.hpp"
 
 class nrs_t;
 
 using findpts::TimerLevel;
 
-class pointInterpolation_t {
+class pointInterpolation_t
+{
 public:
   enum class VerbosityLevel { None, Basic, Detailed };
   pointInterpolation_t(nrs_t *nrs_,
@@ -33,21 +34,34 @@ public:
   // Finds the process, element, and reference coordinates of the given points
   void find(VerbosityLevel verbosity = VerbosityLevel::Basic, bool matchSession = false);
 
-  void
-  eval(dlong nFields, dlong inputFieldOffset, const occa::memory& o_in, dlong outputFieldOffset, occa::memory& o_out);
+  void eval(dlong nFields,
+            dlong inputFieldOffset,
+            const occa::memory &o_in,
+            dlong outputFieldOffset,
+            occa::memory &o_out);
 
   void eval(dlong nFields, dlong inputFieldOffset, dfloat *in, dlong outputFieldOffset, dfloat *out);
 
-  auto *ptr() { return findpts_.get(); }
-  auto &data() {return data_;}
+  auto *ptr()
+  {
+    return findpts_.get();
+  }
 
-  int numPoints() const { return nPoints; }
+  auto &data()
+  {
+    return data_;
+  }
+
+  int numPoints() const
+  {
+    return nPoints;
+  }
 
   // calls underlying findpts_t::update
   void o_update();
 
   // add points on device
-  void setPoints(int n, const occa::memory& o_x, const occa::memory& o_y, const occa::memory& o_z);
+  void setPoints(int n, const occa::memory &o_x, const occa::memory &o_y, const occa::memory &o_z);
   void setPoints(int n,
                  const occa::memory &o_x,
                  const occa::memory &o_y,
@@ -90,9 +104,9 @@ private:
 
   int nPoints;
 
-  dfloat * _x;
-  dfloat * _y;
-  dfloat * _z;
+  dfloat *_x;
+  dfloat *_y;
+  dfloat *_z;
   dlong *_session;
 
   occa::memory _o_x;

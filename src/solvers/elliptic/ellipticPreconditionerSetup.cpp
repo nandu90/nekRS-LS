@@ -28,49 +28,63 @@
 #include "ellipticPrecon.h"
 #include "platform.hpp"
 
-void ellipticPreconditionerSetup(elliptic_t* elliptic, ogs_t* ogs)
+void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs)
 {
   elliptic->precon = new precon_t();
   precon_t *precon = elliptic->precon;
   const auto pre = platform->device.occaDevice().memoryAllocated();
-  
-  mesh_t* mesh = elliptic->mesh;
-  setupAide& options = elliptic->options;
+
+  mesh_t *mesh = elliptic->mesh;
+  setupAide &options = elliptic->options;
 
   MPI_Barrier(platform->comm.mpiComm);
   const double tStart = MPI_Wtime();
 
-  if(options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
+  if (options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
     const std::vector<int> levels = determineMGLevels(elliptic->name);
     elliptic->nLevels = levels.size();
     elliptic->levels = (int *)calloc(elliptic->nLevels, sizeof(int));
-    for (int i = 0; i < elliptic->nLevels; ++i)
-       elliptic->levels[i] = levels.at(i);
+    for (int i = 0; i < elliptic->nLevels; ++i) {
+      elliptic->levels[i] = levels.at(i);
+    }
 
     ellipticMultiGridSetup(elliptic, precon);
-  } else if(options.compareArgs("PRECONDITIONER", "SEMFEM")) {
-    if(platform->comm.mpiRank == 0) printf("building SEMFEM preconditioner ...\n"); fflush(stdout);
+  } else if (options.compareArgs("PRECONDITIONER", "SEMFEM")) {
+    if (platform->comm.mpiRank == 0) {
+      printf("building SEMFEM preconditioner ...\n");
+    }
+    fflush(stdout);
     precon->SEMFEMSolver = new SEMFEMSolver_t(elliptic);
-  } else if(options.compareArgs("PRECONDITIONER", "JACOBI")) {
-    if(platform->comm.mpiRank == 0) printf("building Jacobi preconditioner ... "); fflush(stdout);
+  } else if (options.compareArgs("PRECONDITIONER", "JACOBI")) {
+    if (platform->comm.mpiRank == 0) {
+      printf("building Jacobi preconditioner ... ");
+    }
+    fflush(stdout);
     precon->o_invDiagA = platform->device.malloc<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
     ellipticUpdateJacobi(elliptic, precon->o_invDiagA);
-  } else if(options.compareArgs("PRECONDITIONER", "NONE")) {
-    // nothing 
+  } else if (options.compareArgs("PRECONDITIONER", "NONE")) {
+    // nothing
   } else {
-    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Unknown preconditioner!");
+    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Unknown preconditioner!");
   }
 
   precon->preconBytes = platform->device.occaDevice().memoryAllocated() - pre;
 
   MPI_Barrier(platform->comm.mpiComm);
-  if(platform->comm.mpiRank == 0)  printf("done (%gs)\n", MPI_Wtime() - tStart); fflush(stdout);
+  if (platform->comm.mpiRank == 0) {
+    printf("done (%gs)\n", MPI_Wtime() - tStart);
+  }
+  fflush(stdout);
 }
 
 precon_t::~precon_t()
 {
-  if(SEMFEMSolver) delete SEMFEMSolver;
-  if(MGSolver) delete MGSolver;
+  if (SEMFEMSolver) {
+    delete SEMFEMSolver;
+  }
+  if (MGSolver) {
+    delete MGSolver;
+  }
   o_diagA.free();
   o_invDiagA.free();
 }

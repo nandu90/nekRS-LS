@@ -1,6 +1,6 @@
 #if !defined(alignment_hpp_)
 #define alignment_hpp_
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include <array>
 #include <vector>
 enum class boundaryAlignment_t { X, Y, Z, UNALIGNED };

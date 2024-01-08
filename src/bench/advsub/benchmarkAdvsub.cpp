@@ -10,7 +10,8 @@
 #include "omp.h"
 #endif
 
-namespace {
+namespace
+{
 
 // for a given Nq, return the largest cubNq
 const std::map<int, int> maximumCubaturePoints = {
@@ -28,6 +29,7 @@ const std::map<int, int> maximumCubaturePoints = {
     {13, 20},
     {14, 21},
 };
+
 struct CallParameters {
   int Nfields;
   int Nelements;
@@ -39,7 +41,8 @@ struct CallParameters {
 };
 } // namespace
 
-namespace std {
+namespace std
+{
 template <> struct less<CallParameters> {
   bool operator()(const CallParameters &lhs, const CallParameters &rhs) const
   {
@@ -51,7 +54,8 @@ template <> struct less<CallParameters> {
 };
 } // namespace std
 
-namespace {
+namespace
+{
 std::map<CallParameters, occa::kernel> cachedResults;
 }
 
@@ -85,13 +89,15 @@ occa::kernel benchmarkAdvsub(int Nfields,
     return cachedResults.at(params);
   }
 
-  nrsCheck(Nq > 14, platform->comm.mpiComm, EXIT_FAILURE, 
-           "%s\n", "Nq > 14 is unsupported");
+  nekrsCheck(Nq > 14, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Nq > 14 is unsupported");
 
   const auto largestCubNq = maximumCubaturePoints.at(Nq);
 
-  nrsCheck(cubNq > largestCubNq, platform->comm.mpiComm, EXIT_FAILURE, 
-           "cubNq > %d is unsupported\n", largestCubNq); 
+  nekrsCheck(cubNq > largestCubNq,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "cubNq > %d is unsupported\n",
+             largestCubNq);
 
   if (!dealias || cubNq < Nq) {
     cubNq = Nq;
@@ -103,11 +109,13 @@ occa::kernel benchmarkAdvsub(int Nfields,
   const int cubNp = cubNq * cubNq * cubNq;
   int fieldOffset = Np * Nelements;
   const int pageW = ALIGN_SIZE / sizeof(dfloat);
-  if (fieldOffset % pageW)
+  if (fieldOffset % pageW) {
     fieldOffset = (fieldOffset / pageW + 1) * pageW;
+  }
   int cubatureOffset = std::max(fieldOffset, Nelements * cubNp);
-  if (cubatureOffset % pageW)
+  if (cubatureOffset % pageW) {
     cubatureOffset = (cubatureOffset / pageW + 1) * pageW;
+  }
 
   occa::properties props = platform->kernelInfo + meshKernelProperties(N);
   props["defines"].asObject();
@@ -128,8 +136,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
 
   std::string diffDataFile = oklpath + "/mesh/constantDifferentiationMatrices.h";
   std::string interpDataFile = oklpath + "/mesh/constantInterpolationMatrices.h";
-  std::string diffInterpDataFile =
-      oklpath + "/mesh/constantDifferentiationInterpolationMatrices.h";
+  std::string diffInterpDataFile = oklpath + "/mesh/constantDifferentiationInterpolationMatrices.h";
 
   props["includes"] += diffDataFile.c_str();
   props["includes"] += interpDataFile.c_str();
@@ -144,51 +151,52 @@ occa::kernel benchmarkAdvsub(int Nfields,
   std::string kernelName;
   if (dealias) {
     kernelName = "subCycleStrongCubatureVolumeHex3D";
-  }
-  else {
+  } else {
     kernelName = "subCycleStrongVolumeHex3D";
   }
 
   if (platform->device.mode() == "dpcpp") {
-    props["simd_length"] = 16; 
+    props["simd_length"] = 16;
   }
 
   const std::string ext = (platform->device.mode() == "Serial") ? ".c" : ".okl";
   fileName = oklpath + "/nrs/" + kernelName + ext;
 
   if (isScalar) {
-    fileName = oklpath + "/cds/" + kernelName + ext;
+    fileName = oklpath + "/nrs/cds/" + kernelName + ext;
   }
 
   if (!dealias) {
     fileName = oklpath + "/nrs/" + kernelName + ".okl";
     if (isScalar) {
-      fileName = oklpath + "/cds/" + kernelName + ".okl";
+      fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
     }
   }
 
   std::vector<int> kernelVariants = {0};
   if (!platform->serial && dealias) {
     if (!isScalar) {
- 
-     std::vector<int> kernelSearchSpace = { 6, 7, 8, 9, 16 };
+
+      std::vector<int> kernelSearchSpace = {6, 7, 8, 9, 16};
       for (auto i : kernelSearchSpace) {
         // v12 requires cubNq <=13
-        if (i == 11 && cubNq > 13)
+        if (i == 11 && cubNq > 13) {
           continue;
- 
+        }
+
         // v14 requires cubNq <=12
-        if (i == 14 && cubNq > 12)
+        if (i == 14 && cubNq > 12) {
           continue;
- 
+        }
+
         // v14 requires cubNq <=12
-        if (i == 16 && cubNq > 14)
+        if (i == 16 && cubNq > 14) {
           continue;
- 
+        }
+
         kernelVariants.push_back(i);
       }
-    }
-    else {
+    } else {
       kernelVariants.push_back(8);
     }
   }
@@ -251,8 +259,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
                        o_conv,
                        o_Ud,
                        o_NU);
-    }
-    else {
+    } else {
       subcyclingKernel(Nelements,
                        o_elementList,
                        o_cubD,
@@ -276,8 +283,9 @@ occa::kernel benchmarkAdvsub(int Nfields,
     newProps["defines/p_knl"] = kernelVariant;
 
     auto kernel = platform->device.buildKernel(fileName, newProps, true);
-    if (platform->options.compareArgs("BUILD ONLY", "TRUE"))
+    if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
       return kernel;
+    }
 
     // perform correctness check
     std::vector<dfloat> referenceResults(NU.size());
@@ -292,8 +300,8 @@ occa::kernel benchmarkAdvsub(int Nfields,
     const auto err = maxRelErr<dfloat>(referenceResults, results, platform->comm.mpiComm);
     if (err > 500 * std::numeric_limits<dfloat>::epsilon()) {
       if (platform->comm.mpiRank == 0 && verbosity > 1) {
-        std::cout << "advSub: Ignore version " << kernelVariant 
-                  << " as correctness check failed with " << err << std::endl;
+        std::cout << "advSub: Ignore version " << kernelVariant << " as correctness check failed with " << err
+                  << std::endl;
       }
 
       // pass un-initialized kernel to skip this kernel variant
@@ -324,8 +332,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
       flopCount += 6. * cubNp * cubNq * Nfields; // apply Dcub
       flopCount += 3. * Np * Nfields;            // compute NU
       flopCount += 4. * Nq * (cubNp + cubNq * cubNq * Nq + cubNq * Nq * Nq) * Nfields; // interpolation
-    }
-    else {
+    } else {
       flopCount = Nq * Nq * Nq * (6. * Nq + 6. * nEXT + 8.) * Nfields;
     }
     const double gflops = (flopCount * Nelements / elapsed) / 1.e9;

@@ -164,6 +164,7 @@ void applyDirichletVelocity(nrs_t *nrs, double time, occa::memory& o_U,occa::mem
 void applyDirichletScalars(nrs_t *nrs, double time, occa::memory& o_S, occa::memory& o_Se)
 {
   cds_t *cds = nrs->cds;
+
   const auto neknekFieldOffset = cds->neknek ? cds->neknek->fieldOffset() : 0;
   for (int is = 0; is < cds->NSfields; is++) {
     if (!cds->compute[is])

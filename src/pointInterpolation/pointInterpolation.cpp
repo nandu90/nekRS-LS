@@ -47,19 +47,19 @@ pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_,
   // communicator is implicitly required to be either platform->comm.mpiComm or platform->comm.mpiCommParent
   // due to other communicator synchronous calls, such as platform->timer.tic
   bool supported = false;
-  for(auto && supportedCommunicator : {platform->comm.mpiComm, platform->comm.mpiCommParent}){
+  for (auto &&supportedCommunicator : {platform->comm.mpiComm, platform->comm.mpiCommParent}) {
     int same = 0;
     MPI_Comm_compare(comm, supportedCommunicator, &same);
     supported |= (same != MPI_UNEQUAL);
   }
-  nrsCheck(!supported,
-    comm,
-    EXIT_FAILURE,
-    "%s",
-    "Communicator must be either platform->comm.mpiComm or platform->comm.mpiCommParent");
+  nekrsCheck(!supported,
+             comm,
+             EXIT_FAILURE,
+             "%s",
+             "Communicator must be either platform->comm.mpiComm or platform->comm.mpiCommParent");
 
-  newton_tol = (sizeof(dfloat) == sizeof(double)) 
-               ? std::max(5e-13, newton_tol_) : std::max(1e-6, newton_tol_);
+  newton_tol =
+      (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(1e-6, newton_tol_);
 
   const int npt_max = 1;
 
@@ -111,11 +111,11 @@ pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_,
 
 occa::memory pointInterpolation_t::distance()
 {
-  nrsCheck(!multipleSessionSupport,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s\n",
-           "distance requires multipleSessionSupport to be enabled in the pointInterpolation_t object!");
+  nekrsCheck(!multipleSessionSupport,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "distance requires multipleSessionSupport to be enabled in the pointInterpolation_t object!");
   return _o_distance;
 }
 
@@ -127,8 +127,7 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
 
   int iErr = 0;
   iErr += !pointsAdded;
-  nrsCheck(iErr, platform->comm.mpiComm, EXIT_FAILURE, 
-           "%s\n", "find called without any points added!");
+  nekrsCheck(iErr, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "find called without any points added!");
 
   const auto n = nPoints;
   const dlong sessionIDMatch = matchSession;
@@ -164,8 +163,7 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
                       << h_y[in] << ", " << h_z[in] << ", " << data_.dist2_base[in] << std::endl;
           }
         }
-      }
-      else if (data_.code_base[in] == findpts::CODE_NOT_FOUND) {
+      } else if (data_.code_base[in] == findpts::CODE_NOT_FOUND) {
         nOutside += 1;
         if (nOutside < 5 && verbosity == VerbosityLevel::Detailed) {
           std::cout << " WARNING: point not within mesh xy[z]: " << h_x[in] << "," << h_y[in] << ", "
@@ -190,37 +188,40 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
 
 void pointInterpolation_t::eval(dlong nFields,
                                 dlong inputFieldOffset,
-                                const occa::memory& o_in,
+                                const occa::memory &o_in,
                                 dlong outputFieldOffset,
-                                occa::memory& o_out)
+                                occa::memory &o_out)
 {
-  nrsCheck(!findCalled, platform->comm.mpiComm, EXIT_FAILURE, 
-           "%s\n", "find has not been called prior to eval!");
- 
+  nekrsCheck(!findCalled,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "find has not been called prior to eval!");
+
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic("pointInterpolation_t::eval", 1);
   }
-  
-  nrsCheck(nrs->fieldOffset > inputFieldOffset,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "pointInterpolation_t::eval inputFieldOffset (%d) is less than nrs->fieldOffset (%d)\n",
-           inputFieldOffset,
-           nrs->fieldOffset);
-  
-  nrsCheck(o_in.size() < nFields * inputFieldOffset * sizeof(dfloat),
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "pointInterpolation_t::eval input size (%" PRId64 ") is smaller than expected (%ld)\n",
-           o_in.size(),
-           nFields * inputFieldOffset * sizeof(dfloat));
-  
-  nrsCheck(o_out.size() < nFields * outputFieldOffset * sizeof(dfloat),
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "pointInterpolation_t::eval output size (%" PRId64 ") is smaller than expected (%ld)\n",
-           o_out.size(),
-           nFields * outputFieldOffset * sizeof(dfloat));
+
+  nekrsCheck(nrs->fieldOffset > inputFieldOffset,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "pointInterpolation_t::eval inputFieldOffset (%d) is less than nrs->fieldOffset (%d)\n",
+             inputFieldOffset,
+             nrs->fieldOffset);
+
+  nekrsCheck(o_in.byte_size() < nFields * inputFieldOffset * sizeof(dfloat),
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "pointInterpolation_t::eval input size (%" PRId64 ") is smaller than expected (%ld)\n",
+             o_in.byte_size(),
+             nFields * inputFieldOffset * sizeof(dfloat));
+
+  nekrsCheck(o_out.byte_size() < nFields * outputFieldOffset * sizeof(dfloat),
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "pointInterpolation_t::eval output size (%" PRId64 ") is smaller than expected (%ld)\n",
+             o_out.byte_size(),
+             nFields * outputFieldOffset * sizeof(dfloat));
 
   findpts_->eval(nPoints, nFields, inputFieldOffset, outputFieldOffset, o_in, &data_, o_out);
 
@@ -235,19 +236,22 @@ void pointInterpolation_t::eval(dlong nFields,
                                 dlong outputFieldOffset,
                                 dfloat *out)
 {
-  nrsCheck(!findCalled, platform->comm.mpiComm, EXIT_FAILURE, 
-           "%s\n", "find has not been called prior to eval!");
+  nekrsCheck(!findCalled,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "find has not been called prior to eval!");
 
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic("pointInterpolation_t::eval", 1);
   }
 
-  nrsCheck(nrs->fieldOffset > inputFieldOffset,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "pointInterpolation_t::eval inputFieldOffset (%d) is less than nrs->fieldOffset (%d)\n",
-           inputFieldOffset,
-           nrs->fieldOffset);
+  nekrsCheck(nrs->fieldOffset > inputFieldOffset,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "pointInterpolation_t::eval inputFieldOffset (%d) is less than nrs->fieldOffset (%d)\n",
+             inputFieldOffset,
+             nrs->fieldOffset);
 
   findpts_->eval(nPoints, nFields, inputFieldOffset, outputFieldOffset, in, &data_, out);
 
@@ -268,7 +272,7 @@ void pointInterpolation_t::setPoints(int n, dfloat *x, dfloat *y, dfloat *z, dlo
   useHostPoints = true;
   useDevicePoints = false;
 
-  if(n > nPoints){
+  if (n > nPoints) {
     data_ = findpts::data_t(n);
   }
 
@@ -280,7 +284,10 @@ void pointInterpolation_t::setPoints(int n, dfloat *x, dfloat *y, dfloat *z, dlo
   _session = session;
 }
 
-void pointInterpolation_t::setPoints(int n, const occa::memory& o_x, const occa::memory& o_y, const occa::memory& o_z)
+void pointInterpolation_t::setPoints(int n,
+                                     const occa::memory &o_x,
+                                     const occa::memory &o_y,
+                                     const occa::memory &o_z)
 {
   occa::memory o_null;
   this->setPoints(n, o_x, o_y, o_z, o_null);
@@ -301,7 +308,7 @@ void pointInterpolation_t::setPoints(int n,
     data_ = findpts::data_t(n);
   }
 
-  if(n > 0) {
+  if (n > 0) {
     _o_x = o_x;
     _o_y = o_y;
     _o_z = o_z;
@@ -321,7 +328,10 @@ void pointInterpolation_t::setTimerLevel(TimerLevel level)
   findpts_->setTimerLevel(level);
 }
 
-TimerLevel pointInterpolation_t::getTimerLevel() const { return timerLevel; }
+TimerLevel pointInterpolation_t::getTimerLevel() const
+{
+  return timerLevel;
+}
 
 void pointInterpolation_t::setTimerName(std::string name)
 {
@@ -329,8 +339,8 @@ void pointInterpolation_t::setTimerName(std::string name)
   findpts_->setTimerName(name);
 }
 
-void pointInterpolation_t::o_update() 
+void pointInterpolation_t::o_update()
 {
   findCalled = true;
-  findpts_->o_update(data_); 
+  findpts_->o_update(data_);
 }

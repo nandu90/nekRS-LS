@@ -92,7 +92,7 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, int tstep)
     }
 
     CIFAIL;
-    nrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+    nekrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 }
 

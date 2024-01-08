@@ -26,15 +26,21 @@ SOFTWARE.
 
 #include "MGSolver.hpp"
 
-MGSolver_t::multigridLevel::multigridLevel(dlong N, dlong M, MPI_Comm comm_):
-  Nrows(N), Ncols(M) 
+MGSolver_t::multigridLevel::multigridLevel(dlong N, dlong M, MPI_Comm comm_) : Nrows(N), Ncols(M)
 {
   comm = comm_;
 }
 
-MGSolver_t::multigridLevel::~multigridLevel() {
+MGSolver_t::multigridLevel::~multigridLevel()
+{
 
-  if (o_x.size()) o_x.free();
-  if (o_rhs.size()) o_rhs.free();
-  if (o_res.size()) o_res.free();
+  if (o_x.byte_size()) {
+    o_x.free();
+  }
+  if (o_rhs.byte_size()) {
+    o_rhs.free();
+  }
+  if (o_res.byte_size()) {
+    o_res.free();
+  }
 }

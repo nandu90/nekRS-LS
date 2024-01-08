@@ -6,14 +6,15 @@
 #include <limits>
 #include <tuple>
 #include <vector>
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 
 struct crystal;
 struct hash_data_3;
 using hashData_t = hash_data_3;
 struct evalSrcPt_t;
 
-namespace findpts {
+namespace findpts
+{
 
 static constexpr int CODE_INTERNAL = 0;
 static constexpr int CODE_BORDER = 1;
@@ -58,11 +59,13 @@ struct data_t {
 
 enum class TimerLevel { None, Basic, Detailed };
 
-namespace impl {
+namespace impl
+{
 struct gslibFindptsData_t;
 }
 
-class findpts_t {
+class findpts_t
+{
 public:
   findpts_t(MPI_Comm comm,
             const dfloat *const x,
@@ -95,7 +98,11 @@ public:
 
   ~findpts_t();
 
-  void find(data_t *findPtsData, const occa::memory& o_x, const occa::memory& o_y, const occa::memory& o_z, const dlong npt);
+  void find(data_t *findPtsData,
+            const occa::memory &o_x,
+            const occa::memory &o_y,
+            const occa::memory &o_z,
+            const dlong npt);
   void find(data_t *findPtsData,
             const occa::memory &o_x,
             const occa::memory &o_y,
@@ -118,15 +125,15 @@ public:
             const dlong npt);
 
   // Device versions
-  void eval(const dlong npt, const occa::memory& o_in, data_t *findPtsData, occa::memory& o_out);
+  void eval(const dlong npt, const occa::memory &o_in, data_t *findPtsData, occa::memory &o_out);
 
   void eval(const dlong npt,
             const dlong nFields,
             const dlong inputOffset,
             const dlong outputOffset,
-            const occa::memory& o_in,
+            const occa::memory &o_in,
             data_t *findPtsData,
-            occa::memory& o_out);
+            occa::memory &o_out);
 
   // Host versions (copies to device when needed)
   void eval(const dlong npt, dfloat *in, data_t *findPtsData, dfloat *out);
@@ -140,12 +147,22 @@ public:
             dfloat *out);
 
   // set timer level
-  void setTimerLevel(TimerLevel level) { timerLevel = level; }
-  TimerLevel getTimerLevel() const { return timerLevel; }
+  void setTimerLevel(TimerLevel level)
+  {
+    timerLevel = level;
+  }
+
+  TimerLevel getTimerLevel() const
+  {
+    return timerLevel;
+  }
 
   // set timer name
   // this is used to prefix the timer names
-  void setTimerName(std::string name) { timerName = name; }
+  void setTimerName(std::string name)
+  {
+    timerName = name;
+  }
 
   crystal *crystalRouter();
 

@@ -1,5 +1,5 @@
-#include "plugins/velRecycling.hpp"
-#include "plugins/tavg.hpp"
+#include "velRecycling.hpp"
+#include "tavg.hpp"
 
 static dfloat zLen;
 static int NSLABS;
@@ -70,7 +70,31 @@ void UDF_Setup(nrs_t *nrs)
   velRecycling::setup(nrs, nrs->o_usrwrk, 0.0, 0.0, zRecycLayer, bID, uBulk);
 #endif
 
-  tavg::setup(nrs);
+  {
+    std::vector<std::vector<occa::memory>> tavgFields;
+
+    auto o_u    = nrs->o_U.slice(0 * nrs->fieldOffset , nrs->fieldOffset);
+    auto o_v    = nrs->o_U.slice(1 * nrs->fieldOffset , nrs->fieldOffset);
+    auto o_w    = nrs->o_U.slice(2 * nrs->fieldOffset , nrs->fieldOffset);
+
+    auto o_temp = nrs->cds->o_S.slice(0 * cds->fieldOffset[0], cds->fieldOffset[0]);
+
+    tavgFields.push_back({o_u});
+    tavgFields.push_back({o_v});
+    tavgFields.push_back({o_w});
+    tavgFields.push_back({o_temp});
+
+    tavgFields.push_back({o_u, o_u});
+    tavgFields.push_back({o_v, o_v});
+    tavgFields.push_back({o_w, o_w});
+    tavgFields.push_back({o_temp, o_temp});
+
+    tavgFields.push_back({o_u, o_v});
+    tavgFields.push_back({o_v, o_w});
+    tavgFields.push_back({o_w, o_v});
+
+    tavg::setup(nrs, tavgFields);
+  }
 }
 
 void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
@@ -78,7 +102,9 @@ void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
   mesh_t *mesh = nrs->meshV;
 
   velRecycling::copy();
-  tavg::run(time);
+  if (nrs->timeStepConverged) {
+    tavg::run(time);
+  }
 
   if (nrs->isOutputStep) {
     occa::memory o_UZ = nrs->o_U + 2 * nrs->fieldOffset;

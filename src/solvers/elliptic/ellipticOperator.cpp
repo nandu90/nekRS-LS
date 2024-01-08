@@ -28,52 +28,55 @@
 #include "elliptic.h"
 #include <iostream>
 
-void ellipticAx(elliptic_t* elliptic,
+void ellipticAx(elliptic_t *elliptic,
                 dlong NelementsList,
                 const occa::memory &o_elementsList,
                 const occa::memory &o_q,
                 occa::memory &o_Aq,
-                const char* precision)
+                const char *precision)
 {
 
-  if(NelementsList == 0) return;
+  if (NelementsList == 0) {
+    return;
+  }
 
-  mesh_t* mesh = elliptic->mesh;
+  mesh_t *mesh = elliptic->mesh;
   setupAide &options = elliptic->options;
 
   const bool coeffField = options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE");
   const bool continuous = options.compareArgs("DISCRETIZATION", "CONTINUOUS");
-  const int mapType = (elliptic->elementType == HEXAHEDRA &&
-                       options.compareArgs("ELEMENT MAP", "TRILINEAR")) ? 1:0;
+  const int mapType =
+      (elliptic->elementType == HEXAHEDRA && options.compareArgs("ELEMENT MAP", "TRILINEAR")) ? 1 : 0;
 
   const std::string precisionStr(precision);
-  const auto mixedPrecision = (precisionStr == pfloatString) && !std::is_same<pfloat, dfloat>::value; 
+  const auto mixedPrecision = (precisionStr == pfloatString) && !std::is_same<pfloat, dfloat>::value;
 
   bool valid = true;
   valid &= continuous;
-  if(mixedPrecision) {
+  if (mixedPrecision) {
     valid &= !elliptic->blockSolver;
     valid &= mapType == 0;
   }
 
-  auto errTxt = [&]()
-  {
+  auto errTxt = [&]() {
     std::stringstream txt;
     txt << "Encountered invalid configuration inside ellipticAx!\n";
-    if(elliptic->blockSolver)
+    if (elliptic->blockSolver) {
       txt << "Precision level (" << precision << ") does not support block solver\n";
-    if(mapType != 0)
+    }
+    if (mapType != 0) {
       txt << "Precision level (" << precision << ") does not support mapType " << mapType << "\n";
+    }
 
     return txt.str();
   };
-  nrsCheck(!valid, MPI_COMM_SELF, EXIT_FAILURE, errTxt().c_str(), "");
+  nekrsCheck(!valid, MPI_COMM_SELF, EXIT_FAILURE, errTxt().c_str(), "");
 
-  occa::memory & o_geom_factors = elliptic->stressForm ? mesh->o_vgeo : mesh->o_ggeo; 
-  occa::memory & o_D = mesh->o_D;
-  occa::memory & o_DT = mesh->o_DT;
-  occa::memory & o_lambda0 = elliptic->o_lambda0;
-  occa::memory & o_lambda1 = elliptic->o_lambda1;
+  occa::memory &o_geom_factors = elliptic->stressForm ? mesh->o_vgeo : mesh->o_ggeo;
+  occa::memory &o_D = mesh->o_D;
+  occa::memory &o_DT = mesh->o_DT;
+  occa::memory &o_lambda0 = elliptic->o_lambda0;
+  occa::memory &o_lambda1 = elliptic->o_lambda1;
 
   occa::kernel &AxKernel = elliptic->AxKernel;
 
@@ -90,39 +93,42 @@ void ellipticAx(elliptic_t* elliptic,
            o_Aq);
 
   double flopCount = mesh->Np * 12 * mesh->Nq + 15 * mesh->Np;
-  if(coeffField)
+  if (coeffField) {
     flopCount += 3 * mesh->Np;
-  else 
+  } else {
     flopCount += 1 * mesh->Np;
+  }
 
-  if(!elliptic->poisson)
+  if (!elliptic->poisson) {
     flopCount += (2 + 1) * mesh->Np;
+  }
 
-  if (elliptic->stressForm)
+  if (elliptic->stressForm) {
     flopCount += (15 + 6) * mesh->Np;
+  }
 
   flopCount *= elliptic->Nfields * static_cast<double>(NelementsList);
 
   const double factor = (mixedPrecision) ? 0.5 : 1.0;
 
   platform->flopCounter->add(elliptic->name + " Ax, N=" + std::to_string(mesh->N) + ", " +
-                             std::string(precision),
+                                 std::string(precision),
                              factor * flopCount);
 }
 
-void ellipticOperator(elliptic_t* elliptic,
+void ellipticOperator(elliptic_t *elliptic,
                       const occa::memory &o_q,
                       occa::memory &o_Aq,
-                      const char* precision,
+                      const char *precision,
                       bool masked)
 {
-  mesh_t* mesh = elliptic->mesh;
+  mesh_t *mesh = elliptic->mesh;
   setupAide &options = elliptic->options;
-  oogs_t* oogs = elliptic->oogsAx;
+  oogs_t *oogs = elliptic->oogsAx;
   const bool overlap = (oogs != elliptic->oogs);
-  const char* ogsDataTypeString = (!strstr(precision, dfloatString)) ? ogsPfloat : ogsDfloat;
+  const char *ogsDataTypeString = (!strstr(precision, dfloatString)) ? ogsPfloat : ogsDfloat;
 
-  if(overlap) {
+  if (overlap) {
 
     ellipticAx(elliptic, mesh->NglobalGatherElements, mesh->o_globalGatherElementList, o_q, o_Aq, precision);
     if (masked) {
@@ -134,10 +140,10 @@ void ellipticOperator(elliptic_t* elliptic,
                         o_Aq,
                         precision);
     }
- 
+
     oogs::start(o_Aq, elliptic->Nfields, elliptic->fieldOffset, ogsDataTypeString, ogsAdd, oogs);
     ellipticAx(elliptic, mesh->NlocalGatherElements, mesh->o_localGatherElementList, o_q, o_Aq, precision);
- 
+
     if (masked) {
       ellipticApplyMask(elliptic,
                         mesh->NlocalGatherElements,
@@ -163,6 +169,5 @@ void ellipticOperator(elliptic_t* elliptic,
                         precision);
     }
     oogs::startFinish(o_Aq, elliptic->Nfields, elliptic->fieldOffset, ogsDataTypeString, ogsAdd, oogs);
-
   }
 }

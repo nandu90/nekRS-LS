@@ -8,22 +8,26 @@
 #include <vector>
 #include <algorithm>
 
-namespace {
+namespace
+{
 
-std::vector<std::string> neknekSolveFields(){
-  auto fields = fieldsToSolve(platform->options);
-  
+std::vector<std::string> neknekSolveFields()
+{
+  auto fields = nrsFieldsToSolve(platform->options);
+
   // mesh velocity is "derived" from fluid velocity, so it is not relevant here
   fields.erase(std::remove(fields.begin(), fields.end(), "mesh"), fields.end());
   return fields;
 }
 
-bool isIntBc(int bcType, std::string field){
+bool isIntBc(int bcType, std::string field)
+{
   bool isInt = bcType == bcMap::bcTypeINT;
-  
-  if(field.find("scalar") != std::string::npos)
+
+  if (field.find("scalar") != std::string::npos) {
     isInt = bcType == bcMap::bcTypeINTS;
-  
+  }
+
   return isInt;
 }
 
@@ -79,7 +83,7 @@ bool neknekCoupled()
   int errorLength = errorLogger.str().length();
   MPI_Allreduce(MPI_IN_PLACE, &errorLength, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
 
-  nrsCheck(errorLength > 0, platform->comm.mpiCommParent, EXIT_FAILURE, "%s\n", errorLogger.str().c_str());
+  nekrsCheck(errorLength > 0, platform->comm.mpiCommParent, EXIT_FAILURE, "%s\n", errorLogger.str().c_str());
 
   MPI_Allreduce(MPI_IN_PLACE, &coupled, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
   return coupled > 0;
@@ -171,7 +175,7 @@ void neknek_t::findIntPoints()
 
   std::vector<dlong> pointMap(mesh->Nlocal, -1);
 
-  if(fields.size()){
+  if (fields.size()) {
     dlong ip = 0;
     for (dlong e = 0; e < mesh->Nelements; ++e) {
       for (dlong f = 0; f < mesh->Nfaces; ++f) {
@@ -216,19 +220,24 @@ void neknek_t::setup()
   MPI_Comm_rank(platform->comm.mpiCommParent, &globalRank);
 
   const int nsessions = this->nsessions_;
-  if(platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank == 0) {
     printf("configuring neknek with %d sessions\n", nsessions);
     std::fflush(stdout);
   }
 
-  nrsCheck(static_cast<bool>(platform->options.compareArgs("CONSTANT FLOW RATE", "TRUE")), 
-           platform->comm.mpiComm, EXIT_FAILURE,
-           "%s\n", "constant flow rate support not supported");
+  nekrsCheck(static_cast<bool>(platform->options.compareArgs("CONSTANT FLOW RATE", "TRUE")),
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "constant flow rate support not supported");
 
-  if(nrs->pSolver) {
-    nrsCheck(static_cast<bool>(nrs->pSolver->allNeumann && platform->options.compareArgs("LOWMACH", "TRUE")), 
-             platform->comm.mpiComm, EXIT_FAILURE, 
-             "%s\n", "variable p0th is not supported!");
+  if (nrs->pSolver) {
+    nekrsCheck(
+        static_cast<bool>(nrs->pSolver->allNeumann && platform->options.compareArgs("LOWMACH", "TRUE")),
+        platform->comm.mpiComm,
+        EXIT_FAILURE,
+        "%s\n",
+        "variable p0th is not supported!");
   }
 
   std::vector<int> Nscalars(nsessions, 0);
@@ -236,12 +245,14 @@ void neknek_t::setup()
 
   MPI_Allreduce(MPI_IN_PLACE, Nscalars.data(), nsessions, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
 
-  auto minNscalar = *std::min_element(Nscalars.begin(),Nscalars.end());
+  auto minNscalar = *std::min_element(Nscalars.begin(), Nscalars.end());
 
-  bool allSame = std::all_of(Nscalars.begin(), Nscalars.end(), [minNscalar] (auto v) {return v == minNscalar;});
+  bool allSame =
+      std::all_of(Nscalars.begin(), Nscalars.end(), [minNscalar](auto v) { return v == minNscalar; });
 
-  if(platform->comm.mpiRank == 0 && !allSame){
-    std::cout << "WARNING: Nscalar is not the same across all sessions -> using the minimum value: " << minNscalar << "\n";
+  if (platform->comm.mpiRank == 0 && !allSame) {
+    std::cout << "WARNING: Nscalar is not the same across all sessions -> using the minimum value: "
+              << minNscalar << "\n";
   }
 
   this->Nscalar_ = minNscalar;
@@ -262,8 +273,9 @@ neknek_t::neknek_t(nrs_t *nrs_, dlong nsessions, dlong sessionID)
   }
 
   this->nEXT_ = 1;
-  if(!platform->options.getArgs("NEKNEK BOUNDARY EXT ORDER").empty())
+  if (!platform->options.getArgs("NEKNEK BOUNDARY EXT ORDER").empty()) {
     platform->options.getArgs("NEKNEK BOUNDARY EXT ORDER", this->nEXT_);
+  }
 
   // set boundary ext order to report to user, if not specified
   platform->options.setArgs("NEKNEK BOUNDARY EXT ORDER", std::to_string(this->nEXT_));

@@ -27,7 +27,9 @@ set(INCLUDE_DIRS
   ${NEKRS_INSTALL_DIR}/include/core/io
   ${NEKRS_INSTALL_DIR}/include/utils
   ${NEKRS_INSTALL_DIR}/include/udf
+  ${NEKRS_INSTALL_DIR}/include/plugins
   ${NEKRS_INSTALL_DIR}/include/nrs
+  ${NEKRS_INSTALL_DIR}/include/nrs/plugins
   ${NEKRS_INSTALL_DIR}/include/setup
   ${NEKRS_INSTALL_DIR}/include/navierStokes
   ${NEKRS_INSTALL_DIR}/include/solvers/elliptic
@@ -36,12 +38,10 @@ set(INCLUDE_DIRS
   ${NEKRS_INSTALL_DIR}/include/nrs/cds
   ${NEKRS_INSTALL_DIR}/include/nrs/bdry
   ${NEKRS_INSTALL_DIR}/include/nrs/regularization
-  ${NEKRS_INSTALL_DIR}/include/nrs/postProcessing
   ${NEKRS_INSTALL_DIR}/include/linAlg
   ${NEKRS_INSTALL_DIR}/include/neknek
   ${NEKRS_INSTALL_DIR}/include/pointInterpolation
   ${NEKRS_INSTALL_DIR}/include/pointInterpolation/findpts
-  ${NEKRS_INSTALL_DIR}/include/lpm
   ${NEKRS_INSTALL_DIR}/occa/include
 )
 

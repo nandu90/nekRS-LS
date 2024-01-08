@@ -20,10 +20,11 @@
 
 namespace fs = std::filesystem;
 
-// extern variable from nrssys.hpp
+// extern variable from nekrsSys.hpp
 platform_t *platform;
 
-namespace {
+namespace
+{
 
 static nrs_t *nrs;
 
@@ -50,7 +51,7 @@ void printFileStdout(std::string file)
   f.close();
 }
 
-setupAide* setDefaultSettings(std::string casename)
+setupAide *setDefaultSettings(std::string casename)
 {
   auto options = new setupAide();
 
@@ -110,9 +111,10 @@ setupAide* setDefaultSettings(std::string casename)
   return options;
 }
 
-}
+} // namespace
 
-namespace nekrs {
+namespace nekrs
+{
 
 void reset()
 {
@@ -134,7 +136,7 @@ void setup(MPI_Comm commg_in,
            int buildOnly,
            int commSizeTarget,
            int ciMode,
-           const std::map<std::string, std::map<std::string, std::string>>& parKeyValuePairs,
+           const std::map<std::string, std::map<std::string, std::string>> &parKeyValuePairs,
            std::string casename,
            std::string _backend,
            std::string _deviceID,
@@ -142,7 +144,7 @@ void setup(MPI_Comm commg_in,
            int sessionID,
            int debug)
 {
-  nrsCheck(initialized, comm_in, EXIT_FAILURE, "%s\n", "Calling setup twice is erroneous!");
+  nekrsCheck(initialized, comm_in, EXIT_FAILURE, "%s\n", "Calling setup twice is erroneous!");
 
   commg = commg_in;
   comm = comm_in;
@@ -152,8 +154,9 @@ void setup(MPI_Comm commg_in,
 
   if (rank == 0) {
     printHeader();
-    if (sizeof(dfloat) == sizeof(float)) 
+    if (sizeof(dfloat) == sizeof(float)) {
       std::cout << "FP precision: 32-bit" << std::endl;
+    }
     std::cout << "MPI tasks: " << size << std::endl << std::endl;
   }
 
@@ -164,7 +167,7 @@ void setup(MPI_Comm commg_in,
   par->sections = parKeyValuePairs;
   parsePar(par, comm, *options);
 
-  if(nSessions > 1) {
+  if (nSessions > 1) {
     options->setArgs("NEKNEK NUMBER OF SESSIONS", std::to_string(nSessions));
     options->setArgs("NEKNEK SESSION ID", std::to_string(sessionID));
   }
@@ -180,23 +183,28 @@ void setup(MPI_Comm commg_in,
   }
 
   // precedence: cmd arg, par, env-var
-  if (options->getArgs("THREAD MODEL").length() == 0)
+  if (options->getArgs("THREAD MODEL").length() == 0) {
     options->setArgs("THREAD MODEL", getenv("NEKRS_OCCA_MODE_DEFAULT"));
-  if (!_backend.empty())
+  }
+  if (!_backend.empty()) {
     options->setArgs("THREAD MODEL", _backend);
-  if (!_deviceID.empty())
+  }
+  if (!_deviceID.empty()) {
     options->setArgs("DEVICE NUMBER", _deviceID);
+  }
 
   // setup platform (requires THREAD MODEL)
   platform = platform_t::getInstance(*options, commg, comm);
   platform->par = par;
 
-  if (debug)
+  if (debug) {
     platform->options.setArgs("VERBOSE", "TRUE");
+  }
 
   int buildRank = rank;
-  if (platform->cacheLocal)
+  if (platform->cacheLocal) {
     MPI_Comm_rank(platform->comm.mpiCommLocal, &buildRank);
+  }
 
   if (rank == 0) {
     std::cout << "using NEKRS_HOME: " << getenv("NEKRS_HOME") << std::endl;
@@ -205,13 +213,14 @@ void setup(MPI_Comm commg_in,
   }
 
   platform->options.setArgs("CI-MODE", std::to_string(ciMode));
-  if (rank == 0 && ciMode)
+  if (rank == 0 && ciMode) {
     std::cout << "enabling continous integration mode " << ciMode << "\n";
+  }
 
   {
     int nelgt, nelgv;
     re2::nelg(platform->options.getArgs("MESH FILE"), nelgt, nelgv, comm);
-    nrsCheck(size > nelgv, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "MPI tasks > number of elements!");
+    nekrsCheck(size > nelgv, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "MPI tasks > number of elements!");
   }
 
   bcMap::setup();
@@ -227,17 +236,20 @@ void setup(MPI_Comm commg_in,
   }
 
   // here we might access some nek variables
-  if (udf.setup0)
+  if (udf.setup0) {
     udf.setup0(comm, platform->options);
-
-  if (rank == 0) {
-    if (!buildOnly && platform->options.compareArgs("STDOUT PAR", "TRUE"))
-      printFileStdout(casename + ".par");
-    if (!buildOnly && platform->options.compareArgs("STDOUT UDF", "TRUE"))
-      udfEcho();
   }
 
-  compileKernels();
+  if (rank == 0) {
+    if (!buildOnly && platform->options.compareArgs("STDOUT PAR", "TRUE")) {
+      printFileStdout(casename + ".par");
+    }
+    if (!buildOnly && platform->options.compareArgs("STDOUT UDF", "TRUE")) {
+      udfEcho();
+    }
+  }
+
+  platform->compileKernels();
 
   oogs::overlap(platform->options.compareArgs("ENABLE GS COMM OVERLAP", "FALSE") ? 0 : 1);
 
@@ -251,24 +263,21 @@ void setup(MPI_Comm commg_in,
       std::ofstream ofs;
       ofs.open(file, std::ofstream::out);
       ofs.close();
-      if (rank == 0)
+      if (rank == 0) {
         std::cout << "\nBuild successful." << std::endl;
+      }
     }
     return;
   }
 
   platform->linAlg = linAlg_t::getInstance();
 
-  nrs = new nrs_t();
-
   {
     int result = 0;
     MPI_Comm_compare(commg, comm, &result);
-
-    nrs->multiSession = (result == MPI_UNEQUAL);
+    nrs = new nrs_t(comm, (result == MPI_UNEQUAL), platform->options);
   }
 
-  nrsSetup(comm, platform->options, nrs);
   if (neknekCoupled()) {
     new neknek_t(nrs, nSessions, sessionID);
   }
@@ -292,8 +301,9 @@ void setup(MPI_Comm commg_in,
     int rankLocal;
     MPI_Comm_rank(platform->comm.mpiCommLocal, &rankLocal);
     if (rankLocal == 0) {
-      for (auto &entry : std::filesystem::directory_iterator(platform->tmpDir))
+      for (auto &entry : std::filesystem::directory_iterator(platform->tmpDir)) {
         fs::remove_all(entry.path());
+      }
     }
   }
 #endif
@@ -301,25 +311,33 @@ void setup(MPI_Comm commg_in,
   initialized = true;
 }
 
-void copyFromNek(double time, int tstep) { nek::ocopyToNek(time, tstep); }
+void copyFromNek(double time, int tstep)
+{
+  nek::ocopyToNek(time, tstep);
+}
 
 void udfExecuteStep(double time, int tstep, int isOutputStep)
 {
-  platform->timer.tic("udfExecuteStep", 1);
-  if (isOutputStep) {
+  nrs->isOutputStep = isOutputStep;
+  if (nrs->isOutputStep) {
     nek::ifoutfld(1);
-    nrs->isOutputStep = 1;
   }
 
-  if (udf.executeStep)
+  platform->timer.tic("udfExecuteStep", 1);
+  if (udf.executeStep) {
     udf.executeStep(nrs, time, tstep);
+  }
+  platform->timer.toc("udfExecuteStep");
 
+  // reset
   nek::ifoutfld(0);
   nrs->isOutputStep = 0;
-  platform->timer.toc("udfExecuteStep");
 }
 
-void nekUserchk(void) { nek::userchk(); }
+void nekUserchk(void)
+{
+  nek::userchk();
+}
 
 double dt(int tstep)
 {
@@ -336,15 +354,16 @@ double dt(int tstep)
 
     dfloat maxDt = 0;
     platform->options.getArgs("MAX DT", maxDt);
-    if (maxDt > 0)
+    if (maxDt > 0) {
       nrs->dt[0] = std::min(nrs->dt[0], maxDt);
+    }
   }
 
-  nrsCheck(nrs->dt[0] < 1e-10 || std::isnan(nrs->dt[0]) || std::isinf(nrs->dt[0]),
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "Invalid time step size %.2e\n",
-           nrs->dt[0]);
+  nekrsCheck(nrs->dt[0] < 1e-10 || std::isnan(nrs->dt[0]) || std::isinf(nrs->dt[0]),
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "Invalid time step size %.2e\n",
+             nrs->dt[0]);
 
   // during a neknek simulation, sync dt across all ranks
   if (nrs->neknek) {
@@ -372,13 +391,14 @@ int outputStep(double time, int tStep)
   if (writeControlRunTime()) {
     double val;
     platform->options.getArgs("START TIME", val);
-    if (lastOutputTime == 0 && val > 0)
+    if (lastOutputTime == 0 && val > 0) {
       lastOutputTime = val;
+    }
     outputStep = ((time - lastOutputTime) + 1e-10) > nekrs::writeInterval();
-  }
-  else {
-    if (writeInterval() > 0)
+  } else {
+    if (writeInterval() > 0) {
       outputStep = (tStep % (int)writeInterval() == 0);
+    }
   }
 
   if (enforceOutputStep) {
@@ -388,18 +408,23 @@ int outputStep(double time, int tStep)
   return outputStep;
 }
 
-void outputStep(int val) { nrs->isOutputStep = val; }
+void outputStep(int val)
+{
+  nrs->isOutputStep = val;
+}
 
 void outfld(double time, int step, std::string suffix)
 {
   std::string oldValue;
   platform->options.getArgs("CHECKPOINT OUTPUT MESH", oldValue);
 
-  if (firstOutfld)
+  if (firstOutfld) {
     platform->options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
+  }
 
-  if (platform->options.compareArgs("MOVING MESH", "TRUE"))
+  if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     platform->options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
+  }
 
   writeFld(nrs, time, step, suffix);
   lastOutputTime = time;
@@ -408,7 +433,10 @@ void outfld(double time, int step, std::string suffix)
   platform->options.setArgs("CHECKPOINT OUTPUT MESH", oldValue);
 }
 
-void outfld(double time, int step) { outfld(time, step, ""); }
+void outfld(double time, int step)
+{
+  outfld(time, step, "");
+}
 
 double endTime(void)
 {
@@ -424,36 +452,43 @@ int numSteps(void)
   return numSteps;
 }
 
-void lastStep(int val) { nrs->lastStep = val; }
+void lastStep(int val)
+{
+  nrs->lastStep = val;
+}
 
 int lastStep(double time, int tstep, double elapsedTime)
 {
   if (!platform->options.getArgs("STOP AT ELAPSED TIME").empty()) {
     double maxElaspedTime;
     platform->options.getArgs("STOP AT ELAPSED TIME", maxElaspedTime);
-    if (elapsedTime > 60.0 * maxElaspedTime)
+    if (elapsedTime > 60.0 * maxElaspedTime) {
       nrs->lastStep = 1;
-  }
-  else if (endTime() >= 0) {
+    }
+  } else if (endTime() >= 0) {
     const double eps = 1e-12;
-    const double timeNew = time +
-                           setPrecision(nrs->dt[0], std::numeric_limits<decltype(nrs->dt[0])>::digits10 + 1);
+    const double timeNew =
+        time + setPrecision(nrs->dt[0], std::numeric_limits<decltype(nrs->dt[0])>::digits10 + 1);
     nrs->lastStep = fabs(timeNew - endTime()) < eps || timeNew > endTime();
-  }
-  else {
+  } else {
     nrs->lastStep = (tstep == numSteps());
   }
 
-  if (enforceLastStep)
+  if (enforceLastStep) {
     return 1;
+  }
   return nrs->lastStep;
 }
 
-void *nekPtr(const char *id) { return nek::ptr(id); }
+void *nekPtr(const char *id)
+{
+  return nek::ptr(id);
+}
 
-void *nrsPtr(void) { return nrs; }
-
-int finalize(void) { return nrsFinalize(nrs); }
+void *nrsPtr(void)
+{
+  return nrs;
+}
 
 int runTimeStatFreq()
 {
@@ -476,7 +511,10 @@ int updateFileCheckFreq()
   return freq;
 }
 
-void printRuntimeStatistics(int step) { platform->timer.printRunStat(step); }
+void printRuntimeStatistics(int step)
+{
+  platform->timer.printRunStat(step);
+}
 
 void processUpdFile()
 {
@@ -502,8 +540,9 @@ void processUpdFile()
   if (fsize) {
     std::string txt = "processing " + updFile + " ...\n";
 
-    if (rank != 0)
+    if (rank != 0) {
       rbuf = new char[fsize];
+    }
 
     MPI_Bcast(rbuf, fsize, MPI_CHAR, 0, comm);
     std::stringstream is;
@@ -513,35 +552,40 @@ void processUpdFile()
 
     std::string checkpoint;
     ini.extract("", "checkpoint", checkpoint);
-    if (checkpoint == "true")
+    if (checkpoint == "true") {
       enforceOutputStep = 1;
+    }
 
     std::string endTime;
     ini.extract("general", "endtime", endTime);
     if (!endTime.empty()) {
-      if (rank == 0)
+      if (rank == 0) {
         txt += "  set endTime = " + endTime + "\n";
+      }
       platform->options.setArgs("END TIME", endTime);
     }
 
     std::string numSteps;
     ini.extract("general", "numsteps", numSteps);
     if (!numSteps.empty()) {
-      if (rank == 0)
+      if (rank == 0) {
         txt += "  set numSteps = " + numSteps + "\n";
+      }
       platform->options.setArgs("NUMBER TIMESTEPS", numSteps);
     }
 
     std::string writeInterval;
     ini.extract("general", "writeinterval", writeInterval);
     if (!writeInterval.empty()) {
-      if (rank == 0)
+      if (rank == 0) {
         txt += "  set writeInterval = " + writeInterval + "\n";
+      }
       platform->options.setArgs("SOLUTION OUTPUT INTERVAL", writeInterval);
     }
 
-    if (rank == 0)
-      std::cout << txt; 
+    if (rank == 0) {
+      std::cout << txt;
+    }
 
     delete[] rbuf;
   }
@@ -555,18 +599,28 @@ void printInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo
 void verboseInfo(bool enabled)
 {
   platform->options.setArgs("VERBOSE SOLVER INFO", "FALSE");
-  if (enabled)
+  if (enabled) {
     platform->options.setArgs("VERBOSE SOLVER INFO", "TRUE");
+  }
 }
 
-void updateTimer(const std::string &key, double time) { platform->timer.set(key, time); }
+void updateTimer(const std::string &key, double time)
+{
+  platform->timer.set(key, time);
+}
 
-void resetTimer(const std::string &key) { platform->timer.reset(key); }
+void resetTimer(const std::string &key)
+{
+  platform->timer.reset(key);
+}
 
-int exitValue() { return platform->exitValue; }
+int exitValue()
+{
+  return platform->exitValue;
+}
 
 void initStep(double time, double dt, int tstep)
-{ 
+{
   timeStepper::initStep(nrs, time, dt, tstep);
   currDt = dt;
 }
@@ -583,10 +637,11 @@ bool runStep(int corrector)
   auto _udf = &udf;
 
   std::function<bool(int)> convergenceCheck = [](int corrector) -> bool {
-    if (udf.timeStepConverged)
+    if (udf.timeStepConverged) {
       return udf.timeStepConverged(nrs, corrector);
-    else
+    } else {
       return true;
+    }
   };
 
   return timeStepper::runStep(nrs, convergenceCheck, corrector);
@@ -598,44 +653,31 @@ double finishStep()
   return nrs->timePrevious + setPrecision(currDt, std::numeric_limits<decltype(nrs->dt[0])>::digits10 + 1);
 }
 
-bool stepConverged() { return nrs->timeStepConverged; }
+bool stepConverged()
+{
+  return nrs->timeStepConverged;
+}
 
-} // namespace nekrs
-
-int nrsFinalize(nrs_t *nrs)
+int finalize()
 {
   int exitValue = nekrs::exitValue();
   if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
-    if (nrs->uSolver)
-      delete nrs->uSolver;
-    if (nrs->vSolver)
-      delete nrs->vSolver;
-    if (nrs->wSolver)
-      delete nrs->wSolver;
-    if (nrs->uvwSolver)
-      delete nrs->uvwSolver;
-    if (nrs->pSolver)
-      delete nrs->pSolver;
-    for (int is; is < nrs->Nscalar; is++) {
-      if (nrs->cds->solver[is])
-        delete nrs->cds->solver[is];
-    }
-    if (nrs->cvode)
-      delete nrs->cvode;
-    if (nrs->meshSolver)
-      delete nrs->meshSolver;
+    nrs->finalize();
 
     hypreWrapper::finalize();
     hypreWrapperDevice::finalize();
     AMGXfinalize();
     nek::finalize();
   }
- 
+
   int rankGlobal;
   MPI_Comm_rank(platform->comm.mpiCommParent, &rankGlobal);
   MPI_Allreduce(MPI_IN_PLACE, &exitValue, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
-  if (rankGlobal == 0)
+  if (rankGlobal == 0) {
     std::cout << "finished with exit code " << exitValue << std::endl;
+  }
 
   return exitValue;
 }
+
+} // namespace nekrs

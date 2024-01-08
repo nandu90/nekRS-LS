@@ -2,7 +2,7 @@
 #include <string>
 #include <array>
 
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "cds.hpp"
 #include "avm.hpp"
 #include "udf.hpp"
@@ -44,11 +44,11 @@ void setup(cds_t *cds)
     if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_RESIDUAL") ||
         platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_HIGHEST_MODAL_DECAY")) {
 
-      nrsCheck(cds->mesh[is]->N < 5,
-               platform->comm.mpiComm,
-               EXIT_FAILURE,
-               "%s\n",
-               "AVM requires polynomialOrder >= 5!");
+      nekrsCheck(cds->mesh[is]->N < 5,
+                 platform->comm.mpiComm,
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "AVM requires polynomialOrder >= 5!");
 
       if (udf.properties == nullptr) {
         o_diff0.push_back(platform->device.malloc<dfloat>(cds->fieldOffset[is]));

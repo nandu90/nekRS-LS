@@ -26,8 +26,7 @@ SOFTWARE.
 
 // for platform
 #include "nekInterfaceAdapter.hpp"
-#include "nrssys.hpp"
-#include "nrs.hpp"
+#include "nekrsSys.hpp"
 #include "tuple_for_each.hpp"
 
 #include <cstdlib>
@@ -54,6 +53,7 @@ struct hash_data_3 {
   double fac[findpts::dim];
   uint *offset;
 };
+
 struct findpts_data_3 {
   struct crystal cr;
   struct findpts_local_data_3 local;
@@ -91,7 +91,7 @@ auto *gslibFindptsSetup(MPI_Comm mpi_comm,
     auto _x = _elx[0];
     auto _y = _elx[1];
     auto _z = _elx[2];
-    for(int i = 0; i < Nlocal; i++) {
+    for (int i = 0; i < Nlocal; i++) {
       x[i] = _x[i];
       y[i] = _y[i];
       z[i] = _z[i];
@@ -136,10 +136,13 @@ auto *gslibFindptsSetup(MPI_Comm mpi_comm,
 }
 } // extern "C"
 
-namespace findpts {
-namespace {
+namespace findpts
+{
+namespace
+{
 
-namespace pool {
+namespace pool
+{
 static occa::memory o_scratch;
 static occa::memory h_out;
 static occa::memory h_r;
@@ -155,8 +158,9 @@ static dlong *code;
 
 static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
 {
-  if (pn == 0)
+  if (pn == 0) {
     return;
+  }
 
   dlong Nbytes = 0;
   Nbytes += pn * sizeof(dlong);                            // code
@@ -169,9 +173,10 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
   Nbytes += dim * pn * sizeof(dfloat);                     // x,y,z coordinates
   Nbytes += nOutputFields * outputOffset * sizeof(dfloat); // output buffer
 
-  if (Nbytes > pool::o_scratch.size()) {
-    if (pool::o_scratch.size())
+  if (Nbytes > pool::o_scratch.byte_size()) {
+    if (pool::o_scratch.byte_size()) {
       pool::o_scratch.free();
+    }
     void *buffer = std::calloc(Nbytes, 1);
     pool::o_scratch = platform->device.malloc(Nbytes, buffer);
     std::free(buffer);
@@ -182,8 +187,9 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
 
   const auto NbytesR = dim * pn * sizeof(dfloat);
   if (NbytesR > pool::h_r.size()) {
-    if (pool::h_r.size())
+    if (pool::h_r.size()) {
       pool::h_r.free();
+    }
     void *buffer = std::calloc(NbytesR, 1);
     pool::h_r = platform->device.malloc(NbytesR, buffer, props);
     pool::r = (dfloat *)pool::h_r.ptr();
@@ -192,8 +198,9 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
 
   const auto NbytesEl = pn * sizeof(dlong);
   if (NbytesEl > pool::h_el.size()) {
-    if (pool::h_el.size())
+    if (pool::h_el.size()) {
       pool::h_el.free();
+    }
     void *buffer = std::calloc(NbytesEl, 1);
     pool::h_el = platform->device.malloc(NbytesEl, buffer, props);
     pool::el = (dlong *)pool::h_el.ptr();
@@ -202,8 +209,9 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
 
   const auto NbytesCode = pn * sizeof(dlong);
   if (NbytesCode > pool::h_code.size()) {
-    if (pool::h_code.size())
+    if (pool::h_code.size()) {
       pool::h_code.free();
+    }
     void *buffer = std::calloc(NbytesCode, 1);
     pool::h_code = platform->device.malloc(NbytesCode, buffer, props);
     pool::code = (dlong *)pool::h_code.ptr();
@@ -212,8 +220,9 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
 
   const auto NbytesDist2 = pn * sizeof(dfloat);
   if (NbytesDist2 > pool::h_dist2.size()) {
-    if (pool::h_dist2.size())
+    if (pool::h_dist2.size()) {
       pool::h_dist2.free();
+    }
     void *buffer = std::calloc(NbytesDist2, 1);
     pool::h_dist2 = platform->device.malloc(NbytesDist2, buffer, props);
     pool::dist2 = (dfloat *)pool::h_dist2.ptr();
@@ -222,8 +231,9 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
 
   const auto NbytesOut = nOutputFields * outputOffset * sizeof(dfloat);
   if (NbytesOut > pool::h_out.size() && NbytesOut > 0) {
-    if (pool::h_out.size())
+    if (pool::h_out.size()) {
       pool::h_out.free();
+    }
     void *buffer = std::calloc(NbytesOut, 1);
     pool::h_out = platform->device.malloc(NbytesOut, buffer, props);
     pool::out = (dfloat *)pool::h_out.ptr();
@@ -668,8 +678,9 @@ void findpts_t::findptsEvalImpl(occa::memory &o_out,
         out_base[opt->index + outputOffset * field] = opt->out[field];
       }
     }
-    if (outputOffset)
+    if (outputOffset) {
       o_out.copyFrom(out_base.data(), nFields * outputOffset * sizeof(dfloat));
+    }
 
     // launch local eval kernel on all points that can be evaluated on the current rank
     if (timerLevel != TimerLevel::None) {
@@ -723,8 +734,10 @@ void findpts_t::findptsEvalImpl(dfloat *out,
 
   {
     const auto Nbytes = inputOffset * nFields * sizeof(dfloat);
-    if (o_in.size() < Nbytes) {
-      if (o_in.size()) o_in.free();
+    if (o_in.byte_size() < Nbytes) {
+      if (o_in.byte_size()) {
+        o_in.free();
+      }
       constexpr int growthFactor = 2;
       o_in = platform->device.malloc(growthFactor * Nbytes);
     }
@@ -732,8 +745,10 @@ void findpts_t::findptsEvalImpl(dfloat *out,
 
   {
     const auto Nbytes = outputOffset * nFields * sizeof(dfloat);
-    if (o_out.size() < Nbytes) {
-      if (o_out.size()) o_out.free();
+    if (o_out.byte_size() < Nbytes) {
+      if (o_out.byte_size()) {
+        o_out.free();
+      }
       constexpr int growthFactor = 2;
       o_out = platform->device.malloc(growthFactor * Nbytes);
     }
@@ -861,8 +876,9 @@ void findpts_t::findptsEvalImpl(dfloat *out,
       platform->timer.toc(timerName + "findptsEvalImpl::localEvalKernel");
     }
 
-    if (outputOffset)
+    if (outputOffset) {
       o_out.copyTo(out, nFields * outputOffset * sizeof(dfloat));
+    }
 
     for (; n; --n, ++opt) {
       for (int field = 0; field < nFields; ++field) {
@@ -1061,8 +1077,15 @@ findpts_t::~findpts_t()
   }
 }
 
-static slong lfloor(dfloat x) { return floor(x); }
-static slong lceil(dfloat x) { return ceil(x); }
+static slong lfloor(dfloat x)
+{
+  return floor(x);
+}
+
+static slong lceil(dfloat x)
+{
+  return ceil(x);
+}
 
 static ulong hash_index_aux(dfloat low, dfloat fac, ulong n, dfloat x)
 {
@@ -1083,15 +1106,16 @@ struct srcPt_t {
   dfloat x[dim];
   int index, proc, sessionId;
 };
+
 struct outPt_t {
   dfloat r[dim], dist2, disti;
   int index, code, el, proc, elsid;
 };
 
 void findpts_t::find(data_t *const findPtsData,
-                     const occa::memory& o_xintIn,
-                     const occa::memory& o_yintIn,
-                     const occa::memory& o_zintIn,
+                     const occa::memory &o_xintIn,
+                     const occa::memory &o_yintIn,
+                     const occa::memory &o_zintIn,
                      const dlong npt)
 {
   occa::memory o_NULL;
@@ -1273,8 +1297,9 @@ void findpts_t::find(data_t *const findPtsData,
       const int ie = hash_offset[hi + 1];
       for (; i != ie; ++i) {
         const int pp = hash_offset[i];
-        if (pp == p->proc)
+        if (pp == p->proc) {
           continue; /* don't send back to source proc */
+        }
         *proc_p++ = pp;
         *q++ = *p;
       }
@@ -1385,8 +1410,9 @@ void findpts_t::find(data_t *const findPtsData,
       platform->timer.toc(timerName + "find::send back::sarray_sort");
     }
     n = outPt_t.n;
-    while (n && opt[n - 1].code == CODE_NOT_FOUND)
+    while (n && opt[n - 1].code == CODE_NOT_FOUND) {
       --n;
+    }
     outPt_t.n = n;
 #ifdef DIAGNOSTICS
     printf("(proc %u) sending back %u found points\n", id, (int)outPt_t.n);
@@ -1536,8 +1562,8 @@ void findpts_t::find(data_t *const findPtsData,
   }
 
   if (npt) {
-    if (o_code.size() < npt * sizeof(dlong)) {
-      if (o_code.size()) {
+    if (o_code.byte_size() < npt * sizeof(dlong)) {
+      if (o_code.byte_size()) {
         o_code.free();
         o_el.free();
         o_r.free();
@@ -1590,8 +1616,9 @@ void findpts_t::find(data_t *const findPtsData,
   o_xint.copyFrom(x_base, npt);
   o_yint.copyFrom(y_base, npt);
   o_zint.copyFrom(z_base, npt);
-  if(session)
+  if (session) {
     o_session.copyFrom(session, npt);
+  }
 
   this->find(findPtsData, o_xint, o_yint, o_zint, o_session, sessionIdMatch, npt);
 
@@ -1603,7 +1630,7 @@ void findpts_t::find(data_t *const findPtsData,
   }
 }
 
-void findpts_t::eval(const dlong npt, const occa::memory& o_in, data_t *findPtsData, occa::memory& o_out)
+void findpts_t::eval(const dlong npt, const occa::memory &o_in, data_t *findPtsData, occa::memory &o_out)
 {
   this->eval(npt, 1, 0, npt, o_in, findPtsData, o_out);
 }
@@ -1617,9 +1644,9 @@ void findpts_t::eval(const dlong npt,
                      const dlong nFields,
                      const dlong inputOffset,
                      const dlong outputOffset,
-                     const occa::memory& o_fldIn,
+                     const occa::memory &o_fldIn,
                      data_t *findPtsData,
-                     occa::memory& o_fldOut)
+                     occa::memory &o_fldOut)
 {
   auto o_in = o_fldIn.isInitialized() ? o_fldIn.cast(occa::dtype::byte) : o_fldIn;
   auto o_out = o_fldOut.isInitialized() ? o_fldOut.cast(occa::dtype::byte) : o_fldOut;
@@ -1633,8 +1660,9 @@ void findpts_t::eval(const dlong npt,
 
   auto fieldSizesTuple = n_tuple<int, findpts_t::maxFields>{};
   tuple_for_each(fieldSizesTuple, [&](auto T) {
-    if (nFields != decltype(T)::value)
+    if (nFields != decltype(T)::value) {
       return;
+    }
     findptsEvalImpl<evalOutPt_t<decltype(T)::value>>(o_out,
                                                      findPtsData->code_base,
                                                      findPtsData->proc_base,
@@ -1649,12 +1677,12 @@ void findpts_t::eval(const dlong npt,
                                                      *this->cr);
   });
 
-  nrsCheck(nFields < 1 || nFields > findpts_t::maxFields,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "Error: nFields = %d is not supported. nFields must be between 1 and %d.",
-           nFields,
-           findpts_t::maxFields);
+  nekrsCheck(nFields < 1 || nFields > findpts_t::maxFields,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "Error: nFields = %d is not supported. nFields must be between 1 and %d.",
+             nFields,
+             findpts_t::maxFields);
 
   timerName = timerNameSave;
 
@@ -1679,8 +1707,9 @@ void findpts_t::eval(const dlong npt,
   timerName = timerName + "eval::";
   auto fieldSizesTuple = n_tuple<int, findpts_t::maxFields>{};
   tuple_for_each(fieldSizesTuple, [&](auto T) {
-    if (nFields != decltype(T)::value)
+    if (nFields != decltype(T)::value) {
       return;
+    }
 
     findptsEvalImpl<evalOutPt_t<decltype(T)::value>>(out,
                                                      findPtsData->code_base,
@@ -1696,12 +1725,12 @@ void findpts_t::eval(const dlong npt,
                                                      *this->cr);
   });
 
-  nrsCheck(nFields < 1 || nFields > findpts_t::maxFields,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "Error: nFields = %d is not supported. nFields must be between 1 and %d.",
-           nFields,
-           findpts_t::maxFields);
+  nekrsCheck(nFields < 1 || nFields > findpts_t::maxFields,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "Error: nFields = %d is not supported. nFields must be between 1 and %d.",
+             nFields,
+             findpts_t::maxFields);
 
   timerName = timerNameSave;
 
@@ -1710,15 +1739,19 @@ void findpts_t::eval(const dlong npt,
   }
 }
 
-crystal *findpts_t::crystalRouter() { return this->cr; }
+crystal *findpts_t::crystalRouter()
+{
+  return this->cr;
+}
 
 void findpts_t::o_update(data_t &data)
 {
   auto npt = data.code.size();
-  if (npt == 0)
+  if (npt == 0) {
     return;
-  if (o_code.size() < npt * sizeof(dlong)) {
-    if (o_code.size()) {
+  }
+  if (o_code.byte_size() < npt * sizeof(dlong)) {
+    if (o_code.byte_size()) {
       o_code.free();
       o_el.free();
       o_r.free();

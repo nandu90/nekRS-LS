@@ -43,13 +43,12 @@ void linAlg_t::runTimers()
 
   const auto Nrep = 20;
 
-  auto run = [&](int fields) 
-  {
+  auto run = [&](int fields) {
     const auto Nlocal = nel * (N + 1) * (N + 1) * (N + 1);
     const auto offset = Nlocal;
     auto o_weight = platform->device.malloc<dfloat>(Nlocal);
-    auto o_r = platform->device.malloc<dfloat>(fields*Nlocal);
-    auto o_z = platform->device.malloc<dfloat>(fields*Nlocal);
+    auto o_r = platform->device.malloc<dfloat>(fields * Nlocal);
+    auto o_z = platform->device.malloc<dfloat>(fields * Nlocal);
 
     // warm-up
     weightedInnerProdMany(Nlocal, fields, offset, o_weight, o_r, o_z, platform->comm.mpiComm);
@@ -66,14 +65,17 @@ void linAlg_t::runTimers()
 
     double elapsedMax = *std::max_element(elapsed.begin(), elapsed.end());
     double elapsedMin = *std::min_element(elapsed.begin(), elapsed.end());
-    double elapsedAvg = std::accumulate(elapsed.begin(), elapsed.end(), 0.0); 
+    double elapsedAvg = std::accumulate(elapsed.begin(), elapsed.end(), 0.0);
 
     MPI_Allreduce(MPI_IN_PLACE, &elapsedMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
     MPI_Allreduce(MPI_IN_PLACE, &elapsedMin, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
     MPI_Allreduce(MPI_IN_PLACE, &elapsedAvg, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
     if (platform->comm.mpiRank == 0) {
-      printf("wdotp nFields=%02d min/avg/max: %.3es %.3es %.3es  ", 
-             fields, elapsedMin, elapsedAvg/Nrep, elapsedMax);
+      printf("wdotp nFields=%02d min/avg/max: %.3es %.3es %.3es  ",
+             fields,
+             elapsedMin,
+             elapsedAvg / Nrep,
+             elapsedMax);
     }
 
     if (platform->comm.mpiCommSize > 1) {
@@ -87,25 +89,26 @@ void linAlg_t::runTimers()
       const auto elapsed = (MPI_Wtime() - tStart) / Nrep;
       auto elapsedMax = 0.0;
       MPI_Allreduce(&elapsed, &elapsedMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
-      if (platform->comm.mpiRank == 0)
-        printf("(avg local: %.3es / %.3eGB/s)\n", elapsedMax, (1 + 2*fields)*Nlocal*sizeof(dfloat)/elapsedMax/1e9);
-    }
-    else {
+      if (platform->comm.mpiRank == 0) {
+        printf("(avg local: %.3es / %.3eGB/s)\n",
+               elapsedMax,
+               (1 + 2 * fields) * Nlocal * sizeof(dfloat) / elapsedMax / 1e9);
+      }
+    } else {
       if (platform->comm.mpiRank == 0) {
         printf("\n");
       }
     }
   };
 
-  for (int i: {1,3}) {
+  for (int i : {1, 3}) {
     run(i);
   }
 
   if (platform->comm.mpiRank == 0) {
     std::cout << std::endl;
-  } 
+  }
 }
-
 
 linAlg_t *linAlg_t::getInstance()
 {
@@ -150,7 +153,7 @@ void linAlg_t::reallocScratch(const size_t Nbytes)
   if (h_scratch.size()) {
     h_scratch.free();
   }
-  if (o_scratch.size()) {
+  if (o_scratch.byte_size()) {
     o_scratch.free();
   }
   // pinned scratch buffer
@@ -506,7 +509,6 @@ void linAlg_t::adyz(const dlong N, const dfloat alpha, const occa::memory &o_y, 
   adyzKernel(N, alpha, o_y, o_z);
 }
 
-
 void linAlg_t::adyMany(const dlong N,
                        const dlong Nfields,
                        const dlong offset,
@@ -540,7 +542,7 @@ dfloat linAlg_t::sum(const dlong N, occa::memory &o_a, MPI_Comm _comm, const dlo
 {
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -571,7 +573,7 @@ dfloat linAlg_t::sumMany(const dlong N,
 {
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -600,7 +602,7 @@ dfloat linAlg_t::min(const dlong N, const occa::memory &o_a, MPI_Comm _comm)
 {
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -627,7 +629,7 @@ dfloat linAlg_t::max(const dlong N, const occa::memory &o_a, MPI_Comm _comm)
 {
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -656,7 +658,7 @@ dfloat linAlg_t::amax(const dlong N, const occa::memory &o_a, MPI_Comm _comm)
 {
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -688,7 +690,7 @@ dfloat linAlg_t::amaxMany(const dlong N,
 {
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -725,7 +727,7 @@ dfloat linAlg_t::norm2(const dlong N, const occa::memory &o_x, MPI_Comm _comm)
 
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -770,7 +772,7 @@ dfloat linAlg_t::norm2Many(const dlong N,
 
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -811,7 +813,7 @@ dfloat linAlg_t::norm1(const dlong N, const occa::memory &o_x, MPI_Comm _comm)
 
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -855,7 +857,7 @@ dfloat linAlg_t::norm1Many(const dlong N,
 
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -902,7 +904,7 @@ dfloat linAlg_t::innerProd(const dlong N,
 
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -952,7 +954,7 @@ dfloat linAlg_t::weightedInnerProd(const dlong N,
 
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -1019,12 +1021,12 @@ void linAlg_t::weightedInnerProdMulti(const dlong N,
 
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = NVec * Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
   if (N > 1 || NVec > 1 || Nfields > 1) {
-    weightedInnerProdMultiKernel(Nblock, 
+    weightedInnerProdMultiKernel(Nblock,
                                  N,
                                  Nfields,
                                  fieldOffset,
@@ -1050,10 +1052,11 @@ void linAlg_t::weightedInnerProdMulti(const dlong N,
     o_w.copyTo(&w, N);
     o_x.copyTo(&x, N);
     o_y.copyTo(&y, N);
-    if (weight)
+    if (weight) {
       result[0] = w * x * y;
-    else
+    } else {
       result[0] = x * y;
+    }
   }
 
   if (_comm != MPI_COMM_SELF) {
@@ -1125,7 +1128,7 @@ dfloat linAlg_t::weightedInnerProdMany(const dlong N,
 
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -1172,7 +1175,7 @@ linAlg_t::weightedNorm2(const dlong N, const occa::memory &o_w, const occa::memo
 
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -1221,7 +1224,7 @@ dfloat linAlg_t::weightedNorm2Many(const dlong N,
 
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -1266,7 +1269,7 @@ linAlg_t::weightedNorm1(const dlong N, const occa::memory &o_w, const occa::memo
 
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -1312,7 +1315,7 @@ dfloat linAlg_t::weightedNorm1Many(const dlong N,
   }
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -1351,7 +1354,7 @@ linAlg_t::weightedSqrSum(const dlong N, const occa::memory &o_w, const occa::mem
 {
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.size() < Nbytes) {
+  if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
@@ -1381,19 +1384,27 @@ linAlg_t::weightedSqrSum(const dlong N, const occa::memory &o_w, const occa::mem
   return sum;
 }
 
-
 void linAlg_t::crossProduct(const dlong N,
                             const dlong fieldOffset,
                             const occa::memory &o_x,
                             const occa::memory &o_y,
                             occa::memory &o_z)
 {
-  nrsCheck(o_x.length() < (3*fieldOffset),
-           MPI_COMM_SELF, EXIT_FAILURE, "%s", "o_x too small to store a vector field!\n");
-  nrsCheck(o_y.length() < (3*fieldOffset),
-           MPI_COMM_SELF, EXIT_FAILURE, "%s", "o_x too small to store a vector field!\n");
-  nrsCheck(o_z.length() < (3*fieldOffset),
-           MPI_COMM_SELF, EXIT_FAILURE, "%s", "o_x too small to store a vector field!\n");
+  nekrsCheck(o_x.length() < (3 * fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_x too small to store a vector field!\n");
+  nekrsCheck(o_y.length() < (3 * fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_x too small to store a vector field!\n");
+  nekrsCheck(o_z.length() < (3 * fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_x too small to store a vector field!\n");
 
   crossProductKernel(N, fieldOffset, o_x, o_y, o_z);
 }
@@ -1417,8 +1428,11 @@ void linAlg_t::magSqrVector(const dlong N,
                             const occa::memory &o_u,
                             occa::memory &o_mag)
 {
-  nrsCheck(o_u.length() < (3*fieldOffset),
-           MPI_COMM_SELF, EXIT_FAILURE, "%s", "o_u too small to store a vector field!\n");
+  nekrsCheck(o_u.length() < (3 * fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_u too small to store a vector field!\n");
 
   magSqrVectorKernel(N, fieldOffset, o_u, o_mag);
 }
@@ -1428,8 +1442,11 @@ void linAlg_t::magSqrSymTensor(const dlong N,
                                const occa::memory &o_tensor,
                                occa::memory &o_mag)
 {
-  nrsCheck(o_tensor.length() < 6*fieldOffset,
-           MPI_COMM_SELF, EXIT_FAILURE, "%s", "o_tensor too small to store a symmetric tensor field!\n");
+  nekrsCheck(o_tensor.length() < 6 * fieldOffset,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_tensor too small to store a symmetric tensor field!\n");
 
   magSqrSymTensorKernel(N, fieldOffset, o_tensor, o_mag);
 }
@@ -1441,10 +1458,16 @@ void linAlg_t::linearCombination(const dlong N,
                                  const occa::memory &o_x,
                                  occa::memory &o_y)
 {
-  nrsCheck(o_coeff.length() < Nfields,
-           MPI_COMM_SELF, EXIT_FAILURE, "o_c too small for %d fields!\n", Nfields);
-  nrsCheck(o_x.length() < (Nfields*fieldOffset),
-           MPI_COMM_SELF, EXIT_FAILURE, "o_x too small to store %d fields!\n", Nfields);
+  nekrsCheck(o_coeff.length() < Nfields,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "o_c too small for %d fields!\n",
+             Nfields);
+  nekrsCheck(o_x.length() < (Nfields * fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "o_x too small to store %d fields!\n",
+             Nfields);
 
   linearCombinationKernel(N, Nfields, fieldOffset, o_coeff, o_x, o_y);
 }
@@ -1456,8 +1479,8 @@ dfloat linAlg_t::maxRelativeError(const dlong N,
                                   const occa::memory &o_u,
                                   const occa::memory &o_uRef,
                                   MPI_Comm comm)
-{ 
-  auto o_err = platform->o_memPool.reserve<dfloat>(std::max(Nfields*fieldOffset, N));
-  relativeErrorKernel(N, Nfields, fieldOffset, absTol, o_u, o_uRef, o_err); 
+{
+  auto o_err = platform->o_memPool.reserve<dfloat>(std::max(Nfields * fieldOffset, N));
+  relativeErrorKernel(N, Nfields, fieldOffset, absTol, o_u, o_uRef, o_err);
   return this->amaxMany(N, Nfields, fieldOffset, o_err, comm);
 }

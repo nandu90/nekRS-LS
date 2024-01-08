@@ -2,7 +2,7 @@
 #define CVODE_SOLVER_HPP_
 
 #include <limits>
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "occa.hpp"
 #include <functional>
 #include <map>
@@ -18,7 +18,8 @@
 
 class nrs_t;
 
-class cvode_t {
+class cvode_t
+{
 public:
 #ifdef ENABLE_CVODE
   static constexpr bool enabled = true;
@@ -26,17 +27,17 @@ public:
   static constexpr bool enabled = false;
 #endif
   using userRHS_t = std::function<
-      void(nrs_t *nrs, double time, double t0, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)>;
+      void(nrs_t *nrs, double time, double t0, const LVector_t<dfloat> &o_y, LVector_t<dfloat> &o_ydot)>;
   using userJacobian_t = std::function<
-      void(nrs_t *nrs, double time, double t0, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)>;
+      void(nrs_t *nrs, double time, double t0, const LVector_t<dfloat> &o_y, LVector_t<dfloat> &o_ydot)>;
   using userLocalPointSourceL_t =
-      std::function<void(nrs_t *nrs, double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot)>;
+      std::function<void(nrs_t *nrs, double time, const LVector_t<dfloat> &o_y, LVector_t<dfloat> &o_ydot)>;
   using userLocalPointSourceE_t =
-      std::function<void(nrs_t *nrs, double time, const occa::memory& o_y, occa::memory &_ydot)>;
+      std::function<void(nrs_t *nrs, double time, const occa::memory &o_y, occa::memory &_ydot)>;
 
-  using userPostNrsToCv_t = std::function<void(nrs_t *nrs,  LVector_t<dfloat> & o_LField, bool isYdot)>;
+  using userPostNrsToCv_t = std::function<void(nrs_t *nrs, LVector_t<dfloat> &o_LField, bool isYdot)>;
   using userPostCvToNrs_t = std::function<void(nrs_t *nrs, occa::memory o_EField, bool isYdot)>;
-  using userMakeq_t = std::function<void(nrs_t *nrs, double time, occa::memory& o_FS)>;
+  using userMakeq_t = std::function<void(nrs_t *nrs, double time, occa::memory &o_FS)>;
   using userPreSolve_t = std::function<void(nrs_t *nrs)>;
   using userPostSolve_t = std::function<void(nrs_t *nrs)>;
 
@@ -46,49 +47,131 @@ public:
   void initialize();
   void solve(double t0, double t1, int tstep);
 
-  void setRHS(userRHS_t _userRHS) { userRHS = _userRHS; }
-  void setJacobian(userJacobian_t _userJacobian) { userJacobian = _userJacobian; }
+  void setRHS(userRHS_t _userRHS)
+  {
+    userRHS = _userRHS;
+  }
+
+  void setJacobian(userJacobian_t _userJacobian)
+  {
+    userJacobian = _userJacobian;
+  }
+
   void setLocalPointSource(userLocalPointSourceL_t _userLocalPointSource);
   void setLocalPointSource(userLocalPointSourceE_t _userLocalPointSource);
 
-  void setUserPostCvToNrs(userPostCvToNrs_t _userPostCvToNrs) { userPostCvToNrs = _userPostCvToNrs; }
-  void setUserPostNrsToCv(userPostNrsToCv_t _userPostNrsToCv) { userPostNrsToCv = _userPostNrsToCv; }
-  void setUserMakeq(userMakeq_t _userMakeq) { userMakeq = _userMakeq; }
-  void setUserPreSolve(userPreSolve_t _userPreSolve) { userPreSolve = _userPreSolve; }
+  void setUserPostCvToNrs(userPostCvToNrs_t _userPostCvToNrs)
+  {
+    userPostCvToNrs = _userPostCvToNrs;
+  }
 
-  void setUserPostSolve(userPostSolve_t _userPostSolve) { userPostSolve = _userPostSolve; }
+  void setUserPostNrsToCv(userPostNrsToCv_t _userPostNrsToCv)
+  {
+    userPostNrsToCv = _userPostNrsToCv;
+  }
+
+  void setUserMakeq(userMakeq_t _userMakeq)
+  {
+    userMakeq = _userMakeq;
+  }
+
+  void setUserPreSolve(userPreSolve_t _userPreSolve)
+  {
+    userPreSolve = _userPreSolve;
+  }
+
+  void setUserPostSolve(userPostSolve_t _userPostSolve)
+  {
+    userPostSolve = _userPostSolve;
+  }
 
   void printInfo(bool printVerboseInfo);
 
-  bool isRhsEvaluation() const { return rhsEval; }
-  void setIsRhsEvaluation(bool _rhsEval) { rhsEval = _rhsEval; }
+  bool isRhsEvaluation() const
+  {
+    return rhsEval;
+  }
 
-  bool areDetailedTimersEnabled() const { return detailedTimersEnabled; }
-  void enableDetailedTimers() { detailedTimersEnabled = true; }
+  void setIsRhsEvaluation(bool _rhsEval)
+  {
+    rhsEval = _rhsEval;
+  }
 
-  void setIsJacobianEvaluation(bool _jacEval) { jacEval = _jacEval; }
-  bool isJacobianEvaluation() const { return jacEval; }
+  bool areDetailedTimersEnabled() const
+  {
+    return detailedTimersEnabled;
+  }
 
-  int timeStep() const { return externalTStep; }
-  void setTimeStep(int tstep) { externalTStep = tstep; }
-  double time() const { return tExternal; }
+  void enableDetailedTimers()
+  {
+    detailedTimersEnabled = true;
+  }
 
-  void rhs(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot);
-  void jtvRhs(double time, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot);
-  dlong numEquations() const { return nEq; }
-  int numScalars() const { return Nscalar; } 
+  void setIsJacobianEvaluation(bool _jacEval)
+  {
+    jacEval = _jacEval;
+  }
 
-  bool mixedPrecisionJtv() const { return mixedPrecisionJtvEnabled; }
+  bool isJacobianEvaluation() const
+  {
+    return jacEval;
+  }
 
-  dfloat &g0() { return _g0; }
-  dfloat &dt() { return dtCvode[0]; }
-  dfloat *coeffBDF() { return _coeffBDF.data(); }
-  dfloat *coeffEXT() { return _coeffEXT.data(); }
+  int timeStep() const
+  {
+    return externalTStep;
+  }
+
+  void setTimeStep(int tstep)
+  {
+    externalTStep = tstep;
+  }
+
+  double time() const
+  {
+    return tExternal;
+  }
+
+  void rhs(double time, const LVector_t<dfloat> &o_y, LVector_t<dfloat> &o_ydot);
+  void jtvRhs(double time, const LVector_t<dfloat> &o_y, LVector_t<dfloat> &o_ydot);
+
+  dlong numEquations() const
+  {
+    return nEq;
+  }
+
+  int numScalars() const
+  {
+    return Nscalar;
+  }
+
+  bool mixedPrecisionJtv() const
+  {
+    return mixedPrecisionJtvEnabled;
+  }
+
+  dfloat &g0()
+  {
+    return _g0;
+  }
+
+  dfloat &dt()
+  {
+    return dtCvode[0];
+  }
+
+  dfloat *coeffBDF()
+  {
+    return _coeffBDF.data();
+  }
+
+  dfloat *coeffEXT()
+  {
+    return _coeffEXT.data();
+  }
 
   void updateCounters();
   void resetCounters();
-
-
 
   long numSteps() const;
   long numRHSEvals() const;
@@ -98,8 +181,15 @@ public:
   void printTimers();
   void resetTimers();
 
-  std::string scope() const { return timerScope; }
-  void setTimerScope(std::string scope) { timerScope = scope; }
+  std::string scope() const
+  {
+    return timerScope;
+  }
+
+  void setTimerScope(std::string scope)
+  {
+    timerScope = scope;
+  }
 
   occa::memory o_pointSource; // scratch field for point source
   occa::memory o_vgeoPfloat;
@@ -122,19 +212,23 @@ private:
   int cvodeErrorWt(N_Vector y, N_Vector ewt);
 #endif
 
-  int jtvRhs(double time, const occa::memory& o_y, occa::memory& o_ydot);
-  int jtv(double t, const occa::memory& o_v, const occa::memory& o_y, const occa::memory& o_fy, 
-          occa::memory& o_work, occa::memory& o_Jv);
- 
-  void defaultRHS(double time, double t0, const  LVector_t<dfloat> & o_y,  LVector_t<dfloat> & o_ydot);
-  
+  int jtvRhs(double time, const occa::memory &o_y, occa::memory &o_ydot);
+  int jtv(double t,
+          const occa::memory &o_v,
+          const occa::memory &o_y,
+          const occa::memory &o_fy,
+          occa::memory &o_work,
+          occa::memory &o_Jv);
+
+  void defaultRHS(double time, double t0, const LVector_t<dfloat> &o_y, LVector_t<dfloat> &o_ydot);
+
   // hand nekRS-style E-vector to CVODE, which uses an L-vector
-  void nrsToCv(occa::memory o_EFeild,  LVector_t<dfloat> & o_LField, bool isYdot);
+  void nrsToCv(occa::memory o_EFeild, LVector_t<dfloat> &o_LField, bool isYdot);
 
   // unpack CVODE L-vector into nekRS-style E-vector
-  void cvToNrs(const  LVector_t<dfloat> & o_LField, occa::memory o_EField, bool isYdot);
+  void cvToNrs(const LVector_t<dfloat> &o_LField, occa::memory o_EField, bool isYdot);
 
-  nrs_t* nrs;
+  nrs_t *nrs;
 
   std::string timerName = "cvode_t::";
   std::string timerScope;
@@ -189,7 +283,7 @@ private:
   userPreSolve_t userPreSolve;
   userPostSolve_t userPostSolve;
 
-  void makeq(double time, occa::memory& o_FS);
+  void makeq(double time, occa::memory &o_FS);
 
   static constexpr int maxTimestepperOrder = 3;
   std::array<dfloat, maxTimestepperOrder> _coeffBDF;
@@ -221,7 +315,7 @@ private:
   // Dirichlet values, extrapolated to the current time
   occa::memory o_maskIds;
   dlong Nmasked;
-  dlong maskOffset;           // page-aligned offset for indexing into o_maskValues
+  dlong maskOffset; // page-aligned offset for indexing into o_maskValues
 
   occa::kernel weakLaplacianKernel;
   occa::kernel mapToMaskedPointKernel;
@@ -242,7 +336,6 @@ private:
   N_Vector cvodeY;
 #endif
   occa::memory o_cvodeY;
-
 };
 
 #endif

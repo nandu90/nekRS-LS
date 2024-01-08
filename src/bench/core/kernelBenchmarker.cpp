@@ -2,7 +2,8 @@
 #include <limits>
 #include "nrs.hpp"
 
-namespace {
+namespace
+{
 double run(int Nsamples, std::function<void(occa::kernel &)> kernelRunner, occa::kernel &kernel)
 {
   platform->device.finish();
@@ -17,6 +18,7 @@ double run(int Nsamples, std::function<void(occa::kernel &)> kernelRunner, occa:
   return (MPI_Wtime() - start) / Nsamples;
 }
 } // namespace
+
 std::pair<occa::kernel, double>
 benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
                 std::function<void(occa::kernel &)> kernelRunner,
@@ -32,10 +34,11 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
     MPI_Barrier(platform->comm.mpiComm);
     auto candidateKernel = kernelBuilder(kernelVariant);
 
-    if (!candidateKernel.isInitialized())
+    if (!candidateKernel.isInitialized()) {
       continue;
+    }
 
-    if(platform->options.compareArgs("BUILD ONLY", "FALSE")){
+    if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
       // warmup
       double elapsed = run(1, kernelRunner, candidateKernel);
 
@@ -45,9 +48,10 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
       MPI_Allreduce(&candidateKernelTiming, &tMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
       MPI_Allreduce(&candidateKernelTiming, &tMin, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm);
 
-      const double tRatio = tMax/tMin;
-      if (platform->comm.mpiRank == 0 && tRatio > 1.1)
+      const double tRatio = tMax / tMin;
+      if (platform->comm.mpiRank == 0 && tRatio > 1.1) {
         printf("WARNING: kernel[%d] timings differ by up to %.2f across ranks!\n", kernelVariant, tRatio);
+      }
 
       candidateKernelTiming = tMax;
 
@@ -80,10 +84,11 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
     MPI_Barrier(platform->comm.mpiComm);
     auto candidateKernel = kernelBuilder(kernelVariant);
 
-    if (!candidateKernel.isInitialized())
+    if (!candidateKernel.isInitialized()) {
       continue; // remove variant if it doesn't compile
+    }
 
-    if(platform->options.compareArgs("BUILD ONLY", "FALSE")){
+    if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
 
       // warmup
       double elapsed = run(1, kernelRunner, candidateKernel);
@@ -98,9 +103,10 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
       MPI_Allreduce(&candidateKernelTiming, &tMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
       MPI_Allreduce(&candidateKernelTiming, &tMin, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm);
 
-      const double tRatio = tMax/tMin;
-      if (platform->comm.mpiRank == 0 && tRatio > 1.1)
+      const double tRatio = tMax / tMin;
+      if (platform->comm.mpiRank == 0 && tRatio > 1.1) {
         printf("WARNING: kernel[%d] timings differ by up to %.2f across ranks!\n", kernelVariant, tRatio);
+      }
 
       candidateKernelTiming = tMax;
 
@@ -115,8 +121,11 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
     }
   }
 
-  nrsCheck(!fastestKernel.isInitialized(), MPI_COMM_SELF, EXIT_FAILURE, 
-           "%s\n", "Cannot find valid kernel variant!");
+  nekrsCheck(!fastestKernel.isInitialized(),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "Cannot find valid kernel variant!");
 
   return std::make_pair(fastestKernel, fastestTime);
 }

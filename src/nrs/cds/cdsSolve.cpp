@@ -2,55 +2,55 @@
 #include "nrs.hpp"
 #include "linAlg.hpp"
 
-occa::memory cdsSolve(const int is, cds_t* cds, double time, int stage)
+occa::memory cds_t::solve(const int is, double time, int stage)
 {
   std::string sid = scalarDigitStr(is);
 
-  mesh_t* mesh = cds->mesh[0];
+  mesh_t* mesh = this->mesh[0];
   if(is) {
-    mesh = cds->meshV;
+    mesh = this->meshV;
   }
 
   platform->timer.tic("scalar rhs", 1);
 
-  auto o_rhs = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[is]);
-  o_rhs.copyFrom(cds->o_BF, cds->fieldOffset[is], 0, cds->fieldOffsetScan[is]);
+  auto o_rhs = platform->o_memPool.reserve<dfloat>(this->fieldOffset[is]);
+  o_rhs.copyFrom(this->o_BF, this->fieldOffset[is], 0, this->fieldOffsetScan[is]);
 
-  cds->neumannBCKernel(mesh->Nelements,
+  this->neumannBCKernel(mesh->Nelements,
                        1,
                        mesh->o_sgeo,
                        mesh->o_vmapM,
                        mesh->o_EToB,
                        is,
                        time,
-                       cds->fieldOffset[is],
+                       this->fieldOffset[is],
                        0,
-                       cds->EToBOffset,
+                       this->EToBOffset,
                        mesh->o_x,
                        mesh->o_y,
                        mesh->o_z,
-                       cds->o_Ue,
-                       cds->o_S,
-                       cds->o_EToB,
-                       cds->o_diff,
-                       cds->o_rho,
-                       *(cds->o_usrwrk),
+                       this->o_Ue,
+                       this->o_S,
+                       this->o_EToB,
+                       this->o_diff,
+                       this->o_rho,
+                       *(this->o_usrwrk),
                        o_rhs);
 
   platform->timer.toc("scalar rhs");
 
   auto o_S = [&]()
   {
-     auto o_S0 = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[is]);
+     auto o_S0 = platform->o_memPool.reserve<dfloat>(this->fieldOffset[is]);
      if (platform->options.compareArgs("SCALAR" + sid + " INITIAL GUESS", "EXTRAPOLATION") && stage == 1)
-       o_S0.copyFrom(cds->o_Se, cds->fieldOffset[is], 0, cds->fieldOffsetScan[is]);
+       o_S0.copyFrom(this->o_Se, this->fieldOffset[is], 0, this->fieldOffsetScan[is]);
      else
-       o_S0.copyFrom(cds->o_S, cds->fieldOffset[is], 0, cds->fieldOffsetScan[is]);
+       o_S0.copyFrom(this->o_S, this->fieldOffset[is], 0, this->fieldOffsetScan[is]);
      
      return o_S0;
   }();
 
-  ellipticSolve(cds->solver[is], o_rhs, o_S);
+  ellipticSolve(this->solver[is], o_rhs, o_S);
 
   return o_S;
 }

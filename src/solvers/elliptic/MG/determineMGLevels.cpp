@@ -20,18 +20,17 @@ std::vector<int> determineMGLevels(std::string section)
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
 
   std::string p_mgschedule = platform->options.getArgs(optionsPrefix + "MULTIGRID SCHEDULE");
-  if(!p_mgschedule.empty()){
+  if (!p_mgschedule.empty()) {
 
     // note: default order is not required here.
     // We just need the levels, not the degree.
     auto [scheduleMap, errorString] = parseMultigridSchedule(p_mgschedule, platform->options, 3);
 
-    nrsCheck(errorString.size(), platform->comm.mpiComm, EXIT_FAILURE,
-             "%s\n", errorString.c_str());
+    nekrsCheck(errorString.size(), platform->comm.mpiComm, EXIT_FAILURE, "%s\n", errorString.c_str());
 
-    for(auto && [cyclePosition, smootherOrder] : scheduleMap){
+    for (auto &&[cyclePosition, smootherOrder] : scheduleMap) {
       auto [order, isDownLeg] = cyclePosition;
-      if(isDownLeg){
+      if (isDownLeg) {
         levels.push_back(order);
       }
     }
@@ -42,11 +41,13 @@ std::vector<int> determineMGLevels(std::string section)
       if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE", "TRUE")) {
         // if the coarse level has p > 1 and requires solving the coarsest level,
         // rather than just smoothing, SEMFEM must be used for the discretization
-        const auto usesSEMFEM =
-            platform->options.compareArgs(optionsPrefix + "MULTIGRID SEMFEM", "TRUE");
+        const auto usesSEMFEM = platform->options.compareArgs(optionsPrefix + "MULTIGRID SEMFEM", "TRUE");
 
-        nrsCheck(!usesSEMFEM, platform->comm.mpiComm, EXIT_FAILURE, 
-                 "%s\n", "FEM coarse discretization only supports p=1 for the coarsest level!");
+        nekrsCheck(!usesSEMFEM,
+                   platform->comm.mpiComm,
+                   EXIT_FAILURE,
+                   "%s\n",
+                   "FEM coarse discretization only supports p=1 for the coarsest level!");
       }
     }
 
@@ -54,7 +55,7 @@ std::vector<int> determineMGLevels(std::string section)
   }
 
   if (platform->options.compareArgs(optionsPrefix + "MULTIGRID SMOOTHER", "ASM") ||
-           platform->options.compareArgs(optionsPrefix + "MULTIGRID SMOOTHER", "RAS")) {
+      platform->options.compareArgs(optionsPrefix + "MULTIGRID SMOOTHER", "RAS")) {
     std::map<int, std::vector<int>> mg_level_lookup = {
         {1, {1}},
         {2, {2, 1}},

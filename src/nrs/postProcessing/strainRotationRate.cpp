@@ -1,47 +1,34 @@
 #include "nrs.hpp"
-#include "platform.hpp"
-#include "linAlg.hpp"
-#include "postProcessing.hpp"
 
-void postProcessing::strainRotationRate(nrs_t *nrs, bool smooth, bool rotationRate, 
-                                        const occa::memory& o_U, occa::memory& o_SO)
+void nrs_t::strainRotationRate(bool smooth, bool rotationRate, const occa::memory &o_U, occa::memory &o_SO)
 {
-  mesh_t *mesh = nrs->meshV;
+  mesh_t *mesh = this->meshV;
 
-  const int nFields = (rotationRate) ? 2*nrs->NVfields + nrs->NVfields : 2*nrs->NVfields;
+  const int nFields = (rotationRate) ? 2 * this->NVfields + this->NVfields : 2 * this->NVfields;
 
-  nrsCheck(o_SO.length() < (nFields*nrs->fieldOffset),
-           MPI_COMM_SELF, EXIT_FAILURE, "o_SO too small to store %d fields!\n", nFields); 
- 
-  nrs->SijOijKernel(mesh->Nelements,
-		    nrs->fieldOffset,
-		    (int) rotationRate,
-                    (int) smooth,
-		    mesh->o_vgeo,
-		    mesh->o_D,
-		    o_U,
-		    o_SO);
+  nekrsCheck(o_SO.length() < (nFields * this->fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "o_SO too small to store %d fields!\n",
+             nFields);
 
-  if(smooth) { 
-    oogs::startFinish(o_SO, 
-                      nFields,
-                      nrs->fieldOffset,
-                      ogsDfloat,
-                      ogsAdd,
-                      nrs->gsh);
+  this->SijOijKernel(mesh->Nelements,
+                     this->fieldOffset,
+                     (int)rotationRate,
+                     (int)smooth,
+                     mesh->o_vgeo,
+                     mesh->o_D,
+                     o_U,
+                     o_SO);
 
-    platform->linAlg->axmyMany(mesh->Nlocal, 
-                               nFields, 
-                               nrs->fieldOffset, 
-                               0, 
-                               1.0, 
-                               mesh->o_invLMM, 
-                               o_SO);
-  } 
+  if (smooth) {
+    oogs::startFinish(o_SO, nFields, this->fieldOffset, ogsDfloat, ogsAdd, this->gsh);
+
+    platform->linAlg->axmyMany(mesh->Nlocal, nFields, this->fieldOffset, 0, 1.0, mesh->o_invLMM, o_SO);
+  }
 }
 
-void postProcessing::strainRate(nrs_t *nrs, bool smooth, 
-                                const occa::memory& o_U, occa::memory& o_S)
+void nrs_t::strainRate(bool smooth, const occa::memory &o_U, occa::memory &o_S)
 {
-  strainRotationRate(nrs, smooth, false, o_U, o_S); 
+  strainRotationRate(smooth, false, o_U, o_S);
 }

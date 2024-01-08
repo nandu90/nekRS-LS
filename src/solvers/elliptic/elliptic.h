@@ -32,7 +32,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "mesh3D.h"
 #include "platform.hpp"
 
@@ -52,8 +52,8 @@ class SolutionProjection;
 class precon_t;
 class elliptic_t;
 
-struct GmresData{
-  GmresData(elliptic_t*);
+struct GmresData {
+  GmresData(elliptic_t *);
   int nRestartVectors;
   int flexible;
   occa::memory o_V;
@@ -62,21 +62,20 @@ struct GmresData{
   occa::memory o_scratch;
   occa::memory h_scratch;
   occa::memory h_y;
-  dfloat* y;
-  dfloat* H;
-  dfloat* sn;
-  dfloat* cs;
-  dfloat* s;
-  dfloat* scratch;
+  dfloat *y;
+  dfloat *H;
+  dfloat *sn;
+  dfloat *cs;
+  dfloat *s;
+  dfloat *scratch;
 };
 
-struct elliptic_t
-{
-  int elementType = 12;      // number of edges (3=tri, 4=quad, 6=tet, 12=hex)
+struct elliptic_t {
+  int elementType = 12; // number of edges (3=tri, 4=quad, 6=tet, 12=hex)
   int blockSolver = 0;
   int Nfields = 1;
   int stressForm = 0;
-  int poisson = 0; 
+  int poisson = 0;
   dlong loffset = 0;
 
   bool mgLevel = false;
@@ -86,25 +85,25 @@ struct elliptic_t
   int Niter;
   dfloat res00Norm, res0Norm, resNorm;
 
-  dlong fieldOffset; 
+  dlong fieldOffset;
 
-  mesh_t* mesh;
+  mesh_t *mesh;
 
   precon_t *precon = nullptr;
 
-  ogs_t* ogs;
-  oogs_t* oogs;
-  oogs_t* oogsAx;
+  ogs_t *ogs;
+  oogs_t *oogs;
+  oogs_t *oogsAx;
 
   setupAide options;
 
-  char* type;
+  char *type;
 
   dfloat tau;
 
   bool allNeumann;
 
-  int* EToB;
+  int *EToB;
 
   // C0-FEM mask data
   dlong Nmasked;
@@ -171,28 +170,29 @@ struct elliptic_t
   occa::memory o_lambda1;
 
   int nLevels;
-  int* levels;
+  int *levels;
 
-  SolutionProjection* solutionProjection;
+  SolutionProjection *solutionProjection;
   GmresData *gmresData;
 
-  std::function<void(dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x)> applyZeroNormalMask;
-  std::function<void(const occa::memory & o_r, occa::memory & o_z)> userPreconditioner;
+  std::function<void(dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x)>
+      applyZeroNormalMask;
+  std::function<void(const occa::memory &o_r, occa::memory &o_z)> userPreconditioner;
 
   ~elliptic_t();
 };
 
 #include "ellipticSolutionProjection.h"
 
-elliptic_t* ellipticBuildMultigridLevelFine(elliptic_t* elliptic);
+elliptic_t *ellipticBuildMultigridLevelFine(elliptic_t *elliptic);
 
-void ellipticPreconditioner(elliptic_t* elliptic, const occa::memory& o_r, occa::memory& o_z);
-void ellipticPreconditionerSetup(elliptic_t* elliptic, ogs_t* ogs);
-void ellipticBuildPreconditionerKernels(elliptic_t* elliptic);
+void ellipticPreconditioner(elliptic_t *elliptic, const occa::memory &o_r, occa::memory &o_z);
+void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs);
+void ellipticBuildPreconditionerKernels(elliptic_t *elliptic);
 
-void ellipticSolve(elliptic_t* elliptic, const occa::memory& o_r, occa::memory o_x);
+void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_r, occa::memory o_x);
 
-void ellipticSolveSetup(elliptic_t* elliptic);
+void ellipticSolveSetup(elliptic_t *elliptic);
 
 // indices used in combinedPCG routines
 struct CombinedPCGId {
@@ -206,35 +206,49 @@ struct CombinedPCGId {
   static constexpr int f = 6;
 };
 
-int pcg(elliptic_t* elliptic, const dfloat tol, const int MAXIT, dfloat &res, occa::memory &o_r, occa::memory &o_x);
+int pcg(elliptic_t *elliptic,
+        const dfloat tol,
+        const int MAXIT,
+        dfloat &res,
+        occa::memory &o_r,
+        occa::memory &o_x);
 
-void initializeGmresData(elliptic_t*);
-int pgmres(elliptic_t* elliptic, const dfloat tol, const int MAXIT, dfloat &res, occa::memory &o_r, occa::memory &o_x);
+void initializeGmresData(elliptic_t *);
+int pgmres(elliptic_t *elliptic,
+           const dfloat tol,
+           const int MAXIT,
+           dfloat &res,
+           occa::memory &o_r,
+           occa::memory &o_x);
 
-void ellipticOperator(elliptic_t* elliptic,
+void ellipticOperator(elliptic_t *elliptic,
                       const occa::memory &o_q,
                       occa::memory &o_Aq,
-                      const char* precision,
+                      const char *precision,
                       bool masked = true);
 
-void ellipticAx(elliptic_t* elliptic,
+void ellipticAx(elliptic_t *elliptic,
                 dlong NelementsList,
                 const occa::memory &o_elementsList,
                 const occa::memory &o_q,
                 occa::memory &o_Aq,
-                const char* precision);
+                const char *precision);
 
-void ellipticMultiGridUpdateLambda(elliptic_t* elliptic);
+void ellipticMultiGridUpdateLambda(elliptic_t *elliptic);
 void ellipticUpdateJacobi(elliptic_t *ellipticBase, occa::memory &o_invDiagA);
-void ellipticUpdateJacobi(elliptic_t* elliptic);
+void ellipticUpdateJacobi(elliptic_t *elliptic);
 
 void ellipticMultiGridSetup(elliptic_t *elliptic, precon_t *precon);
-elliptic_t* ellipticBuildMultigridLevel(elliptic_t* baseElliptic, int Nc, int Nf);
+elliptic_t *ellipticBuildMultigridLevel(elliptic_t *baseElliptic, int Nc, int Nf);
 
-dfloat ellipticUpdatePCG(elliptic_t* elliptic, occa::memory &o_p, occa::memory &o_Ap, dfloat alpha,
-                          occa::memory &o_x, occa::memory &o_r);
+dfloat ellipticUpdatePCG(elliptic_t *elliptic,
+                         occa::memory &o_p,
+                         occa::memory &o_Ap,
+                         dfloat alpha,
+                         occa::memory &o_x,
+                         occa::memory &o_r);
 
-void ellipticZeroMean(elliptic_t* elliptic, occa::memory &o_q);
+void ellipticZeroMean(elliptic_t *elliptic, occa::memory &o_q);
 
 void ellipticOgs(mesh_t *mesh,
                  dlong mNlocal,
@@ -249,13 +263,13 @@ void ellipticOgs(mesh_t *mesh,
                  occa::memory &o_maskIdsGlobal,
                  ogs_t **ogs);
 
-static void ellipticAllocateWorkspace(elliptic_t* elliptic)
+static void ellipticAllocateWorkspace(elliptic_t *elliptic)
 {
   elliptic->o_p = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
   elliptic->o_z = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
   elliptic->o_Ap = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
-  elliptic->o_x0 = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset); 
-  elliptic->o_rPfloat = platform->o_memPool.reserve<pfloat>(elliptic->Nfields * elliptic->fieldOffset); 
+  elliptic->o_x0 = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
+  elliptic->o_rPfloat = platform->o_memPool.reserve<pfloat>(elliptic->Nfields * elliptic->fieldOffset);
   elliptic->o_zPfloat = platform->o_memPool.reserve<pfloat>(elliptic->Nfields * elliptic->fieldOffset);
 
   if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
@@ -263,12 +277,12 @@ static void ellipticAllocateWorkspace(elliptic_t* elliptic)
   }
 }
 
-static void ellipticFreeWorkspace(elliptic_t* elliptic)
+static void ellipticFreeWorkspace(elliptic_t *elliptic)
 {
   elliptic->o_p.free();
-  elliptic->o_z.free(); 
-  elliptic->o_Ap.free(); 
-  elliptic->o_x0.free(); 
+  elliptic->o_z.free();
+  elliptic->o_Ap.free();
+  elliptic->o_x0.free();
   elliptic->o_rPfloat.free();
   elliptic->o_zPfloat.free();
 
@@ -277,5 +291,4 @@ static void ellipticFreeWorkspace(elliptic_t* elliptic)
   }
 }
 
- 
 #endif

@@ -1,4 +1,4 @@
-#include "plugins/lpm.hpp"
+#include "lpm.hpp"
 
 #include "ci.inc"
 #include "randomVector.hpp"

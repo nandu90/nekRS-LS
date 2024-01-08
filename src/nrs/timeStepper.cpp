@@ -13,6 +13,29 @@
 #include "bdry.hpp"
 #include "Urst.hpp"
 
+static void advectionFlops(mesh_t *mesh, int Nfields)
+{
+  const auto cubNq = mesh->cubNq;
+  const auto cubNp = mesh->cubNp;
+  const auto Nq = mesh->Nq;
+  const auto Np = mesh->Np;
+  const auto Nelements = mesh->Nelements;
+  double flopCount = 0.0; // per elem basis
+  if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+    flopCount += 4. * Nq * (cubNp + cubNq * cubNq * Nq + cubNq * Nq * Nq); // interpolation
+    flopCount += 6. * cubNp * cubNq;                                       // apply Dcub
+    flopCount += 5 * cubNp; // compute advection term on cubature mesh
+    flopCount += mesh->Np;  // weight by inv. mass matrix
+  } else {
+    flopCount += 8 * (Np * Nq + Np);
+  }
+
+  flopCount *= Nelements;
+  flopCount *= Nfields;
+
+  platform->flopCounter->add("advection", flopCount);
+}
+
 static void lagFields(nrs_t *nrs)
 {
   // lag velocity
@@ -123,29 +146,6 @@ static void computeDivUErr(nrs_t *nrs, dfloat &divUErrVolAvg, dfloat &divUErrL2)
 namespace timeStepper
 {
 
-void advectionFlops(mesh_t *mesh, int Nfields)
-{
-  const auto cubNq = mesh->cubNq;
-  const auto cubNp = mesh->cubNp;
-  const auto Nq = mesh->Nq;
-  const auto Np = mesh->Np;
-  const auto Nelements = mesh->Nelements;
-  double flopCount = 0.0; // per elem basis
-  if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
-    flopCount += 4. * Nq * (cubNp + cubNq * cubNq * Nq + cubNq * Nq * Nq); // interpolation
-    flopCount += 6. * cubNp * cubNq;                                       // apply Dcub
-    flopCount += 5 * cubNp; // compute advection term on cubature mesh
-    flopCount += mesh->Np;  // weight by inv. mass matrix
-  } else {
-    flopCount += 8 * (Np * Nq + Np);
-  }
-
-  flopCount *= Nelements;
-  flopCount *= Nfields;
-
-  platform->flopCounter->add("advection", flopCount);
-}
-
 void adjustDt(nrs_t *nrs, int tstep)
 {
   const double TOLToZero = (sizeof(dfloat) == sizeof(double)) ? 1e-8 : 1e-5;
@@ -205,10 +205,10 @@ void adjustDt(nrs_t *nrs, int tstep)
         if (maxU > TOLToZero) {
           nrs->dt[0] = sqrt(targetCFL * minLengthScale / maxU);
         } else {
-          nrsAbort(platform->comm.mpiComm,
-                   EXIT_FAILURE,
-                   "%s\n",
-                   "Zero velocity and body force! Please specify an initial timestep!");
+          nekrsAbort(platform->comm.mpiComm,
+                     EXIT_FAILURE,
+                     "%s\n",
+                     "Zero velocity and body force! Please specify an initial timestep!");
         }
       }
     }
@@ -407,7 +407,7 @@ bool runStep(nrs_t *nrs, std::function<bool(int)> convergenceCheck, int stage)
     udf.postScalar(nrs, timeNew, tstep);
   }
 
-  evaluateProperties(nrs, timeNew);
+  nrs->evaluateProperties(timeNew);
 
   if (udf.div) {
     platform->timer.tic("udfDiv", 1);
@@ -453,11 +453,11 @@ bool runStep(nrs_t *nrs, std::function<bool(int)> convergenceCheck, int stage)
 void setDt(nrs_t *nrs, dfloat dt, int tstep)
 {
   nrs->dt[0] = dt;
-  nrsCheck(std::isnan(nrs->dt[0]) || std::isinf(nrs->dt[0]),
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s",
-           "Unreasonable dt! Dying ...\n");
+  nekrsCheck(std::isnan(nrs->dt[0]) || std::isinf(nrs->dt[0]),
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s",
+             "Unreasonable dt! Dying ...\n");
 
   nrs->idt = 1 / nrs->dt[0];
 
@@ -493,12 +493,6 @@ void setDt(nrs_t *nrs, dfloat dt, int tstep)
   nrs->ig0 = 1.0 / nrs->g0;
   nrs->o_coeffBDF.copyFrom(nrs->coeffBDF);
   nrs->o_coeffEXT.copyFrom(nrs->coeffEXT);
-
-  if (nrs->Nscalar) {
-    nrs->cds->idt = 1 / nrs->cds->dt[0];
-    nrs->cds->g0 = nrs->g0;
-    nrs->cds->ig0 = nrs->ig0;
-  }
 }
 
 void makeq(nrs_t *nrs, double time, int tstep, occa::memory o_FS, occa::memory o_BF)
@@ -597,7 +591,7 @@ void makeq(nrs_t *nrs, double time, int tstep, occa::memory o_FS, occa::memory o
 
     cds->sumMakefKernel(mesh->Nlocal,
                         mesh->o_LMM,
-                        cds->idt,
+                        *(cds->idt),
                         cds->o_coeffEXT,
                         cds->o_coeffBDF,
                         cds->fieldOffsetSum,
@@ -651,7 +645,7 @@ void scalarSolve(nrs_t *nrs, double time, occa::memory o_S, int stage)
     (is) ? mesh = cds->meshV : mesh = cds->mesh[0];
 
     cds->setEllipticCoeffKernel(mesh->Nlocal,
-                                cds->g0 * cds->idt,
+                                *(cds->g0) * *(cds->idt),
                                 cds->fieldOffsetScan[is],
                                 nrs->fieldOffset,
                                 static_cast<int>(cds->o_BFDiag.isInitialized()),
@@ -660,7 +654,7 @@ void scalarSolve(nrs_t *nrs, double time, occa::memory o_S, int stage)
                                 cds->o_BFDiag,
                                 cds->o_ellipticCoeff);
 
-    occa::memory o_Snew = cdsSolve(is, cds, time, stage);
+    occa::memory o_Snew = cds->solve(is, time, stage);
     o_Snew.copyTo(o_S, cds->fieldOffset[is], cds->fieldOffsetScan[is]);
   }
   platform->timer.toc("scalarSolve");
@@ -694,7 +688,6 @@ void makef(nrs_t *nrs, double time, int tstep, occa::memory o_FU, occa::memory o
     flops *= static_cast<double>(mesh->Nelements);
     platform->flopCounter->add("velocityFilterRT", flops);
   }
-
 
   if (movingMesh && !nrs->Nsubsteps) {
     nrs->advectMeshVelocityKernel(mesh->Nelements,
@@ -753,7 +746,6 @@ void makef(nrs_t *nrs, double time, int tstep, occa::memory o_FU, occa::memory o
                       o_Usubcycling,
                       o_FU,
                       o_BF);
-
 
   dfloat sumMakefFlops = 0.0;
   if (nrs->Nsubsteps) {
@@ -1016,16 +1008,17 @@ void printInfo(nrs_t *nrs, double time, int tstep, bool printStepInfo, bool prin
     }
   }
 
-  if (nrs->cvode)
+  if (nrs->cvode) {
     nrs->cvode->resetCounters();
+  }
 
-  bool largeCFLCheck = (cfl > 30) && numberActiveFields(nrs);
+  bool largeCFLCheck = (cfl > 30) && nrs->numberActiveFields();
 
-  nrsCheck(largeCFLCheck || std::isnan(cfl) || std::isinf(cfl),
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s\n",
-           "Unreasonable CFL!");
+  nekrsCheck(largeCFLCheck || std::isnan(cfl) || std::isinf(cfl),
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "Unreasonable CFL!");
 }
 
 } // namespace timeStepper

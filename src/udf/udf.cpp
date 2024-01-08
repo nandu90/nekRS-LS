@@ -25,65 +25,88 @@ static std::string udfFile;
 
 static void verifyOudf()
 {
-  for (auto& [key, value] :  bcMap::map()) {
+  for (auto &[key, value] : bcMap::map()) {
     auto field = key.first;
     const int bcID = value;
- 
-    if (field.compare("velocity") == 0 && (bcID == bcMap::bcTypeV || bcID == bcMap::bcTypeINT))
+
+    if (field.compare("velocity") == 0 && (bcID == bcMap::bcTypeV || bcID == bcMap::bcTypeINT)) {
       oudfFindDirichlet(field);
-    if (field.compare("mesh") == 0 && bcID == bcMap::bcTypeV)
+    }
+    if (field.compare("mesh") == 0 && bcID == bcMap::bcTypeV) {
       oudfFindDirichlet(field);
+    }
     if (field.compare("pressure") == 0 &&
-        (bcID == bcMap::bcTypeONX || bcID == bcMap::bcTypeONY || bcID == bcMap::bcTypeONZ || 
-         bcID == bcMap::bcTypeON || bcID == bcMap::bcTypeO))
+        (bcID == bcMap::bcTypeONX || bcID == bcMap::bcTypeONY || bcID == bcMap::bcTypeONZ ||
+         bcID == bcMap::bcTypeON || bcID == bcMap::bcTypeO)) {
       oudfFindDirichlet(field);
-    if (field.compare(0, 6, "scalar") == 0 && (bcID == bcMap::bcTypeS || bcID == bcMap::bcTypeINTS))
+    }
+    if (field.compare(0, 6, "scalar") == 0 && (bcID == bcMap::bcTypeS || bcID == bcMap::bcTypeINTS)) {
       oudfFindDirichlet(field);
- 
-    if (field.compare("velocity") == 0 &&
-        (bcID == bcMap::bcTypeSHLX || bcID == bcMap::bcTypeSHLY || bcID == bcMap::bcTypeSHLZ || bcID == bcMap::bcTypeSHL))
+    }
+
+    if (field.compare("velocity") == 0 && (bcID == bcMap::bcTypeSHLX || bcID == bcMap::bcTypeSHLY ||
+                                           bcID == bcMap::bcTypeSHLZ || bcID == bcMap::bcTypeSHL)) {
       oudfFindNeumann(field);
-    if (field.compare("mesh") == 0 && bcID == bcMap::bcTypeSHL)
+    }
+    if (field.compare("mesh") == 0 && bcID == bcMap::bcTypeSHL) {
       oudfFindNeumann(field);
-    if (field.compare(0, 6, "scalar") == 0 && bcID == bcMap::bcTypeF)
+    }
+    if (field.compare(0, 6, "scalar") == 0 && bcID == bcMap::bcTypeF) {
       oudfFindNeumann(field);
+    }
   }
 }
 
 void oudfFindDirichlet(std::string &field)
 {
-  nrsCheck(field.find("velocity") != std::string::npos && !velocityDirichletConditions,
-           MPI_COMM_SELF, EXIT_FAILURE,
-           "%s\n", "Cannot find velocityDirichletConditions!");
+  nekrsCheck(field.find("velocity") != std::string::npos && !velocityDirichletConditions,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "Cannot find velocityDirichletConditions!");
 
-  nrsCheck(field.find("scalar") != std::string::npos && !scalarDirichletConditions,
-           MPI_COMM_SELF, EXIT_FAILURE,
-           "%s\n", "Cannot find scalarDirichletConditions!");
+  nekrsCheck(field.find("scalar") != std::string::npos && !scalarDirichletConditions,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "Cannot find scalarDirichletConditions!");
 
   if (field == "pressure" && !pressureDirichletConditions) {
-    if (platform->comm.mpiRank == 0)
+    if (platform->comm.mpiRank == 0) {
       std::cout << "WARNING: Cannot find pressureDirichletConditions!\n";
+    }
   }
 
   if (field.find("mesh") != std::string::npos) {
     if (bcMap::useDerivedMeshBoundaryConditions()) {
-      nrsCheck(meshVelocityDirichletConditions, MPI_COMM_SELF, EXIT_FAILURE,
-               "%s\n", "meshVelocityDirichletConditions is defined although derived mesh boundary conditions are used!");
+      nekrsCheck(
+          meshVelocityDirichletConditions,
+          MPI_COMM_SELF,
+          EXIT_FAILURE,
+          "%s\n",
+          "meshVelocityDirichletConditions is defined although derived mesh boundary conditions are used!");
     } else {
-      nrsCheck(!meshVelocityDirichletConditions, MPI_COMM_SELF, EXIT_FAILURE, 
-               "%s\n", "Cannot find meshVelocityDirichletConditions!");
+      nekrsCheck(!meshVelocityDirichletConditions,
+                 MPI_COMM_SELF,
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "Cannot find meshVelocityDirichletConditions!");
     }
   }
 }
 
 void oudfFindNeumann(std::string &field)
 {
-  nrsCheck(field.find("velocity") != std::string::npos && !velocityNeumannConditions,
-           MPI_COMM_SELF, EXIT_FAILURE,
-           "%s\n", "Cannot find velocityNeumannConditions!");
-  nrsCheck(field.find("scalar") != std::string::npos && !scalarNeumannConditions,
-           MPI_COMM_SELF, EXIT_FAILURE,
-           "%s\n", "Cannot find scalarNeumannConditions!");
+  nekrsCheck(field.find("velocity") != std::string::npos && !velocityNeumannConditions,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "Cannot find velocityNeumannConditions!");
+  nekrsCheck(field.find("scalar") != std::string::npos && !scalarNeumannConditions,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "Cannot find scalarNeumannConditions!");
 }
 
 void adjustOudf(bool buildRequired, const std::string &postOklSource, const std::string &filePath)
@@ -99,13 +122,15 @@ void adjustOudf(bool buildRequired, const std::string &postOklSource, const std:
   std::ofstream f;
   f.open(filePath, std::ios_base::app);
 
-  if (buildRequired)
+  if (buildRequired) {
     f << "#ifdef __okl__\n";
+  }
 
   bool found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+velocityDirichletConditions)"));
   velocityDirichletConditions = found;
-  if (!found && buildRequired)
+  if (!found && buildRequired) {
     f << "void velocityDirichletConditions(bcData *bc){}\n";
+  }
 
   found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+meshVelocityDirichletConditions)"));
   meshVelocityDirichletConditions = found;
@@ -116,7 +141,7 @@ void adjustOudf(bool buildRequired, const std::string &postOklSource, const std:
            "  velocityDirichletConditions(bc);\n"
            "}\n";
     } else if (!meshVelocityDirichletConditions) {
-      if (platform->options.getArgs("MESH SOLVER").empty() || 
+      if (platform->options.getArgs("MESH SOLVER").empty() ||
           platform->options.compareArgs("MESH SOLVER", "NONE")) {
         f << "void meshVelocityDirichletConditions(bcData *bc){}\n";
       }
@@ -125,38 +150,44 @@ void adjustOudf(bool buildRequired, const std::string &postOklSource, const std:
 
   found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+velocityNeumannConditions)"));
   velocityNeumannConditions = found;
-  if (!found && buildRequired)
+  if (!found && buildRequired) {
     f << "void velocityNeumannConditions(bcData *bc){}\n";
+  }
 
   found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+pressureDirichletConditions)"));
   pressureDirichletConditions = found;
-  if (!found && buildRequired)
+  if (!found && buildRequired) {
     f << "void pressureDirichletConditions(bcData *bc){}\n";
+  }
 
   found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+scalarNeumannConditions)"));
   scalarNeumannConditions = found;
-  if (!found && buildRequired)
+  if (!found && buildRequired) {
     f << "void scalarNeumannConditions(bcData *bc){}\n";
+  }
 
   found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+scalarDirichletConditions)"));
   scalarDirichletConditions = found;
 
-  if (!found && buildRequired)
+  if (!found && buildRequired) {
     f << "void scalarDirichletConditions(bcData *bc){}\n";
+  }
 
-  if (buildRequired)
+  if (buildRequired) {
     f << "#endif\n";
+  }
 
   f.close();
 }
 
-void udfAutoKernels(const std::string& udfFileCache, const std::string& postOklSource, const std::string& oudfFileCache)
+void udfAutoKernels(const std::string &udfFileCache,
+                    const std::string &postOklSource,
+                    const std::string &oudfFileCache)
 {
   const std::string includeFile = fs::path(udfFileCache).parent_path() / fs::path("udfAutoLoadKernel.hpp");
   std::ofstream f(includeFile);
 
-  auto buffer = [&]()
-  {
+  auto buffer = [&]() {
     std::stringstream fbuffer;
     std::ifstream postOklSourceStream(postOklSource);
     fbuffer << postOklSourceStream.rdbuf();
@@ -170,9 +201,9 @@ void udfAutoKernels(const std::string& udfFileCache, const std::string& postOklS
 
   {
     std::regex_token_iterator<std::string::iterator> rend; // default constructor = end-of-sequence:
-    std::regex_token_iterator<std::string::iterator> token (buffer.begin(), buffer.end(), exp, 1);
- 
-    while (token != rend) { 
+    std::regex_token_iterator<std::string::iterator> token(buffer.begin(), buffer.end(), exp, 1);
+
+    while (token != rend) {
       const auto kernelName = *token++;
       kernelNameList.push_back(kernelName);
       f << "static occa::kernel " << kernelName << ";\n";
@@ -192,11 +223,12 @@ void udfAutoKernels(const std::string& udfFileCache, const std::string& postOklS
   fileSync(includeFile.c_str());
 }
 
-void udfBuild(const std::string& _udfFile, setupAide &options)
+void udfBuild(const std::string &_udfFile, setupAide &options)
 {
   udfFile = fs::absolute(_udfFile);
-  if (platform->comm.mpiRank == 0)
-    nrsCheck(!fs::exists(udfFile), MPI_COMM_SELF, EXIT_FAILURE, "Cannot find %s!\n", udfFile.c_str()); 
+  if (platform->comm.mpiRank == 0) {
+    nekrsCheck(!fs::exists(udfFile), MPI_COMM_SELF, EXIT_FAILURE, "Cannot find %s!\n", udfFile.c_str());
+  }
 
   const int verbose = options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
   const std::string installDir(getenv("NEKRS_HOME"));
@@ -212,8 +244,8 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
   const std::string cmakeBuildDir = cache_dir + "/udf";
   const std::string postOklSource = cmakeBuildDir + "/CMakeFiles/OKL.dir/okl.cpp.i";
 
-  const std::string libnekrsFile = (sizeof(dfloat) == sizeof(float)) ?  installDir + "/lib/libnekrs-fp32.so"
-                                                                     :  installDir + "/lib/libnekrs.so"; 
+  const std::string libnekrsFile = (sizeof(dfloat) == sizeof(float)) ? installDir + "/lib/libnekrs-fp32.so"
+                                                                     : installDir + "/lib/libnekrs.so";
   const std::string libnekrsHashFile = cache_dir + "/udf/libnekrs.hash";
 
   std::string oudfFile;
@@ -225,12 +257,13 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
   MPI_Comm_rank(comm, &buildRank);
 
   int buildRequired = 0;
-  if(platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank == 0) {
 
-    auto getHash = [&](const std::string& fname)
-    { 
+    auto getHash = [&](const std::string &fname) {
       std::ifstream f(fname);
-      if(!f.is_open()) return std::string("");
+      if (!f.is_open()) {
+        return std::string("");
+      }
       std::stringstream buffer;
       buffer << f.rdbuf();
       f.close();
@@ -238,40 +271,47 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
       return buffer.str();
     };
 
-    // changes in udf include files + env-vars are currently not detected  
-    // note, we want to avoid calling system() 
+    // changes in udf include files + env-vars are currently not detected
+    // note, we want to avoid calling system()
     if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
       buildRequired = 1;
     } else if (!fs::exists(udfLib) || !fs::exists(oudfFileCache)) {
       buildRequired = 1;
-    } else if (SHA1::from_file(udfFile) != getHash(udfHashFile)) { 
-      buildRequired = 1; 
-    } else if (SHA1::from_file(libnekrsFile) != getHash(libnekrsHashFile)) { 
-      buildRequired = 1; 
-    } 
+    } else if (SHA1::from_file(udfFile) != getHash(udfHashFile)) {
+      buildRequired = 1;
+    } else if (SHA1::from_file(libnekrsFile) != getHash(libnekrsHashFile)) {
+      buildRequired = 1;
+    }
 
     if (fs::exists(std::string(case_dir + "/ci.inc"))) {
-      if (isFileNewer(std::string(case_dir + "/ci.inc").c_str(), udfFileCache.c_str()))
+      if (isFileNewer(std::string(case_dir + "/ci.inc").c_str(), udfFileCache.c_str())) {
         buildRequired = 1;
+      }
     }
 
     if (fs::exists(oudfFile)) {
-      if (isFileNewer(oudfFile.c_str(), oudfFileCache.c_str())) 
+      if (isFileNewer(oudfFile.c_str(), oudfFileCache.c_str())) {
         buildRequired = 1;
+      }
     }
 
     // check for a typical include file
     if (fs::exists(std::string(case_dir + "/" + casename + ".okl"))) {
-      if (isFileNewer(std::string(case_dir + "/" + casename + ".okl").c_str(), oudfFileCache.c_str())) 
+      if (isFileNewer(std::string(case_dir + "/" + casename + ".okl").c_str(), oudfFileCache.c_str())) {
         buildRequired = 1;
+      }
     }
   }
   MPI_Bcast(&buildRequired, 1, MPI_INT, 0, comm);
 
   int oudfFileExists;
-  if(platform->comm.mpiRank == 0) oudfFileExists = fs::exists(oudfFile);
+  if (platform->comm.mpiRank == 0) {
+    oudfFileExists = fs::exists(oudfFile);
+  }
   MPI_Bcast(&oudfFileExists, 1, MPI_INT, 0, comm);
-  if(!oudfFileExists) options.removeArgs("UDF OKL FILE");
+  if (!oudfFileExists) {
+    options.removeArgs("UDF OKL FILE");
+  }
 
   if (platform->cacheBcast || platform->cacheLocal) {
     if (oudfFileExists) {
@@ -299,8 +339,9 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
           (platform->comm.mpiRank == 0) ? std::string("") : std::string("> /dev/null 2>&1");
 
       if (buildRequired) {
-        if (platform->comm.mpiRank == 0)
+        if (platform->comm.mpiRank == 0) {
           printf("building udf ... \n");
+        }
         fflush(stdout);
 
         {
@@ -315,7 +356,6 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
           f.close();
         }
 
-
         // generate udfFileCache
         {
           std::ofstream f(udfFileCache, std::ios::trunc);
@@ -325,26 +365,23 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
             << "#include \"" << udfFile << "\"" << std::endl;
 
           // autoload plugins
-          std::map<std::string, std::string> pluginTable =
-          {
-            {"nekrs_tavg_hpp_"         , "tavg::buildKernel"},
-            {"nekrs_RANSktau_hpp_"     , "RANSktau::buildKernel"},
-            {"nekrs_lowMach_hpp_"      , "lowMach::buildKernel"},
-            {"nekrs_velRecycling_hpp_" , "velRecycling::buildKernel"},
-            {"nekrs_lpm_hpp_"          , "lpm_t::registerKernels"},
-            {"nekrs_plugin_nekCRF_hpp_", "nekCRF::buildKernel"}
-          };
+          std::map<std::string, std::string> pluginTable = {
+              {"nekrs_tavg_hpp_", "tavg::buildKernel"},
+              {"nekrs_RANSktau_hpp_", "RANSktau::buildKernel"},
+              {"nekrs_lowMach_hpp_", "lowMach::buildKernel"},
+              {"nekrs_velRecycling_hpp_", "velRecycling::buildKernel"},
+              {"nekrs_lpm_hpp_", "lpm_t::registerKernels"},
+              {"nekrs_plugin_nekCRF_hpp_", "nekCRF::buildKernel"}};
 
-          f << "void UDF_AutoLoadPlugins(occa::properties& kernelInfo)" << std::endl
-            << "{" << std::endl;
+          f << "void UDF_AutoLoadPlugins(occa::properties& kernelInfo)" << std::endl << "{" << std::endl;
 
-            for (auto const& plugin : pluginTable) {
-              f << "#ifdef " << plugin.first << std::endl
-                << "  " << plugin.second << "(kernelInfo);" << std::endl
-                << "#endif" << std::endl;
-            }
+          for (auto const &plugin : pluginTable) {
+            f << "#ifdef " << plugin.first << std::endl
+              << "  " << plugin.second << "(kernelInfo);" << std::endl
+              << "#endif" << std::endl;
+          }
 
-          f << "}" << std::endl; 
+          f << "}" << std::endl;
           f.close();
         }
 
@@ -352,8 +389,9 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
                  std::string(cache_dir + std::string("/udf/CMakeLists.txt")).c_str());
 
         std::string cmakeFlags("-Wno-dev");
-        if (verbose)
+        if (verbose) {
           cmakeFlags += " --trace-expand";
+        }
 
         { // generate dummy to make cmake happy that the file exists
           const std::string includeFile = std::string(cache_dir + std::string("/udf/udfAutoLoadKernel.hpp"));
@@ -366,16 +404,18 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
         extract_ifdef("__okl__", udfFile.c_str(), std::string(cache_dir + "/udf/okl.cpp").c_str());
         bool oklSectionFound = fs::file_size(cache_dir + "/udf/okl.cpp");
 
-        if(!oklSectionFound && oudfFileExists) {
-           copyFile(oudfFile.c_str(), std::string(cache_dir + "/udf/okl.cpp").c_str());
-           if(platform->comm.mpiRank == 0)
-             printf("Cannot find okl section in udf (oudf will be deprecated in next version!)\n");
+        if (!oklSectionFound && oudfFileExists) {
+          copyFile(oudfFile.c_str(), std::string(cache_dir + "/udf/okl.cpp").c_str());
+          if (platform->comm.mpiRank == 0) {
+            printf("Cannot find okl section in udf (oudf will be deprecated in next version!)\n");
+          }
         } else if (!oklSectionFound) {
-          if(platform->comm.mpiRank == 0)
+          if (platform->comm.mpiRank == 0) {
             printf("Cannot find oudf or okl section in udf\n");
+          }
           return EXIT_FAILURE;
         }
-  
+
         const std::string useFloat = (sizeof(dfloat) == sizeof(float)) ? "ON" : "OFF";
 
         sprintf(cmd,
@@ -392,22 +432,27 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
                 case_dir.c_str(),
                 pipeToNull.c_str());
         const int retVal = system(cmd);
-        if (verbose && platform->comm.mpiRank == 0)
+        if (verbose && platform->comm.mpiRank == 0) {
           printf("%s (cmake retVal: %d)\n", cmd, retVal);
-        if (retVal)
+        }
+        if (retVal) {
           return EXIT_FAILURE;
+        }
 
         { // generate pre-processed okl
           sprintf(cmd, "cd %s && make -j1 okl.i %s", cmakeBuildDir.c_str(), pipeToNull.c_str());
           const int retVal = system(cmd);
-          if (verbose && platform->comm.mpiRank == 0)
+          if (verbose && platform->comm.mpiRank == 0) {
             printf("%s (preprocessing retVal: %d)\n", cmd, retVal);
-          if (retVal)
+          }
+          if (retVal) {
             return EXIT_FAILURE;
+          }
         }
 
-        if(oklSectionFound)
+        if (oklSectionFound) {
           udfAutoKernels(udfFileCache, postOklSource, cache_dir + "/udf/okl.cpp");
+        }
 
         { // build
           sprintf(cmd, "cd %s/udf && make -j1 %s", cache_dir.c_str(), pipeToNull.c_str());
@@ -415,19 +460,22 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
           if (verbose && platform->comm.mpiRank == 0) {
             printf("%s (make retVal: %d)\n", cmd, retVal);
           }
-          if (retVal)
+          if (retVal) {
             return EXIT_FAILURE;
+          }
           fileSync(udfLib.c_str());
         }
 
-        if (platform->comm.mpiRank == 0)
+        if (platform->comm.mpiRank == 0) {
           printf("done (%gs)\n", MPI_Wtime() - tStart);
+        }
         fflush(stdout);
 
       } // buildRequired
 
-      if(fs::exists(cache_dir + "/udf/okl.cpp")) 
+      if (fs::exists(cache_dir + "/udf/okl.cpp")) {
         fs::rename(cache_dir + "/udf/okl.cpp", oudfFileCache);
+      }
 
       adjustOudf(buildRequired, postOklSource, oudfFileCache); // call every time for verifyOudf
       verifyOudf();
@@ -436,16 +484,17 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
 
     } // rank 0
 
-    if (platform->cacheBcast || platform->cacheLocal)
+    if (platform->cacheBcast || platform->cacheLocal) {
       fileBcast(fs::path(udfFileCache).parent_path(), platform->tmpDir, comm, platform->verbose);
+    }
 
     return 0;
   }();
 
-
   options.setArgs("OKL FILE CACHE", oudfFileCache);
-  if (platform->cacheBcast || platform->cacheLocal)
+  if (platform->cacheBcast || platform->cacheLocal) {
     options.setArgs("OKL FILE CACHE", std::string(platform->tmpDir + "/udf/udf.okl"));
+  }
 
   MPI_Bcast(&velocityDirichletConditions, 1, MPI_INT, 0, comm);
   MPI_Bcast(&meshVelocityDirichletConditions, 1, MPI_INT, 0, comm);
@@ -456,29 +505,30 @@ void udfBuild(const std::string& _udfFile, setupAide &options)
 
   MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_SUM, platform->comm.mpiComm);
 
-  nrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "see above and cmake.log for more details");
-
+  nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "see above and cmake.log for more details");
 }
 
 void *udfLoadFunction(const char *fname, int errchk)
 {
   static void *h = nullptr;
-  if(!h) {
+  if (!h) {
     std::string cache_dir(getenv("NEKRS_CACHE_DIR"));
-    if (platform->cacheBcast)
+    if (platform->cacheBcast) {
       cache_dir = fs::path(platform->tmpDir);
+    }
 
     const auto udfLib = std::string(fs::path(cache_dir) / "udf/libUDF.so");
 
-    if(platform->comm.mpiRank == 0 && platform->verbose)
+    if (platform->comm.mpiRank == 0 && platform->verbose) {
       std::cout << "loading " << udfLib << std::endl;
+    }
 
     h = dlopen(udfLib.c_str(), RTLD_NOW | RTLD_GLOBAL);
-    nrsCheck(!h, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", dlerror());
+    nekrsCheck(!h, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", dlerror());
   }
 
   void *fptr = dlsym(h, fname);
-  nrsCheck(!fptr && errchk, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", dlerror());
+  nekrsCheck(!fptr && errchk, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", dlerror());
 
   dlerror();
 
@@ -515,10 +565,9 @@ void udfEcho()
   std::string text;
 
   std::cout << std::endl;
-  while(!fudf.eof()) 
-  {
-    getline(fudf,text);
-    std::cout << "<<< " << text << "\n" ;
+  while (!fudf.eof()) {
+    getline(fudf, text);
+    std::cout << "<<< " << text << "\n";
   }
   fudf.close();
   fs::remove(tmpFile);
@@ -526,10 +575,9 @@ void udfEcho()
   std::ifstream foudf(oudfFileCache);
 
   std::cout << std::endl;
-  while(!foudf.eof()) 
-  {
-    getline(foudf,text);
-    std::cout << "<<< " << text << "\n" ;
+  while (!foudf.eof()) {
+    getline(foudf, text);
+    std::cout << "<<< " << text << "\n";
   }
   std::cout << std::endl;
 

@@ -8,7 +8,8 @@
 #include "platform.hpp"
 #include "gslib.h"
 
-namespace {
+namespace
+{
 void quadrature_rule(double q_r[4][3], double q_w[4])
 {
   double a = (5.0 + 3.0 * sqrt(5.0)) / 20.0;
@@ -32,6 +33,7 @@ void quadrature_rule(double q_r[4][3], double q_w[4])
   q_w[2] = 1.0 / 24.0;
   q_w[3] = 1.0 / 24.0;
 }
+
 long long bisection_search_index(const long long *sortedArr, long long value, long long start, long long end)
 {
   long long fail = -1;
@@ -41,11 +43,9 @@ long long bisection_search_index(const long long *sortedArr, long long value, lo
     const long long m = (L + R) / 2;
     if (sortedArr[m] < value) {
       L = m + 1;
-    }
-    else if (sortedArr[m] > value) {
+    } else if (sortedArr[m] > value) {
       R = m - 1;
-    }
-    else {
+    } else {
       return m;
     }
   }
@@ -64,10 +64,26 @@ long long linear_search_index(const long long *unsortedArr, long long value, lon
 }
 
 /* Basis functions and derivatives in 3D */
-double phi_3D_1(double q_r[4][3], int q) { return q_r[q][0]; }
-double phi_3D_2(double q_r[4][3], int q) { return q_r[q][1]; }
-double phi_3D_3(double q_r[4][3], int q) { return q_r[q][2]; }
-double phi_3D_4(double q_r[4][3], int q) { return 1.0 - q_r[q][0] - q_r[q][1] - q_r[q][2]; }
+double phi_3D_1(double q_r[4][3], int q)
+{
+  return q_r[q][0];
+}
+
+double phi_3D_2(double q_r[4][3], int q)
+{
+  return q_r[q][1];
+}
+
+double phi_3D_3(double q_r[4][3], int q)
+{
+  return q_r[q][2];
+}
+
+double phi_3D_4(double q_r[4][3], int q)
+{
+  return 1.0 - q_r[q][0] - q_r[q][1] - q_r[q][2];
+}
+
 void dphi(double deriv[3], int q)
 {
   if (q == 0) {
@@ -96,7 +112,10 @@ void dphi(double deriv[3], int q)
 }
 
 /* Math functions */
-long long maximum(long long a, long long b) { return a > b ? a : b; }
+long long maximum(long long a, long long b)
+{
+  return a > b ? a : b;
+}
 
 double determinant(double A[3][3])
 {
@@ -202,6 +221,7 @@ static COOGraph coo_graph;
 } // namespace
 
 static struct comm comm;
+
 struct gs_data {
   struct comm comm;
 };
@@ -209,15 +229,15 @@ static struct gs_data *gsh;
 
 /* Interface definition */
 SEMFEMSolver_t::matrix_t *SEMFEMSolver_t::build(const int N_,
-                                const int n_elem_,
-                                occa::memory _o_x,
-                                occa::memory _o_y,
-                                occa::memory _o_z,
-                                double *pmask_,
-                                double lambda0_,
-                                hypreWrapper::IJ_t &hypreIJ,
-                                MPI_Comm mpiComm,
-                                long long int *gatherGlobalNodes)
+                                                const int n_elem_,
+                                                occa::memory _o_x,
+                                                occa::memory _o_y,
+                                                occa::memory _o_z,
+                                                double *pmask_,
+                                                double lambda0_,
+                                                hypreWrapper::IJ_t &hypreIJ,
+                                                MPI_Comm mpiComm,
+                                                long long int *gatherGlobalNodes)
 {
   n_x = N_;
   n_y = N_;
@@ -247,8 +267,9 @@ SEMFEMSolver_t::matrix_t *SEMFEMSolver_t::build(const int N_,
 
   constructOnHost = !platform->device.deviceAtomic;
 
-  if (!constructOnHost)
+  if (!constructOnHost) {
     load();
+  }
 
   matrix_distribution();
 
@@ -264,21 +285,26 @@ SEMFEMSolver_t::matrix_t *SEMFEMSolver_t::build(const int N_,
       long long numRowsGlobal64;
       long long numRows64 = numRows;
       comm_allreduce(&comm, gs_long_long, gs_add, &numRows64, 1, &numRowsGlobal64);
-      nrsCheck(numRowsGlobal64 > std::numeric_limits<int>::max(), comm.c, EXIT_FAILURE,
-               "%s\n", "Number of global rows requires BigInt support!");
+      nekrsCheck(numRowsGlobal64 > std::numeric_limits<int>::max(),
+                 comm.c,
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "Number of global rows requires BigInt support!");
     }
 
     hypreWrapper::BigInt *ownedRows = (hypreWrapper::BigInt *)calloc(numRows, sizeof(hypreWrapper::BigInt));
     int ctr = 0;
-    for (long long row = row_start; row <= row_end; ++row)
+    for (long long row = row_start; row <= row_end; ++row) {
       ownedRows[ctr++] = row;
+    }
 
     hypreWrapper::Int *ncols = (hypreWrapper::Int *)calloc(numRows, sizeof(hypreWrapper::Int));
     hypreIJ.MatrixGetRowCounts(numRows, ownedRows, ncols);
 
     int nnz = 0;
-    for (int i = 0; i < numRows; ++i)
+    for (int i = 0; i < numRows; ++i) {
       nnz += ncols[i];
+    }
 
     // construct COO matrix from Hypre matrix
     hypreWrapper::BigInt *hAj = (hypreWrapper::BigInt *)calloc(nnz, sizeof(hypreWrapper::BigInt));
@@ -295,8 +321,9 @@ SEMFEMSolver_t::matrix_t *SEMFEMSolver_t::build(const int N_,
     ctr = 0;
     for (int i = 0; i < numRows; ++i) {
       long long row = ownedRows[i];
-      for (int col = 0; col < ncols[i]; ++col)
+      for (int col = 0; col < ncols[i]; ++col) {
         Ai[ctr++] = row;
+      }
     }
 
     free(hAj);
@@ -344,7 +371,8 @@ SEMFEMSolver_t::matrix_t *SEMFEMSolver_t::build(const int N_,
   return matrix;
 }
 
-namespace {
+namespace
+{
 
 /* FEM Assembly definition */
 void matrix_distribution()
@@ -365,10 +393,11 @@ void matrix_distribution()
   glo_num = (long long *)malloc(n_xyze * sizeof(long long));
 
   for (idx = 0; idx < n_xyze; idx++) {
-    if (pmask[idx] > 0.0)
+    if (pmask[idx] > 0.0) {
       glo_num[idx] = idx_start + (long long)idx;
-    else
+    } else {
       glo_num[idx] = -1;
+    }
   }
 
   gs(glo_num, gs_long_long, gs_min, 0, gsh, 0);
@@ -419,11 +448,9 @@ void matrix_distribution()
       current_count++;
       current_rank = ranking_tuple_array[idx].rank;
       ranking_tuple_array[idx].rank = current_count;
-    }
-    else if (ranking_tuple_array[idx].rank == current_rank) {
+    } else if (ranking_tuple_array[idx].rank == current_rank) {
       ranking_tuple_array[idx].rank = current_count;
-    }
-    else {
+    } else {
       break;
     }
   }
@@ -451,6 +478,7 @@ void matrix_distribution()
   array_free(&ranking_transfer);
   crystal_free(&crystal_router_handle);
 }
+
 void construct_coo_graph()
 {
 
@@ -672,8 +700,7 @@ void fem_assembly_host(hypreWrapper::IJ_t &hypreIJ)
   }
 
   int err = hypreIJ.MatrixAddToValues(nrows, ncols, rows, cols, vals);
-  nrsCheck(err != 0, comm.c, EXIT_FAILURE, 
-           "%s\n", "hypreWrapper::IJMatrixAddToValues failed!");
+  nekrsCheck(err != 0, comm.c, EXIT_FAILURE, "%s\n", "hypreWrapper::IJMatrixAddToValues failed!");
 
   free(rows);
   free(rowOffsets);
@@ -684,6 +711,7 @@ void fem_assembly_host(hypreWrapper::IJ_t &hypreIJ)
   free(y);
   free(z);
 }
+
 void fem_assembly_device(hypreWrapper::IJ_t &hypreIJ)
 {
 
@@ -704,11 +732,11 @@ void fem_assembly_device(hypreWrapper::IJ_t &hypreIJ)
   occa::memory o_rows = platform->device.malloc<long long>(nrows);
   o_rows.copyFrom(rows);
 
-  occa::memory o_rowOffsets= platform->device.malloc<long long>((nrows+1));
+  occa::memory o_rowOffsets = platform->device.malloc<long long>((nrows + 1));
   o_rowOffsets.copyFrom(rowOffsets);
 
   occa::memory o_cols = platform->device.malloc<long long>(nnz);
-  o_cols.copyFrom(cols); 
+  o_cols.copyFrom(cols);
 
   occa::memory o_vals = platform->device.malloc<float>(nnz);
   o_vals.copyFrom(vals);
@@ -727,8 +755,7 @@ void fem_assembly_device(hypreWrapper::IJ_t &hypreIJ)
   o_vals.copyTo(vals, nnz);
 
   int err = hypreIJ.MatrixAddToValues(nrows, ncols, rows, cols, vals);
-  nrsCheck(err != 0, comm.c, EXIT_FAILURE,
-           "%s\n", "hypreWrapper::IJMatrixAddToValues failed!");
+  nekrsCheck(err != 0, comm.c, EXIT_FAILURE, "%s\n", "hypreWrapper::IJMatrixAddToValues failed!");
 
   free(rows);
   free(rowOffsets);
@@ -747,21 +774,25 @@ void fem_assembly(hypreWrapper::IJ_t &hypreIJ)
 
   /* Variables */
   double tStart = MPI_Wtime();
-  if (comm.id == 0)
+  if (comm.id == 0) {
     printf("building matrix ... ");
+  }
   int idx;
 
   row_start = 0;
   row_end = 0;
 
-  for (idx = 0; idx < n_xyze; idx++)
-    if (glo_num[idx] >= 0)
+  for (idx = 0; idx < n_xyze; idx++) {
+    if (glo_num[idx] >= 0) {
       row_end = maximum(row_end, glo_num[idx]);
+    }
+  }
 
   long long scan_out[2], scan_buf[2];
   comm_scan(scan_out, &comm, gs_long_long, gs_max, &row_end, 1, scan_buf);
-  if (comm.id > 0)
+  if (comm.id > 0) {
     row_start = scan_out[0] + 1;
+  }
 
   num_loc_dofs = row_end - row_start + 1;
 
@@ -782,8 +813,7 @@ void fem_assembly(hypreWrapper::IJ_t &hypreIJ)
 
   if (constructOnHost) {
     fem_assembly_host(hypreIJ);
-  }
-  else {
+  } else {
     fem_assembly_device(hypreIJ);
   }
 
@@ -794,11 +824,16 @@ void fem_assembly(hypreWrapper::IJ_t &hypreIJ)
   free(glo_num);
 
   MPI_Barrier(comm.c);
-  if (comm.id == 0)
+  if (comm.id == 0) {
     printf("done (%gs)\n", MPI_Wtime() - tStart);
+  }
 }
 
-void load() { computeStiffnessMatrixKernel = platform->kernels.get("computeStiffnessMatrix"); }
+void load()
+{
+  computeStiffnessMatrixKernel = platform->kernels.get("computeStiffnessMatrix");
+}
+
 void mesh_connectivity(int v_coord[8][3], int t_map[8][4])
 {
 

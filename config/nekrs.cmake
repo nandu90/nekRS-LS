@@ -32,7 +32,7 @@ set(NRS_SRC
     src/nrs/registerNrsKernels.cpp
     src/nrs/numberActiveFields.cpp
     src/nrs/cfl.cpp
-    src/nrs/nrsSetup.cpp
+    src/nrs/nrs.cpp
     src/nrs/applyDirichlet.cpp
     src/nrs/timeStepper.cpp
     src/nrs/evaluateProperties.cpp
@@ -40,7 +40,7 @@ set(NRS_SRC
     src/nrs/tombo.cpp
     src/nrs/constantFlowRate.cpp
     src/nrs/Urst.cpp
-    src/nrs/cds/cdsSetup.cpp
+    src/nrs/cds/cds.cpp
     src/nrs/cds/cdsSolve.cpp
     src/core/io/parsePar.cpp
     src/core/io/re2Reader.cpp
@@ -58,10 +58,10 @@ set(NRS_SRC
     src/linAlg/matrixTranspose.cpp
     src/linAlg/matrixRightSolve.cpp
     src/plugins/tavg.cpp
-    src/plugins/velRecycling.cpp
-    src/plugins/RANSktau.cpp
-    src/plugins/lowMach.cpp
-    src/plugins/lpm.cpp
+    src/nrs/plugins/velRecycling.cpp
+    src//nrs/plugins/RANSktau.cpp
+    src/nrs/plugins/lowMach.cpp
+    src/nrs/plugins/lpm.cpp
     src/pointInterpolation/findpts/findpts.cpp
     src/pointInterpolation/pointInterpolation.cpp
     src/neknek/neknek.cpp
@@ -93,10 +93,11 @@ set(NRS_INCLUDE
     src/nrs/regularization
     src/linAlg
     src/nrs
+    src/nrs/plugins
+    src/plugins
     src/neknek
     src/nrs/cds
     src/pointInterpolation/findpts
-    src/nrs/postProcessing
     src/pointInterpolation
     src/solvers/cvode
     ${BENCH_SOURCE_DIR}

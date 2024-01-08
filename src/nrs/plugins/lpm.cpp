@@ -18,17 +18,17 @@ lpm_t::lpm_t(nrs_t *nrs_, dfloat bb_tol_, dfloat newton_tol_)
     : nrs(nrs_), solverOrder(nrs->nEXT), bb_tol(bb_tol_), newton_tol(newton_tol_),
       interp(std::make_unique<pointInterpolation_t>(nrs, bb_tol, newton_tol))
 {
-  nrsCheck(!kernelsRegistered_,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s\n",
-           "lpm_t::registerKernels has not been called prior to constructing lpm_t!");
-  
-  nrsCheck(neknekCoupled(),
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s\n",
-           "lpm_t + neknek is not supported!");
+  nekrsCheck(!kernelsRegistered_,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "lpm_t::registerKernels has not been called prior to constructing lpm_t!");
+
+  nekrsCheck(neknekCoupled(),
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "lpm_t + neknek is not supported!");
 
   nEXT = nrs->nEXT;
   nBDF = nrs->nBDF;
@@ -58,18 +58,18 @@ lpm_t::lpm_t(nrs_t *nrs_, dfloat bb_tol_, dfloat newton_tol_)
 
 void lpm_t::abOrder(int order)
 {
-  nrsCheck(order <= 0 && order <= 3,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "Invalid integration order (%d)!\n",
-           order);
-  nrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
+  nekrsCheck(order <= 0 && order <= 3,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "Invalid integration order (%d)!\n",
+             order);
+  nekrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
   solverOrder = order;
 
   dt.resize(solverOrder + 1);
   coeffAB.resize(solverOrder);
 
-  if (o_coeffAB.size()) {
+  if (o_coeffAB.byte_size()) {
     o_coeffAB.free();
   }
 
@@ -78,11 +78,11 @@ void lpm_t::abOrder(int order)
 
 void lpm_t::rkOrder(int order)
 {
-  nrsCheck(order <= 0,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "Integration order (%d) must be positive!\n",
-           order);
+  nekrsCheck(order <= 0,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "Integration order (%d) must be positive!\n",
+             order);
 
   bool supported = false;
   constexpr int maxRKOrder = 4;
@@ -90,59 +90,60 @@ void lpm_t::rkOrder(int order)
     supported |= order == ord;
   }
 
-  nrsCheck(!supported,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "RK order (%d) is not supported!\n",
-           order);
-  nrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
+  nekrsCheck(!supported, platform->comm.mpiComm, EXIT_FAILURE, "RK order (%d) is not supported!\n", order);
+  nekrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
   solverOrder = order;
 
   dt.resize(solverOrder + 1);
   coeffRK.resize(solverOrder);
 
-  if (o_coeffRK.size()) {
+  if (o_coeffRK.byte_size()) {
     o_coeffRK.free();
   }
 
   o_coeffRK = platform->device.malloc<dfloat>(solverOrder);
 }
 
-lpm_t::SolverType lpm_t::stringToSolverType(const std::string& _solverType)
+lpm_t::SolverType lpm_t::stringToSolverType(const std::string &_solverType)
 {
   std::string solverType = _solverType;
   lowerCase(solverType);
-  if (solverType == "ab")
+  if (solverType == "ab") {
     return SolverType::AB;
+  }
 
-  if (solverType == "rk")
+  if (solverType == "rk") {
     return SolverType::RK;
+  }
 
   return SolverType::INVALID;
 }
 
-void lpm_t::setSolver(const std::string& _solver)
+void lpm_t::setSolver(const std::string &_solver)
 {
   std::string solver = _solver;
   lowerCase(solver);
   this->solverType = stringToSolverType(solver);
-  nrsCheck(this->solverType == SolverType::INVALID,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "Solver (%s) is not supported.!",
-           solver.c_str());
+  nekrsCheck(this->solverType == SolverType::INVALID,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "Solver (%s) is not supported.!",
+             solver.c_str());
 }
 
-void lpm_t::registerDOF(const std::string& dofName, bool output) { registerDOF(1, dofName, output); }
+void lpm_t::registerDOF(const std::string &dofName, bool output)
+{
+  registerDOF(1, dofName, output);
+}
 
-void lpm_t::registerDOF(dlong Nfields, const std::string& _dofName, bool output)
+void lpm_t::registerDOF(dlong Nfields, const std::string &_dofName, bool output)
 {
   std::string dofName = _dofName;
-  nrsCheck(this->initialized(),
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "cannot register DOF %s after calling initialize!\n",
-           dofName.c_str());
+  nekrsCheck(this->initialized(),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "cannot register DOF %s after calling initialize!\n",
+             dofName.c_str());
 
   lowerCase(dofName);
   const auto nDOFs = dofIds.size();
@@ -156,41 +157,44 @@ void lpm_t::registerDOF(dlong Nfields, const std::string& _dofName, bool output)
   }
 }
 
-int lpm_t::dofId(const std::string& _dofName) const
+int lpm_t::dofId(const std::string &_dofName) const
 {
   std::string dofName = _dofName;
   lowerCase(dofName);
-  nrsCheck(dofIds.count(dofName) == 0,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "DOF %s not registered!\n",
-           dofName.c_str());
+  nekrsCheck(dofIds.count(dofName) == 0,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "DOF %s not registered!\n",
+             dofName.c_str());
   return dofIds.at(dofName);
 }
 
-int lpm_t::numDOFs(const std::string& _dofName) const
+int lpm_t::numDOFs(const std::string &_dofName) const
 {
   std::string dofName = _dofName;
   lowerCase(dofName);
-  nrsCheck(dofIds.count(dofName) == 0,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "DOF %s not registered!\n",
-           dofName.c_str());
+  nekrsCheck(dofIds.count(dofName) == 0,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "DOF %s not registered!\n",
+             dofName.c_str());
   return dofCounts.at(dofName);
 }
 
-void lpm_t::registerProp(const std::string& propName, bool output) { registerProp(1, propName, output); }
+void lpm_t::registerProp(const std::string &propName, bool output)
+{
+  registerProp(1, propName, output);
+}
 
-void lpm_t::registerProp(dlong Nfields, const std::string& _propName, bool output)
+void lpm_t::registerProp(dlong Nfields, const std::string &_propName, bool output)
 {
   std::string propName = _propName;
   lowerCase(propName);
-  nrsCheck(this->initialized(),
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "cannot register prop %s after calling initialize!\n",
-           propName.c_str());
+  nekrsCheck(this->initialized(),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "cannot register prop %s after calling initialize!\n",
+             propName.c_str());
   const auto nprops = propIds.size();
   if (propIds.count(propName) == 0) {
     propIds[propName] = nprops;
@@ -201,39 +205,42 @@ void lpm_t::registerProp(dlong Nfields, const std::string& _propName, bool outpu
   }
 }
 
-int lpm_t::propId(const std::string& _propName) const
+int lpm_t::propId(const std::string &_propName) const
 {
   std::string propName = _propName;
   lowerCase(propName);
-  nrsCheck(propIds.count(propName) == 0,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "prop %s not registered!\n",
-           propName.c_str());
+  nekrsCheck(propIds.count(propName) == 0,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "prop %s not registered!\n",
+             propName.c_str());
   return propIds.at(propName);
 }
 
-int lpm_t::numProps(const std::string& _propName) const
+int lpm_t::numProps(const std::string &_propName) const
 {
   std::string propName = _propName;
   lowerCase(propName);
-  nrsCheck(propIds.count(propName) == 0,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "prop %s not registered!\n",
-           propName.c_str());
+  nekrsCheck(propIds.count(propName) == 0,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "prop %s not registered!\n",
+             propName.c_str());
   return propCounts.at(propName);
 }
 
-void lpm_t::registerInterpField(const std::string& _interpFieldName, int Nfields, const occa::memory& o_fld, bool output)
+void lpm_t::registerInterpField(const std::string &_interpFieldName,
+                                int Nfields,
+                                const occa::memory &o_fld,
+                                bool output)
 {
   std::string interpFieldName = _interpFieldName;
   lowerCase(interpFieldName);
-  nrsCheck(this->initialized(),
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "cannot register interpField %s after calling initialize!\n",
-           interpFieldName.c_str());
+  nekrsCheck(this->initialized(),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "cannot register interpField %s after calling initialize!\n",
+             interpFieldName.c_str());
 
   const auto nInterpFields = interpFieldIds.size();
   if (interpFieldIds.count(interpFieldName) == 0) {
@@ -246,48 +253,54 @@ void lpm_t::registerInterpField(const std::string& _interpFieldName, int Nfields
   }
 }
 
-void lpm_t::registerInterpField(const std::string& interpFieldName, const occa::memory& o_fld, bool output)
+void lpm_t::registerInterpField(const std::string &interpFieldName, const occa::memory &o_fld, bool output)
 {
   registerInterpField(interpFieldName, 1, o_fld, output);
 }
 
-int lpm_t::interpFieldId(const std::string& _interpFieldName) const
+int lpm_t::interpFieldId(const std::string &_interpFieldName) const
 {
   std::string interpFieldName = _interpFieldName;
   lowerCase(interpFieldName);
-  nrsCheck(interpFieldIds.count(interpFieldName) == 0,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "interpField %s not registered!\n",
-           interpFieldName.c_str());
+  nekrsCheck(interpFieldIds.count(interpFieldName) == 0,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "interpField %s not registered!\n",
+             interpFieldName.c_str());
   return interpFieldIds.at(interpFieldName);
 }
 
-int lpm_t::numFieldsInterp(const std::string& _interpFieldName) const
+int lpm_t::numFieldsInterp(const std::string &_interpFieldName) const
 {
   std::string interpFieldName = _interpFieldName;
   lowerCase(interpFieldName);
-  nrsCheck(interpFieldIds.count(interpFieldName) == 0,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "interpField %s not registered!\n",
-           interpFieldName.c_str());
+  nekrsCheck(interpFieldIds.count(interpFieldName) == 0,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "interpField %s not registered!\n",
+             interpFieldName.c_str());
   return interpFieldCounts.at(interpFieldName);
 }
 
-void lpm_t::setUserRHS(lpm_t::rhsFunc_t userRHS) { userRHS_ = userRHS; }
+void lpm_t::setUserRHS(lpm_t::rhsFunc_t userRHS)
+{
+  userRHS_ = userRHS;
+}
 
-void lpm_t::addUserData(void *userdata) { userdata_ = userdata; }
+void lpm_t::addUserData(void *userdata)
+{
+  userdata_ = userdata;
+}
 
-const occa::memory lpm_t::getDOF(const std::string& dofName) 
-{ 
+const occa::memory lpm_t::getDOF(const std::string &dofName)
+{
   const auto id = dofId(dofName);
   auto Nfields = numDOFs(dofName);
 
   return o_y.slice(id * fieldOffset_, Nfields * fieldOffset_);
 }
 
-const std::vector<dfloat> lpm_t::getDOFHost(const std::string& dofName)
+const std::vector<dfloat> lpm_t::getDOFHost(const std::string &dofName)
 {
   auto o_dof = getDOF(dofName);
   auto Nfields = numDOFs(dofName);
@@ -297,14 +310,14 @@ const std::vector<dfloat> lpm_t::getDOFHost(const std::string& dofName)
   return h_dof;
 }
 
-const occa::memory lpm_t::getProp(const std::string& propName) 
-{ 
- const auto id = propId(propName);
- auto Nfields = numProps(propName);
- return o_prop.slice(id * fieldOffset_, Nfields * fieldOffset_);
+const occa::memory lpm_t::getProp(const std::string &propName)
+{
+  const auto id = propId(propName);
+  auto Nfields = numProps(propName);
+  return o_prop.slice(id * fieldOffset_, Nfields * fieldOffset_);
 }
 
-const std::vector<dfloat> lpm_t::getPropHost(const std::string& propName)
+const std::vector<dfloat> lpm_t::getPropHost(const std::string &propName)
 {
   auto o_propEntry = getProp(propName);
   auto Nfields = numProps(propName);
@@ -314,24 +327,25 @@ const std::vector<dfloat> lpm_t::getPropHost(const std::string& propName)
   return h_prop;
 }
 
-void lpm_t::setProp(const std::string& propName, const occa::memory& o_fld, dlong fldOffset)
+void lpm_t::setProp(const std::string &propName, const occa::memory &o_fld, dlong fldOffset)
 {
   auto o_propEntry = getProp(propName);
   auto Nfields = numProps(propName);
-  const auto offset = (fldOffset > 0) ? fldOffset :  numParticles();
+  const auto offset = (fldOffset > 0) ? fldOffset : numParticles();
 
-  if (o_fld.size())
-    o_propEntry.copyFrom(o_fld, Nfields * offset);  
+  if (o_fld.byte_size()) {
+    o_propEntry.copyFrom(o_fld, Nfields * offset);
+  }
 }
 
-const occa::memory lpm_t::getInterpField(const std::string& interpFieldName)
+const occa::memory lpm_t::getInterpField(const std::string &interpFieldName)
 {
   const auto id = interpFieldId(interpFieldName);
   auto Nfields = numFieldsInterp(interpFieldName);
   return o_interpFld.slice(id * fieldOffset_, Nfields * fieldOffset_);
 }
 
-const std::vector<dfloat> lpm_t::getInterpFieldHost(const std::string& interpFieldName)
+const std::vector<dfloat> lpm_t::getInterpFieldHost(const std::string &interpFieldName)
 {
   auto o_interpFldEntry = getInterpField(interpFieldName);
   auto Nfields = numFieldsInterp(interpFieldName);
@@ -358,27 +372,27 @@ void lpm_t::handleAllocation(size_t offset)
 
 void lpm_t::initialize(int nParticles, double t0, const std::vector<dfloat> &y0)
 {
-  nrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
-  nrsCheck(y0.size() != nParticles * nDOFs_,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "y0.size() = %ld, while expecting %d entries!\n",
-           y0.size(),
-           nParticles * nDOFs_);
+  nekrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
+  nekrsCheck(y0.size() != nParticles * nDOFs_,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "y0.size() = %ld, while expecting %d entries!\n",
+             y0.size(),
+             nParticles * nDOFs_);
 
   auto o_y0 = platform->device.malloc<dfloat>(y0.size(), y0.data());
   this->initialize(nParticles, t0, o_y0);
 }
 
-void lpm_t::initialize(int nParticles, double t0, const occa::memory& o_y0)
+void lpm_t::initialize(int nParticles, double t0, const occa::memory &o_y0)
 {
-  nrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
-  nrsCheck(o_y0.length() != nParticles * nDOFs_,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "o_y0.length() = %ld , while expecting %ld words!\n",
-           o_y0.length(),
-           nParticles * nDOFs_);
+  nekrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
+  nekrsCheck(o_y0.length() != nParticles * nDOFs_,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "o_y0.length() = %ld , while expecting %ld words!\n",
+             o_y0.length(),
+             nParticles * nDOFs_);
 
   time = t0;
 
@@ -388,15 +402,13 @@ void lpm_t::initialize(int nParticles, double t0, const occa::memory& o_y0)
   handleAllocation(fieldOffset_);
 
   for (auto [fieldName, nFields] : interpFieldCounts) {
-    laggedInterpFields[fieldName] =
-        platform->device.malloc<dfloat>(nEXT * nFields * nrs->fieldOffset);
-    extrapolatedInterpFields[fieldName] =
-        platform->device.malloc<dfloat>(nFields * nrs->fieldOffset);
+    laggedInterpFields[fieldName] = platform->device.malloc<dfloat>(nEXT * nFields * nrs->fieldOffset);
+    extrapolatedInterpFields[fieldName] = platform->device.malloc<dfloat>(nFields * nrs->fieldOffset);
   }
 
   // set initial condition based on user-input
   if (nParticles_ > 0) {
-    for (auto& dof : dofNames) {
+    for (auto &dof : dofNames) {
       const auto id = dofId(dof);
       auto o_y_dof = getDOF(dof);
       auto o_y0_dof = o_y0 + id * nParticles_;
@@ -414,10 +426,12 @@ void lpm_t::abCoeff(dfloat *dt, int tstep)
 {
   const int order = std::min(tstep, this->solverOrder);
   nek::coeffAB(coeffAB.data(), dt, order);
-  for (int i = 0; i < order; ++i)
+  for (int i = 0; i < order; ++i) {
     coeffAB[i] *= dt[0];
-  for (int i = order; i > order; i--)
+  }
+  for (int i = order; i > order; i--) {
     coeffAB[i - 1] = 0.0;
+  }
   o_coeffAB.copyFrom(coeffAB.data(), solverOrder);
 }
 
@@ -428,7 +442,7 @@ void lpm_t::interpolate()
   }
 }
 
-void lpm_t::interpolate(const std::string& interpFieldName)
+void lpm_t::interpolate(const std::string &interpFieldName)
 {
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic(timerName + "integrate::userRHS::interpolate", 1);
@@ -446,16 +460,16 @@ void lpm_t::interpolate(const std::string& interpFieldName)
 
 void lpm_t::integrate(double tf)
 {
-  nrsCheck(!initialized_,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s\n",
-           "cannot call integrate before calling initialize!");
-  nrsCheck(!userRHS_,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s\n",
-           "cannot call integrate without setting a userRHS!");
+  nekrsCheck(!initialized_,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "cannot call integrate before calling initialize!");
+  nekrsCheck(!userRHS_,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "cannot call integrate without setting a userRHS!");
 
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic(timerName + "integrate", 1);
@@ -509,12 +523,10 @@ void lpm_t::integrate(double tf)
 
   if (userODESolver_) {
     userODESolver_(nrs, this, time, tf, tstep, o_y, userdata_, o_ydot);
-  }
-  else {
+  } else {
     if (solverType == SolverType::AB) {
       integrateAB();
-    }
-    else if (solverType == SolverType::RK) {
+    } else if (solverType == SolverType::RK) {
       integrateRK();
     }
   }
@@ -545,7 +557,7 @@ void lpm_t::integrate(double tf)
 }
 
 // setup new particle coordinates
-void lpm_t::find(const occa::memory& o_yNew)
+void lpm_t::find(const occa::memory &o_yNew)
 {
   occa::memory o_xCoord, o_yCoord, o_zCoord;
   if (fieldOffset_) {
@@ -605,8 +617,7 @@ void lpm_t::integrateAB()
     if (fieldOffset_ > 0) {
       o_ydot.copyFrom(o_k, nDOFs_ * fieldOffset_); // for later lagging
     }
-  }
-  else {
+  } else {
     platform->timer.tic(timerName + "integrate::userRHS", 1);
     userRHS_(nrs, this, time, o_y, userdata_, o_ydot);
     platform->timer.toc(timerName + "integrate::userRHS");
@@ -639,11 +650,7 @@ void lpm_t::integrateRK()
     return;
   }
 
-  nrsCheck(false,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "RK solver order %d not supported!\n",
-           solverOrder);
+  nekrsCheck(false, platform->comm.mpiComm, EXIT_FAILURE, "RK solver order %d not supported!\n", solverOrder);
 }
 
 void lpm_t::integrateRK1()
@@ -655,14 +662,15 @@ void lpm_t::integrateRK1()
   dfloat rkCoeff = dt[0];
 
   // o_y += dt[0] * o_ydot
-  if (nParticles_)
+  if (nParticles_) {
     platform->linAlg->axpbyMany(nParticles_, nDOFs_, fieldOffset_, rkCoeff, o_k, 1.0, o_y);
+  }
 }
 
 void lpm_t::integrateRK2()
 {
   occa::memory o_k1, o_k2;
-  if(fieldOffset_ > 0){
+  if (fieldOffset_ > 0) {
     o_k1 = o_k + 0 * nDOFs_ * fieldOffset_;
     o_k2 = o_k + 1 * nDOFs_ * fieldOffset_;
   }
@@ -672,8 +680,9 @@ void lpm_t::integrateRK2()
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_ytmp = o_y + dt[0] * o_k1
-  if (nParticles_)
+  if (nParticles_) {
     platform->linAlg->axpbyzMany(nParticles_, nDOFs_, fieldOffset_, 1.0, o_y, dt[0], o_k1, o_ytmp);
+  }
 
   this->find(o_ytmp);
 
@@ -688,14 +697,15 @@ void lpm_t::integrateRK2()
   coeffRK[0] = 0.5 * dt[0], coeffRK[1] = 0.5 * dt[0];
   o_coeffRK.copyFrom(coeffRK.data(), coeffRK.size());
 
-  if (nParticles_)
+  if (nParticles_) {
     this->nStagesSumManyKernel(nParticles_, fieldOffset_, solverOrder, nDOFs_, o_coeffRK, o_k, o_y);
+  }
 }
 
 void lpm_t::integrateRK3()
 {
   occa::memory o_k1, o_k2, o_k3;
-  if(fieldOffset_ > 0){
+  if (fieldOffset_ > 0) {
     o_k1 = o_k + 0 * nDOFs_ * fieldOffset_;
     o_k2 = o_k + 1 * nDOFs_ * fieldOffset_;
     o_k3 = o_k + 2 * nDOFs_ * fieldOffset_;
@@ -706,8 +716,9 @@ void lpm_t::integrateRK3()
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_ytmp = o_y + dt[0]/2 * o_k1
-  if (nParticles_)
+  if (nParticles_) {
     platform->linAlg->axpbyzMany(nParticles_, nDOFs_, fieldOffset_, 1.0, o_y, 0.5 * dt[0], o_k1, o_ytmp);
+  }
 
   this->find(o_ytmp);
 
@@ -737,14 +748,15 @@ void lpm_t::integrateRK3()
   coeffRK[0] = 1.0 / 6.0 * dt[0], coeffRK[1] = 2.0 / 3.0 * dt[0], coeffRK[2] = 1.0 / 6.0 * dt[0];
   o_coeffRK.copyFrom(coeffRK.data(), coeffRK.size());
 
-  if (nParticles_)
+  if (nParticles_) {
     this->nStagesSumManyKernel(nParticles_, fieldOffset_, solverOrder, nDOFs_, o_coeffRK, o_k, o_y);
+  }
 }
 
 void lpm_t::integrateRK4()
 {
   occa::memory o_k1, o_k2, o_k3, o_k4;
-  if(fieldOffset_ > 0){
+  if (fieldOffset_ > 0) {
     o_k1 = o_k + 0 * nDOFs_ * fieldOffset_;
     o_k2 = o_k + 1 * nDOFs_ * fieldOffset_;
     o_k3 = o_k + 2 * nDOFs_ * fieldOffset_;
@@ -756,8 +768,9 @@ void lpm_t::integrateRK4()
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_ytmp = o_y + dt[0]/2 * o_k1
-  if (nParticles_)
+  if (nParticles_) {
     platform->linAlg->axpbyzMany(nParticles_, nDOFs_, fieldOffset_, 1.0, o_y, 0.5 * dt[0], o_k1, o_ytmp);
+  }
 
   this->find(o_ytmp);
 
@@ -769,8 +782,9 @@ void lpm_t::integrateRK4()
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_ytmp = o_y + dt[0]/2 * o_k2
-  if (nParticles_)
+  if (nParticles_) {
     platform->linAlg->axpbyzMany(nParticles_, nDOFs_, fieldOffset_, 1.0, o_y, 0.5 * dt[0], o_k2, o_ytmp);
+  }
 
   this->find(o_ytmp);
 
@@ -779,8 +793,9 @@ void lpm_t::integrateRK4()
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_ytmp = o_y + dt[0] * o_k3
-  if (nParticles_)
+  if (nParticles_) {
     platform->linAlg->axpbyzMany(nParticles_, nDOFs_, fieldOffset_, 1.0, o_y, dt[0], o_k3, o_ytmp);
+  }
 
   this->find(o_ytmp);
 
@@ -798,8 +813,9 @@ void lpm_t::integrateRK4()
   coeffRK[3] = 1.0 / 6.0 * dt[0];
   o_coeffRK.copyFrom(coeffRK.data(), coeffRK.size());
 
-  if (nParticles_)
+  if (nParticles_) {
     this->nStagesSumManyKernel(nParticles_, fieldOffset_, solverOrder, nDOFs_, o_coeffRK, o_k, o_y);
+  }
 }
 
 std::set<std::string> lpm_t::nonCoordinateOutputDOFs() const
@@ -849,7 +865,8 @@ int lpm_t::numUnfoundParticles() const
   return numUnfound;
 }
 
-namespace {
+namespace
+{
 template <int N> struct particle_t_N {
   dfloat r[3];
   dlong code, proc, el;
@@ -968,12 +985,12 @@ void lpm_t::migrate()
 {
 
   const int entriesPerParticle = nDOFs_ + solverOrder * nDOFs_ + nProps_ + nInterpFields_;
-  nrsCheck(entriesPerParticle > lpm_t::maxEntriesPerParticleMigration,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "entriesPerParticle (%d) > lpm_t::maxEntriesPerParticleMigration (%d)!\n",
-           entriesPerParticle,
-           lpm_t::maxEntriesPerParticleMigration);
+  nekrsCheck(entriesPerParticle > lpm_t::maxEntriesPerParticleMigration,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "entriesPerParticle (%d) > lpm_t::maxEntriesPerParticleMigration (%d)!\n",
+             entriesPerParticle,
+             lpm_t::maxEntriesPerParticleMigration);
 
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic(timerName + "migrate", 1);
@@ -1049,8 +1066,9 @@ void lpm_t::migrate()
     }
 
     if (o_sendRankMap.length() < sendRankMap.size()) {
-      if (o_sendRankMap.length())
+      if (o_sendRankMap.length()) {
         o_sendRankMap.free();
+      }
       o_sendRankMap = platform->device.malloc<dlong>(sendRankMap.size());
     }
 
@@ -1166,8 +1184,9 @@ void lpm_t::migrate()
       }
 
       if (o_migrateMap.length() < migrateMap.size()) {
-        if (o_migrateMap.length())
+        if (o_migrateMap.length()) {
           o_migrateMap.free();
+        }
         o_migrateMap = platform->device.malloc<dlong>(migrateMap.size());
       }
       if (this->numParticles() > 0) {
@@ -1197,16 +1216,14 @@ void lpm_t::migrate()
   if (nReceived) {
     // pack buffers for sending to other procs
     auto o_yRecv = platform->device.malloc<dfloat>(nReceived * nDOFs_, yRecv.data());
-    auto o_ydotRecv =
-        platform->device.malloc<dfloat>(solverOrder * nReceived * nDOFs_, ydotRecv.data());
+    auto o_ydotRecv = platform->device.malloc<dfloat>(solverOrder * nReceived * nDOFs_, ydotRecv.data());
 
     occa::memory o_propRecv, o_interpFldRecv;
     if (nProps_) {
       o_propRecv = platform->device.malloc<dfloat>(nReceived * nProps_, propRecv.data());
     }
     if (nInterpFields_) {
-      o_interpFldRecv =
-          platform->device.malloc<dfloat>(nReceived * nInterpFields_, interpFldRecv.data());
+      o_interpFldRecv = platform->device.malloc<dfloat>(nReceived * nInterpFields_, interpFldRecv.data());
     }
 
     std::vector<dlong> recvRankMap(nReceived, -1);
@@ -1216,8 +1233,9 @@ void lpm_t::migrate()
     }
 
     if (o_recvRankMap.length() < recvRankMap.size()) {
-      if (o_recvRankMap.length())
+      if (o_recvRankMap.length()) {
         o_recvRankMap.free();
+      }
       o_recvRankMap = platform->device.malloc<dlong>(recvRankMap.size());
     }
 
@@ -1248,14 +1266,18 @@ void lpm_t::migrate()
   nParticles_ = newNParticles;
   fieldOffset_ = newFieldOffset;
 
-  if (o_yOld.size())
+  if (o_yOld.byte_size()) {
     o_yOld.free();
-  if (o_ydotOld.size())
+  }
+  if (o_ydotOld.byte_size()) {
     o_ydotOld.free();
-  if (o_propOld.size())
+  }
+  if (o_propOld.byte_size()) {
     o_propOld.free();
-  if (o_interpFldOld.size())
+  }
+  if (o_interpFldOld.byte_size()) {
     o_interpFldOld.free();
+  }
 
   // do an additional findpts call
   if (timerLevel != TimerLevel::None) {
@@ -1300,24 +1322,24 @@ void lpm_t::addParticles(int newNParticles,
   const auto expectedYSize = newNParticles * nDOFs_;
   const auto expectedPropSize = newNParticles * nProps_;
   const auto expectedYdotSize = solverOrder * newNParticles * nDOFs_;
-  nrsCheck(yNewPart.size() < expectedYSize,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "yNewPart size is %ld but expected %d words!\n",
-           yNewPart.size(),
-           expectedYSize);
-  nrsCheck(propNewPart.size() < expectedPropSize,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "propNewPart size is %ld but expected %d words!\n",
-           propNewPart.size(),
-           expectedPropSize);
-  nrsCheck(ydotNewPart.size() < expectedYdotSize,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "ydotNewPart size is %ld but expected %d words!\n",
-           ydotNewPart.size(),
-           expectedYdotSize);
+  nekrsCheck(yNewPart.size() < expectedYSize,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "yNewPart size is %ld but expected %d words!\n",
+             yNewPart.size(),
+             expectedYSize);
+  nekrsCheck(propNewPart.size() < expectedPropSize,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "propNewPart size is %ld but expected %d words!\n",
+             propNewPart.size(),
+             expectedPropSize);
+  nekrsCheck(ydotNewPart.size() < expectedYdotSize,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "ydotNewPart size is %ld but expected %d words!\n",
+             ydotNewPart.size(),
+             expectedYdotSize);
 
   auto o_yNewPart = platform->device.malloc<dfloat>(expectedYSize, yNewPart.data());
   auto o_propNewPart = platform->device.malloc<dfloat>(expectedPropSize, propNewPart.data());
@@ -1330,7 +1352,7 @@ void lpm_t::addParticles(int newNParticles,
   o_ydotNewPart.free();
 }
 
-void lpm_t::addParticles(int newNParticles, const occa::memory& o_yNewPart, const occa::memory& o_propNewPart)
+void lpm_t::addParticles(int newNParticles, const occa::memory &o_yNewPart, const occa::memory &o_propNewPart)
 {
   const auto expectedYdotSize = solverOrder * newNParticles * nDOFs_;
   auto o_ydotNewPart = platform->device.malloc<dfloat>(expectedYdotSize);
@@ -1338,9 +1360,9 @@ void lpm_t::addParticles(int newNParticles, const occa::memory& o_yNewPart, cons
 }
 
 void lpm_t::addParticles(int newNParticles,
-                         const occa::memory& o_yNewPart,
-                         const occa::memory& o_propNewPart,
-                         const occa::memory& o_ydotNewPart)
+                         const occa::memory &o_yNewPart,
+                         const occa::memory &o_propNewPart,
+                         const occa::memory &o_ydotNewPart)
 {
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic(timerName + "addParticles", 1);
@@ -1360,24 +1382,24 @@ void lpm_t::addParticles(int newNParticles,
   auto expectedYSize = incomingOffset * nDOFs_;
   auto expectedPropSize = incomingOffset * nProps_;
   auto expectedYdotSize = solverOrder * incomingOffset * nDOFs_;
-  nrsCheck(o_yNewPart.length() < expectedYSize,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "o_yNewPart length is %ld but expected %ld words!\n",
-           o_yNewPart.length(),
-           expectedYSize);
-  nrsCheck(o_propNewPart.length() < expectedPropSize,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "o_propNewPart length is %ld but expected %ld words!\n",
-           o_propNewPart.length(),
-           expectedPropSize);
-  nrsCheck(o_ydotNewPart.length() < expectedYdotSize,
-           MPI_COMM_SELF,
-           EXIT_FAILURE,
-           "o_ydotNewPart length is %ld but expected %ld words!\n",
-           o_ydotNewPart.length(),
-           expectedYdotSize);
+  nekrsCheck(o_yNewPart.length() < expectedYSize,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "o_yNewPart length is %ld but expected %ld words!\n",
+             o_yNewPart.length(),
+             expectedYSize);
+  nekrsCheck(o_propNewPart.length() < expectedPropSize,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "o_propNewPart length is %ld but expected %ld words!\n",
+             o_propNewPart.length(),
+             expectedPropSize);
+  nekrsCheck(o_ydotNewPart.length() < expectedYdotSize,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "o_ydotNewPart length is %ld but expected %ld words!\n",
+             o_ydotNewPart.length(),
+             expectedYdotSize);
 
   std::vector<dlong> remainingMap(this->nParticles_, 0);
   std::vector<dlong> insertMap(newNParticles, 0);
@@ -1386,8 +1408,9 @@ void lpm_t::addParticles(int newNParticles,
   if (this->nParticles_) {
     std::iota(remainingMap.begin(), remainingMap.end(), 0);
     if (o_remainingMap.length() < this->nParticles_) {
-      if (o_remainingMap.length())
+      if (o_remainingMap.length()) {
         o_remainingMap.free();
+      }
       o_remainingMap = platform->device.malloc<dlong>(this->nParticles_);
     }
     o_remainingMap.copyFrom(remainingMap.data(), this->nParticles_);
@@ -1397,8 +1420,9 @@ void lpm_t::addParticles(int newNParticles,
   if (newNParticles) {
     std::iota(insertMap.begin(), insertMap.end(), this->nParticles_);
     if (o_insertMap.length() < newNParticles) {
-      if (o_insertMap.length())
+      if (o_insertMap.length()) {
         o_insertMap.free();
+      }
       o_insertMap = platform->device.malloc<dlong>(newNParticles);
     }
     o_insertMap.copyFrom(insertMap.data(), newNParticles);
@@ -1460,14 +1484,18 @@ void lpm_t::addParticles(int newNParticles,
     o_interpFldDummy.free();
   }
 
-  if (o_propOld.size())
+  if (o_propOld.byte_size()) {
     o_propOld.free();
-  if (o_interpFldOld.size())
+  }
+  if (o_interpFldOld.byte_size()) {
     o_interpFldOld.free();
-  if (o_yOld.size())
+  }
+  if (o_yOld.byte_size()) {
     o_yOld.free();
-  if (o_ydotOld.size())
+  }
+  if (o_ydotOld.byte_size()) {
     o_ydotOld.free();
+  }
 
   nParticles_ += newNParticles;
   fieldOffset_ = newOffset;
@@ -1538,8 +1566,9 @@ void lpm_t::deleteParticles()
   const auto Nwords = this->numParticles();
   if (Nwords > 0) {
     if (o_remainingMap.length() < Nwords) {
-      if (o_remainingMap.length())
+      if (o_remainingMap.length()) {
         o_remainingMap.free();
+      }
       o_remainingMap = platform->device.malloc<dlong>(Nwords);
     }
     o_remainingMap.copyFrom(remainingMap.data(), Nwords);
@@ -1574,14 +1603,18 @@ void lpm_t::deleteParticles()
                          o_interpFld);
   }
 
-  if (o_propOld.size())
+  if (o_propOld.byte_size()) {
     o_propOld.free();
-  if (o_interpFldOld.size())
+  }
+  if (o_interpFldOld.byte_size()) {
     o_interpFldOld.free();
-  if (o_yOld.size())
+  }
+  if (o_yOld.byte_size()) {
     o_yOld.free();
-  if (o_ydotOld.size())
+  }
+  if (o_ydotOld.byte_size()) {
     o_ydotOld.free();
+  }
 
   nParticles_ = newNParticles;
   fieldOffset_ = newOffset;
@@ -1612,8 +1645,9 @@ void lpm_t::deleteParticles()
   }
 }
 
-namespace {
-std::string lpm_vtu_data(const std::string& fieldName, long long int nComponent, long long int distance)
+namespace
+{
+std::string lpm_vtu_data(const std::string &fieldName, long long int nComponent, long long int distance)
 {
   return "<DataArray type=\"Float32\" Name=\"" + fieldName + "\" NumberOfComponents=\"" +
          std::to_string(nComponent) + "\" format=\"append\" offset=\"" + std::to_string(distance) + "\"/>\n";
@@ -1689,7 +1723,8 @@ void lpm_t::writeFld()
   // particles DOFs, sans coordinates
   auto particleOutputDOFs = nonCoordinateOutputDOFs();
 
-  std::string message = "<VTKFile type=\"UnstructuredGrid\" version=\"1.0\" byte_order=\"LittleEndian\" header_type=\"UInt64\">\n";
+  std::string message = "<VTKFile type=\"UnstructuredGrid\" version=\"1.0\" byte_order=\"LittleEndian\" "
+                        "header_type=\"UInt64\">\n";
   message += "\t<UnstructuredGrid>\n";
   message += "\t\t<FieldData>\n";
   message += "\t\t\t<DataArray type=\"Float32\" Name=\"TIME\" NumberOfTuples=\"1\" format=\"ascii\"> " +
@@ -1714,8 +1749,9 @@ void lpm_t::writeFld()
 
   // output particle properties
   for (auto [propName, isOutput] : outputProps) {
-    if (!isOutput)
+    if (!isOutput) {
       continue;
+    }
     const auto Nfields = propCounts.at(propName);
     message += "\t\t\t\t" + lpm_vtu_data(propName, Nfields, offset);
     offset += (Nfields * globalNPartOutput) * sizeof(float) + 1 * sizeof(long long int);
@@ -1723,8 +1759,9 @@ void lpm_t::writeFld()
 
   // output interpolated fields
   for (auto [interpFieldName, isOutput] : outputInterpFields) {
-    if (!isOutput)
+    if (!isOutput) {
       continue;
+    }
     const auto Nfields = interpFieldCounts.at(interpFieldName);
     message += "\t\t\t\t" + lpm_vtu_data(interpFieldName, Nfields, offset);
     offset += (Nfields * globalNPartOutput) * sizeof(float) + 1 * sizeof(long long int);
@@ -1805,8 +1842,9 @@ void lpm_t::writeFld()
 
   // particle properties
   for (auto [propName, isOutput] : outputProps) {
-    if (!isOutput)
+    if (!isOutput) {
       continue;
+    }
     auto propHost = getPropHost(propName);
     auto Nfields = numProps(propName);
 
@@ -1826,8 +1864,9 @@ void lpm_t::writeFld()
 
   // interpolated fields
   for (auto [interpFieldName, isOutput] : outputInterpFields) {
-    if (!isOutput)
+    if (!isOutput) {
       continue;
+    }
     auto interpFieldHost = getInterpFieldHost(interpFieldName);
     auto Nfields = numFieldsInterp(interpFieldName);
 
@@ -1875,7 +1914,7 @@ void lpm_t::registerKernels(occa::properties &kernelInfo)
   const std::string oklpath(getenv("NEKRS_KERNEL_DIR"));
 
   kernelName = "remapParticles";
-  fileName = oklpath + "/plugins/" + kernelName + ".okl";
+  fileName = oklpath + "/nrs/plugins/" + kernelName + ".okl";
   platform->kernels.add(kernelName, fileName, kernelInfo);
 }
 
@@ -1885,16 +1924,20 @@ void lpm_t::setTimerLevel(TimerLevel level)
   interp->setTimerLevel(level);
 }
 
-TimerLevel lpm_t::getTimerLevel() const { return timerLevel; }
+TimerLevel lpm_t::getTimerLevel() const
+{
+  return timerLevel;
+}
 
-void lpm_t::setTimerName(const std::string& name)
+void lpm_t::setTimerName(const std::string &name)
 {
   timerName = name;
   interp->setTimerName(name);
 }
 
-namespace {
-long long int parseNumParticles(const std::string& restartfile, const std::string &header)
+namespace
+{
+long long int parseNumParticles(const std::string &restartfile, const std::string &header)
 {
   std::smatch npartmatch;
   bool found = std::regex_search(header, npartmatch, std::regex(R"(<Piece NumberOfPoints=\"(\d+)\")"));
@@ -1908,8 +1951,7 @@ long long int parseNumParticles(const std::string& restartfile, const std::strin
 
   try {
     nparticles = std::stoll(npartmatch[1].str());
-  }
-  catch (std::invalid_argument e) {
+  } catch (std::invalid_argument e) {
     errorLogger << "Could not read number of particles while reading " << restartfile << "!\n";
     errorLogger << "Exception said:\n" << e.what() << std::endl;
   }
@@ -1917,17 +1959,13 @@ long long int parseNumParticles(const std::string& restartfile, const std::strin
   auto errorString = errorLogger.str();
   int errorLength = errorString.length();
   MPI_Allreduce(MPI_IN_PLACE, &errorLength, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-  
-  nrsCheck(errorLength > 0,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s",
-           errorString.c_str());
+
+  nekrsCheck(errorLength > 0, platform->comm.mpiComm, EXIT_FAILURE, "%s", errorString.c_str());
 
   return nparticles;
 }
 
-auto parsePointData(const std::string& restartfile, const std::string& pointData)
+auto parsePointData(const std::string &restartfile, const std::string &pointData)
 {
   std::ostringstream errorLogger;
   std::string fieldName = "";
@@ -1943,14 +1981,15 @@ auto parsePointData(const std::string& restartfile, const std::string& pointData
 
   found = std::regex_search(pointData, match, std::regex(R"(\s*NumberOfComponents=\"(\d+)\")"));
   if (!found) {
-    errorLogger << "Could not parse " << fieldName << " number of components while reading " << restartfile << "\n";
+    errorLogger << "Could not parse " << fieldName << " number of components while reading " << restartfile
+                << "\n";
   }
 
   try {
     numComponents = std::stoll(match[1].str());
-  }
-  catch (std::invalid_argument &e) {
-    errorLogger << "Could not parse " << fieldName << " number of components while reading " << restartfile << "!\n";
+  } catch (std::invalid_argument &e) {
+    errorLogger << "Could not parse " << fieldName << " number of components while reading " << restartfile
+                << "!\n";
     errorLogger << "Exception said:\n" << e.what() << std::endl;
   }
 
@@ -1961,26 +2000,21 @@ auto parsePointData(const std::string& restartfile, const std::string& pointData
 
   try {
     offset = std::stoll(match[1].str());
-  }
-  catch (std::invalid_argument &e) {
+  } catch (std::invalid_argument &e) {
     errorLogger << "Could not parse " << fieldName << " offset while reading " << restartfile << "!\n";
     errorLogger << "Exception said:\n" << e.what() << std::endl;
   }
-  
+
   auto errorString = errorLogger.str();
   int errorLength = errorString.length();
   MPI_Allreduce(MPI_IN_PLACE, &errorLength, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-  
-  nrsCheck(errorLength > 0,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "%s",
-           errorString.c_str());
+
+  nekrsCheck(errorLength > 0, platform->comm.mpiComm, EXIT_FAILURE, "%s", errorString.c_str());
 
   return std::make_tuple(fieldName, numComponents, offset);
 }
 
-auto readHeader(const std::string& restartFile)
+auto readHeader(const std::string &restartFile)
 {
   // read header of VTK UnstructuredGrid file format until reading after the <AppendedData encoding=\"raw\">
   // line
@@ -2022,10 +2056,14 @@ auto readHeader(const std::string& restartFile)
 
 } // namespace
 
-void lpm_t::restart(const std::string& restartFile)
+void lpm_t::restart(const std::string &restartFile)
 {
   bool fileExists = std::filesystem::exists(restartFile);
-  nrsCheck(!fileExists, platform->comm.mpiComm, EXIT_FAILURE, "Restart file %s does not exist!\n", restartFile.c_str());
+  nekrsCheck(!fileExists,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "Restart file %s does not exist!\n",
+             restartFile.c_str());
 
   constexpr long long int dim = 3;
   auto [header, pointData] = readHeader(restartFile);
@@ -2070,12 +2108,12 @@ void lpm_t::restart(const std::string& restartFile)
   nPointData /= dim;
   nPointData /= sizeof(float);
 
-  nrsCheck(nPointData != nPartGlobal,
-           platform->comm.mpiComm,
-           EXIT_FAILURE,
-           "Number of particles in header (%lld) does not match number of particles in file (%lld)",
-           nPartGlobal,
-           nPointData);
+  nekrsCheck(nPointData != nPartGlobal,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "Number of particles in header (%lld) does not match number of particles in file (%lld)",
+             nPartGlobal,
+             nPointData);
 
   position = header.length();
   position += sizeof(float) * (dim * pOffset) + 1 * sizeof(long long int);
@@ -2102,13 +2140,15 @@ void lpm_t::restart(const std::string& restartFile)
   o_yCoord.copyFrom(yCoord.data(), nPartLocal);
   o_zCoord.copyFrom(zCoord.data(), nPartLocal);
 
-  auto readField = [&, &header = header](std::string fieldName, long long int expectedNumComponents, long long int offset) {
-    nrsCheck(fieldType.count(fieldName) == 0,
-             platform->comm.mpiComm,
-             EXIT_FAILURE,
-             "Encountered unregisterd field %s while reading restart %s!\n",
-             fieldName.c_str(),
-             restartFile.c_str());
+  auto readField = [&, &header = header](std::string fieldName,
+                                         long long int expectedNumComponents,
+                                         long long int offset) {
+    nekrsCheck(fieldType.count(fieldName) == 0,
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "Encountered unregisterd field %s while reading restart %s!\n",
+               fieldName.c_str(),
+               restartFile.c_str());
 
     auto type = fieldType[fieldName];
 
@@ -2117,25 +2157,24 @@ void lpm_t::restart(const std::string& restartFile)
     if (type == FieldType::DOF) {
       nComponents = dofCounts.at(fieldName);
       o_fld = getDOF(fieldName);
-    }
-    else if (type == FieldType::PROP) {
+    } else if (type == FieldType::PROP) {
       nComponents = propCounts.at(fieldName);
       o_fld = getProp(fieldName);
-    }
-    else if (type == FieldType::INTERP_FIELD) {
+    } else if (type == FieldType::INTERP_FIELD) {
       nComponents = interpFieldCounts.at(fieldName);
       o_fld = getInterpField(fieldName);
     }
 
-    nrsCheck(nComponents != expectedNumComponents,
-             platform->comm.mpiComm,
-             EXIT_FAILURE,
-             "Expected number of components for field %s (%lld) does not match number of components (%lld) in "
-             "restart file %s!\n",
-             fieldName.c_str(),
-             expectedNumComponents,
-             nComponents,
-             restartFile.c_str());
+    nekrsCheck(
+        nComponents != expectedNumComponents,
+        platform->comm.mpiComm,
+        EXIT_FAILURE,
+        "Expected number of components for field %s (%lld) does not match number of components (%lld) in "
+        "restart file %s!\n",
+        fieldName.c_str(),
+        expectedNumComponents,
+        nComponents,
+        restartFile.c_str());
 
     position = header.length();
     position += offset;
@@ -2148,14 +2187,14 @@ void lpm_t::restart(const std::string& restartFile)
     nPointData /= nComponents;
     nPointData /= sizeof(float);
 
-    nrsCheck(nPointData != nPartGlobal,
-             platform->comm.mpiComm,
-             EXIT_FAILURE,
-             "Number of particles in header (%lld) does not match number of particles in file (%lld) when "
-             "reading field %s!\n",
-             nPartGlobal,
-             nPointData,
-             fieldName.c_str());
+    nekrsCheck(nPointData != nPartGlobal,
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "Number of particles in header (%lld) does not match number of particles in file (%lld) when "
+               "reading field %s!\n",
+               nPartGlobal,
+               nPointData,
+               fieldName.c_str());
 
     std::vector<float> fld(nPartLocal * nComponents);
     std::vector<dfloat> fldHost(this->fieldOffset() * nComponents);
@@ -2203,8 +2242,7 @@ void lpm_t::printTimers()
     auto pos = tag.rfind("::");
     if (pos == std::string::npos) {
       tree[""].push_back(tag);
-    }
-    else {
+    } else {
       auto parent = tag.substr(0, pos);
       tree[parent].push_back(tag);
     }

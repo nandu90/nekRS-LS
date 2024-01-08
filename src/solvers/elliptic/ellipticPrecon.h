@@ -27,23 +27,22 @@
 #ifndef ELLIPTIC_PRECON_H
 #define ELLIPTIC_PRECON_H 1
 
-#include "nrssys.hpp"
+#include "nekrsSys.hpp"
 #include "MG/MGSolver.hpp"
 #include "SEMFEMSolver.hpp"
 
-struct precon_t
-{
+struct precon_t {
   long long int preconBytes;
 
   occa::memory o_diagA;
   occa::memory o_invDiagA;
 
-  MGSolver_t* MGSolver = nullptr;
+  MGSolver_t *MGSolver = nullptr;
   occa::kernel coarsenKernel;
   occa::kernel prolongateKernel;
   bool additive;
 
-  SEMFEMSolver_t* SEMFEMSolver = nullptr;
+  SEMFEMSolver_t *SEMFEMSolver = nullptr;
 
   ~precon_t();
 };

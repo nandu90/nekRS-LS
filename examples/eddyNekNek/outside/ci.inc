@@ -81,7 +81,7 @@ void ciTestPartitionOfUnity(nrs_t *nrs, double time, int tstep)
       std::cout << "Actual   value : " << globalVolume << std::endl;
     }
     CIFAIL;
-    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 }
 
@@ -152,7 +152,7 @@ void ciTestPointInterp(nrs_t *nrs, double time, int tstep)
       std::cout << "  maxErrW = " << maxErrW << "\n";
     }
     CIFAIL;
-    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 
   o_xinterp.free();
@@ -231,7 +231,7 @@ void ciTestInitialStep(nrs_t *nrs, double time, int tstep)
   if (!passed) {
     vizNekNekField(nrs);
     CIFAIL;
-    nrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 }
 

@@ -4,7 +4,8 @@
 #include "velRecycling.hpp"
 
 // private members
-namespace {
+namespace
+{
 oogs_t *ogs;
 nrs_t *nrs;
 
@@ -28,11 +29,12 @@ static bool setupCalled = false;
 int Nblock;
 } // namespace
 
-
-static void setup(nrs_t *nrs_, occa::memory& o_wrk_,  const int bID_, const dfloat wbar_)
+static void setup(nrs_t *nrs_, occa::memory &o_wrk_, const int bID_, const dfloat wbar_)
 {
   static bool isInitialized = false;
-  if (isInitialized) return;
+  if (isInitialized) {
+    return;
+  }
   isInitialized = true;
 
   nrs = nrs_;
@@ -42,12 +44,14 @@ static void setup(nrs_t *nrs_, occa::memory& o_wrk_,  const int bID_, const dflo
 
   mesh_t *mesh = nrs->meshV;
 
-  nrsCheck(o_wrk.length() < nrs->NVfields * nrs->fieldOffset,
-           platform->comm.mpiComm, EXIT_FAILURE, "%s\n",
-           "o_wrk too small!\n");
+  nekrsCheck(o_wrk.length() < nrs->NVfields * nrs->fieldOffset,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "o_wrk too small!\n");
 
   {
-    std::vector<int> tmp {bID};
+    std::vector<int> tmp{bID};
     o_bID = platform->device.malloc<int>(tmp.size());
     o_bID.copyFrom(tmp.data());
   }
@@ -62,10 +66,12 @@ static void setup(nrs_t *nrs_, occa::memory& o_wrk_,  const int bID_, const dflo
 void velRecycling::buildKernel(occa::properties kernelInfo)
 {
   static bool isInitialized = false;
-  if (isInitialized) return;
+  if (isInitialized) {
+    return;
+  }
   isInitialized = true;
 
-  const std::string path = getenv("NEKRS_KERNEL_DIR") + std::string("/plugins/");
+  const std::string path = getenv("NEKRS_KERNEL_DIR") + std::string("/nrs/plugins/");
 
   std::string fileName, kernelName;
   const std::string extension = ".okl";
@@ -84,13 +90,16 @@ void velRecycling::buildKernel(occa::properties kernelInfo)
 
 void velRecycling::copy()
 {
-  nrsCheck(!setupCalled || !buildKernelCalled, MPI_COMM_SELF, EXIT_FAILURE,
-           "%s\n", "called prior to tavg::setup()!");
+  nekrsCheck(!setupCalled || !buildKernelCalled,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "called prior to tavg::setup()!");
 
   mesh_t *mesh = nrs->meshV;
 
   if (interp) {
-    const dlong offset = o_Uint.length() / nrs->NVfields; 
+    const dlong offset = o_Uint.length() / nrs->NVfields;
     interp->eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, offset, o_Uint);
     maskCopyKernel(interp->numPoints(), offset, nrs->fieldOffset, o_maskIds, o_Uint, o_wrk);
   } else {
@@ -124,8 +133,9 @@ void velRecycling::setup(nrs_t *nrs_,
   for (int e = 0; e < mesh->Nelements; e++) {
     const hlong eg = nek::lglel(e); // 0-based
 
-    for (int n = 0; n < mesh->Np; n++)
+    for (int n = 0; n < mesh->Np; n++) {
       ids[e * mesh->Np + n] = eg * mesh->Np + (n + 1);
+    }
 
     for (int n = 0; n < mesh->Nfp * mesh->Nfaces; n++) {
       const int f = n / mesh->Nfp;
@@ -164,14 +174,14 @@ void velRecycling::setup(nrs_t *nrs_,
 
   int cnt = 0;
   for (int e = 0; e < mesh->Nelements; e++) {
-     for (int n = 0; n < mesh->Nfp * mesh->Nfaces; n++) {
+    for (int n = 0; n < mesh->Nfp * mesh->Nfaces; n++) {
       const int f = n / mesh->Nfp;
       if (mesh->EToB[f + e * mesh->Nfaces] == bID) {
         cnt++;
       }
     }
   }
-  
+
   const auto nPoints = cnt;
 
   o_Uint = platform->device.malloc<dfloat>(nrs->NVfields * alignStride<dfloat>(nPoints));
@@ -184,11 +194,11 @@ void velRecycling::setup(nrs_t *nrs_,
 
   cnt = 0;
   for (int e = 0; e < mesh->Nelements; e++) {
-     for (int n = 0; n < mesh->Nfp * mesh->Nfaces; n++) {
+    for (int n = 0; n < mesh->Nfp * mesh->Nfaces; n++) {
       const int f = n / mesh->Nfp;
       const int idM = mesh->vmapM[e * mesh->Nfp * mesh->Nfaces + n];
       if (mesh->EToB[f + e * mesh->Nfaces] == bID) {
-        maskIds[cnt] = idM; 
+        maskIds[cnt] = idM;
         xBid[cnt] = mesh->x[idM] + xOffset;
         yBid[cnt] = mesh->y[idM] + yOffset;
         zBid[cnt] = mesh->z[idM] + zOffset;

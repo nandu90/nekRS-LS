@@ -42,7 +42,7 @@ GmresData::GmresData(elliptic_t *elliptic)
       cs((dfloat *)calloc(nRestartVectors, sizeof(dfloat))),
       s((dfloat *)calloc(nRestartVectors + 1, sizeof(dfloat)))
 {
-  tiny = 10*std::numeric_limits<dfloat>::min();
+  tiny = 10 * std::numeric_limits<dfloat>::min();
 
   int Nblock = (elliptic->mesh->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
   const size_t N = nRestartVectors * Nblock;
@@ -62,7 +62,8 @@ void initializeGmresData(elliptic_t *elliptic)
   elliptic->gmresData = gmresData;
 }
 
-namespace {
+namespace
+{
 void gmresUpdate(elliptic_t *elliptic, occa::memory o_x, int gmresUpdateSize)
 {
   const int nRestartVectors = elliptic->gmresData->nRestartVectors;
@@ -81,7 +82,7 @@ void gmresUpdate(elliptic_t *elliptic, occa::memory o_x, int gmresUpdateSize)
 
     for (int m = k + 1; m < gmresUpdateSize; ++m) {
       y[k] -= H[k + m * (nRestartVectors + 1)] * y[m];
-     }
+    }
 
     y[k] /= (H[k + k * (nRestartVectors + 1)] + tiny);
   }
@@ -90,8 +91,7 @@ void gmresUpdate(elliptic_t *elliptic, occa::memory o_x, int gmresUpdateSize)
 
   if (elliptic->options.compareArgs("SOLVER", "FLEXIBLE")) {
     elliptic->updatePGMRESSolutionKernel(mesh->Nlocal, elliptic->fieldOffset, gmresUpdateSize, o_y, o_Z, o_x);
-  }
-  else {
+  } else {
     platform->linAlg->fill(elliptic->Nfields * elliptic->fieldOffset, 0.0, o_z);
     elliptic->updatePGMRESSolutionKernel(mesh->Nlocal, elliptic->fieldOffset, gmresUpdateSize, o_y, o_V, o_z);
 
@@ -105,7 +105,7 @@ void gmresUpdate(elliptic_t *elliptic, occa::memory o_x, int gmresUpdateSize)
 } // namespace
 
 void free(elliptic_t *elliptic)
-{ 
+{
   elliptic->gmresData->o_V.free();
   elliptic->gmresData->o_Z.free();
 }
@@ -127,8 +127,10 @@ int pgmres(elliptic_t *elliptic,
   const bool serial = platform->device.mode() == "Serial" || platform->device.mode() == "OpenMP";
   const int flexible = elliptic->options.compareArgs("SOLVER", "FLEXIBLE");
 
-  elliptic->gmresData->o_V = platform->o_memPool.reserve<dfloat>(static_cast<size_t>(elliptic->fieldOffset) * elliptic->Nfields * nRestartVectors);
-  elliptic->gmresData->o_Z = platform->o_memPool.reserve<dfloat>(static_cast<size_t>(elliptic->fieldOffset) * elliptic->Nfields * ((flexible) ? nRestartVectors : 1));
+  elliptic->gmresData->o_V = platform->o_memPool.reserve<dfloat>(static_cast<size_t>(elliptic->fieldOffset) *
+                                                                 elliptic->Nfields * nRestartVectors);
+  elliptic->gmresData->o_Z = platform->o_memPool.reserve<dfloat>(
+      static_cast<size_t>(elliptic->fieldOffset) * elliptic->Nfields * ((flexible) ? nRestartVectors : 1));
 
   auto &o_w = elliptic->o_p;
 
@@ -156,12 +158,12 @@ int pgmres(elliptic_t *elliptic,
   dfloat error = rdotr;
   const dfloat TOL = tol;
 
-
   if (verbose && (platform->comm.mpiRank == 0)) {
-    if (flexible)
+    if (flexible) {
       printf("PFGMRES ");
-    else
+    } else {
       printf("PGMRES ");
+    }
     printf("%s: initial res norm %.15e WE NEED TO GET TO %e \n", elliptic->name.c_str(), rdotr, tol);
   }
 
@@ -172,20 +174,14 @@ int pgmres(elliptic_t *elliptic,
     s[0] = nr;
 
     // V(:,0) = r/nr
-    linAlg.axpbyMany(mesh->Nlocal, 
-                     elliptic->Nfields, 
-                     elliptic->fieldOffset, 
-                     1. / (nr + tiny), 
-                     o_r, 
-                     0.0, 
-                     o_V);
+    linAlg.axpbyMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1. / (nr + tiny), o_r, 0.0, o_V);
 
     // Construct orthonormal basis via Gram-Schmidt
     for (int i = 0; i < nRestartVectors; ++i) {
 
-      auto o_Mv = flexible ? o_Z + i*offset : o_Z;
+      auto o_Mv = flexible ? o_Z + i * offset : o_Z;
       // z := M^{-1} V(:,i)
-      ellipticPreconditioner(elliptic, o_V + i*offset, o_Mv);
+      ellipticPreconditioner(elliptic, o_V + i * offset, o_Mv);
 
       // w := A z
       ellipticOperator(elliptic, static_cast<const occa::memory>(o_Mv), o_w, dfloatString);
@@ -201,7 +197,7 @@ int pgmres(elliptic_t *elliptic,
                                     o_w,
                                     platform->comm.mpiComm,
                                     o_y);
-      o_y.copyTo(y, (i + 1) );
+      o_y.copyTo(y, (i + 1));
 #else
       linAlg.weightedInnerProdMulti(mesh->Nlocal,
                                     (i + 1),
@@ -228,11 +224,11 @@ int pgmres(elliptic_t *elliptic,
 
       if (serial) {
         nw = *((dfloat *)elliptic->gmresData->o_scratch.ptr());
-      }
-      else {
+      } else {
         elliptic->gmresData->o_scratch.copyTo(elliptic->gmresData->scratch, Nblock);
-        for (int k = 0; k < Nblock; ++k)
+        for (int k = 0; k < Nblock; ++k) {
           nw += elliptic->gmresData->scratch[k];
+        }
       }
       MPI_Allreduce(MPI_IN_PLACE, &nw, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
       nw = sqrt(nw);
@@ -242,13 +238,13 @@ int pgmres(elliptic_t *elliptic,
         platform->flopCounter->add("gramSchmidt", flopCount);
       }
 
-      //apply Givens rotations to new column
-      // H(i+1,i) = ||w||_2
+      // apply Givens rotations to new column
+      //  H(i+1,i) = ||w||_2
       H[i + 1 + i * (nRestartVectors + 1)] = nw;
 
       // V(:,i+1) = w/nw
       if (i < nRestartVectors - 1) {
-        auto o_Vi = o_V + (i + 1)*offset;
+        auto o_Vi = o_V + (i + 1) * offset;
         linAlg.axpbyMany(mesh->Nlocal,
                          elliptic->Nfields,
                          elliptic->fieldOffset,
@@ -259,8 +255,9 @@ int pgmres(elliptic_t *elliptic,
       }
 
       // apply Givens rotation
-      for (int k = 0; k <= i; ++k)
+      for (int k = 0; k <= i; ++k) {
         H[k + i * (nRestartVectors + 1)] = y[k];
+      }
 
       for (int k = 0; k < i; ++k) {
         const dfloat h1 = H[k + i * (nRestartVectors + 1)];
@@ -288,15 +285,17 @@ int pgmres(elliptic_t *elliptic,
       error = fabs(s[i + 1]) * sqrt(elliptic->resNormFactor);
       rdotr = error;
 
-      if (platform->comm.mpiRank == 0)
-        nrsCheck(std::isnan(error),
-                 MPI_COMM_SELF,
-                 EXIT_FAILURE,
-                 "%s\n",
-                 "Detected invalid resiual norm while running linear solver!");
+      if (platform->comm.mpiRank == 0) {
+        nekrsCheck(std::isnan(error),
+                   MPI_COMM_SELF,
+                   EXIT_FAILURE,
+                   "%s\n",
+                   "Detected invalid resiual norm while running linear solver!");
+      }
 
-      if (verbose && (platform->comm.mpiRank == 0))
+      if (verbose && (platform->comm.mpiRank == 0)) {
         printf("it %d r norm %.15e\n", iter, rdotr);
+      }
 
       if (error < TOL || iter == MAXIT) {
         // update approximation
@@ -306,8 +305,9 @@ int pgmres(elliptic_t *elliptic,
     }
 
     // exit if tolerance is reached
-    if (error < TOL || iter == MAXIT)
+    if (error < TOL || iter == MAXIT) {
       break;
+    }
 
     // update approximation
     gmresUpdate(elliptic, o_x, nRestartVectors);
@@ -327,12 +327,12 @@ int pgmres(elliptic_t *elliptic,
 
     if (serial) {
       nr = *((dfloat *)elliptic->gmresData->o_scratch.ptr());
-    }
-    else {
+    } else {
       nr = 0.0;
       elliptic->gmresData->o_scratch.copyTo(elliptic->gmresData->scratch, Nblock);
-      for (dlong n = 0; n < Nblock; ++n)
+      for (dlong n = 0; n < Nblock; ++n) {
         nr += elliptic->gmresData->scratch[n];
+      }
     }
 
     MPI_Allreduce(MPI_IN_PLACE, &nr, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
