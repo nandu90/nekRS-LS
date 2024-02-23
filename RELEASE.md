@@ -3,11 +3,13 @@
 ## What is new? 
 
 * Interpolation based velocity recycling
-* Run solver in FP32
+* FP32 solver mode
 * CombinedPCG
 * Multi session nek-nek
+* CHT nek-nek support (solid overlaps)
+* HIP support for BoomerAMG
+* Intel GPU support
 * Various bug fixes
-* Add support for Intel GPUs
 
 ## Good to know
 * `nek::userchk` is no longer called automatically during setup 
