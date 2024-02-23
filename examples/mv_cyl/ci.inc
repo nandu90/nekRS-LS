@@ -85,7 +85,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
   nek::ocopyToNek(time, tstep);
   nek::userchk();
 
-  double *err = (double *)nek::scPtr(1);
+  auto err = nek::ptr<double>("errors");
   const int Nfields = 6;
   dfloat expectedErr[Nfields];
 
@@ -141,8 +141,8 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
       }
     }
   }
-  velIterErr = abs(expectedVIter - nrs->uvwSolver->Niter);
-  pIterErr = abs(expectedPIter - nrs->pSolver->Niter);
+  velIterErr = abs(expectedVIter - nrs->uvwSolver->Niter());
+  pIterErr = abs(expectedPIter - nrs->pSolver->Niter());
   if (rank == 0) {
     printf("velIter=%d pIter=%d ", velIterErr, pIterErr);
   }
@@ -156,7 +156,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
   if (rank == 0) {
     printf("\n");
   }
-  passed ? (CIPASS) : (CIFAIL);
+  passed ? (CiPassTest()) : (CiFailTest());
 
   if (nrs->cds->cvode) {
     dfloat expectedCVODERHS = 1.77;
@@ -165,6 +165,6 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
              expectedCVODERHS,
              numCVODERHS);
     }
-    numCVODERHS > 1.1 * expectedCVODERHS ? (CIFAIL) : (CIPASS);
+    numCVODERHS > 1.1 * expectedCVODERHS ? (CiFailTest()) : (CiPassTest());
   }
 }

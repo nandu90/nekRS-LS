@@ -1,4 +1,3 @@
-#include <filesystem>
 #include "nekrsSys.hpp"
 #include "compileKernels.hpp"
 #include "udf.hpp"
@@ -11,12 +10,7 @@ occa::properties compileUDFKernels()
   installDir.assign(getenv("NEKRS_HOME"));
   int N;
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
-  occa::properties kernelInfo = platform->kernelInfo + meshKernelProperties(N);
-  kernelInfo["defines"].asObject();
-  kernelInfo["includes"].asArray();
-  kernelInfo["header"].asArray();
-  kernelInfo["flags"].asObject();
-  kernelInfo["okl/include_paths"].asArray();
+  deviceKernelProperties kernelInfo(platform->kernelInfo + meshKernelProperties(N));
 
   MPI_Barrier(platform->comm.mpiComm);
   const double tStart = MPI_Wtime();
@@ -24,25 +18,23 @@ occa::properties compileUDFKernels()
     std::cout << "loading udf kernels ... " << std::endl;
   }
 
-  occa::properties kernelInfoBC = kernelInfo;
   const std::string bcDataFile = installDir + "/include/nrs/bdry/bcData.h";
-  kernelInfoBC["includes"] += bcDataFile.c_str();
-
-  kernelInfoBC["okl/include_paths"].asArray();
-  kernelInfoBC["okl/include_paths"] += std::string(std::filesystem::current_path()).c_str();
+  kernelInfo.include() += bcDataFile.c_str();
+  kernelInfo.okl_include_paths() += std::string(fs::current_path()).c_str();
 
   if (udf.loadKernels) {
-    udf.loadKernels(kernelInfoBC);
-    // kernelInfoBC might now include user-defined props
+    udf.loadKernels(kernelInfo);
+    // kernelInfoBC might now may include user-defined props
   }
+
   if (udf.autoloadKernels) {
-    udf.autoloadKernels(kernelInfoBC);
+    udf.autoloadKernels(kernelInfo);
   }
 
   // internal BC kernels call device functions defined in this file
   std::string oklFileCache;
   platform->options.getArgs("OKL FILE CACHE", oklFileCache);
-  kernelInfoBC["includes"] += realpath(oklFileCache.c_str(), NULL);
+  kernelInfo.include() += realpath(oklFileCache.c_str(), NULL);
 
   udf.autoloadPlugins(kernelInfo);
 
@@ -66,5 +58,5 @@ occa::properties compileUDFKernels()
   }
   fflush(stdout);
 
-  return kernelInfoBC;
+  return static_cast<occa::properties>(kernelInfo);
 }

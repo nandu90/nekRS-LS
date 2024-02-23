@@ -1,4 +1,3 @@
-#include "nrs.hpp"
 #include "re2Reader.hpp"
 
 void re2::nelg(const std::string &meshFile, int &nelgt, int &nelgv, MPI_Comm comm)

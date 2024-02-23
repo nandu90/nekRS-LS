@@ -1,7 +1,6 @@
-#include "nrs.hpp"
-#include <compileKernels.hpp>
+#include "platform.hpp"
+#include "compileKernels.hpp"
 #include "mesh.h"
-#include "nekrsSys.hpp"
 
 void registerMeshKernels(occa::properties kernelInfoBC)
 {
@@ -52,7 +51,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
     auto hlongSumKernelInfo = kernelInfo;
     hlongSumKernelInfo["defines/dfloat"] = hlongString;
     kernelName = "sum";
-    fileName = oklpath + "/linAlg/" + kernelName + ".okl";
+    fileName = oklpath + "/core/linAlg/" + kernelName + ".okl";
     platform->kernels.add("hlong-" + meshPrefix + kernelName + orderSuffix, fileName, hlongSumKernelInfo);
 
     occa::properties meshKernelInfo = kernelInfo;

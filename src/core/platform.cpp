@@ -1,7 +1,6 @@
 #include <cstdlib>
 #include <strings.h>
 
-#include "nrs.hpp"
 #include "platform.hpp"
 #include "linAlg.hpp"
 #include "flopCounter.hpp"
@@ -19,9 +18,7 @@ static void compileDummyKernel(platform_t &plat)
                                                  "  for (int i = 0; i < N; ++i; @tile(64, @outer, @inner)) {}"
                                                  "}");
 
-  if (rank == 0) {
-    plat.device.occaDevice().buildKernelFromString(dummyKernelStr, dummyKernelName, plat.kernelInfo);
-  }
+  plat.device.occaDevice().buildKernelFromString(dummyKernelStr, dummyKernelName, plat.kernelInfo);
 }
 
 } // namespace
@@ -34,6 +31,18 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 {
   int rank;
   MPI_Comm_rank(_comm, &rank);
+
+  if (device.mode() == "Serial") {
+    options.setArgs("ENABLE GS COMM OVERLAP", "FALSE");
+  }
+
+  if (comm.mpiCommSize == 1) {
+    options.setArgs("ENABLE GS COMM OVERLAP", "FALSE");
+  }
+
+  if (comm.mpiRank == 0 && options.compareArgs("ENABLE GS COMM OVERLAP", "FALSE")) {
+    std::cout << "ENABLE GS COMM OVERLAP disabled\n\n";
+  }
 
   exitValue = 0;
 
@@ -79,13 +88,11 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   flopCounter = std::make_unique<flopCounter_t>();
 
   tmpDir = "/";
-
-  // bcast install dir
   if (cacheBcast || cacheLocal) {
     if (getenv("NEKRS_LOCAL_TMP_DIR")) {
       tmpDir = getenv("NEKRS_LOCAL_TMP_DIR");
     } else {
-      nekrsAbort(_comm, EXIT_FAILURE, "%s\n", "NEKRS_LOCAL_TMP_DIR undefined!");
+      nekrsAbort(comm.mpiComm, EXIT_FAILURE, "%s\n", "NEKRS_LOCAL_TMP_DIR undefined!");
     }
 
     int rankLocal;
@@ -98,36 +105,6 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
                  "Cannot find NEKRS_LOCAL_TMP_DIR %s\n",
                  tmpDir.c_str());
     }
-
-    auto nSessions = 1;
-    options.getArgs("NEKNEK NUMBER OF SESSIONS", nSessions);
-    if (nSessions > 1) {
-      auto sessionID = 0;
-      options.getArgs("NEKNEK SESSION ID", sessionID);
-
-      tmpDir = fs::path(tmpDir) / fs::path(std::string("nrs_") + std::to_string(sessionID));
-
-      if (rankLocal == 0) {
-        fs::create_directory(tmpDir);
-        nekrsCheck(!fs::exists(tmpDir), MPI_COMM_SELF, EXIT_FAILURE, "Cannot create %s\n", tmpDir.c_str());
-      }
-    }
-
-    const auto NEKRS_HOME_NEW = fs::path(tmpDir) / "nekrs";
-    const auto srcPath = fs::path(getenv("NEKRS_HOME"));
-    for (auto &entry : {fs::path("udf"),
-                        fs::path("nek5000"),
-                        fs::path("nekInterface"),
-                        fs::path("include"),
-                        fs::path("gatherScatter"),
-                        fs::path("3rd_party"),
-                        fs::path("kernels")}) {
-
-      fileBcast(srcPath / entry, NEKRS_HOME_NEW, comm.mpiComm, verbose);
-    }
-    setenv("NEKRS_HOME", std::string(NEKRS_HOME_NEW).c_str(), 1);
-    setenv("NEKRS_KERNEL_DIR", std::string(NEKRS_HOME_NEW / "kernels").c_str(), 1);
-    setenv("OGS_HOME", std::string(NEKRS_HOME_NEW / "gatherScatter").c_str(), 1);
   }
 
   {
@@ -182,19 +159,47 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 
   const std::string extension = serial ? ".c" : ".okl";
 
-  compileDummyKernel(*this);
-
-  std::string kernelName, fileName;
-  const auto oklpath = std::string(getenv("NEKRS_KERNEL_DIR"));
-  kernelName = "copyDfloatToPfloat";
-  fileName = oklpath + "/core/" + kernelName + extension;
-  this->kernels.add(kernelName, fileName, this->kernelInfo);
-
-  kernelName = "copyPfloatToDfloat";
-  fileName = oklpath + "/core/" + kernelName + extension;
-  this->kernels.add(kernelName, fileName, this->kernelInfo);
+  if (rank == 0)
+    compileDummyKernel(*this);
 
   occa::json properties;
   o_memPool = device.occaDevice().createMemoryPool(properties);
   o_memPool.setAlignment(ALIGN_SIZE);
+}
+
+// kernel source is required to compute hash during JIT compilation
+void platform_t::bcastKernelSources()
+{
+  if (platform->verbose && comm.mpiRank == 0) {
+    std::cout << "broadcast kernel sources to " << getenv("NEKRS_LOCAL_TMP_DIR") << std::endl; 
+  }
+
+  auto nSessions = 1;
+  options.getArgs("NEKNEK NUMBER OF SESSIONS", nSessions);
+  if (nSessions > 1) {
+    auto sessionID = 0;
+    options.getArgs("NEKNEK SESSION ID", sessionID);
+
+    tmpDir = fs::path(tmpDir) / fs::path(std::string("nrs_") + std::to_string(sessionID));
+
+    if (comm.mpiRank == 0) {
+      fs::create_directory(tmpDir);
+      nekrsCheck(!fs::exists(tmpDir), MPI_COMM_SELF, EXIT_FAILURE, "Cannot create %s\n", tmpDir.c_str());
+    }
+  }
+
+  const auto NEKRS_HOME_NEW = fs::path(tmpDir) / "nekrs";
+  const auto srcPath = fs::path(getenv("NEKRS_HOME"));
+  for (auto &entry : {
+                       fs::path("include"),
+                       fs::path("gatherScatter"),
+                       fs::path("kernels")
+                     }) {
+
+    fileBcast(srcPath / entry, NEKRS_HOME_NEW, comm.mpiComm, verbose);
+  }
+
+  setenv("NEKRS_HOME", std::string(NEKRS_HOME_NEW).c_str(), 1);
+  setenv("NEKRS_KERNEL_DIR", std::string(NEKRS_HOME_NEW / "kernels").c_str(), 1);
+  setenv("OGS_HOME", std::string(NEKRS_HOME_NEW / "gatherScatter").c_str(), 1);
 }

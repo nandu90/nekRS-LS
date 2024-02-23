@@ -36,8 +36,6 @@
 #define TETRAHEDRA 6
 #define HEXAHEDRA 12
 
-struct nrs_t;
-
 struct mesh_t {
   std::vector<dfloat> surfaceIntegral(int nbID, const occa::memory &o_bID, const occa::memory &o_fld);
   std::vector<dfloat>
@@ -197,7 +195,11 @@ struct mesh_t {
   dfloat *intInterp;          // interp from surface node to integration nodes
   dfloat *intx, *inty, *intz; // coordinates of suface integration nodes
 
-  occa::memory o_LMM, o_invLMM, o_divU;
+  occa::memory o_divU;
+  occa::memory o_LMM, o_invLMM;
+
+  occa::memory& o_Jw = o_LMM;
+  occa::memory& o_invAJw = o_invLMM;
 
   // mesh velocity
   occa::memory o_U;
@@ -269,8 +271,6 @@ void parallelSort(int size,
                   size_t sz,
                   int (*compare)(const void *, const void *),
                   void (*match)(void *, void *));
-
-occa::memory meshSolve(nrs_t *nrs, double time, int stage);
 
 /* dimension independent mesh operations */
 void meshConnect(mesh_t *mesh);

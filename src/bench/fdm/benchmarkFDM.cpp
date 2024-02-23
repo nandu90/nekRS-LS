@@ -2,7 +2,6 @@
 #include <vector>
 #include <numeric>
 #include <iostream>
-#include "nrs.hpp"
 
 #include "randomVector.hpp"
 #include "kernelBenchmarker.hpp"

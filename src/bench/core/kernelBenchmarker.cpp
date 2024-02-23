@@ -1,6 +1,5 @@
 #include "kernelBenchmarker.hpp"
 #include <limits>
-#include "nrs.hpp"
 
 namespace
 {

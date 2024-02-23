@@ -7,11 +7,33 @@
 #include <string>
 #include <cstring>
 #include <iostream>
-#include <filesystem>
 
-#include "device.hpp"
 #include "platform.hpp"
 #include "fileUtils.hpp"
+
+static fs::path relative_path(const fs::path& p_in, const fs::path& base_in)
+{
+    auto p = fs::absolute(p_in);
+    auto base = fs::absolute(base_in);
+
+    auto mismatched = std::mismatch(p.begin(), p.end(), base.begin(), base.end());
+
+    if (mismatched.first == p.end() && mismatched.second == base.end())
+      return ".";
+
+    auto it_p = mismatched.first;
+    auto it_base = mismatched.second;
+
+    fs::path ret;
+
+    for (; it_base != base.end(); ++it_base) {
+      if (!it_base->empty()) ret /= ".."; 
+    }
+
+    for (; it_p != p.end(); ++it_p) ret /= *it_p; 
+
+    return ret;
+}
 
 void fileSync(const char *file)
 {
@@ -89,13 +111,14 @@ void fileBcast(const fs::path &srcPathIn, const fs::path &dstPath, MPI_Comm comm
 
     const auto srcPathCanonical = fs::canonical(srcPathIn);
     fs::current_path(srcPathCanonical.parent_path());
-    const auto srcPath = fs::relative(srcPathCanonical, fs::current_path());
 
+    // std::experiment::filesystem does not include relative, use our own version 
+    const auto srcPath = relative_path(srcPathCanonical, fs::current_path());
     if (!fs::is_directory((srcPath))) {
       fileList.push_back(srcPath);
     } else {
       for (const auto &entry : fs::recursive_directory_iterator(srcPath)) {
-        if (entry.is_regular_file() || entry.is_symlink()) {
+        if (!fs::is_directory(entry)) {
           fileList.push_back(entry.path());
         }
       }

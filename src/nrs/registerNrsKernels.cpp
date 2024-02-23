@@ -1,5 +1,4 @@
 #include "nrs.hpp"
-#include "mesh.h"
 #include <compileKernels.hpp>
 
 #include "re2Reader.hpp"
@@ -33,10 +32,10 @@ void registerNrsKernels(occa::properties kernelInfoBC)
   kernelInfo["defines/p_NVfields"] = NVfields;
 
   int Nsubsteps = 0;
-  int nBDF = 0;
-  int nEXT = 0;
   platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
 
+  int nBDF = 0;
+  int nEXT = 0;
   platform->options.getArgs("BDF ORDER", nBDF);
   platform->options.getArgs("EXT ORDER", nEXT);
 
@@ -45,14 +44,15 @@ void registerNrsKernels(occa::properties kernelInfoBC)
   }
 
   {
+    const std::string section = "nrs-";
+
+    kernelName = "subCycleRK";
+    fileName = oklpath + "/nrs/" + kernelName + ".okl";
+    platform->kernels.add(section + kernelName, fileName, platform->kernelInfo);
+
     kernelName = "nStagesSumMany";
     fileName = oklpath + "/core/" + kernelName + ".okl";
     platform->kernels.add(kernelName, fileName, platform->kernelInfo);
-
-    kernelName = "nStagesSum3";
-    fileName = oklpath + "/core/" + kernelName + ".okl";
-    const std::string section = "nrs-";
-    platform->kernels.add(section + kernelName, fileName, platform->kernelInfo);
 
     kernelName = "computeFieldDotNormal";
     fileName = oklpath + "/nrs/" + kernelName + ".okl";
@@ -103,20 +103,17 @@ void registerNrsKernels(occa::properties kernelInfoBC)
     fileName = oklpath + "/nrs/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, meshProps);
 
-    kernelName = "gradientVolume" + suffix;
-    fileName = oklpath + "/nrs/" + kernelName + ".okl";
-    platform->kernels.add(section + kernelName, fileName, meshProps);
-
-    kernelName = "wGradientVolume" + suffix;
-    fileName = oklpath + "/nrs/" + kernelName + ".okl";
-    platform->kernels.add(section + kernelName, fileName, meshProps);
-
     {
       occa::properties prop = kernelInfo;
       const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
+      prop["defines/p_MovingMesh"] = movingMesh;
+
+      kernelName = "subCycleInitU0";
+      fileName = oklpath + "/nrs/" + kernelName + ".okl";
+      platform->kernels.add(section + kernelName, fileName, prop);
+
       prop["defines/p_nEXT"] = nEXT;
       prop["defines/p_nBDF"] = nBDF;
-      prop["defines/p_MovingMesh"] = movingMesh;
       if (Nsubsteps) {
         prop["defines/p_SUBCYCLING"] = 1;
       } else {
@@ -127,13 +124,6 @@ void registerNrsKernels(occa::properties kernelInfoBC)
       fileName = oklpath + "/nrs/" + kernelName + ".okl";
       platform->kernels.add(section + kernelName, fileName, prop);
     }
-
-    kernelName = "wDivergenceVolume" + suffix;
-    fileName = oklpath + "/nrs/" + kernelName + ".okl";
-    platform->kernels.add(section + kernelName, fileName, kernelInfoBC);
-    kernelName = "divergenceVolume" + suffix;
-    fileName = oklpath + "/nrs/" + kernelName + ".okl";
-    platform->kernels.add(section + kernelName, fileName, kernelInfoBC);
 
     kernelName = "divergenceSurface" + suffix;
     fileName = oklpath + "/nrs/" + kernelName + ".okl";
@@ -160,8 +150,8 @@ void registerNrsKernels(occa::properties kernelInfoBC)
     platform->kernels.add(section + kernelName, fileName, meshProps);
 
     auto zeroNormalProps = kernelInfoBC;
-    zeroNormalProps["defines/p_ZERO_NORMAL"] = ZERO_NORMAL;
-    zeroNormalProps["defines/p_NO_OP"] = NO_OP;
+    zeroNormalProps["defines/p_ZERO_NORMAL"] = ellipticBcType::ZERO_NORMAL;
+    zeroNormalProps["defines/p_NO_OP"] = ellipticBcType::NO_OP;
     kernelName = "averageNormalBcType";
     fileName = oklpath + "/nrs/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, zeroNormalProps);
@@ -242,14 +232,6 @@ void registerNrsKernels(occa::properties kernelInfoBC)
       kernelName = "subCycleStrongVolume" + suffix;
       fileName = oklpath + "/nrs/" + kernelName + ".okl";
       platform->kernels.add(section + kernelName, fileName, prop);
-
-      kernelName = "subCycleRK";
-      fileName = oklpath + "/nrs/" + kernelName + ".okl";
-      platform->kernels.add(section + kernelName, fileName, prop);
-
-      kernelName = "subCycleInitU0";
-      fileName = oklpath + "/nrs/" + kernelName + ".okl";
-      platform->kernels.add(section + kernelName, fileName, prop);
     }
 
     kernelName = "extrapolate";
@@ -267,10 +249,6 @@ void registerNrsKernels(occa::properties kernelInfoBC)
     kernelName = "mask";
     fileName = oklpath + "/core/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, kernelInfo);
-
-    kernelName = "filterRT" + suffix;
-    fileName = oklpath + "/nrs/regularization/" + kernelName + ".okl";
-    platform->kernels.add(section + kernelName, fileName, meshProps);
 
     {
       int N;
@@ -293,13 +271,6 @@ void registerNrsKernels(occa::properties kernelInfoBC)
     kernelName = "pressureAddQtl";
     fileName = oklpath + "/nrs/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, meshProps);
-
-    kernelName = "setEllipticCoeff";
-    fileName = oklpath + "/core/" + kernelName + ".okl";
-    platform->kernels.add(section + kernelName, fileName, kernelInfo);
-    kernelName = "setEllipticCoeffPressure";
-    fileName = oklpath + "/nrs/" + kernelName + ".okl";
-    platform->kernels.add(section + kernelName, fileName, kernelInfo);
   }
 
   registerPostProcessingKernels();
@@ -344,4 +315,6 @@ void registerNrsKernels(occa::properties kernelInfoBC)
     registerEllipticKernels(section, poissonEquation);
     registerEllipticPreconditionerKernels(section, poissonEquation);
   }
+
+  registerNekNekKernels();
 }

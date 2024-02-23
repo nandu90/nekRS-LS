@@ -4,18 +4,19 @@
 
 #endif
 
-void userf(nrs_t *nrs, double time, occa::memory o_U, occa::memory o_FU)
+void userf(double time)
 {
-  mesh_t *mesh = nrs->meshV;
-  cfill(mesh->Nlocal, nrs->fieldOffset, nrs->cds->o_S, nrs->o_FU);
+  auto mesh = nrs->meshV;
+  auto o_zNLT = nrs->o_NLT + 2*nrs->fieldOffset;
+  platform->linAlg->axpby(mesh->Nlocal, 1.0, nrs->cds->o_S, 0.0, o_zNLT); 
 }
 
-void UDF_Setup(nrs_t *nrs)
+void UDF_Setup()
 {
-  udf.uEqnSource = &userf;
+  nrs->userVelocitySource = &userf;
 }
 
-void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
+void UDF_ExecuteStep(double time, int tstep)
 {
   if (nrs->isOutputStep) {
     nek::ocopyToNek(time, tstep);

@@ -1,67 +1,75 @@
-#if !defined(nekrs_nekrs_hpp_)
-#define nekrs_nekrs_hpp_
+#if !defined(nrs_nekrs_hpp_)
+#define nrs_nekrs_hpp_
 
-#include "nekrsSys.hpp"
-#include "mesh3D.h"
-#include "elliptic.h"
-#include "cds.hpp"
-#include "linAlg.hpp"
-#include "timer.hpp"
 #include "platform.hpp"
+#include "linAlg.hpp"
+#include "elliptic.hpp"
+#include "cds.hpp"
 #include "neknek.hpp"
-#include "cvode.hpp"
 #include "fldFile.hpp"
 #include "randomVector.hpp"
 
-struct nrs_t {
+class nrs_t : public solver_t {
 
-  bool multiSession;
+using userVelocitySource_t = std::function<void(double)>;
+using userScalarSource_t = std::function<void(double)>;
+using userProperties_t = std::function<void(double)>;
+using userDivergence_t = std::function<void(double)>;
+using preFluid_t = std::function<void(double, int)>;
+using postScalar_t = std::function<void(double, int)>;
+using userConvergenceCheck_t = std::function<bool(int)>;
 
-  int dim, elementType;
+public:
+  userVelocitySource_t userVelocitySource = nullptr;
+  userScalarSource_t userScalarSource = nullptr;
+  userProperties_t userProperties = nullptr;
+  userDivergence_t userDivergence = nullptr;
+  preFluid_t preFluid = nullptr;
+  postScalar_t postScalar = nullptr;
+  userConvergenceCheck_t userConvergenceCheck = nullptr;
+
+  bool multiSession = false;
+
+  int elementType;
 
   mesh_t *_mesh = nullptr;
   mesh_t *meshV = nullptr;
 
-  elliptic_t *uSolver = nullptr;
-  elliptic_t *vSolver = nullptr;
-  elliptic_t *wSolver = nullptr;
-  elliptic_t *uvwSolver = nullptr;
-  elliptic_t *pSolver = nullptr;
-  elliptic_t *meshSolver = nullptr;
+  elliptic *uSolver = nullptr;
+  elliptic *vSolver = nullptr;
+  elliptic *wSolver = nullptr;
+  elliptic *uvwSolver = nullptr;
+  elliptic *pSolver = nullptr;
+  elliptic *meshSolver = nullptr;
 
   cds_t *cds = nullptr;
 
   neknek_t *neknek = nullptr;
-  cvode_t *cvode = nullptr;
 
   oogs_t *gsh = nullptr;
   oogs_t *qqt = nullptr;
 
   oogs_t *gshMesh = nullptr;
 
-  dlong ellipticWrkOffset;
-
-  int flow;
-  int cht;
-  int Nscalar;
-  int NVfields;
+  int flow = 1;
+  int cht = 0;
+  int Nscalar = 0;
+  int NVfields = 3;
 
   dlong fieldOffset;
   dlong cubatureOffset;
 
   int timeStepConverged;
 
-  dfloat dt[3], idt;
-  dfloat g0, ig0;
-  dfloat CFL, unitTimeCFL;
+  dfloat dt[3] = {0.0, 0.0, 0.0};
+  dfloat g0;
 
   double timePrevious;
 
   dfloat p0th[3] = {0.0, 0.0, 0.0};
-  dfloat p0the = 0.0;
-  dfloat dp0thdt;
+  dfloat dp0thdt = 0;
 
-  dfloat alpha0Ref;
+  dfloat alpha0Ref = 1;
 
   int nEXT;
   int nBDF;
@@ -71,37 +79,33 @@ struct nrs_t {
   int isOutputStep;
   int outputForceStep;
 
-  int nRK, Nsubsteps;
-  dfloat *coeffsfRK, *weightsRK, *nodesRK;
-  occa::memory o_coeffsfRK, o_weightsRK;
+  int Nsubsteps = 0;
 
-  dfloat *U, *P;
-  occa::memory o_U, o_P;
-
+  dfloat *U = nullptr;
+  occa::memory o_U;
   occa::memory o_Ue;
 
+  dfloat *P = nullptr;
+  occa::memory o_P;
   occa::memory o_div;
 
+  occa::memory o_prop;
   occa::memory o_rho, o_mue;
   occa::memory o_meshRho, o_meshMue;
 
-  dfloat *usrwrk;
-  occa::memory o_usrwrk;
+  deviceMemory<dfloat> o_usrwrk;
 
   occa::memory o_idH;
 
   occa::memory o_BF;
-  occa::memory o_BFDiag;
-
-  occa::memory o_FU;
-
-  occa::memory o_prop, o_ellipticCoeff;
+  occa::memory o_LHSDiag;
+  occa::memory o_NLT;
 
   dfloat *coeffEXT, *coeffBDF;
   occa::memory o_coeffEXT, o_coeffBDF;
 
-  int *EToB;
-  int *EToBMeshVelocity;
+  int *EToB = nullptr;
+  int *EToBMeshVelocity = nullptr;
   occa::memory o_EToB;
   occa::memory o_EToBMeshVelocity;
 
@@ -114,9 +118,6 @@ struct nrs_t {
   occa::memory o_relUrst;
   occa::memory o_Urst;
 
-  occa::properties *kernelInfo;
-
-  int filterNc;
   dfloat filterS;
   occa::memory o_filterRT;
 
@@ -163,9 +164,6 @@ struct nrs_t {
 
   occa::kernel cflKernel;
 
-  occa::kernel setEllipticCoeffKernel;
-  occa::kernel setEllipticCoeffPressureKernel;
-
   occa::kernel curlKernel;
 
   occa::kernel SijOijKernel;
@@ -182,11 +180,33 @@ struct nrs_t {
 
   occa::kernel applyZeroNormalMaskKernel;
 
-  nrs_t(MPI_Comm comm, bool ms, setupAide &options);
+  nrs_t();
 
-  void finalize();
+  void init();
 
-  void evaluateProperties(const double timeNew);
+  std::string id() const { return "nrs"; };
+
+  void initStep(double time, dfloat dt, int tstep);
+  dfloat adjustDt(int tstep);
+  bool runStep(std::function<bool(int)> convergenceCheck, int stage);
+  void finishStep();
+
+  void printMinMax();
+  void printRunStat(int step);
+  void printInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo);
+
+  void makeNLT(double time, int tstep, occa::memory& o_Usubcycling);
+  dfloat computeCFL();
+  dfloat computeCFL(dfloat dt);
+
+  void flowRatePrintInfo(bool verboseInfo);
+  bool adjustFlowRate(int tstep, double time);
+  dfloat flowRatescaleFactor();
+
+  void evaluateProperties(const double time);
+  void evaluateDivergence(const double time); 
+
+  occa::memory advectionSubcycling(int nEXT, double time);
 
   int numberActiveFields();
 
@@ -200,7 +220,12 @@ struct nrs_t {
   void strainRate(bool smooth, const occa::memory &o_U, occa::memory &o_S);
 
   void Qcriterion(const occa::memory &o_U, occa::memory &o_Q);
+
+  void finalize();
+
 };
+
+void nrsSetDefaultSettings(setupAide* options);
 
 static std::vector<std::string> nrsFieldsToSolve(setupAide &options)
 {

@@ -22,7 +22,7 @@ void printDiagnostics(nrs_t *nrs, double time, int tstep)
 
   const auto energy = [&]() {
     const dfloat scale = 0.5 / mesh->volume;
-    auto o_magSqrU = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+    poolDeviceMemory<dfloat> o_magSqrU(nrs->fieldOffset);
     magSqr(mesh->Nlocal, nrs->fieldOffset, nrs->o_U, o_magSqrU);
     return scale * platform->linAlg->innerProd(mesh->Nlocal,
                        o_magSqrU,
@@ -33,7 +33,7 @@ void printDiagnostics(nrs_t *nrs, double time, int tstep)
 
   const auto enstrophy = [&] () {
     const dfloat scale = 0.5 / mesh->volume;
-    auto o_curlU = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
+    poolDeviceMemory<dfloat> o_curlU(nrs->NVfields * nrs->fieldOffset);
     nrs->curlKernel(mesh->Nelements,
                     0,
                     mesh->o_vgeo,
@@ -42,7 +42,7 @@ void printDiagnostics(nrs_t *nrs, double time, int tstep)
                     nrs->o_U,
                     o_curlU);
 
-    auto o_magCurlU = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+    poolDeviceMemory<dfloat> o_magCurlU(nrs->fieldOffset);
     magSqr(mesh->Nlocal, nrs->fieldOffset, o_curlU, o_magCurlU);
 
     return scale * platform->linAlg->innerProd(mesh->Nlocal,
@@ -87,15 +87,14 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
   dfloat eps;
   platform->par->extract("casedata", "eps", eps);
   if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
-    double *const nek_cb_scnrs = (double *)nek::ptr("cb_scnrs");
-    nek_cb_scnrs[0] = eps;
+    *nek::ptr<double>("eps") = eps;
   }
 }
 
-void UDF_Setup(nrs_t *nrs)
+void UDF_Setup()
 {
   // set IC
-  mesh_t *mesh = nrs->meshV;
+  auto mesh = nrs->meshV;
 
   dfloat U0, V0, W0;
   platform->par->extract("casedata", "U0", U0);
@@ -114,7 +113,7 @@ void UDF_Setup(nrs_t *nrs)
   }
 }
 
-void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
+void UDF_ExecuteStep(double time, int tstep)
 {
   printDiagnostics(nrs, time, tstep);
 

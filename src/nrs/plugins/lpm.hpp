@@ -30,9 +30,9 @@ public:
   using rhsFunc_t = std::function<void(nrs_t *nrs,
                                        lpm_t *lpm,
                                        double time,
-                                       const occa::memory &o_y,
+                                       const deviceMemory<dfloat>& o_y,
                                        void *userdata,
-                                       occa::memory o_ydot)>;
+                                       deviceMemory<dfloat>& o_ydot)>;
 
   // User-defined ODE solver
   // Integrate from t0 to tf
@@ -50,11 +50,11 @@ public:
                                              double t0,
                                              double tf,
                                              int step,
-                                             const occa::memory &o_y,
+                                             const deviceMemory<dfloat>& o_y,
                                              void *userdata,
-                                             occa::memory &o_ydot)>;
+                                             deviceMemory<dfloat>& o_ydot)>;
 
-  lpm_t(nrs_t *nrs, dfloat bb_tol_ = 0.01, dfloat newton_tol_ = 0.0);
+  lpm_t(dfloat bb_tol_ = 0.01, dfloat newton_tol_ = 0.0);
 
   ~lpm_t() = default;
 
@@ -203,12 +203,14 @@ public:
   // Get particle degrees of freedom on device
   // Pre:
   //  initialized() = true
-  const occa::memory getDOF(const std::string &dofName);
+  occa::memory getDOF(const std::string &dofName) const;
 
   // Get particle property on device
   // Pre:
   //  initialized() = true
-  const occa::memory getProp(const std::string &propName);
+  occa::memory getProp(const std::string &propName) const;
+
+  std::vector<dfloat> getPropHost(const std::string &propName) const;
 
   void setProp(const std::string &propName, const occa::memory &o_fld, dlong _offset = 0);
 
@@ -303,9 +305,6 @@ private:
 
   // Get particle coordinates on host
   const std::vector<dfloat> getDOFHost(const std::string &dofName);
-
-  // Get particle properties on host
-  const std::vector<dfloat> getPropHost(const std::string &propName);
 
   // Get interpolated fields on host
   const std::vector<dfloat> getInterpFieldHost(const std::string &interpFieldName);

@@ -1,7 +1,7 @@
 #include "tavg.hpp"
 
-static occa::memory o_work;
-static occa::memory o_divTau;
+static poolDeviceMemory<dfloat> o_work;
+static deviceMemory<dfloat> o_divTau;
 
 /* latitude north */
 static dfloat NLAT;
@@ -52,17 +52,13 @@ void avgBoundaryValue(nrs_t *nrs, int BID, int nflds, occa::memory o_flds, dfloa
   const auto Nfaces = mesh->Nfaces;
   const auto offset = Nfaces * Nelements;
 
-  static dfloat *sum;
-  static dfloat *sumFace;
-  static dfloat *area;
-  static occa::memory o_sumFace;
-  static occa::memory o_area;
+  static std::vector<dfloat> sum;
+  static std::vector<dfloat> sumFace;
+  static deviceMemory<dfloat> o_sumFace;
 
-  if (!o_sumFace.isInitialized()) {
-    o_sumFace = platform->device.malloc<dfloat>((nflds + 1) * Nfaces * Nelements);
-    sumFace = (dfloat *)calloc((nflds + 1) * Nfaces * Nelements, sizeof(dfloat));
-    sum = (dfloat *)calloc(nflds + 1, sizeof(dfloat));
-  }
+  o_sumFace.resize((nflds + 1) * Nfaces * Nelements);
+  sumFace.resize((nflds + 1) * Nfaces * Nelements);
+  sum.resize(nflds + 1);
 
   avgBIDValue(Nelements,
               BID,
@@ -73,8 +69,8 @@ void avgBoundaryValue(nrs_t *nrs, int BID, int nflds, occa::memory o_flds, dfloa
               mesh->o_vmapM,
               o_flds,
               o_sumFace);
-  o_sumFace.copyTo(sumFace, (nflds + 1) * Nfaces * Nelements);
-
+  o_sumFace.copyTo(sumFace);
+ 
   for (int j = 0; j < nflds + 1; ++j) {
     sum[j] = 0;
     for (int i = 0; i < Nfaces * Nelements; ++i) {
@@ -82,7 +78,7 @@ void avgBoundaryValue(nrs_t *nrs, int BID, int nflds, occa::memory o_flds, dfloa
     }
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, sum, nflds + 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, sum.data(), nflds + 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
 
   const auto invArea = 1 / sum[nflds];
   for (int i = 0; i < nflds; ++i) {
@@ -160,17 +156,17 @@ void planarAverage(nrs_t *nrs)
   planarAvg(mesh, "xz", NUMBER_ELEMENTS_X, NUMBER_ELEMENTS_Y, NUMBER_ELEMENTS_Z, 6, nrs->fieldOffset, o_work);
 }
 
-void userf(nrs_t *nrs, double time, occa::memory o_U, occa::memory o_FU)
+void userf(double time)
 {
-  mesh_t *mesh = nrs->meshV;
-  coriolis(mesh->Nlocal, nrs->fieldOffset, nrs->meshV->o_y, nrs->cds->o_S, nrs->o_U, o_divTau, o_FU);
+  auto mesh = nrs->meshV;
+  coriolis(mesh->Nlocal, nrs->fieldOffset, nrs->meshV->o_y, nrs->cds->o_S, nrs->o_U, o_divTau, nrs->o_NLT);
 }
 
-void userq(nrs_t *nrs, double time, occa::memory o_S, occa::memory o_SU)
+void userq(double time)
 {
-  mesh_t *mesh = nrs->meshV;
+  auto mesh = nrs->meshV;
   auto o_divTauY = o_divTau.slice(1 * nrs->fieldOffset , nrs->fieldOffset);
-  platform->linAlg->axpby(mesh->Nlocal, -1.0, o_divTauY, 1.0, o_SU, 0, 0);
+  platform->linAlg->axpby(mesh->Nlocal, -1.0, o_divTauY, 1.0, nrs->cds->o_NLT, 0, 0);
 }
 
 void writeStatistics(nrs_t *nrs, double time, int tstep, const std::string& fname)
@@ -182,7 +178,7 @@ void writeStatistics(nrs_t *nrs, double time, int tstep, const std::string& fnam
 
   static pointInterpolation_t *interpolator = nullptr;
   static std::vector<dfloat> xp, yp, zp;
-  static occa::memory o_fields1D;
+  static deviceMemory<dfloat> o_fields1D;
   const auto Nfields = 9;
 
   if (!interpolator) {
@@ -200,10 +196,10 @@ void writeStatistics(nrs_t *nrs, double time, int tstep, const std::string& fnam
         zp.push_back(z0);
       }
 
-      o_fields1D = platform->device.malloc<dfloat>(Nfields * offset);
+      o_fields1D.resize(Nfields * offset);
     }
 
-    interpolator = new pointInterpolation_t(nrs);
+    interpolator = new pointInterpolation_t(mesh);
     interpolator->setPoints(np, xp.data(), yp.data(), zp.data());
     interpolator->find();
 
@@ -216,13 +212,14 @@ void writeStatistics(nrs_t *nrs, double time, int tstep, const std::string& fnam
   
   o_work.copyFrom(tavg::o_avg(), 3 * nrs->fieldOffset);
 
+  auto o_gradY = o_work.slice(3 * nrs->fieldOffset, 3 * nrs->fieldOffset);
   gradY(mesh->Nelements, 
         mesh->o_vgeo, 
         mesh->o_D, 
         nrs->fieldOffset, 
         mesh->o_invLMM, 
         tavg::o_avg(), 
-        o_work + 3 * nrs->fieldOffset );
+        o_gradY);
 
   o_work.copyFrom(tavg::o_avg() + 3 * nrs->fieldOffset , 
                   3 * nrs->fieldOffset ,
@@ -239,13 +236,13 @@ void writeStatistics(nrs_t *nrs, double time, int tstep, const std::string& fnam
 
   interpolator->eval(Nfields, 
                      nrs->fieldOffset, 
-                     o_work, 
+                     o_work.ptr(), 
                      offset, 
-                     o_fields1D);
+                     o_fields1D.ptr());
 
   if (platform->comm.mpiRank == 0) {
     std::vector<dfloat> fields1D(o_fields1D.length());
-    o_fields1D.copyTo(fields1D.data());
+    o_fields1D.copyTo(fields1D);
 
     const auto sep = "  ";
     std::ofstream f(fname, std::ios::app);
@@ -274,27 +271,29 @@ void writeStatistics(nrs_t *nrs, double time, int tstep, const std::string& fnam
   }
 }
 
-void UDF_LoadKernels(occa::properties &kernelInfo)
+void UDF_LoadKernels(deviceKernelProperties& kernelInfo)
 {
-  setupAide &options = platform->options;
+  setupAide& options = platform->options;
 
   dfloat cond;
   options.getArgs("SCALAR00 DIFFUSIVITY", cond);
   const dfloat g = 9.81;
   const dfloat omega = 7.2921159e-5;
 
-  kernelInfo["defines/p_fcor"] = 2 * omega * LREF / UREF * sin(NLAT * M_PI / 180);
-  kernelInfo["defines/p_bcor"] = 2 * omega * LREF / UREF * cos(NLAT * M_PI / 180);
-
   GACC = LREF * g / (UREF * UREF);
-  kernelInfo["defines/p_gacc"] = GACC;
-  kernelInfo["defines/p_cond"] = cond;
-  kernelInfo["defines/p_TsGrad"] = ILSTRENGTH * LREF / TREF;
   T0S = TS0 / TREF;
-  kernelInfo["defines/p_T0s"] = T0S;
   SCOOLRATE = SCR * LREF / TREF / UREF / 3600;
-  kernelInfo["defines/p_sCoolRate"] = SCOOLRATE;
-  kernelInfo["defines/p_YLEN"] = YLEN;
+  
+  kernelInfo.define("p_fcor")      = 2 * omega * LREF / UREF * sin(NLAT * M_PI / 180);
+  kernelInfo.define("p_bcor")      = 2 * omega * LREF / UREF * cos(NLAT * M_PI / 180);
+  kernelInfo.define("p_gacc")      = GACC;
+  kernelInfo.define("p_cond")      = cond;
+  kernelInfo.define("p_TsGrad")    = ILSTRENGTH * LREF / TREF;
+  kernelInfo.define("p_T0s")       = T0S;
+  kernelInfo.define("p_sCoolRate") = SCOOLRATE;
+  kernelInfo.define("p_YLEN")      = YLEN;
+
+  //std::cout << static_cast<occa::properties>(kernelInfo) << std::endl;
 }
 
 void UDF_Setup0(MPI_Comm comm, setupAide &options)
@@ -323,7 +322,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 
 }
 
-void UDF_Setup(nrs_t *nrs)
+void UDF_Setup()
 {
   auto mesh = nrs->meshV;
 
@@ -348,13 +347,12 @@ void UDF_Setup(nrs_t *nrs)
     rescale(0.0, YLEN, mesh->y);
     rescale(0.0, ZLEN, mesh->z);
   }
-  o_divTau = platform->device.malloc<dfloat>(3 * nrs->fieldOffset);
+  o_divTau.resize(3 * nrs->fieldOffset);
 
+  nrs->o_usrwrk.resize(5);
 
-  nrs->o_usrwrk = platform->device<dfloat>.malloc(5);
-
-  udf.uEqnSource = &userf;
-  udf.sEqnSource = &userq;
+  nrs->userVelocitySource = &userf;
+  nrs->userScalarSource = &userq;
 
   platform->options.setArgs("VERBOSE SOLVER INFO", "TRUE");
   platform->options.setArgs("RUNTIME STATISTICS FREQUENCY", "5000");
@@ -371,11 +369,11 @@ void UDF_Setup(nrs_t *nrs)
   }
 
   {
-    std::vector<std::vector<occa::memory>> tavgFields;
+    std::vector<std::vector<deviceMemory<dfloat>>> tavgFields;
 
-    auto o_u    = nrs->o_U.slice(0 * nrs->fieldOffset , nrs->fieldOffset);
-    auto o_w    = nrs->o_U.slice(2 * nrs->fieldOffset , nrs->fieldOffset);
-    auto o_temp = nrs->cds->o_S.slice(0 * cds->fieldOffset[0], cds->fieldOffset[0]);
+    deviceMemory<dfloat> o_u(nrs->o_U.slice(0 * nrs->fieldOffset , nrs->fieldOffset));
+    deviceMemory<dfloat> o_w(nrs->o_U.slice(2 * nrs->fieldOffset , nrs->fieldOffset));
+    deviceMemory<dfloat> o_temp(nrs->cds->o_S.slice(0 * nrs->cds->fieldOffset[0], nrs->cds->fieldOffset[0]));
 
     tavgFields.push_back({o_u});
     tavgFields.push_back({o_w});
@@ -385,7 +383,7 @@ void UDF_Setup(nrs_t *nrs)
     tavgFields.push_back({o_w, o_temp});
     tavgFields.push_back({o_w, o_w, o_temp});
 
-    tavg::setup(nrs, tavgFields);
+    tavg::setup(nrs->fieldOffset, tavgFields);
   }
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
@@ -418,11 +416,11 @@ void UDF_Setup(nrs_t *nrs)
   }
 }
 
-void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
+void UDF_ExecuteStep(double time, int tstep)
 {
-  mesh_t *mesh = nrs->meshV;
+  auto mesh = nrs->meshV;
 
-  o_work = platform->o_memPool.reserve(9 * nrs->fieldOffset);
+  o_work.resize(9 * nrs->fieldOffset);
 
   {
     static int calld = 0;
@@ -445,7 +443,7 @@ void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
   dfloat avgWallValues[3];
   avgBoundaryValue(nrs, bIdWall, 3, o_work, avgWallValues);
 
-  dfloat wallData[5];
+  std::vector<dfloat> wallData(nrs->o_usrwrk.size());
   const dfloat thts = wallData[0] = T0S + SCOOLRATE * time;
 
   const auto uAvgWall = avgWallValues[0];
@@ -456,12 +454,13 @@ void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
   dfloat rLength;
   const dfloat diffTempWall = fabs(tempAvgWall - (thts - 1.));
   findUThetaTau(magUWall, diffTempWall, rLength, wallData[3], wallData[4]);
-  nrs->o_usrwrk.copyFrom(wallData, sizeof(wallData));
+  nrs->o_usrwrk.copyFrom(wallData);
 
   const auto factru = (1. + BETAM * ZWALL * rLength) / KAPPA / ZWALL;
   const auto scale = 1. / (factru * factru);
   auto o_ddyAvg = o_work.slice(3 * nrs->fieldOffset, 3 * nrs->fieldOffset);
-  auto o_visMF = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+  poolDeviceMemory<dfloat> o_visMF(nrs->fieldOffset);
+
   visMF(mesh->Nlocal, 
         nrs->fieldOffset, 
         scale, 
@@ -480,8 +479,8 @@ void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
             o_visMF,
             o_ddyAvg,
             o_divTau);
-  o_visMF.free();
-  qqt::startFinish(o_divTau, 3, nrs->fieldOffset, ogsDfloat, ogsAdd, nrs->qqt);
+
+  oogs::startFinish(o_divTau, 3, nrs->fieldOffset, ogsDfloat, ogsAdd, nrs->gsh);
 
   if (nrs->isOutputStep) {
     if (platform->comm.mpiRank == 0) {
@@ -500,5 +499,5 @@ void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
     // tavg::outfld();
   }
 
-  o_work.free();
+  o_work.clear();
 }

@@ -1,8 +1,6 @@
 #include <math.h>
 #include <vector>
 
-#include "constantFlowRate.hpp"
-
 static int ciMode = 0;
 
 #define EPS 4e-3
@@ -77,5 +75,5 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
     printf("tau: %g; relative error = %g\n", utau, utauErr);
   }
 
-  (fabs(utauErr) < EPS) ? (CIPASS) : (CIFAIL);
+  (fabs(utauErr) < EPS) ? (CiPassTest()) : (CiFailTest());
 }

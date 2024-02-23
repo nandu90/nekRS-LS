@@ -4,8 +4,8 @@
 static dfloat Stk;
 static dlong nParticlesInject;
 static dlong injectionFrequency;
-static occa::memory o_yNewPart; // for adding new particles
-static occa::memory o_propNewPart;
+static deviceMemory<dfloat> o_yNewPart; // for adding new particles
+static deviceMemory<dfloat> o_propNewPart;
 
 static dfloat xMin;
 static dfloat yMin;
@@ -35,7 +35,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
   platform->par->extract("casedata", "injectionfrequency", injectionFrequency);
 }
 
-void userRHS(nrs_t *nrs, lpm_t *lpm, double time, occa::memory o_y, void *userdata, occa::memory o_ydot)
+void userRHS(nrs_t *nrs, lpm_t *lpm, double time, const deviceMemory<dfloat>& o_y, void *userdata, deviceMemory<dfloat>& o_ydot)
 {
   auto offset = lpm->fieldOffset();
 
@@ -79,9 +79,9 @@ auto generateInflowPoints(nrs_t *nrs)
   return std::make_tuple(xPart, yPart, zPart);
 }
 
-void UDF_Setup(nrs_t *nrs)
+void UDF_Setup()
 {
-  auto *mesh = nrs->meshV;
+  auto mesh = nrs->meshV;
 
   xMin = platform->linAlg->min(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm);
   yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
@@ -94,7 +94,7 @@ void UDF_Setup(nrs_t *nrs)
   const dfloat newton_tol = 5e-13;
   const dfloat bb_tol = 1e-4;
 
-  particles = new lpm_t(nrs, bb_tol, newton_tol);
+  particles = new lpm_t(bb_tol, newton_tol);
   particles->setUserRHS(userRHS);
 
   particles->setSolver("AB");
@@ -113,7 +113,7 @@ void UDF_Setup(nrs_t *nrs)
 
   // interpolate initial fluid velocity onto particle positions
   std::vector<dfloat> particleU0(nrs->NVfields * nParticles);
-  auto interpolator = pointInterpolation_t(nrs);
+  auto interpolator = pointInterpolation_t(mesh);
   interpolator.setPoints(nParticles, xPart.data(), yPart.data(), zPart.data());
   interpolator.find();
 
@@ -145,7 +145,7 @@ void UDF_Setup(nrs_t *nrs)
   particles->initialize(nParticles, t0, y0);
 
   // set Stokes number
-  auto o_tmp = platform->device.malloc<dfloat>(nParticles);
+  deviceMemory<dfloat> o_tmp(nParticles);
   platform->linAlg->fill(nParticles, Stk, o_tmp);
   particles->setProp("stokes_number", o_tmp); 
 }
@@ -160,17 +160,17 @@ void addNewParticles(nrs_t *nrs, double time, int tstep)
   const auto NNewYPart = nPartAdd * particles->nDOFs();
   if (o_yNewPart.length() < NNewYPart) {
     if (o_yNewPart.byte_size()) {
-      o_yNewPart.free();
+      o_yNewPart.clear();
     }
-    o_yNewPart = platform->device.malloc<dfloat>(NNewYPart);
+    o_yNewPart.resize(NNewYPart);
   }
 
   const auto NNewPropPart = nPartAdd * particles->nProps();
   if (o_propNewPart.length() < NNewPropPart) {
     if (o_propNewPart.byte_size()) {
-      o_propNewPart.free();
+      o_propNewPart.clear();
     }
-    o_propNewPart = platform->device.malloc<dfloat>(NNewPropPart);
+    o_propNewPart.resize(NNewPropPart);
   }
 
   auto o_xPart = o_yNewPart + 0 * nPartAdd;
@@ -186,7 +186,7 @@ void addNewParticles(nrs_t *nrs, double time, int tstep)
   platform->linAlg->fill(nPartAdd, Stk, o_propNewPart);
 
   // interpolate fluid velocity onto new particle positions (set initial velocity as fluid velocity)
-  auto interpolator = pointInterpolation_t(nrs);
+  auto interpolator = pointInterpolation_t(nrs->meshV);
   interpolator.setPoints(nPartAdd, xPart.data(), yPart.data(), zPart.data());
   interpolator.find();
 
@@ -195,7 +195,7 @@ void addNewParticles(nrs_t *nrs, double time, int tstep)
   particles->addParticles(nPartAdd, o_yNewPart, o_propNewPart);
 }
 
-void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
+void UDF_ExecuteStep(double time, int tstep)
 {
   particles->integrate(time);
 

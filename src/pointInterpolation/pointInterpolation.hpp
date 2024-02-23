@@ -5,8 +5,7 @@
 #include <memory>
 #include "nekrsSys.hpp"
 #include "findpts.hpp"
-
-class nrs_t;
+#include "mesh.h"
 
 using findpts::TimerLevel;
 
@@ -14,13 +13,13 @@ class pointInterpolation_t
 {
 public:
   enum class VerbosityLevel { None, Basic, Detailed };
-  pointInterpolation_t(nrs_t *nrs_,
+  pointInterpolation_t(mesh_t *mesh,
                        double bb_tol = 0.01,
                        double newton_tol_ = 0,
                        bool mySession_ = true,
                        dlong sessionID_ = 0,
                        bool multipleSessionSupport_ = false);
-  pointInterpolation_t(nrs_t *nrs_,
+  pointInterpolation_t(mesh_t *mesh_,
                        MPI_Comm comm,
                        dlong localHashSize,
                        dlong globalHashSize,
@@ -84,7 +83,7 @@ public:
   occa::memory distance();
 
 private:
-  nrs_t *nrs;
+  mesh_t *mesh;
   double newton_tol;
   std::string timerName = "";
   TimerLevel timerLevel = TimerLevel::None;

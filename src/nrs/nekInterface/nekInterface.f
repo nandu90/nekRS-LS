@@ -1,0 +1,1264 @@
+#include "bcType.h"
+
+c-----------------------------------------------------------------------
+c
+c NEK5000 Interface
+c
+c-----------------------------------------------------------------------
+      subroutine nekf_bootstrap(comm_in,path_in,session_in,mesh_in)
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'DOMAIN'
+      include 'NEKINTF'
+
+      integer comm_in
+      character session_in*(*),path_in*(*)
+      character mesh_in*(*)
+
+      real rtest
+      integer itest
+      integer*8 itest8
+      character ctest
+      logical ltest 
+
+      character*1  re2fle1(132)
+      equivalence  (RE2FLE,re2fle1)
+
+      ! set word size for REAL
+      wdsize = sizeof(rtest)
+      ! set word size for INTEGER
+      isize = sizeof(itest)
+      ! set word size for INTEGER*8
+      isize8 = sizeof(itest8) 
+      ! set word size for LOGICAL
+      lsize = sizeof(ltest) 
+      ! set word size for CHARACTER
+      csize = sizeof(ctest)
+
+      call setupcomm(comm_in,newcomm,newcommg,path_in,session_in)
+      call iniproc()
+
+      istep  = 0
+      call initdim ! Initialize / set default values.
+      call initdat
+      call files
+
+      call usrdat0
+
+      lp = 0 !ltrunc(PATH,132)
+      call chcopy(re2fle1(lp+1),mesh_in,len(mesh_in))
+      ls = lp + len(mesh_in)
+      call blank(re2fle1(ls+1),len(re2fle)-ls)
+
+      call nekrs_registerPtr('ndim', ndim)
+      call nekrs_registerPtr('nelv', nelv)
+      call nekrs_registerPtr('nelt', nelt)
+      call nekrs_registerPtr('lelt', lelt)
+      call nekrs_registerPtr('ldimt', ldimt)
+      call nekrs_registerPtr('nx1', nx1)
+      call nekrs_registerPtr('ifield', ifield)
+      call nekrs_registerPtr('boundaryID', boundaryID)
+      call nekrs_registerPtr('boundaryIDt', boundaryIDt)
+
+      call nekrs_registerPtr('glo_num', glo_num)
+
+      call nekrs_registerPtr('nekcomm', nekcomm)
+      call nekrs_registerPtr('istep', istep)
+
+      call nekrs_registerPtr('param', param)
+      call nekrs_registerPtr('xc', xc)
+      call nekrs_registerPtr('yc', yc)
+      call nekrs_registerPtr('zc', zc)
+      call nekrs_registerPtr('xm1', xm1)
+      call nekrs_registerPtr('ym1', ym1)
+      call nekrs_registerPtr('zm1', zm1)
+
+      call nekrs_registerPtr('unx', unx)
+      call nekrs_registerPtr('uny', uny)
+      call nekrs_registerPtr('unz', unz)
+
+      call nekrs_registerPtr('vx', vx)
+      call nekrs_registerPtr('vy', vy)
+      call nekrs_registerPtr('vz', vz)
+      call nekrs_registerPtr('pr', pr)
+      call nekrs_registerPtr('t', t)
+      call nekrs_registerPtr('wx', wx)
+      call nekrs_registerPtr('wy', wy)
+      call nekrs_registerPtr('wz', wz)
+
+      call nekrs_registerPtr('time', time)
+      call nekrs_registerPtr('p0th', p0th)
+
+      call nekrs_registerPtr('vmult', vmult)
+      call nekrs_registerPtr('tmult', tmult)
+
+      call nekrs_registerPtr('ifgetu', ifgetu)
+      call nekrs_registerPtr('ifgetp', ifgetp)
+      call nekrs_registerPtr('ifgett', ifgett)
+      call nekrs_registerPtr('ifgets', ifgets)
+
+      call nekrs_registerPtr('cbc', cbc)
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_setup(ifflow_in,
+     $                      npscal_in, idpss_in, p32, mpart, contol,
+     $                      rho, mue, rhoCp, lambda, stsform) 
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'DOMAIN'
+      include 'NEKINTF'
+
+      integer iftmsh_in, ifflow_in, mpart, p32
+      integer idpss_in(*)
+      real rho, mue, rhoCp, lambda, contol
+      integer stsform
+
+      common /rdump/ ntdump
+
+      common /ivrtx/ vertex ((2**ldim)*lelt)
+      integer*8 vertex
+
+      etimes = dnekclock_sync()
+
+      call read_re2_hdr(ifbswap, .true.)
+
+      if(ndim.eq.2) call exitti('Mesh has to be 3D!$', ndim) 
+
+      call setDefaultParam
+      loglevel   = 1
+      cpfld(1,2) = rho
+      cpfld(1,1) = mue
+      cpfld(2,2) = rhoCp
+      cpfld(2,1) = lambda
+
+      param(27) = 1  ! torder 1 to save mem
+      param(32) = p32 ! number of BC fields read from re2
+      param(99) = -1 ! no dealiasing to save mem
+
+      fluid_partitioner = mpart
+      solid_partitioner = 1 ! RCB 
+      connectivityTol = contol
+
+      ifflow = .true.
+      if(ifflow_in.eq.0) ifflow = .false.
+      iftran = .true.
+      ifheat = .false.
+      ifvo   = .true.
+      ifpo   = .true.
+      if(stsform.eq.1) ifstrs = .true.
+
+      if (npscal_in .gt. 0) then
+        ifheat = .true.
+        if(nelgt.ne.nelgv) iftmsh(2) = .true.
+        if(nelgt.ne.nelgv .and. param(32).eq.1) param(32) = 2 
+        npscal = npscal_in - 1
+        param(23) = npscal
+        ifto = .true.    
+        call icopy(idpss, idpss_in, npscal+1)
+        do i = 1,npscal
+          ifpsco(i) = .true.
+        enddo 
+      endif
+
+
+      call bcastParam
+      call chkParam
+
+      call mapelpr 
+      call read_re2_data(ifbswap, .true., .true., .true.)
+
+      ifld_bId = 2
+      if(ifflow) ifld_bId = 1
+      do iel = 1,nelv
+      do ifc = 1,2*ndim
+         boundaryID(ifc,iel) = -1
+         if(bc(5,ifc,iel,ifld_bId).gt.0)
+     $     boundaryID(ifc,iel) = bc(5,ifc,iel,ifld_bId)
+      enddo
+      enddo
+
+      if(nelgt.ne.nelgv) then 
+        do iel = 1,nelt
+        do ifc = 1,2*ndim
+         boundaryIDt(ifc,iel) = -1
+         if(bc(5,ifc,iel,2).gt.0)
+     $     boundaryIDt(ifc,iel) = bc(5,ifc,iel,2)
+        enddo
+        enddo
+      endif
+
+      call setvar          ! Initialize most variables
+
+      igeom = 2
+      call setup_topo      ! Setup domain topology
+
+      if(.not. ifflow) then
+        call rone(vmult,lx1*ly1*lz1*nelv)
+        ifield = 1
+        call dssum(vmult,lx1,ly1,lz1)
+        call invcol1(vmult,lx1*ly1*lz1*nelv)
+      endif
+
+      call genwz           ! Compute GLL points, weights, etc.
+
+      if(nio.eq.0) write(6,*) 'call usrdat'
+      call usrdat
+      if(nio.eq.0) write(6,'(A,/)') ' done :: usrdat' 
+
+      call gengeom(igeom)  ! Generate geometry, after usrdat 
+
+      if(nio.eq.0) write(6,*) 'call usrdat2'
+      call usrdat2
+      if(nio.eq.0) write(6,'(A,/)') ' done :: usrdat2' 
+
+      call fix_geom
+      call geom_reset(1)    ! recompute Jacobians, etc.
+
+      call vrdsmsh          ! verify mesh topology
+
+      call setlog(.false.)  ! Initalize logical flags
+
+      call bcmask  ! Set BC masks for Dirichlet boundaries.
+
+      ifield = 1
+
+      if(nio.eq.0) write(6,*) 'call usrdat3'
+      call usrdat3
+      if(nio.eq.0) write(6,'(A,/)') ' done :: usrdat3'
+
+      time = 0.0
+      p0thn = p0th
+      ntdump = 0
+
+      etimeSetup = dnekclock_sync() - etimes
+      if(nio.eq.0) write(6,999) etimeSetup 
+ 999  format(' nek setup done in ', 1p1e13.4, ' s')
+      if(nio.eq.0) write(6,*) 
+      call flush(6)
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_resetio()
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKINTF'
+
+      real ts
+      integer npscals, p63s
+      logical ifxyos, ifvos, ifpos, iftos, ifpscos(ldimt1)
+      common /ros/  ts
+      common /ios/  npscals, p63s
+      common /ifos/ ifxyos, ifvos, ifpos, iftos, ifpscos
+
+      time = ts
+
+      param(63) = p63s
+
+      npscal = npscals
+      ifxyo  = ifxyos 
+      ifvo   = ifvos 
+      ifpo   = ifpos 
+      ifto   = iftos 
+      do i = 1,ldimt1
+        ifpsco(i) = ifpscos(i) 
+      enddo
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_setio(ttime, xo, vo, po, so, ns, fp64)
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKINTF'
+
+      real ttime
+      integer xo, vo, po, so, fp64
+
+      real ts
+      integer npscals, p63s
+      logical ifxyos, ifvos, ifpos, iftos
+
+      common /ros/  ts
+      common /ios/  npscals, p63s
+      common /ifos/ ifxyos, ifvos, ifpos
+
+      ts = time
+      time = ttime
+
+      p63s = param(63)
+      param(63) = fp64 
+ 
+      npscals = npscal
+      ifxyos  = ifxyo
+      ifvos   = ifvo
+      ifpos   = ifpo
+      iftos   = ifto
+
+      npscal = ns-1 
+      ifxyo  = .false.
+      ifvo   = .false.
+      ifpo   = .false.
+      ifto   = .false.
+ 
+      if(xo.ne.0) ifxyo = .true.
+      if(vo.ne.0) ifvo  = .true.
+      if(po.ne.0) ifpo  = .true.
+      if(so.ne.0) then
+        ifto = .true.
+      endif
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_outfld(prefix, nrg_in, vx_in, vy_in, vz_in,
+     &                       pm1_in, t_in, ps_in, nps_in)
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'RESTART'
+      include 'NEKINTF'
+
+      character prefix*(*)
+      integer nrg_in
+
+      real vx_in(*), vy_in(*), vz_in(*)
+      real pm1_in(*)
+      real t_in(*)
+      real ps_in(lx1,ly1,lz1,lelt,*)
+      integer nps_in
+
+      integer*8 offs0,offs,nbyte,stride,strideB,nxyzo8
+      logical ifxyo_s
+      logical rego
+ 
+      common /SCRUZ/  ur1(lxo*lxo*lxo*lelt)
+     &              , ur2(lxo*lxo*lxo*lelt)
+     &              , ur3(lxo*lxo*lxo*lelt)
+
+      rego = .false.
+      if(nrg_in.gt.0) rego = .true.
+
+      if(nio.eq.0) then
+        if(rego) then
+          WRITE(6,1001) istep,time,nrg_in
+ 1001     FORMAT(/,i9,1pe12.4,' Writing checkpoint Nrg=', i2)
+        else
+          WRITE(6,1002) istep,time
+ 1002     FORMAT(/,i9,1pe12.4,' Writing checkpoint')
+        endif
+      endif
+
+      tiostart=dnekclock_sync()
+
+      call io_init
+
+      ifxyo_s = ifxyo 
+      ifxyo_  = ifxyo
+
+      nout = nelt
+      nxo  = lx1
+      nyo  = ly1
+      nzo  = lz1
+      if (rego) then ! dump on regular (uniform) mesh
+         if (nrg_in.gt.lxo) then
+            if (nid.eq.0) write(6,*) 
+     &         'WARNING: nrg too large, reset to lxo!'
+            nrg_in = lxo
+         endif
+         nxo  = nrg_in
+         nyo  = nxo 
+         nzo  = 1
+         if(if3d) nzo = nxo 
+      endif
+      offs0 = iHeaderSize + 4 + isize*nelgt
+
+      ierr=0
+      if (nid.eq.pid0) then
+         call mfo_open_files(prefix,ierr)         ! open files on i/o nodes
+      endif
+      call err_chk(ierr,'Error opening file in mfo_open_files. $')
+      call bcast(ifxyo_,lsize)
+      ifxyo = ifxyo_
+      call mfo_write_hdr                     ! create element mapping + write hdr
+
+      nxyzo8  = nxo*nyo*nzo
+      strideB = nelB * nxyzo8*wdsizo
+      stride  = nelgt* nxyzo8*wdsizo
+
+      ioflds = 0
+      ! dump all fields based on the t-mesh to avoid different
+      ! topologies in the post-processor
+      if (ifxyo) then
+         offs = offs0 + ldim*strideB
+         call byte_set_view(offs,ifh_mbyte)
+         if (rego) then
+            call map2reg(ur1,nrg,xm1,nout)
+            call map2reg(ur2,nrg,ym1,nout)
+            if (if3d) call map2reg(ur3,nrg,zm1,nout)
+            call mfo_outv(ur1,ur2,ur3,nout,nxo,nyo,nzo)
+         else
+            call mfo_outv(xm1,ym1,zm1,nout,nxo,nyo,nzo)
+         endif
+         ioflds = ioflds + ldim
+      endif
+
+      if (ifvo ) then
+         offs = offs0 + ioflds*stride + ldim*strideB
+         call byte_set_view(offs,ifh_mbyte)
+         if (rego) then
+             call map2reg(ur1,nrg,vx_in,nout)
+             call map2reg(ur2,nrg,vy_in,nout)
+             if (if3d) call map2reg(ur3,nrg,vz_in,nout)
+             call mfo_outv(ur1,ur2,ur3,nout,nxo,nyo,nzo) 
+         else
+            call mfo_outv(vx_in,vy_in,vz_in,nout,nxo,nyo,nzo)
+         endif
+         ioflds = ioflds + ldim
+      endif
+
+      if (ifpo ) then
+         offs = offs0 + ioflds*stride + strideB
+         call byte_set_view(offs,ifh_mbyte)
+         if (rego) then
+            call map2reg(ur1,nrg,pm1_in,nout)
+            call mfo_outs(ur1,nout,nxo,nyo,nzo)
+         else
+            call mfo_outs(pm1_in,nout,nxo,nyo,nzo)
+         endif
+         ioflds = ioflds + 1
+      endif
+
+      if (ifto ) then
+         offs = offs0 + ioflds*stride + strideB
+         call byte_set_view(offs,ifh_mbyte)
+         if (rego) then
+            call map2reg(ur1,nrg,t_in,nout)
+            call mfo_outs(ur1,nout,nxo,nyo,nzo)
+         else
+            call mfo_outs(t_in,nout,nxo,nyo,nzo)
+         endif
+         ioflds = ioflds + 1
+      endif
+
+      do k=1,nps_in
+         if(.true.) then
+           offs = offs0 + ioflds*stride + strideB
+           call byte_set_view(offs,ifh_mbyte)
+           if (rego) then
+              call map2reg(ur1,nrg,ps_in(1,1,1,1,k),nout)
+              call mfo_outs(ur1,nout,nxo,nyo,nzo)
+           else
+              call mfo_outs(ps_in(1,1,1,1,k),nout,nxo,nyo,nzo)
+           endif
+           ioflds = ioflds + 1
+         endif
+      enddo
+      dnbyte = 1.*ioflds*nout*wdsizo*nxo*nyo*nzo
+
+      if (if3d) then
+         offs0   = offs0 + ioflds*stride
+         strideB = nelB *2*4   ! min/max single precision
+         stride  = nelgt*2*4
+         ioflds  = 0
+         ! add meta data to the end of the file
+         if (ifxyo) then
+            offs = offs0 + ldim*strideB
+            call byte_set_view(offs,ifh_mbyte)
+            call mfo_mdatav(xm1,ym1,zm1,nout)
+            ioflds = ioflds + ldim
+         endif
+         if (ifvo ) then
+            offs = offs0 + ioflds*stride + ldim*strideB
+            call byte_set_view(offs,ifh_mbyte)
+            call mfo_mdatav(vx_in,vy_in,vz_in,nout)
+            ioflds = ioflds + ldim
+         endif
+         if (ifpo ) then
+            offs = offs0 + ioflds*stride + strideB
+            call byte_set_view(offs,ifh_mbyte)
+            call mfo_mdatas(pm1_in,nout)
+            ioflds = ioflds + 1
+         endif
+         if (ifto ) then
+            offs = offs0 + ioflds*stride + strideB
+            call byte_set_view(offs,ifh_mbyte)
+            call mfo_mdatas(t_in,nout)
+            ioflds = ioflds + 1
+         endif
+         do k=1,nps_in
+           if(.true.) then
+             offs = offs0 + ioflds*stride + strideB
+             call byte_set_view(offs,ifh_mbyte)
+             call mfo_mdatas(ps_in(1,1,1,1,k), nout)
+             ioflds = ioflds + 1
+           endif
+         enddo
+         dnbyte = dnbyte + 2.*ioflds*nout*wdsizo
+      endif
+
+      ierr = 0
+      if (nid.eq.pid0) then 
+         if(ifmpiio) then
+           call byte_close_mpi(ifh_mbyte,ierr)
+         else
+           call byte_close(ierr)
+         endif
+      endif
+      call err_chk(ierr,'Error closing file in mfo_outfld. Abort. $')
+
+      tio = dnekclock_sync()-tiostart
+      if (tio.le.0) tio=1.
+
+      dnbyte = glsum(dnbyte,1)
+      dnbyte = dnbyte + iHeaderSize + 4. + isize*nelgt
+      dnbyte = dnbyte/1e9
+      if(nio.eq.0) write(6,7) istep,time,dnbyte,dnbyte/tio,
+     &             nfileo
+    7 format(/,i9,1pe12.4,' done ::',/,
+     &       30X,'file size = ',3pG12.2,'GB',/,
+     &       30X,'avg data-throughput = ',0pf7.1,'GB/s',/,
+     &       30X,'io-nodes = ',i5,/)
+
+      ifxyo = ifxyo_s ! restore old value
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_storesol()
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKINTF'
+
+      parameter(ltot=lx1*ly1*lz1*lelt)
+      common /outtmp/  w1(ltot),w2(ltot),w3(ltot),wp(ltot)
+     &                ,wt(ltot,1)
+
+      ntot1  = lx1*ly1*lz1*nelt
+
+      call copy(w1,vx,ntot1)
+      call copy(w2,vy,ntot1)
+      call copy(w3,vz,ntot1)
+      call copy(wp,pr,ntot1)
+      do i = 1,1
+         call copy(wt(1,i),t(1,1,1,1,i),ntot1)
+      enddo
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_restoresol()
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKINTF'
+
+      parameter(ltot=lx1*ly1*lz1*lelt)
+      common /outtmp/  w1(ltot),w2(ltot),w3(ltot),wp(ltot)
+     &                ,wt(ltot,1)
+
+      ntot1  = lx1*ly1*lz1*nelt
+
+      call copy(vx,w1,ntot1)
+      call copy(vy,w2,ntot1)
+      call copy(vz,w3,ntot1)
+      call copy(pr,wp,ntot1)
+      do i = 1,1
+         call copy(t(1,1,1,1,i),wt(1,i),ntot1)
+      enddo
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_restart(rfile,l)
+
+      character*(l) rfile
+
+      include 'SIZE'
+      include 'RESTART'
+      include 'INPUT'
+
+      logical  iffort(  ldimt1,0:lpert)
+     $       , ifrest(0:ldimt1,0:lpert)
+     $       , ifprsl(  ldimt1,0:lpert)
+
+      call blank(initc(1),132)
+      call chcopy(initc(1),rfile,l)
+
+      call slogic (iffort,ifrest,ifprsl,nfiles)
+
+      call nekgsync()
+      call restart(nfiles) !  Check restart files
+      call nekgsync()
+
+      getu = 1
+      getp = 1
+      gett = 1
+ 
+      if (.not. ifgetu) getu = 0 
+      if (.not. ifgetp) getp = 0
+      if (.not. ifgett) gett = 0
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_end()
+
+      include 'SIZE'
+      include 'DPROCMAP'
+
+#ifdef DPROCMAP
+#ifdef MPI
+      call MPI_Win_free(dProcmapH, ierr)
+#endif
+#endif 
+      !call nek_end()
+
+      return
+      end
+c-----------------------------------------------------------------------
+      real function nekf_uf(u,v,w)
+
+      real u(*), v(*), w(*)
+
+      call nekuf(u,v,w)
+
+      return
+      end
+c-----------------------------------------------------------------------
+      integer function nekf_lglel(e)
+
+      integer e
+
+      include 'SIZE'
+      include 'PARALLEL'
+
+      nekf_lglel = lglel(e)
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_uic(ifld)
+
+      include 'SIZE'
+      include 'TSTEP'
+
+      ifield_ = ifield
+      ifield = ifld
+      if (nio.eq.0) write(6,*) 'useric for ifld ', ifield
+      call nekuic
+      ifield = ifield_
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_ifoutfld(iswitch)
+
+      include 'SIZE'
+      include 'TSTEP'
+
+      ifoutfld = .true.
+      if (iswitch .eq. 0) ifoutfld = .false. 
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_setics()
+
+      include 'SIZE'
+      include 'RESTART'
+      include 'NEKINTF'
+
+      call setics()
+      getu = 1
+      getp = 1
+      gett = 1
+ 
+      if (.not. ifgetu) getu = 0 
+      if (.not. ifgetp) getp = 0
+      if (.not. ifgett) gett = 0
+
+      return
+      end
+c-----------------------------------------------------------------------
+      integer function nekf_bcmap(bID, ifld, ismesh)
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKINTF'
+
+      integer bID, ifld, ismesh
+      character*3 c
+
+      if (bID < 1) then ! not a boundary
+        nekf_bcmap = 0
+        return 
+      endif 
+
+      ibc = 0 
+      c = cbc_bmap(bID, ifld)
+
+      if (ifld.eq.1) then
+        if (c.eq.'W  ') then 
+          ibc = p_bcTypeW 
+        else if (c.eq.'v  ') then 
+          ibc = p_bcTypeV 
+          if(ismesh.eq.1) then
+            ibc = p_bcTypeW 
+          endif
+        else if (c.eq.'int') then 
+          ibc = p_bcTypeINT
+          if(ismesh.eq.1) then
+            ibc = p_bcTypeW 
+          endif
+        else if (c.eq.'o  ' .or. c.eq.'O  ') then 
+          ibc = p_bcTypeO 
+          if(ismesh.eq.1) then
+            ! outflow remaps to SYM bounds for mesh solver
+            ibc = p_bcTypeSYM 
+          endif
+        else if (c.eq.'on ' .or. c.eq.'ON ') then 
+          ibc = p_bcTypeON 
+          if(ismesh.eq.1) then
+            ! outflow remaps to SYM bounds for mesh solver
+            ibc = p_bcTypeSYM 
+          endif
+        else if (c.eq.'onx') then 
+          ibc = p_bcTypeONX 
+          if(ismesh.eq.1) then
+            ! outflow remaps to SYM bounds for mesh solver
+            ibc = p_bcTypeSYM 
+          endif
+        else if (c.eq.'ony') then 
+          ibc = p_bcTypeONY 
+          if(ismesh.eq.1) then
+            ! outflow remaps to SYM bounds for mesh solver
+            ibc = p_bcTypeSYM 
+          endif
+        else if (c.eq.'onz') then 
+          ibc = p_bcTypeONZ 
+          if(ismesh.eq.1) then
+            ! outflow remaps to SYM bounds for mesh solver
+            ibc = p_bcTypeSYM 
+          endif
+        else if (c.eq.'SYX') then 
+          ibc = p_bcTypeSYMX 
+        else if (c.eq.'SYY') then 
+          ibc = p_bcTypeSYMY 
+         else if (c.eq.'SYZ') then 
+          ibc = p_bcTypeSYMZ 
+         else if (c.eq.'SYM') then 
+          ibc = p_bcTypeSYM
+         else if (c.eq.'shx') then 
+          ibc = p_bcTypeSHLX 
+         else if (c.eq.'shy') then 
+          ibc = p_bcTypeSHLY 
+         else if (c.eq.'shz') then 
+          ibc = p_bcTypeSHLZ 
+         else if (c.eq.'shl') then 
+          ibc = p_bcTypeSHL 
+          if(ismesh.eq.1) then
+            ! outflow remaps to SYM bounds for mesh solver
+            ibc = p_bcTypeSYM 
+          endif
+         else if (c.eq.'mv ') then 
+          ibc = p_bcTypeV 
+        endif
+      else if(ifld.gt.1) then
+        if (c.eq.'t  ') then 
+          ibc = p_bcTypeS 
+        else if (c.eq.'int') then 
+          ibc = p_bcTypeINTS 
+        else if (c.eq.'o  ' .or. c.eq.'O  ' .or. c.eq.'I  ') then 
+          ibc = p_bcTypeF0 
+        else if (c.eq.'f  ') then 
+          ibc = p_bcTypeF 
+        endif
+      endif
+
+      if(nid.eq.0)
+     $  write(6,*) ifld, 'bID: ', bID, 'cbc: ', c, 'bcType: ', ibc
+
+      if (ibc.eq.0) then
+        write(6,*) 'Found unsupport BC type: ''', c , '''' 
+        call exitt 
+      endif
+
+      nekf_bcmap = ibc
+
+      return
+      end
+c-----------------------------------------------------------------------
+      integer function nekf_nbid(isTmsh)
+
+      include 'SIZE'
+      include 'TOTAL'
+
+      common /nekmpi/ mid,mp,nekcomm,nekgroup,nekreal
+
+      integer sum
+      integer*8 bid8(2*ldim*lelt)
+      integer maxbid
+
+#if 0
+      if(isTmsh.eq.1) then
+        n = 2*ndim*nelt
+        do i = 1,n
+           bid8(i) = boundaryIDt(i,1)
+        enddo
+      else
+        n = 2*ndim*nelv
+        do i = 1,n
+           bid8(i) = boundaryID(i,1)
+        enddo
+      endif
+
+      call fgslib_gs_unique(bid8, n, nekcomm, np)
+
+      sum = 0 
+      do i = 1,n
+        if(bid8(i).gt.0) sum = sum + 1
+      enddo
+
+      nekf_nbid = iglsum(sum,1)
+#else
+      maxbid = 0
+      if(isTmsh.eq.1) then
+        n = 2*ndim*nelt
+        do i = 1,n
+           if(boundaryIDt(i,1) .gt. maxbid) maxbid = boundaryIDt(i,1) 
+        enddo
+      else
+        n = 2*ndim*nelv
+        do i = 1,n
+           if(boundaryID(i,1) .gt. maxbid) maxbid = boundaryID(i,1) 
+        enddo
+      endif
+
+      nekf_nbid = iglmax(maxbid,1)
+#endif
+
+      return
+      end
+c-----------------------------------------------------------------------
+      integer*8 function nekf_set_vert(nx, isTmsh)
+
+      include 'SIZE'
+      include 'TOTAL'
+      include 'NEKINTF'
+
+      integer npts, isTmsh
+
+      common /ivrtx/ vertex ((2**ldim),lelt)
+      integer*8 vertex
+
+      integer*8 ngv
+
+      nel = nelt
+      if (isTmsh.eq.0) nel = nelv
+      call set_vert(glo_num,ngv,nx,nel,vertex,.false.)
+
+      nekf_set_vert = ngv
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_dssum(u)
+      include 'SIZE'
+      include 'TOTAL'
+
+      ifld = ifield
+      ifield = 1
+      call dssum(u,lx1,ly1,lz1)
+      ifield = ifld 
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_gen_bcmap()
+c
+c     map: BC type to a consecutive boundaryID (index-1)
+c     cbc_bmap: map^T  
+c
+      include 'SIZE'
+      include 'TOTAL'
+
+      integer bID, bcID
+      integer map(max(p_velNBcType, p_scalNBcType))
+      integer cnt(max(p_velNBcType, p_scalNBcType))
+      integer ibc_bmap(lbid, ldimt1) 
+
+      integer bIDcnt, bIDcntV
+
+      logical ifalg,ifnorx,ifnory,ifnorz
+      character*3 cb 
+
+      call ifill(boundaryID, -1, size(boundaryID))
+      call ifill(boundaryIDt,-1, size(boundaryIDt))
+
+      call izero(map, size(map))
+
+      if(.not.ifflow .and. .not.ifheat) return 
+
+      if(ifflow) then
+
+        do iel = 1,nelv
+        do ifc = 1,2*ndim
+           cb = cbc(ifc,iel,1) 
+           call chknord(ifalg,ifnorx,ifnory,ifnorz,ifc,iel)
+
+           if(cb.eq.'W  ') then 
+             map(p_bcTypeW) = 1
+           else if(cb.eq.'int') then 
+             map(p_bcTypeINT) = 1
+           else if(cb.eq.'v  ') then 
+             map(p_bcTypeV) = 1
+           else if(cb.eq.'mv ') then 
+             map(p_bcTypeMV) = 1
+           else if(cb.eq.'o  ' .or. cb.eq.'O  ') then
+             map(p_bcTypeO) = 1
+           else if(cb.eq.'on ' .or. cb.eq.'ON ') then
+             if (ifnorx) map(p_bcTypeONX) = 1 
+             if (ifnory) map(p_bcTypeONY) = 1 
+             if (ifnorz) map(p_bcTypeONZ) = 1 
+             if (.not.ifalg) map(p_bcTypeON) = 1
+           else if(cb.eq.'SYM') then
+             if (ifnorx) map(p_bcTypeSYMX) = 1 
+             if (ifnory) map(p_bcTypeSYMY) = 1 
+             if (ifnorz) map(p_bcTypeSYMZ) = 1 
+             if (.not.ifalg) map(p_bcTypeSYM) = 1
+           else if(cb.eq.'shl') then
+             if (ifnorx) map(p_bcTypeSHLX) = 1 
+             if (ifnory) map(p_bcTypeSHLY) = 1 
+             if (ifnorz) map(p_bcTypeSHLZ) = 1 
+             if (.not.ifalg) map(p_bcTypeSHL) = 1
+           endif
+        enddo
+        enddo
+
+      else
+
+        do iel = 1,nelv
+        do ifc = 1,2*ndim
+           cb = cbc(ifc,iel,2)
+           if(cb.eq.'int') then 
+             map(p_bcTypeINTS) = 1
+           else if(cb.eq.'t  ') then 
+             map(p_bcTypeS) = 1
+           else if(cb.eq.'I  ' .or. cb.eq.'O  ') then 
+             map(p_bcTypeF0) = 1
+           else if(cb.eq.'f  ') then 
+             map(p_bcTypeF) = 1
+           endif
+        enddo
+        enddo
+
+      endif
+
+      ! assign each bcType to a consecutive bID
+      bIDcntV = 0
+      do i = 1,size(map)
+        map(i) = iglmax(map(i),1)
+        if(map(i).gt.0) then
+          bIDcntV = bIDcntV + 1
+          map(i) = bIDcntV
+        endif 
+      enddo
+
+      ! check if boundaryIDs match between all fields
+      do ifld = 2,nfield
+        if(idpss(ifld-1).lt.0 .or. iftmsh(ifld)) goto 199
+        call izero(cnt, size(cnt))
+
+        do iel = 1,nelv
+        do ifc = 1,2*ndim
+           cb = cbc(ifc,iel,ifld)
+           if(cb.eq.'int') then 
+             cnt(p_bcTypeINTS) = 1
+           else if(cb.eq.'t  ') then 
+             cnt(p_bcTypeS) = 1
+           else if(cb.eq.'I  ' .or. cb.eq.'O  ') then 
+             cnt(p_bcTypeF0) = 1
+           else if(cb.eq.'f  ') then 
+             cnt(p_bcTypeF) = 1
+           endif
+        enddo
+        enddo
+
+        bIDcnt = 0
+        do i = 1,size(cnt)
+          cnt(i) = iglmax(cnt(i),1)
+          if(cnt(i).gt.0) then
+            bIDcnt = bIDcnt + 1
+          endif 
+        enddo
+
+        if(bIDcnt .gt. bIDcntV) then
+           if(nid.eq.0)  write(6,*) 'Number of boundary types ',
+     $       'for field ', ifld, ' needs to be <= ', bIDcntV, 
+     $       '(field 1)'
+           call exitt
+        endif
+
+ 50     continue
+      enddo
+
+      ierr = 0
+
+      if(ifflow) then
+
+      do iel = 1,nelv
+      do ifc = 1,2*ndim
+         cb = cbc(ifc,iel,1)
+         call chknord(ifalg,ifnorx,ifnory,ifnorz,ifc,iel)
+ 
+         if(cb.eq.'W  ') then
+           boundaryID(ifc,iel) = map(p_bcTypeW) 
+         else if(cb.eq.'int') then
+           boundaryID(ifc,iel) = map(p_bcTypeINT) 
+         else if(cb.eq.'v  ') then
+           boundaryID(ifc,iel) = map(p_bcTypeV) 
+         else if(cb.eq.'mv ') then
+           boundaryID(ifc,iel) = map(p_bcTypeMV) 
+         else if(cb.eq.'o  ' .or. cb.eq.'O  ') then
+           boundaryID(ifc,iel) = map(p_bcTypeO) 
+         else if(cb.eq.'on ' .or. cb.eq.'ON ') then
+           if (ifnorx) boundaryID(ifc,iel) = map(p_bcTypeONX) 
+           if (ifnory) boundaryID(ifc,iel) = map(p_bcTypeONY) 
+           if (ifnorz) boundaryID(ifc,iel) = map(p_bcTypeONZ) 
+           if (.not.ifalg) boundaryID(ifc,iel) = map(p_bcTypeON) 
+         else if(cb.eq.'SYM') then
+           if (ifnorx) boundaryID(ifc,iel) = map(p_bcTypeSYMX) 
+           if (ifnory) boundaryID(ifc,iel) = map(p_bcTypeSYMY) 
+           if (ifnorz) boundaryID(ifc,iel) = map(p_bcTypeSYMZ) 
+           if (.not.ifalg) boundaryID(ifc,iel) = map(p_bcTypeSYM) 
+         else if(cb.eq.'shl') then
+           if (ifnorx) boundaryID(ifc,iel) = map(p_bcTypeSHLX) 
+           if (ifnory) boundaryID(ifc,iel) = map(p_bcTypeSHLY) 
+           if (ifnorz) boundaryID(ifc,iel) = map(p_bcTypeSHLZ) 
+           if (.not.ifalg) boundaryID(ifc,iel) = map(p_bcTypeSHL)
+         else  
+           if(cb.ne.'E  ' .and. cb.ne.'P  ') then
+             ierr = 1
+             write(6,*) 'Found unsupport BC type: ''', cb , '''' 
+             goto 99
+           endif
+         endif
+      enddo
+      enddo
+ 99   call err_chk(ierr, 'Invalid velocity boundary condition type!$')
+
+      if(map(p_bcTypeW).gt.0)
+     $  cbc_bmap(map(p_bcTypeW), 1) = 'W  '
+      if(map(p_bcTypeINT).gt.0)
+     $  cbc_bmap(map(p_bcTypeINT), 1) = 'int'
+      if(map(p_bcTypeV).gt.0)
+     $  cbc_bmap(map(p_bcTypeV), 1) = 'v  '
+      if(map(p_bcTypeMV).gt.0)
+     $   cbc_bmap(map(p_bcTypeMV), 1) = 'mv '
+      if(map(p_bcTypeO).gt.0)
+     $   cbc_bmap(map(p_bcTypeO), 1) = 'o  '
+      if(map(p_bcTypeON).gt.0)
+     $   cbc_bmap(map(p_bcTypeON), 1) = 'on '
+      if(map(p_bcTypeONX).gt.0)
+     $   cbc_bmap(map(p_bcTypeONX), 1) = 'onx'
+      if(map(p_bcTypeONY).gt.0)
+     $   cbc_bmap(map(p_bcTypeONY), 1) = 'ony'
+      if(map(p_bcTypeONZ).gt.0)
+     $   cbc_bmap(map(p_bcTypeONZ), 1) = 'onz'
+      if(map(p_bcTypeSYMX).gt.0)
+     $   cbc_bmap(map(p_bcTypeSYMX), 1) = 'SYX'
+      if(map(p_bcTypeSYMY).gt.0)
+     $   cbc_bmap(map(p_bcTypeSYMY), 1) = 'SYY'
+      if(map(p_bcTypeSYMZ).gt.0)
+     $   cbc_bmap(map(p_bcTypeSYMZ), 1) = 'SYZ'
+      if(map(p_bcTypeSYM).gt.0)
+     $   cbc_bmap(map(p_bcTypeSYM), 1) = 'SYM'
+      if(map(p_bcTypeSHLX).gt.0)
+     $   cbc_bmap(map(p_bcTypeSHLX), 1) = 'shx'
+      if(map(p_bcTypeSHLY).gt.0)
+     $   cbc_bmap(map(p_bcTypeSHLY), 1) = 'shy'
+      if(map(p_bcTypeSHLZ).gt.0)
+     $   cbc_bmap(map(p_bcTypeSHLZ), 1) = 'shz'
+      if(map(p_bcTypeSHL).gt.0)
+     $   cbc_bmap(map(p_bcTypeSHL), 1) = 'shl'
+
+      else
+
+        do iel = 1,nelv
+        do ifc = 1,2*ndim
+           cb = cbc(ifc,iel,2)
+           if(cb.eq.'int') then 
+             boundaryID(ifc,iel) = map(p_bcTypeINTS) 
+           else if(cb.eq.'t  ') then 
+             boundaryID(ifc,iel) = map(p_bcTypeS) 
+           else if(cb.eq.'I  ' .or. cb.eq.'O  ') then 
+             boundaryID(ifc,iel) = map(p_bcTypeF0) 
+           else if(cb.eq.'f  ') then 
+             boundaryID(ifc,iel) = map(p_bcTypeF)
+           endif
+        enddo
+        enddo
+
+      endif
+
+      do ifld = 2,nfield
+        ierr = 0
+        if(idpss(ifld-1).lt.0 .or. iftmsh(ifld)) goto 199
+        call izero(ibc_bmap, size(ibc_bmap))
+
+        if(bIDcntV .gt. 0) then
+        do iel = 1,nelv
+        do ifc = 1,2*ndim
+          bID = boundaryID(ifc,iel)
+          if(bID.gt.0) then
+            cb = cbc(ifc,iel,ifld) 
+            if(cb.eq.'t  ') then
+              bcID = p_bcTypeS 
+            else if(cb.eq.'int') then
+              bcID = p_bcTypeINTS
+            else if(cb.eq.'I  ' .or. cb.eq.'O  ') then
+              bcID = p_bcTypeF0 
+            else if(cb.eq.'f  ') then
+              bcID = p_bcTypeF 
+            else
+              if(cb.ne.'E  ' .and. cb.ne.'P  ') then
+                ierr = 1
+                write(6,*) 'Found unsupport BC type: ''', cb , '''' 
+                goto 98 
+              endif
+            endif 
+            ibc_bmap(bID, ifld) = bcID 
+          endif          
+        enddo
+        enddo
+        endif
+ 98     call err_chk(ierr, 'Invalid scalar boundary condition type!$')
+
+        do bID = 1,p_scalNBcType
+           bcID = iglmax(ibc_bmap(bID, ifld),1)
+           if(bcID.eq.p_bcTypeINTS) cbc_bmap(bID, ifld) = 'int' 
+           if(bcID.eq.p_bcTypeS) cbc_bmap(bID, ifld) = 't  ' 
+           if(bcID.eq.p_bcTypeF0) cbc_bmap(bID, ifld) = 'I  ' 
+           if(bcID.eq.p_bcTypeF) cbc_bmap(bID, ifld) = 'f  ' 
+        enddo
+ 199    continue
+      enddo
+
+      ! cht
+      ifld = 2
+      if(idpss(ifld-1).gt.-1 .and. iftmsh(ifld)) then
+        call izero(map, size(map))
+
+        do iel = 1,nelt
+        do ifc = 1,2*ndim
+           cb = cbc(ifc,iel,ifld) 
+           if(cb.eq.'t  ') then
+             map(p_bcTypeS) = 1
+           else if(cb.eq.'int') then 
+             map(p_bcTypeINTS) = 1
+           else if(cb.eq.'I  ' .or. cb.eq.'O  ') then 
+             map(p_bcTypeF0) = 1
+           else if(cb.eq.'f  ') then
+             map(p_bcTypeF) = 1
+           endif
+        enddo
+        enddo
+ 
+        bid = 0
+        do i = 1,p_scalNBcType
+          map(i) = iglmax(map(i),1)
+          if(map(i).gt.0) then
+            bid = bid + 1
+            map(i) = bid
+          endif 
+        enddo
+ 
+        ierr = 0
+        if(bid .gt. 0) then
+        do iel = 1,nelt
+        do ifc = 1,2*ndim
+           cb = cbc(ifc,iel,ifld) 
+           if(cb.eq.'int') then 
+             boundaryIDt(ifc,iel) = map(p_bcTypeINTS) 
+           else if(cb.eq.'t  ') then 
+             boundaryIDt(ifc,iel) = map(p_bcTypeS) 
+           else if(cb.eq.'I  ' .or. cb.eq.'O  ') then 
+             boundaryIDt(ifc,iel) = map(p_bcTypeF0) 
+           else if(cb.eq.'f  ') then 
+             boundaryIDt(ifc,iel) = map(p_bcTypeF)  
+           else
+             if(cb.ne.'E  ' .and. cb.ne.'P  ') then
+               ierr = 1
+               write(6,*) 'Found unsupport BC type: ''', cb , '''' 
+               goto 97 
+             endif
+           endif
+        enddo
+        enddo
+        endif
+ 97     call err_chk(ierr, 'Invalid temp boundary condition type!$')
+
+        if(map(p_bcTypeINTS).gt.0) 
+     $    cbc_bmap(map(p_bcTypeINTS), ifld) = 'int'
+        if(map(p_bcTypeS).gt.0)
+     $    cbc_bmap(map(p_bcTypeS), ifld) = 't  '
+        if(map(p_bcTypeF0).gt.0)
+     $    cbc_bmap(map(p_bcTypeF0), ifld) = 'I  '
+        if(map(p_bcTypeF).gt.0)
+     $    cbc_bmap(map(p_bcTypeF), ifld) = 'f  '
+
+      endif
+
+      return
+      end
+c-----------------------------------------------------------------------
+C
+C     Generate geometric factors without updating coords
+C
+C----------------------------------------------------------------------
+      subroutine nekf_updggeom()
+      include 'SIZE'
+      include 'INPUT'
+      include 'TSTEP'
+      include 'GEOM'
+      include 'WZ'
+
+      COMMON /SCRUZ/ XM3 (LX3,LY3,LZ3,LELT)
+     $ ,             YM3 (LX3,LY3,LZ3,LELT)
+     $ ,             ZM3 (LX3,LY3,LZ3,LELT)
+
+      ifld_save = ifield
+      ifield = 1
+
+      CALL LAGMASS
+      CALL GEOM1 (XM3,YM3,ZM3)
+      CALL GEOM2
+      CALL UPDMSYS (1)
+      CALL VOLUME
+      CALL SETINVM
+      CALL SETDEF
+      CALL SFASTAX
+
+      ifield = ifld_save
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekrs_registerPtr(id, ptr)
+
+      character id*(*)
+      character ptr*(*)
+
+      call nekf_registerPtr(id, ptr, len(id))
+
+      return
+      end
+

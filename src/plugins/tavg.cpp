@@ -15,7 +15,7 @@ occa::memory o_Urm2;
 occa::memory o_Pavg, o_Prms;
 occa::memory o_Savg, o_Srms;
 
-tavg::fields userFieldList;
+std::vector< std::vector<deviceMemory<dfloat>> > userFieldList;
 occa::memory o_AVG;
 
 occa::kernel EXKernel;
@@ -158,7 +158,7 @@ void tavg::run(double time)
   timel = time;
 }
 
-void tavg::setup(dlong _fieldOffset, const fields &flds)
+void tavg::setup(dlong _fieldOffset, const std::vector< std::vector<deviceMemory<dfloat>> >& flds)
 {
   static bool isInitialized = false;
   if (isInitialized) {
@@ -205,13 +205,11 @@ void tavg::outfld(int _outXYZ, int FP64)
     outXYZ = 1;
   }
 
-  occa::memory o_Tavg, o_Trms;
-
   if (userFieldList.size()) {
     writeFld("tavg", atime, outfldCounter, outXYZ, FP64, o_NULL, o_NULL, o_AVG, userFieldList.size());
   }
 
-  atime = 0;
+  atime = 0; // reset
   outfldCounter++;
 }
 

@@ -102,6 +102,7 @@ preconditioner              Jacobi [D]
                             multigrid [D for PRESSURE]                 polynomial multigrid + coarse grid correction
                               +additive
                             SEMFEM
+                              +non-smoothed                            
 
 coarseGridDiscretization    FEM [D]                                    linear finite elment discretization
                               +Galerkin                                coarse grid matrix by Galerkin projection 
@@ -151,9 +152,7 @@ regularization
                             avm                                        artificial viscosity method
                               +c0                                      make viscosity C0 continous across elements
                               +scalingCoeff=<float>                    strength of artifical viscosity
-                              +hpfResidual                             use HPF Residual AVM
-                                +nModes=<int>                          number of modes
-                              +highestModalDecay                       use Persson's highest modal decay AVM
+                              +highestModalDecay                       use Persson's highest modal decay model 
                                 +threshold=<float>
                                 +activationWidth=<float>
 ----------------------------------------------------------------------------------------------------------------------

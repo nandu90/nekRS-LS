@@ -73,9 +73,9 @@ void ogsHostFree(void *gsh){
 }
 
 
-void *ogsGsUnique(hlong *gatherGlobalNodes,
-                   dlong NuniqueBases,
-                   MPI_Comm meshComm){
+void ogsGsUnique(hlong *gatherGlobalNodes,
+                 dlong NuniqueBases,
+                 MPI_Comm meshComm){
 
   /* gslib stuff */
   comm_ext world;

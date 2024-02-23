@@ -1,7 +1,6 @@
 #if !defined(nekrs_timer_hpp_)
 #define nekrs_timer_hpp_
 
-#include <string>
 #include "nekrsSys.hpp"
 
 namespace timer
@@ -34,10 +33,11 @@ struct timer_t {
   double deviceElapsed(const std::string tag);
   long long int count(const std::string tag);
   double query(const std::string tag, std::string metric);
-  void printRunStat(int step);
+  void printStatSetElapsedTimeSolve(double time);
   void printStatEntry(std::string name, std::string tag, std::string type, double tNorm);
   void printStatEntry(std::string name, double time, double tNorm);
   void printStatEntry(std::string name, double tTag, long long int nCalls, double tNorm);
+  std::tuple<double, long long int> sumAllMatchingTags(std::function<bool(std::string)> predicate, const std::string metric);
 
   // print every entry in the map
   void printAll();

@@ -45,9 +45,11 @@ void processUpdFile();
 void printInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo);
 void verboseInfo(bool enabled);
 void updateTimer(const std::string &key, double time);
-void resetTimer(const std::string &key); 
-void* nrsPtr(void);
-void* nekPtr(const char* id);
+void resetTimer(const std::string &key);
+
+void* platformPtr(void);
+const auto& platform = platformPtr;
+
 void initStep(double time, double dt, int tstep);
 bool runStep(std::function<bool(int)> convergenceCheck, int corrector);
 bool runStep(int corrector);

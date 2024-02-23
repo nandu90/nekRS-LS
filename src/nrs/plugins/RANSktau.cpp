@@ -164,9 +164,10 @@ void RANSktau::updateProperties()
   mueKernel(mesh->Nelements * mesh->Np, nrs->fieldOffset, rho, mueLam, o_k, o_tau, o_mut, o_mue, o_diff);
 }
 
-occa::memory RANSktau::o_mue_t()
+const deviceMemory<dfloat> RANSktau::o_mue_t()
 {
-  return o_mut;
+  deviceMemory<dfloat> out(o_mut);
+  return out;
 }
 
 void RANSktau::updateSourceTerms()
@@ -184,8 +185,8 @@ void RANSktau::updateSourceTerms()
   occa::memory o_SijMag2 = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
   occa::memory o_SijOij = platform->o_memPool.reserve<dfloat>(3 * nrs->NVfields * nrs->fieldOffset);
 
-  occa::memory o_FS = cds->o_FS + cds->fieldOffsetScan[kFieldIndex];
-  occa::memory o_BFDiag = cds->o_BFDiag + cds->fieldOffsetScan[kFieldIndex];
+  occa::memory o_FS = cds->o_NLT + cds->fieldOffsetScan[kFieldIndex];
+  occa::memory o_LHSDiag = cds->o_LHSDiag + cds->fieldOffsetScan[kFieldIndex];
 
   nrs->strainRotationRate(true, true, nrs->o_U, o_SijOij);
 
@@ -201,11 +202,11 @@ void RANSktau::updateSourceTerms()
                 o_tau,
                 o_SijMag2,
                 o_OiOjSk,
-                o_BFDiag,
+                o_LHSDiag,
                 o_FS);
 }
 
-void RANSktau::setup(nrs_t *nrsIn, dfloat mueIn, dfloat rhoIn, int ifld)
+void RANSktau::setup(dfloat mueIn, dfloat rhoIn, int ifld)
 {
   static bool isInitialized = false;
   if (isInitialized) {
@@ -213,7 +214,7 @@ void RANSktau::setup(nrs_t *nrsIn, dfloat mueIn, dfloat rhoIn, int ifld)
   }
   isInitialized = true;
 
-  nrs = nrsIn;
+  nrs = dynamic_cast<nrs_t*>(platform->solver);;
   mueLam = mueIn;
   rho = rhoIn;
   kFieldIndex = ifld;
@@ -226,9 +227,9 @@ void RANSktau::setup(nrs_t *nrsIn, dfloat mueIn, dfloat rhoIn, int ifld)
 
   o_mut = platform->device.malloc<dfloat>(cds->fieldOffset[kFieldIndex]);
 
-  if (!cds->o_BFDiag.ptr()) {
-    cds->o_BFDiag = platform->device.malloc<dfloat>(cds->fieldOffsetSum);
-    platform->linAlg->fill(cds->fieldOffsetSum, 0.0, cds->o_BFDiag);
+  if (!cds->o_LHSDiag.ptr()) {
+    cds->o_LHSDiag = platform->device.malloc<dfloat>(cds->fieldOffsetSum);
+    platform->linAlg->fill(cds->fieldOffsetSum, 0.0, cds->o_LHSDiag);
   }
 
   setupCalled = true;

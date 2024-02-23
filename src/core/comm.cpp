@@ -1,6 +1,5 @@
 #include "platform.hpp"
 #include "comm.hpp"
-#include "nrs.hpp"
 
 comm_t::comm_t(MPI_Comm _commg, MPI_Comm _comm)
 {

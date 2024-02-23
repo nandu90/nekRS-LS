@@ -1,8 +1,7 @@
-#include "constantFlowRate.hpp"
+#include "platform.hpp"
 #include "linAlg.hpp"
 #include "nrs.hpp"
 #include "udf.hpp"
-#include <limits>
 #include "alignment.hpp"
 #include "bcMap.hpp"
 #include "bdry.hpp"
@@ -51,17 +50,18 @@ void compute(nrs_t *nrs, double time)
   double flops = 0.0;
 
   platform->timer.tic("pressure rhs", 1);
-  occa::memory o_Prhs = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+  auto o_Prhs = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+  auto o_lambda0 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
   {
     occa::memory o_gradPCoeff = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
 
-    nrs->setEllipticCoeffPressureKernel(mesh->Nlocal, nrs->fieldOffset, nrs->o_rho, nrs->o_ellipticCoeff);
+    platform->linAlg->adyz(mesh->Nlocal, 1.0, nrs->o_rho, o_lambda0);
 
     nrs->wgradientVolumeKernel(mesh->Nelements,
                                mesh->o_vgeo,
                                mesh->o_D,
                                nrs->fieldOffset,
-                               nrs->o_ellipticCoeff,
+                               o_lambda0,
                                o_gradPCoeff);
 
     double flopsGrad = 6 * mesh->Np * mesh->Nq + 18 * mesh->Np;
@@ -81,7 +81,7 @@ void compute(nrs_t *nrs, double time)
   platform->timer.toc("pressure rhs");
 
   platform->timer.tic("pressureSolve", 1);
-  ellipticSolve(nrs->pSolver, o_Prhs, nrs->o_Pc);
+  nrs->pSolver->solve(o_lambda0, o_NULL, o_Prhs, nrs->o_Pc);
   platform->timer.toc("pressureSolve");
   o_Prhs.free();
 
@@ -116,25 +116,21 @@ void compute(nrs_t *nrs, double time)
   platform->timer.toc("velocity rhs");
 
   platform->timer.tic("velocitySolve", 1);
-  nrs->setEllipticCoeffKernel(mesh->Nlocal,
-                              nrs->g0 * nrs->idt,
-                              0 * nrs->fieldOffset,
-                              nrs->fieldOffset,
-                              0,
-                              nrs->o_mue,
-                              nrs->o_rho,
-                              o_NULL,
-                              nrs->o_ellipticCoeff);
+
+  o_lambda0.free();
+  o_lambda0 = nrs->o_mue;
+  auto o_lambda1 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+  platform->linAlg->axpby(mesh->Nlocal, nrs->g0 / nrs->dt[0], nrs->o_rho, 0.0, o_lambda1);
 
   if (nrs->uvwSolver) {
-    ellipticSolve(nrs->uvwSolver, o_RhsVel, nrs->o_Uc);
+    nrs->uvwSolver->solve(o_lambda0, o_lambda1, o_RhsVel, nrs->o_Uc);
   } else {
     occa::memory o_Ucx = nrs->o_Uc + 0 * nrs->fieldOffset;
     occa::memory o_Ucy = nrs->o_Uc + 1 * nrs->fieldOffset;
     occa::memory o_Ucz = nrs->o_Uc + 2 * nrs->fieldOffset;
-    ellipticSolve(nrs->uSolver, o_RhsVel.slice(0 * nrs->fieldOffset), o_Ucx);
-    ellipticSolve(nrs->vSolver, o_RhsVel.slice(1 * nrs->fieldOffset), o_Ucy);
-    ellipticSolve(nrs->wSolver, o_RhsVel.slice(2 * nrs->fieldOffset), o_Ucz);
+    nrs->uSolver->solve(o_lambda0, o_lambda1, o_RhsVel.slice(0 * nrs->fieldOffset), o_Ucx);
+    nrs->vSolver->solve(o_lambda0, o_lambda1, o_RhsVel.slice(1 * nrs->fieldOffset), o_Ucy);
+    nrs->wSolver->solve(o_lambda0, o_lambda1, o_RhsVel.slice(2 * nrs->fieldOffset), o_Ucz);
   }
   platform->timer.toc("velocitySolve");
 
@@ -186,15 +182,50 @@ bool checkIfRecomputeDirection(nrs_t *nrs, int tstep)
 
 } // namespace
 
-namespace ConstantFlowRate
+void nrs_t::flowRatePrintInfo(bool verboseInfo)
 {
+  auto mesh = this->meshV;
 
-bool adjust(nrs_t *nrs, int tstep, double time)
+  if (platform->comm.mpiRank != 0) {
+    return;
+  }
+
+  std::string flowRateType = "flowRate";
+
+  dfloat currentRate = currentFlowRate;
+  dfloat finalFlowRate = postCorrectionFlowRate;
+  dfloat userSpecifiedFlowRate = flowRate * mesh->volume / lengthScale;
+
+  dfloat err = std::abs(userSpecifiedFlowRate - finalFlowRate);
+
+  // scale is invariant to uBulk/volumetric flow rate, since it's a unitless ratio
+  dfloat scale = constantFlowScale;
+
+  if (!platform->options.compareArgs("CONSTANT FLOW RATE TYPE", "VOLUMETRIC")) {
+    flowRateType = "uBulk";
+
+    // put in bulk terms, instead of volumetric
+    currentRate *= lengthScale / mesh->volume;
+    finalFlowRate *= lengthScale / mesh->volume;
+    userSpecifiedFlowRate = flowRate;
+    err = std::abs(userSpecifiedFlowRate - finalFlowRate);
+  }
+  if (verboseInfo) {
+    printf("flowRate : %s0 %.2e  %s %.2e  err %.2e  scale %.5e\n",
+           flowRateType.c_str(),
+           currentRate,
+           flowRateType.c_str(),
+           finalFlowRate,
+           err,
+           scale);
+  }
+}
+
+bool nrs_t::adjustFlowRate(int tstep, double time)
 {
-
   double flops = 0.0;
 
-  mesh_t *mesh = nrs->meshV;
+  mesh_t *mesh = this->meshV;
   platform->options.getArgs("FLOW RATE", flowRate);
 
   const bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
@@ -210,8 +241,8 @@ bool adjust(nrs_t *nrs, int tstep, double time)
              "%s\n",
              "Flow direction is not aligned in (X,Y,Z)");
 
-  const bool recomputeBaseFlowRate = checkIfRecompute(nrs, tstep);
-  const bool recomputeDirection = checkIfRecomputeDirection(nrs, tstep);
+  const bool recomputeBaseFlowRate = checkIfRecompute(this, tstep);
+  const bool recomputeDirection = checkIfRecomputeDirection(this, tstep);
 
   if (recomputeDirection) {
     if (directionAligned) {
@@ -244,13 +275,13 @@ bool adjust(nrs_t *nrs, int tstep, double time)
       platform->options.getArgs("CONSTANT FLOW TO BID", toBID);
 
       occa::memory o_centroid =
-          platform->o_memPool.reserve<dfloat>(nrs->NVfields * mesh->Nelements * mesh->Nfaces);
+          platform->o_memPool.reserve<dfloat>(this->NVfields * mesh->Nelements * mesh->Nfaces);
       platform->linAlg->fill(mesh->Nelements * mesh->Nfaces * 3, 0.0, o_centroid);
 
       occa::memory o_counts = platform->o_memPool.reserve<dfloat>(mesh->Nelements * mesh->Nfaces);
       platform->linAlg->fill(mesh->Nelements * mesh->Nfaces, 0.0, o_counts);
 
-      nrs->computeFaceCentroidKernel(mesh->Nelements,
+      this->computeFaceCentroidKernel(mesh->Nelements,
                                      fromBID,
                                      mesh->o_EToB,
                                      mesh->o_vmapM,
@@ -282,7 +313,7 @@ bool adjust(nrs_t *nrs, int tstep, double time)
 
       platform->linAlg->fill(mesh->Nelements * mesh->Nfaces * 3, 0.0, o_centroid);
       platform->linAlg->fill(mesh->Nelements * mesh->Nfaces, 0.0, o_counts);
-      nrs->computeFaceCentroidKernel(mesh->Nelements,
+      this->computeFaceCentroidKernel(mesh->Nelements,
                                      toBID,
                                      mesh->o_EToB,
                                      mesh->o_vmapM,
@@ -326,74 +357,52 @@ bool adjust(nrs_t *nrs, int tstep, double time)
   }
 
   if (recomputeBaseFlowRate) {
-    int NiterU, NiterV, NiterW, NiterUVW, NiterP;
-    double res00NormU, res00NormV, res00NormW, res00NormUVW, res00NormP;
-    double res0NormU, res0NormV, res0NormW, res0NormUVW, res0NormP;
-    double resNormU, resNormV, resNormW, resNormUVW, resNormP;
-    if (nrs->uvwSolver) {
-      NiterUVW = nrs->uvwSolver->Niter;
-      res00NormUVW = nrs->uvwSolver->res00Norm;
-      res0NormUVW = nrs->uvwSolver->res0Norm;
-      resNormUVW = nrs->uvwSolver->resNorm;
+    auto getSolverData = [](elliptic *solver)
+    {
+      if (solver) {
+        std::tuple<int, dfloat, dfloat, dfloat> val(solver->Niter(), solver->initialResidual(), solver->initialGuessResidual(), solver->finalResidual());
+        return val;
+      } else {
+        std::tuple<int, dfloat, dfloat, dfloat> val(0, 0, 0, 0);
+        return val;
+      }
+    };
+
+    const auto [NiterUVW, res00NormUVW, res0NormUVW, resNormUVW] = getSolverData(this->uvwSolver);
+    const auto [NiterU, res00NormU, res0NormU, resNormU] = getSolverData(this->uSolver);
+    const auto [NiterV, res00NormV, res0NormV, resNormV] = getSolverData(this->vSolver);
+    const auto [NiterW, res00NormW, res0NormW, resNormW] = getSolverData(this->wSolver);
+    const auto [NiterP, res00NormP, res0NormP, resNormP] = getSolverData(this->pSolver);
+
+    compute(this, time);
+
+    // restore norms + update iteration count
+    auto setSolverData = [](elliptic *solver, int Niter, dfloat res00Norm, dfloat res0Norm, dfloat resNorm)
+    {
+      solver->Niter(solver->Niter() + Niter);
+      solver->initialResidual(res00Norm);
+      solver->initialGuessResidual(res0Norm);
+      solver->finalResidual(resNorm);
+    };
+
+    if (this->uvwSolver) {
+      setSolverData(this->uvwSolver, NiterUVW, res00NormUVW, res0NormUVW, resNormUVW);
     } else {
-      NiterU = nrs->uSolver->Niter;
-      res00NormU = nrs->uSolver->res00Norm;
-      res0NormU = nrs->uSolver->res0Norm;
-      resNormU = nrs->uSolver->resNorm;
-
-      NiterV = nrs->vSolver->Niter;
-      res00NormV = nrs->vSolver->res00Norm;
-      res0NormV = nrs->vSolver->res0Norm;
-      resNormV = nrs->vSolver->resNorm;
-
-      NiterW = nrs->wSolver->Niter;
-      res00NormW = nrs->wSolver->res00Norm;
-      res0NormW = nrs->wSolver->res0Norm;
-      resNormW = nrs->wSolver->resNorm;
+      setSolverData(this->uSolver, NiterU, res00NormU, res0NormU, resNormU);
+      setSolverData(this->vSolver, NiterV, res00NormV, res0NormV, resNormV);
+      setSolverData(this->wSolver, NiterW, res00NormW, res0NormW, resNormW);
     }
-
-    NiterP = nrs->pSolver->Niter;
-    res00NormP = nrs->pSolver->res00Norm;
-    res0NormP = nrs->pSolver->res0Norm;
-    resNormP = nrs->pSolver->resNorm;
-
-    compute(nrs, time);
-
-    if (nrs->uvwSolver) {
-      nrs->uvwSolver->Niter += NiterUVW;
-      nrs->uvwSolver->res00Norm = res00NormUVW;
-      nrs->uvwSolver->res0Norm = res0NormUVW;
-      nrs->uvwSolver->resNorm = resNormUVW;
-    } else {
-      nrs->uSolver->Niter += NiterU;
-      nrs->uSolver->res00Norm = res00NormU;
-      nrs->uSolver->res0Norm = res0NormU;
-      nrs->uSolver->resNorm = resNormU;
-
-      nrs->vSolver->Niter += NiterV;
-      nrs->vSolver->res00Norm = res00NormV;
-      nrs->vSolver->res0Norm = res0NormV;
-      nrs->vSolver->resNorm = resNormV;
-
-      nrs->wSolver->Niter += NiterW;
-      nrs->wSolver->res00Norm = res00NormW;
-      nrs->wSolver->res0Norm = res0NormW;
-      nrs->wSolver->resNorm = resNormW;
-    }
-    nrs->pSolver->Niter += NiterP;
-    nrs->pSolver->res00Norm = res00NormP;
-    nrs->pSolver->res0Norm = res0NormP;
-    nrs->pSolver->resNorm = resNormP;
+    setSolverData(this->pSolver, NiterP, res00NormP, res0NormP, resNormP);
   }
 
-  occa::memory o_currentFlowRate = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+  occa::memory o_currentFlowRate = platform->o_memPool.reserve<dfloat>(this->fieldOffset);
 
-  nrs->computeFieldDotNormalKernel(mesh->Nlocal,
-                                   nrs->fieldOffset,
+  this->computeFieldDotNormalKernel(mesh->Nlocal,
+                                   this->fieldOffset,
                                    flowDirection[0],
                                    flowDirection[1],
                                    flowDirection[2],
-                                   nrs->o_U,
+                                   this->o_U,
                                    o_currentFlowRate);
 
   flops += 5 * mesh->Nlocal;
@@ -405,13 +414,13 @@ bool adjust(nrs_t *nrs, int tstep, double time)
       platform->linAlg->sum(mesh->Nlocal, o_currentFlowRate, platform->comm.mpiComm) / lengthScale;
 
   if (recomputeBaseFlowRate) {
-    occa::memory o_baseFlowRate = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
-    nrs->computeFieldDotNormalKernel(mesh->Nlocal,
-                                     nrs->fieldOffset,
+    occa::memory o_baseFlowRate = platform->o_memPool.reserve<dfloat>(this->fieldOffset);
+    this->computeFieldDotNormalKernel(mesh->Nlocal,
+                                     this->fieldOffset,
                                      flowDirection[0],
                                      flowDirection[1],
                                      flowDirection[2],
-                                     nrs->o_Uc,
+                                     this->o_Uc,
                                      o_baseFlowRate);
     flops += 5 * mesh->Nlocal;
 
@@ -432,17 +441,17 @@ bool adjust(nrs_t *nrs, int tstep, double time)
 
   // add corrections
   platform->linAlg
-      ->axpbyMany(mesh->Nlocal, nrs->NVfields, nrs->fieldOffset, constantFlowScale, nrs->o_Uc, 1.0, nrs->o_U);
+      ->axpbyMany(mesh->Nlocal, this->NVfields, this->fieldOffset, constantFlowScale, this->o_Uc, 1.0, this->o_U);
 
-  platform->linAlg->axpby(mesh->Nlocal, constantFlowScale, nrs->o_Pc, 1.0, nrs->o_P);
+  platform->linAlg->axpby(mesh->Nlocal, constantFlowScale, this->o_Pc, 1.0, this->o_P);
 
   // compute flow rate after correction as diagnostic
-  nrs->computeFieldDotNormalKernel(mesh->Nlocal,
-                                   nrs->fieldOffset,
+  this->computeFieldDotNormalKernel(mesh->Nlocal,
+                                   this->fieldOffset,
                                    flowDirection[0],
                                    flowDirection[1],
                                    flowDirection[2],
-                                   nrs->o_U,
+                                   this->o_U,
                                    o_currentFlowRate);
 
   flops += 5 * mesh->Nlocal;
@@ -458,46 +467,9 @@ bool adjust(nrs_t *nrs, int tstep, double time)
   return recomputeBaseFlowRate;
 }
 
-dfloat scaleFactor()
+dfloat nrs_t::flowRatescaleFactor()
 {
   return constantFlowScale;
 }
 
-void printInfo(mesh_t *mesh, bool verboseInfo)
-{
-  if (platform->comm.mpiRank != 0) {
-    return;
-  }
 
-  std::string flowRateType = "flowRate";
-
-  dfloat currentRate = currentFlowRate;
-  dfloat finalFlowRate = postCorrectionFlowRate;
-  dfloat userSpecifiedFlowRate = flowRate * mesh->volume / lengthScale;
-
-  dfloat err = std::abs(userSpecifiedFlowRate - finalFlowRate);
-
-  // scale is invariant to uBulk/volumetric flow rate, since it's a unitless ratio
-  dfloat scale = constantFlowScale;
-
-  if (!platform->options.compareArgs("CONSTANT FLOW RATE TYPE", "VOLUMETRIC")) {
-    flowRateType = "uBulk";
-
-    // put in bulk terms, instead of volumetric
-    currentRate *= lengthScale / mesh->volume;
-    finalFlowRate *= lengthScale / mesh->volume;
-    userSpecifiedFlowRate = flowRate;
-    err = std::abs(userSpecifiedFlowRate - finalFlowRate);
-  }
-  if (verboseInfo) {
-    printf("flowRate : %s0 %.2e  %s %.2e  err %.2e  scale %.5e\n",
-           flowRateType.c_str(),
-           currentRate,
-           flowRateType.c_str(),
-           finalFlowRate,
-           err,
-           scale);
-  }
-}
-
-} // namespace ConstantFlowRate

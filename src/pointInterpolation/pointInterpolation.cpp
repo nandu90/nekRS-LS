@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <mpi.h>
-#include "nrs.hpp"
 #include "platform.hpp"
 #include <vector>
 
@@ -11,18 +10,19 @@
 #include "pointInterpolation.hpp"
 #include <algorithm>
 #include <inttypes.h>
+
 #include "bcMap.hpp"
 
-pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_,
+pointInterpolation_t::pointInterpolation_t(mesh_t *mesh,
                                            double bb_tol,
                                            double newton_tol_,
                                            bool mySession_,
                                            dlong sessionID_,
                                            bool multipleSessionSupport_)
-    : pointInterpolation_t(nrs_,
+    : pointInterpolation_t(mesh,
                            platform->comm.mpiCommParent,
-                           nrs_->_mesh->Nlocal,
-                           nrs_->_mesh->Nlocal,
+                           mesh->Nlocal,
+                           mesh->Nlocal,
                            bb_tol,
                            newton_tol_,
                            mySession_,
@@ -31,7 +31,7 @@ pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_,
 {
 }
 
-pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_,
+pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
                                            MPI_Comm comm,
                                            dlong localHashSize,
                                            dlong globalHashSize,
@@ -40,10 +40,9 @@ pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_,
                                            bool mySession_,
                                            dlong sessionID_,
                                            bool multipleSessionSupport_)
-    : nrs(nrs_), newton_tol(newton_tol_), mySession(mySession_), sessionID(sessionID_),
+    : mesh(mesh_), newton_tol(newton_tol_), mySession(mySession_), sessionID(sessionID_),
       multipleSessionSupport(multipleSessionSupport_), nPoints(0)
 {
-
   // communicator is implicitly required to be either platform->comm.mpiComm or platform->comm.mpiCommParent
   // due to other communicator synchronous calls, such as platform->timer.tic
   bool supported = false;
@@ -62,8 +61,6 @@ pointInterpolation_t::pointInterpolation_t(nrs_t *nrs_,
       (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(1e-6, newton_tol_);
 
   const int npt_max = 1;
-
-  mesh_t *mesh = nrs->_mesh;
 
   if (mySession) {
     mesh->o_x.copyTo(mesh->x, mesh->Nlocal);
@@ -202,12 +199,12 @@ void pointInterpolation_t::eval(dlong nFields,
     platform->timer.tic("pointInterpolation_t::eval", 1);
   }
 
-  nekrsCheck(nrs->fieldOffset > inputFieldOffset,
+  nekrsCheck(mesh->Nlocal > inputFieldOffset,
              platform->comm.mpiComm,
              EXIT_FAILURE,
-             "pointInterpolation_t::eval inputFieldOffset (%d) is less than nrs->fieldOffset (%d)\n",
+             "pointInterpolation_t::eval inputFieldOffset (%d) is less than mesh->Nlocal (%d)\n",
              inputFieldOffset,
-             nrs->fieldOffset);
+             mesh->Nlocal);
 
   nekrsCheck(o_in.byte_size() < nFields * inputFieldOffset * sizeof(dfloat),
              platform->comm.mpiComm,
@@ -246,12 +243,12 @@ void pointInterpolation_t::eval(dlong nFields,
     platform->timer.tic("pointInterpolation_t::eval", 1);
   }
 
-  nekrsCheck(nrs->fieldOffset > inputFieldOffset,
+  nekrsCheck(mesh->Nlocal > inputFieldOffset,
              platform->comm.mpiComm,
              EXIT_FAILURE,
-             "pointInterpolation_t::eval inputFieldOffset (%d) is less than nrs->fieldOffset (%d)\n",
+             "pointInterpolation_t::eval inputFieldOffset (%d) is less than mesh->Nlocal (%d)\n",
              inputFieldOffset,
-             nrs->fieldOffset);
+             mesh->Nlocal);
 
   findpts_->eval(nPoints, nFields, inputFieldOffset, outputFieldOffset, in, &data_, out);
 

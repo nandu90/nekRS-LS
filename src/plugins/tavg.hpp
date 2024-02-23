@@ -14,11 +14,9 @@
 
 namespace tavg
 {
-typedef std::vector< std::vector<occa::memory> > fields;
-
 void buildKernel(occa::properties kernelInfo);
 void run(double time);
-void setup(dlong fieldOffset, const fields& fields);
+void setup(dlong fieldOffset, const std::vector< std::vector<deviceMemory<dfloat>> >& fields);
 void outfld();
 void outfld(int outXYZ, int FP64);
 void reset();

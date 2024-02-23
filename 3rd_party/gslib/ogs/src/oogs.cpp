@@ -523,7 +523,7 @@ oogs_t *oogs::setup(ogs_t *ogs,
   if (gsMode == OOGS_AUTO) {
     auto knlOverlapStr = (callback) ? "userKnlOverlap" : ""; 
     if (gs->rank == 0) {
-      printf("autotuning gs for wordSize=%d nFields=%d %s\n", Nbytes, nVec, knlOverlapStr);
+      printf("autotuning gs for wordSize=%d nFields=%d %s\n", (int)Nbytes, nVec, knlOverlapStr);
     }
     const int Ntests = 10;
     double elapsedMin = std::numeric_limits<double>::max();

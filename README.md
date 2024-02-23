@@ -17,7 +17,7 @@ Capabilities:
 * Incompressible and low Mach-number Navier-Stokes + scalar transport 
 * High-order curvilinear conformal spectral elements in space 
 * Variable time step 2nd/3rd order semi-implicit time integration
-* MPI + [OCCA](https://github.com/libocca/occa) (backends: CUDA, HIP, OPENCL, SERIAL/C++)
+* MPI + [OCCA](https://github.com/libocca/occa) supporting CUDA, HIP, DPC++, SERIAL (C++)
 * LES and RANS turbulence models
 * Arbitrary-Lagrangian-Eulerian moving mesh
 * Lagrangian phase model
@@ -31,15 +31,14 @@ Capabilities:
 
 Requirements:
 * Linux, Mac OS X (Microsoft WSL and Windows is not supported) 
-* C++17/C99 compatible compiler
-* GNU/Intel/NVHPC Fortran compiler
+* GNU/oneAPI/NVHPC/ROCm compilers (C++17/C99 compatible)
 * MPI-3.1 or later
-* CMake version 3.18 or later 
+* CMake version 3.21 or later 
 
 Download the latest release available under
 
 ```sh
-https://github.com/Nek5000/nekRS/archive/refs/tags/v23.1.tar.gz 
+https://github.com/Nek5000/nekRS/archive/refs/tags/v24.0.tar.gz 
 ```
 
 or clone our GitHub repository:

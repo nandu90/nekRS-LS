@@ -74,20 +74,33 @@ occa::memory pressureSolve(nrs_t* nrs, double time, int stage)
     o_gradDiv);
   flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
 
-  occa::memory o_rhs = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
-  const auto viscContribution = (nrs->nBDF > 1) ? 1 : 0; 
-  occa::memory o_irho = nrs->o_ellipticCoeff;
-  nrs->pressureRhsKernel(
-    mesh->Nlocal,
-    nrs->fieldOffset,
-    viscContribution,
-    nrs->o_mue,
-    o_irho,
-    nrs->o_BF,
-    o_stressTerm,
-    o_gradDiv,
-    o_rhs);
-  flopCount += 12 * static_cast<double>(mesh->Nlocal);
+  auto o_rhs = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
+
+  auto o_lambda0 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+  platform->linAlg->adyz(mesh->Nlocal, 1.0, nrs->o_rho, o_lambda0);
+
+  if (platform->options.compareArgs("PRESSURE VISCOUS TERMS", "TRUE")) {
+    nrs->pressureRhsKernel(
+      mesh->Nlocal,
+      nrs->fieldOffset,
+      nrs->o_mue,
+      o_lambda0, /* 1/rho */
+      nrs->o_BF,
+      o_stressTerm,
+      o_gradDiv,
+      o_rhs);
+    flopCount += 12 * static_cast<double>(mesh->Nlocal);
+  } else {
+    o_rhs.copyFrom(nrs->o_BF);
+
+    auto o_BFx = nrs->o_BF.slice(0*nrs->fieldOffset, mesh->Nlocal);
+    auto o_BFy = nrs->o_BF.slice(1*nrs->fieldOffset, mesh->Nlocal);
+    auto o_BFz = nrs->o_BF.slice(2*nrs->fieldOffset, mesh->Nlocal);
+
+    platform->linAlg->axmy(mesh->Nlocal, 1.0, o_lambda0, o_BFx); 
+    platform->linAlg->axmy(mesh->Nlocal, 1.0, o_lambda0, o_BFy); 
+    platform->linAlg->axmy(mesh->Nlocal, 1.0, o_lambda0, o_BFz); 
+  }
 
   oogs::startFinish(o_rhs, nrs->NVfields, nrs->fieldOffset,ogsDfloat, ogsAdd, nrs->gsh);
 
@@ -116,7 +129,7 @@ occa::memory pressureSolve(nrs_t* nrs, double time, int stage)
   nrs->pressureAddQtlKernel(
     mesh->Nlocal,
     mesh->o_LMM,
-    nrs->g0 * nrs->idt,
+    nrs->g0 * 1/nrs->dt[0],
     nrs->o_div,
     o_pRhs);
   flopCount += 3 * mesh->Nlocal;
@@ -126,7 +139,7 @@ occa::memory pressureSolve(nrs_t* nrs, double time, int stage)
     mesh->o_sgeo,
     mesh->o_vmapM,
     nrs->o_EToB,
-    nrs->g0 * nrs->idt,
+    nrs->g0 * 1/nrs->dt[0],
     nrs->fieldOffset,
     o_rhs,
     nrs->o_U,
@@ -139,7 +152,7 @@ occa::memory pressureSolve(nrs_t* nrs, double time, int stage)
   occa::memory o_p = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
   o_p.copyFrom(nrs->o_P);
 
-  ellipticSolve(nrs->pSolver, static_cast<const occa::memory>(o_pRhs), o_p);
+  nrs->pSolver->solve(o_lambda0, o_NULL, static_cast<const occa::memory>(o_pRhs), o_p);
 
   return o_p;
 }
@@ -189,7 +202,6 @@ occa::memory velocitySolve(nrs_t* nrs, double time, int stage)
     nrs->o_BF,
     o_gradMueDiv,
     o_gradP,
-    nrs->o_rho,
     o_rhs);
 
   flopCount += 9 * mesh->Nlocal;
@@ -217,18 +229,26 @@ occa::memory velocitySolve(nrs_t* nrs, double time, int stage)
   platform->timer.toc("velocity rhs");
   platform->flopCounter->add("velocity RHS", flopCount);
 
-  occa::memory o_U = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
+  auto o_U = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
   o_U.copyFrom(platform->options.compareArgs("VELOCITY INITIAL GUESS", "EXTRAPOLATION") && stage == 1 ? nrs->o_Ue : nrs->o_U);
 
+  auto o_lambda0 = nrs->o_mue;
+  auto o_lambda1 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+
+  if (nrs->o_LHSDiag.isInitialized())
+    platform->linAlg->axpbyz(mesh->Nlocal, nrs->g0 / nrs->dt[0], nrs->o_rho, 1.0, nrs->o_LHSDiag, o_lambda1);
+  else
+    platform->linAlg->axpby(mesh->Nlocal, nrs->g0 / nrs->dt[0], nrs->o_rho, 0.0, o_lambda1);
+
   if(nrs->uvwSolver) {
-    ellipticSolve(nrs->uvwSolver, static_cast<const occa::memory>(o_rhs), o_U);
+    nrs->uvwSolver->solve(o_lambda0, o_lambda1, static_cast<const occa::memory>(o_rhs), o_U);
   } else {
     const auto o_rhsX = o_rhs.slice(0 * nrs->fieldOffset);
     const auto o_rhsY = o_rhs.slice(1 * nrs->fieldOffset);
     const auto o_rhsZ = o_rhs.slice(2 * nrs->fieldOffset);
-    ellipticSolve(nrs->uSolver, o_rhsX, o_U.slice(0 * nrs->fieldOffset));
-    ellipticSolve(nrs->vSolver, o_rhsY, o_U.slice(1 * nrs->fieldOffset));
-    ellipticSolve(nrs->wSolver, o_rhsZ, o_U.slice(2 * nrs->fieldOffset));
+    nrs->uSolver->solve(o_lambda0, o_lambda1, o_rhsX, o_U.slice(0 * nrs->fieldOffset));
+    nrs->vSolver->solve(o_lambda0, o_lambda1, o_rhsY, o_U.slice(1 * nrs->fieldOffset));
+    nrs->wSolver->solve(o_lambda0, o_lambda1, o_rhsZ, o_U.slice(2 * nrs->fieldOffset));
   }
 
   return o_U;

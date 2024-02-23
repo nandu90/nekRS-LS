@@ -1,20 +1,10 @@
-#include <cstdio>
-#include <fstream>
-#include <getopt.h>
-#include <iostream>
-#include <string>
-#include <unistd.h>
-#include <vector>
-#include <limits>
+#include "nekrsSys.hpp"
 #include <optional>
-#include <filesystem>
 
 #include "inipp.hpp"
 #include "tinyexpr.h"
 
-#include "nrs.hpp"
-#include <algorithm>
-#include "parseMultigridSchedule.hpp"
+#include "ellipticParseMultigridSchedule.hpp"
 #include "hypreWrapperDevice.hpp"
 
 #include "AMGX.hpp"
@@ -918,8 +908,12 @@ void parseSmoother(const int rank, setupAide &options, inipp::Ini *par, std::str
     options.setArgs(parSection + "MULTIGRID CHEBYSHEV DEGREE", "1");
     options.setArgs(parSection + "MULTIGRID CHEBYSHEV MAX EIGENVALUE BOUND FACTOR", "1.1");
     if (parScope == "pressure") {
-      options.setArgs(parSection + "MULTIGRID SMOOTHER", "FOURTHOPTCHEBYSHEV+ASM");
-      options.setArgs(parSection + "MULTIGRID CHEBYSHEV DEGREE", "3");
+      if (options.compareArgs(parSection + "SMOOTHED SEMFEM", "TRUE")) {
+        options.setArgs(parSection + "MULTIGRID CHEBYSHEV DEGREE", "2");
+      } else {
+        options.setArgs(parSection + "MULTIGRID SMOOTHER", "FOURTHOPTCHEBYSHEV+ASM");
+        options.setArgs(parSection + "MULTIGRID CHEBYSHEV DEGREE", "3");
+      }
     }
   }
 
@@ -937,6 +931,7 @@ void parseSmoother(const int rank, setupAide &options, inipp::Ini *par, std::str
       {"fourthcheby"},
       {"fourthoptcheby"},
       {"jac"},
+      {"degree"},
       {"mineigenvalueboundfactor"},
       {"maxeigenvalueboundfactor"},
   };
@@ -964,7 +959,12 @@ void parseSmoother(const int rank, setupAide &options, inipp::Ini *par, std::str
         chebyshevType = "CHEBYSHEV";
         options.setArgs(parSection + "MULTIGRID CHEBYSHEV MIN EIGENVALUE BOUND FACTOR", "0.1");
       }
+
       for (std::string s : list) {
+        const auto degreeStr = parseValueForKey(s, "degree");
+        if (!degreeStr.empty()) {
+          options.setArgs(parSection + "MULTIGRID CHEBYSHEV DEGREE", degreeStr);
+        }
 
         const auto minEigBoundStr = parseValueForKey(s, "mineigenvalueboundfactor");
         if (!minEigBoundStr.empty()) {
@@ -982,7 +982,7 @@ void parseSmoother(const int rank, setupAide &options, inipp::Ini *par, std::str
 
         if (s.find("jac") != std::string::npos) {
           surrogateSmootherSet = true;
-          options.setArgs(parSection + "MULTIGRID SMOOTHER", "DAMPEDJACOBI," + chebyshevType);
+          options.setArgs(parSection + "MULTIGRID SMOOTHER", chebyshevType + "+DAMPEDJACOBI");
           if (p_preconditioner.find("additive") != std::string::npos) {
             append_error("Additive vcycle is not supported for Chebyshev smoother");
           }
@@ -1046,6 +1046,7 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
       {"none"},
       {"jac"},
       {"semfem"},
+      {"non-smoothed"},
       {"femsem"},
       {"pmg"},
       {"multigrid"},
@@ -1090,8 +1091,25 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
     options.setArgs(parSection + "MGSOLVER CYCLE", key);
   } else if (p_preconditioner.find("semfem") != std::string::npos ||
              p_preconditioner.find("femsem") != std::string::npos) {
+    auto smoothed = (p_preconditioner.find("non-smoothed") != std::string::npos) ? false : true;
+
+    std::string p_coarseGridDiscretization;
+    if (par->extract(parScope, "coarsegriddiscretization", p_coarseGridDiscretization)) {
+      if (p_coarseGridDiscretization.find("semfem") != std::string::npos) {
+        smoothed = false;
+      }
+    }
+
     options.setArgs(parSection + "PRECONDITIONER", "SEMFEM");
-    options.setArgs(parSection + "ELLIPTIC PRECO COEFF FIELD", "FALSE");
+    options.setArgs(parSection + "SMOOTHED SEMFEM", "FALSE");
+    if (smoothed) {
+      options.setArgs(parSection + "SMOOTHED SEMFEM", "TRUE");
+      options.setArgs(parSection + "PRECONDITIONER", "MULTIGRID");
+      options.setArgs(parSection + "MGSOLVER CYCLE", "VCYCLE+MULTIPLICATIVE");
+      options.setArgs(parSection + "MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE");
+      options.setArgs(parSection + "MULTIGRID SEMFEM", "TRUE");
+      options.setArgs(parSection + "ELLIPTIC PRECO COEFF FIELD", "FALSE");
+    }
   }
 
   parseSmoother(rank, options, par, parScope);
@@ -1106,13 +1124,18 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
   if (options.compareArgs(parSection + "PRECONDITIONER", "MULTIGRID")) {
     std::string p_mgschedule;
     if (par->extract(parScope, "pmgschedule", p_mgschedule)) {
+      const auto semfem = options.compareArgs(parSection + "SMOOTHED SEMFEM", "TRUE"); 
+      if (semfem) { 
+        append_error("pMGSchedule not supported for preconditioner = semfem.\n");
+      }
+
       options.setArgs(parSection + "MULTIGRID SCHEDULE", p_mgschedule);
 
       options.removeArgs(parSection + "MULTIGRID CHEBYSHEV DEGREE");
 
       // validate multigrid schedule
       // note: default order here is not actually required
-      auto [scheduleMap, errorString] = parseMultigridSchedule(p_mgschedule, options, 3);
+      auto [scheduleMap, errorString] = ellipticParseMultigridSchedule(p_mgschedule, options, 3);
       if (!errorString.empty()) {
         append_error(errorString);
       }
@@ -1158,11 +1181,12 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
 
         const bool smoothCrs = options.compareArgs(parSection + "COARSE SOLVER", "SMOOTHER") ||
                                options.compareArgs(parSection + "MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE");
-        if (!smoothCrs) {
+        if (!smoothCrs && !semfem) {
           append_error("specified coarse Chebyshev degree, but coarseSolver=smoother is not set.\n");
         }
       }
     }
+
   }
 }
 
@@ -1183,7 +1207,12 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
   if (applyDefault) {
     options.setArgs(parSectionName + "SOLVER", "PCG");
     if (options.compareArgs(parSectionName + "PRECONDITIONER", "JACOBI")) {
+#if 1
       options.setArgs(parSectionName + "SOLVER", "PCG+COMBINED");
+#else
+      options.setArgs(parSectionName + "SOLVER", "PCG");
+#endif
+
     }
 
     if (parScope == "pressure") {
@@ -2128,6 +2157,11 @@ void parseProblemTypeSection(const int rank, setupAide &options, inipp::Ini *par
           {"variableviscosity"},
       };
       const std::vector<std::string> list = serializeString(eqn, '+');
+
+      auto eqnType = list[0]; 
+      upperCase(eqnType);
+      options.setArgs("EQUATION TYPE", eqnType);
+
       for (std::string entry : list) {
         checkValidity(rank, validValues, entry);
       }

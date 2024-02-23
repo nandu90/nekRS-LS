@@ -2,7 +2,6 @@
 #include <vector>
 #include <numeric>
 #include <iostream>
-#include "nrs.hpp"
 
 #include "randomVector.hpp"
 #include "kernelBenchmarker.hpp"
@@ -142,10 +141,10 @@ occa::kernel benchmarkAdvsub(int Nfields,
   props["includes"] += interpDataFile.c_str();
   props["includes"] += diffInterpDataFile.c_str();
 
-  std::string fileName = oklpath + "/bench/advsub/readCubDMatrix.okl";
+  std::string fileName = oklpath + "/nrs/readCubDMatrix.okl";
   auto readCubDMatrixKernel = platform->device.buildKernel(fileName, props, true);
 
-  fileName = oklpath + "/bench/advsub/readIMatrix.okl";
+  fileName = oklpath + "/nrs/readIMatrix.okl";
   auto readIMatrixKernel = platform->device.buildKernel(fileName, props, true);
 
   std::string kernelName;

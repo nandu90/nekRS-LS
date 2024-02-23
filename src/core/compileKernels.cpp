@@ -2,7 +2,6 @@
 #include "nekrsSys.hpp"
 #include "compileKernels.hpp"
 #include "bcMap.hpp"
-#include "elliptic.h"
 #include "mesh.h"
 #include "ogs.hpp"
 #include "ogsKernels.hpp"
@@ -40,22 +39,18 @@ void platform_t::compileKernels()
   }
 
   // register what to compile
-  registerLinAlgKernels();
-
-  LVector_t<dfloat>::registerKernels();
-  LVector_t<pfloat>::registerKernels();
-
-  registerNekNekKernels();
-  registerCvodeKernels(kernelInfoBC);
+  registerCoreKernels();
   registerMeshKernels(kernelInfoBC);
-  registerNrsKernels(kernelInfoBC);
+  registerPointInterpolationKernels();
+  if (platform->solver->id() == "nrs")
+    registerNrsKernels(kernelInfoBC);
 
   if (platform->comm.mpiRank == 0) {
     printf("JIT compiling kernels (this may take awhile if they are not in cache) ...\n");
     fflush(stdout);
   }
 
-  // compile
+  // perform actual compilation (if needed) and load
   platform->kernels.compile();
   {
     const bool buildNodeLocal = platform->cacheLocal;
@@ -73,14 +68,6 @@ void platform_t::compileKernels()
                   buildOnly);
   }
 
-  // load platform related kernels
-  std::string kernelName;
-  kernelName = "copyDfloatToPfloat";
-  platform->copyDfloatToPfloatKernel = platform->kernels.get(kernelName);
-
-  kernelName = "copyPfloatToDfloat";
-  platform->copyPfloatToDfloatKernel = platform->kernels.get(kernelName);
-
   MPI_Barrier(platform->comm.mpiComm);
   const double loadTime = MPI_Wtime() - tStart;
 
@@ -97,4 +84,16 @@ void platform_t::compileKernels()
     printf("done (%gs)\n\n", loadTime);
   }
   fflush(stdout);
+
+  // assign platform related kernels
+  std::string kernelName;
+  kernelName = "core-copyDfloatToPfloat";
+  platform->copyDfloatToPfloatKernel = platform->kernels.get(kernelName);
+
+  kernelName = "core-copyPfloatToDfloat";
+  platform->copyPfloatToDfloatKernel = platform->kernels.get(kernelName);
+
+  kernelName = "core-copyDfloatToDouble";
+  platform->copyDfloatToDoubleKernel = platform->kernels.get(kernelName);
+
 }

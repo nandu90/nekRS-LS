@@ -6,18 +6,17 @@ void nrs_t::evaluateProperties(const double timeNew)
 {
 
   bool rhsCVODE = false;
-  if(this->cvode)
-    rhsCVODE = this->cvode->isRhsEvaluation();
-
+  if(this->cds) {
+    if (this->cds->cvode) { 
+     rhsCVODE = this->cds->cvode->isRhsEvaluation();
+    }
+  }
   const std::string tag = rhsCVODE ? "udfPropertiesCVODE" : "udfProperties";
 
   platform->timer.tic(tag, 1);
-  cds_t *cds = this->cds;
 
-  if (udf.properties) {
-    occa::memory o_S = (this->Nscalar) ? cds->o_S : o_NULL;
-    occa::memory o_SProp = (this->Nscalar) ? cds->o_prop : o_NULL;
-    udf.properties(this, timeNew, this->o_U, o_S, this->o_prop, o_SProp);
+  if (this->userProperties) {
+    this->userProperties(timeNew);
   }
 
   if (this->Nscalar) {
@@ -27,10 +26,9 @@ void nrs_t::evaluateProperties(const double timeNew)
 
       std::string regularizationMethod;
       platform->options.getArgs("SCALAR" + sid + " REGULARIZATION METHOD", regularizationMethod);
-      const bool applyAVM = regularizationMethod.find("AVM_RESIDUAL") != std::string::npos ||
-                            regularizationMethod.find("AVM_HIGHEST_MODAL_DECAY") != std::string::npos;
+      const bool applyAVM = regularizationMethod.find("AVM_HIGHEST_MODAL_DECAY") != std::string::npos; 
       if (applyAVM)
-        avm::apply(this, timeNew, is, cds->o_S);
+        avm::apply(cds, timeNew, is, cds->o_S);
     }
   }
 

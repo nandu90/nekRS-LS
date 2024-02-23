@@ -115,7 +115,7 @@ void testDirection(nrs_t *nrs, std::string dir)
 
   auto LInfError = computeLInfError(nrs, o_fields, o_refFields);
   if (LInfError > tol) {
-    CIFAIL;
+    CiFailTest();
   }
 
   o_fields.free();
@@ -125,7 +125,7 @@ void testDirection(nrs_t *nrs, std::string dir)
 void testFusedPlanarAvg(nrs_t *nrs, std::string dir)
 {
   if (dir.size() != 2) {
-    CIFAIL;
+    CiFailTest();
   }
 
   auto o_fields = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset);
@@ -152,7 +152,7 @@ void testFusedPlanarAvg(nrs_t *nrs, std::string dir)
 
   auto LInfError = computeLInfError(nrs, o_fields, o_refFields);
   if (LInfError > tol) {
-    CIFAIL;
+    CiFailTest();
   }
 
   // (2) xz == x, z, e.g.
@@ -169,7 +169,7 @@ void testFusedPlanarAvg(nrs_t *nrs, std::string dir)
 
   LInfError = computeLInfError(nrs, o_fields, o_refFields);
   if (LInfError > tol) {
-    CIFAIL;
+    CiFailTest();
   }
 
   // (3) xz, zx both work
@@ -186,7 +186,7 @@ void testFusedPlanarAvg(nrs_t *nrs, std::string dir)
 
   LInfError = computeLInfError(nrs, o_fields, o_refFields);
   if (LInfError > tol) {
-    CIFAIL;
+    CiFailTest();
   }
 
   o_fields.free();
@@ -218,7 +218,7 @@ void ciTestDistance(nrs_t *nrs)
 
   nek::ocopyToNek();
   nek::userchk();
-  double *n5kDist = (double *)nek::scPtr(1);
+  auto n5kDist = nek::ptr<double>("dist");
 
   // for zeros
   const auto floorTol = 1e2 * std::numeric_limits<dfloat>::epsilon();
@@ -238,7 +238,7 @@ void ciTestDistance(nrs_t *nrs)
   MPI_Allreduce(MPI_IN_PLACE, &maxRelErr, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm);
 
   if (maxRelErr > tol) {
-    CIFAIL;
+    CiFailTest();
     nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 }
@@ -266,7 +266,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
   nek::ocopyToNek(time, tstep);
   nek::userchk();
 
-  double *err = (double *)nek::scPtr(1);
+  auto err = nek::ptr<double>("errors");
   double vxErr, prErr, sErr;
 
   switch (ciMode) {
@@ -293,7 +293,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
     printf("relative error to target: vx=%g pr=%g s=%g\n", vxErr, prErr, sErr);
   }
 
-  (vxErr < EPS && prErr < EPS && sErr < EPS) ? (CIPASS) : (CIFAIL);
+  (vxErr < EPS && prErr < EPS && sErr < EPS) ? (CiPassTest()) : (CiFailTest());
 
   if (nrs->cds->cvode) {
     dfloat expectedCVODERHS = 3.6;
@@ -302,6 +302,6 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
              expectedCVODERHS,
              numCVODERHS);
     }
-    numCVODERHS > 1.1 * expectedCVODERHS ? (CIFAIL) : (CIPASS);
+    numCVODERHS > 1.1 * expectedCVODERHS ? (CiFailTest()) : (CiPassTest());
   }
 }

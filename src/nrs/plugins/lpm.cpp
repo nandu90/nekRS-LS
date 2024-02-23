@@ -8,15 +8,14 @@
 #include <numeric>
 #include <regex>
 #include <tuple>
-#include <filesystem>
 #include "tuple_for_each.hpp"
 #include "gslib.h" // needed for sarray_transfer
 
 #include <inttypes.h>
 
-lpm_t::lpm_t(nrs_t *nrs_, dfloat bb_tol_, dfloat newton_tol_)
-    : nrs(nrs_), solverOrder(nrs->nEXT), bb_tol(bb_tol_), newton_tol(newton_tol_),
-      interp(std::make_unique<pointInterpolation_t>(nrs, bb_tol, newton_tol))
+lpm_t::lpm_t(dfloat bb_tol_, dfloat newton_tol_)
+    : nrs(dynamic_cast<nrs_t*>(platform->solver)), solverOrder(nrs->nEXT), bb_tol(bb_tol_), newton_tol(newton_tol_),
+      interp(std::make_unique<pointInterpolation_t>(nrs->meshV, bb_tol, newton_tol))
 {
   nekrsCheck(!kernelsRegistered_,
              platform->comm.mpiComm,
@@ -292,7 +291,7 @@ void lpm_t::addUserData(void *userdata)
   userdata_ = userdata;
 }
 
-const occa::memory lpm_t::getDOF(const std::string &dofName)
+occa::memory lpm_t::getDOF(const std::string &dofName) const
 {
   const auto id = dofId(dofName);
   auto Nfields = numDOFs(dofName);
@@ -310,14 +309,14 @@ const std::vector<dfloat> lpm_t::getDOFHost(const std::string &dofName)
   return h_dof;
 }
 
-const occa::memory lpm_t::getProp(const std::string &propName)
+occa::memory lpm_t::getProp(const std::string &propName) const
 {
   const auto id = propId(propName);
   auto Nfields = numProps(propName);
   return o_prop.slice(id * fieldOffset_, Nfields * fieldOffset_);
 }
 
-const std::vector<dfloat> lpm_t::getPropHost(const std::string &propName)
+std::vector<dfloat> lpm_t::getPropHost(const std::string &propName) const
 {
   auto o_propEntry = getProp(propName);
   auto Nfields = numProps(propName);
@@ -390,7 +389,7 @@ void lpm_t::initialize(int nParticles, double t0, const occa::memory &o_y0)
   nekrsCheck(o_y0.length() != nParticles * nDOFs_,
              platform->comm.mpiComm,
              EXIT_FAILURE,
-             "o_y0.length() = %ld , while expecting %ld words!\n",
+             "o_y0.length() = %ld , while expecting %d words!\n",
              o_y0.length(),
              nParticles * nDOFs_);
 
@@ -498,7 +497,7 @@ void lpm_t::integrate(double tf)
 
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     interp.reset();
-    interp = std::make_unique<pointInterpolation_t>(nrs, bb_tol, newton_tol);
+    interp = std::make_unique<pointInterpolation_t>(nrs->meshV, bb_tol, newton_tol);
   }
 
   // set extrapolated state to t^n (copy from laggedInterpFields)
@@ -522,7 +521,9 @@ void lpm_t::integrate(double tf)
   dt[0] = dtStep;
 
   if (userODESolver_) {
-    userODESolver_(nrs, this, time, tf, tstep, o_y, userdata_, o_ydot);
+    deviceMemory<dfloat> o_y_(o_y);
+    deviceMemory<dfloat> o_ydot_(o_ydot);
+    userODESolver_(nrs, this, time, tf, tstep, o_y_, userdata_, o_ydot_);
   } else {
     if (solverType == SolverType::AB) {
       integrateAB();
@@ -619,7 +620,9 @@ void lpm_t::integrateAB()
     }
   } else {
     platform->timer.tic(timerName + "integrate::userRHS", 1);
-    userRHS_(nrs, this, time, o_y, userdata_, o_ydot);
+    deviceMemory<dfloat> o_ydot_(o_ydot);
+    deviceMemory<dfloat> o_y_(o_y);
+    userRHS_(nrs, this, time, o_y_, userdata_, o_ydot_);
     platform->timer.toc(timerName + "integrate::userRHS");
 
     if (nParticles_ > 0) {
@@ -656,7 +659,9 @@ void lpm_t::integrateRK()
 void lpm_t::integrateRK1()
 {
   platform->timer.tic(timerName + "integrate::userRHS", 1);
-  userRHS_(nrs, this, time, o_y, userdata_, o_k);
+  deviceMemory<dfloat> o_k_(o_k);
+  deviceMemory<dfloat> o_y_(o_y);
+  userRHS_(nrs, this, time, o_y_, userdata_, o_k_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
   dfloat rkCoeff = dt[0];
@@ -674,9 +679,13 @@ void lpm_t::integrateRK2()
     o_k1 = o_k + 0 * nDOFs_ * fieldOffset_;
     o_k2 = o_k + 1 * nDOFs_ * fieldOffset_;
   }
+  deviceMemory<dfloat> o_k1_(o_k1);
+  deviceMemory<dfloat> o_k2_(o_k2);
+  deviceMemory<dfloat> o_y_(o_y);
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
-  userRHS_(nrs, this, time, o_y, userdata_, o_k1);
+
+  userRHS_(nrs, this, time, o_y_, userdata_, o_k1_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_ytmp = o_y + dt[0] * o_k1
@@ -690,7 +699,8 @@ void lpm_t::integrateRK2()
   extrapolateFluidState(time + dt[0]);
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
-  userRHS_(nrs, this, time + dt[0], o_ytmp, userdata_, o_k2);
+  deviceMemory<dfloat> o_ytmp_(o_ytmp);
+  userRHS_(nrs, this, time + dt[0], o_ytmp_, userdata_, o_k2_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_y = o_y + 0.5 * dt[0] * (o_k1 + o_k2)
@@ -710,9 +720,13 @@ void lpm_t::integrateRK3()
     o_k2 = o_k + 1 * nDOFs_ * fieldOffset_;
     o_k3 = o_k + 2 * nDOFs_ * fieldOffset_;
   }
+  deviceMemory<dfloat> o_k1_(o_k1);
+  deviceMemory<dfloat> o_k2_(o_k2);
+  deviceMemory<dfloat> o_k3_(o_k3);
+  deviceMemory<dfloat> o_y_(o_y);
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
-  userRHS_(nrs, this, time, o_y, userdata_, o_k1);
+  userRHS_(nrs, this, time, o_y_, userdata_, o_k1_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_ytmp = o_y + dt[0]/2 * o_k1
@@ -726,7 +740,7 @@ void lpm_t::integrateRK3()
   extrapolateFluidState(time + 0.5 * dt[0]);
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
-  userRHS_(nrs, this, time + 0.5 * dt[0], o_y, userdata_, o_k2);
+  userRHS_(nrs, this, time + 0.5 * dt[0], o_y_, userdata_, o_k2_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_ytmp = o_y - dt[0] * o_k1 + 2 * dt[0] * o_k2
@@ -741,7 +755,8 @@ void lpm_t::integrateRK3()
   extrapolateFluidState(time + dt[0]);
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
-  userRHS_(nrs, this, time + dt[0], o_ytmp, userdata_, o_k3);
+  deviceMemory<dfloat> o_ytmp_(o_ytmp);
+  userRHS_(nrs, this, time + dt[0], o_ytmp_, userdata_, o_k3_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_y = o_y + dt[0] * (1/6 * o_k1 + 2/3 * o_k2 + 1/6 * o_k3)
@@ -762,9 +777,15 @@ void lpm_t::integrateRK4()
     o_k3 = o_k + 2 * nDOFs_ * fieldOffset_;
     o_k4 = o_k + 3 * nDOFs_ * fieldOffset_;
   }
+  deviceMemory<dfloat> o_k1_(o_k1);
+  deviceMemory<dfloat> o_k2_(o_k2);
+  deviceMemory<dfloat> o_k3_(o_k3);
+  deviceMemory<dfloat> o_k4_(o_k4);
+  deviceMemory<dfloat> o_y_(o_y);
+
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
-  userRHS_(nrs, this, time, o_y, userdata_, o_k1);
+  userRHS_(nrs, this, time, o_y_, userdata_, o_k1_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_ytmp = o_y + dt[0]/2 * o_k1
@@ -778,7 +799,7 @@ void lpm_t::integrateRK4()
   extrapolateFluidState(time + 0.5 * dt[0]);
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
-  userRHS_(nrs, this, time + 0.5 * dt[0], o_y, userdata_, o_k2);
+  userRHS_(nrs, this, time + 0.5 * dt[0], o_y_, userdata_, o_k2_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_ytmp = o_y + dt[0]/2 * o_k2
@@ -789,7 +810,7 @@ void lpm_t::integrateRK4()
   this->find(o_ytmp);
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
-  userRHS_(nrs, this, time + 0.5 * dt[0], o_y, userdata_, o_k3);
+  userRHS_(nrs, this, time + 0.5 * dt[0], o_y_, userdata_, o_k3_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_ytmp = o_y + dt[0] * o_k3
@@ -803,7 +824,8 @@ void lpm_t::integrateRK4()
   extrapolateFluidState(time + dt[0]);
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
-  userRHS_(nrs, this, time + dt[0], o_ytmp, userdata_, o_k4);
+  deviceMemory<dfloat> o_ytmp_(o_ytmp);
+  userRHS_(nrs, this, time + dt[0], o_ytmp_, userdata_, o_k4_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
   // o_y = o_y + dt[0] * (1/6 * o_k1 + 1/3 * o_k2 + 1/3 * o_k3 + 1/6 * o_k4)
@@ -1385,19 +1407,19 @@ void lpm_t::addParticles(int newNParticles,
   nekrsCheck(o_yNewPart.length() < expectedYSize,
              MPI_COMM_SELF,
              EXIT_FAILURE,
-             "o_yNewPart length is %ld but expected %ld words!\n",
+             "o_yNewPart length is %ld but expected %d words!\n",
              o_yNewPart.length(),
              expectedYSize);
   nekrsCheck(o_propNewPart.length() < expectedPropSize,
              MPI_COMM_SELF,
              EXIT_FAILURE,
-             "o_propNewPart length is %ld but expected %ld words!\n",
+             "o_propNewPart length is %ld but expected %d words!\n",
              o_propNewPart.length(),
              expectedPropSize);
   nekrsCheck(o_ydotNewPart.length() < expectedYdotSize,
              MPI_COMM_SELF,
              EXIT_FAILURE,
-             "o_ydotNewPart length is %ld but expected %ld words!\n",
+             "o_ydotNewPart length is %ld but expected %d words!\n",
              o_ydotNewPart.length(),
              expectedYdotSize);
 
@@ -2058,7 +2080,7 @@ auto readHeader(const std::string &restartFile)
 
 void lpm_t::restart(const std::string &restartFile)
 {
-  bool fileExists = std::filesystem::exists(restartFile);
+  bool fileExists = fs::exists(restartFile);
   nekrsCheck(!fileExists,
              platform->comm.mpiComm,
              EXIT_FAILURE,

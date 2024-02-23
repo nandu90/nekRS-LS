@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <tuple>
 
-#include "timer.hpp"
 #include "platform.hpp"
 #include "ogs.hpp"
 #include "orderedMap.hpp"
@@ -49,7 +48,14 @@ inline void sync()
 
 double tElapsedTimeSolve = 0;
 
-auto sumAllMatchingTags(std::function<bool(std::string)> predicate, const std::string metric)
+} // namespace
+
+void timer_t::printStatSetElapsedTimeSolve(double time)
+{
+  tElapsedTimeSolve = time;
+}
+
+std::tuple<double, long long int> timer_t::sumAllMatchingTags(std::function<bool(std::string)> predicate, const std::string metric)
 {
   long long int count = 0;
   double elapsed = 0;
@@ -70,7 +76,6 @@ auto sumAllMatchingTags(std::function<bool(std::string)> predicate, const std::s
   return std::make_tuple(elapsed, count);
 }
 
-} // namespace
 
 timer_t::timer_t(MPI_Comm comm, occa::device device, int ifSyncDefault, int enableSync)
 {
@@ -410,234 +415,6 @@ void timer_t::printStatEntry(std::string name, double time, double tNorm)
   }
 }
 
-void timer_t::printRunStat(int step)
-{
-  int rank;
-  MPI_Comm_rank(comm_, &rank);
-
-  set("velocity proj",
-      query("velocity proj pre", "DEVICE:MAX") + query("velocity proj post", "DEVICE:MAX"),
-      count("velocity proj pre"));
-
-  set("pressure proj",
-      query("pressure proj pre", "DEVICE:MAX") + query("pressure proj post", "DEVICE:MAX"),
-      count("pressure proj pre"));
-
-  set("scalar proj",
-      query("scalar proj pre", "DEVICE:MAX") + query("scalar proj post", "DEVICE:MAX"),
-      count("scalar proj pre"));
-
-  set("mesh proj",
-      query("mesh proj pre", "DEVICE:MAX") + query("mesh proj post", "DEVICE:MAX"),
-      count("mesh proj pre"));
-
-  double gsTime = ogsTime(/* reportHostTime */ true);
-  MPI_Allreduce(MPI_IN_PLACE, &gsTime, 1, MPI_DOUBLE, MPI_MAX, comm_);
-
-  const double tElapsedTime = query("elapsed", "DEVICE:MAX");
-
-  if (rank == 0) {
-    std::cout << "\n>>> runtime statistics (step= " << step << "  totalElapsed= " << tElapsedTime << "s"
-              << "):\n";
-  }
-
-  std::cout.setf(std::ios::scientific);
-  int outPrecisionSave = std::cout.precision();
-  std::cout.precision(5);
-
-  if (rank == 0) {
-    std::cout << "name                    "
-              << "time          "
-              << "abs%  "
-              << "rel%  "
-              << "calls\n";
-  }
-
-  tElapsedTimeSolve = query("elapsedStepSum", "DEVICE:MAX");
-  const double tSetup = query("setup", "DEVICE:MAX");
-
-  const double tMinSolveStep = query("minSolveStep", "DEVICE:MAX");
-  const double tMaxSolveStep = query("maxSolveStep", "DEVICE:MAX");
-
-  const double tScalarCvode = query("cvode_t::solve", "DEVICE:MAX");
-
-  bool printFlops = !platform->options.compareArgs("PRESSURE PRECONDITIONER", "SEMFEM") && tScalarCvode < 0;
-
-  const double flops =
-      platform->flopCounter->get(platform->comm.mpiComm) / (tElapsedTimeSolve * platform->comm.mpiCommSize);
-
-  printStatEntry("  solve                 ", tElapsedTimeSolve, tElapsedTimeSolve);
-  if (tElapsedTimeSolve > 0 && rank == 0) {
-    std::cout << "    min                 " << tMinSolveStep << "s\n";
-    std::cout << "    max                 " << tMaxSolveStep << "s\n";
-    if (printFlops) {
-      std::cout << "    flops/rank          " << flops << "\n";
-    }
-  }
-
-  auto lpmLocalKernelPredicate = [](const std::string &tag) {
-    return tag.find("lpm_t::") != std::string::npos && tag.find("localKernel") != std::string::npos;
-  };
-
-  auto lpmLocalEvalKernelPredicate = [](const std::string &tag) {
-    return tag.find("lpm_t::") != std::string::npos && tag.find("localEvalKernel") != std::string::npos;
-  };
-
-  auto neknekLocalKernelPredicate = [](const std::string &tag) {
-    return tag.find("neknek_t::") != std::string::npos && tag.find("localKernel") != std::string::npos;
-  };
-
-  auto neknekLocalEvalKernelPredicate = [](const std::string &tag) {
-    return tag.find("neknek_t::") != std::string::npos && tag.find("localEvalKernel") != std::string::npos;
-  };
-
-  printStatEntry("    checkpointing       ", "checkpointing", "DEVICE:MAX", tElapsedTimeSolve);
-  printStatEntry("    udfExecuteStep      ", "udfExecuteStep", "DEVICE:MAX", tElapsedTimeSolve);
-  const double tudf = query("udfExecuteStep", "DEVICE:MAX");
-  printStatEntry("      lpm integrate     ", "lpm_t::integrate", "DEVICE:MAX", tudf);
-  const double tlpm = query("lpm_t::integrate", "DEVICE:MAX");
-  printStatEntry("        userRHS         ", "lpm_t::integrate::userRHS", "DEVICE:MAX", tlpm);
-  const double tParticleRHS = query("lpm_t::integrate::userRHS", "DEVICE:MAX");
-  printStatEntry("          interpolate   ",
-                 "lpm_t::integrate::userRHS::interpolate",
-                 "DEVICE:MAX",
-                 tParticleRHS);
-  const double tInterpPart = query("lpm_t::integrate::userRHS::interpolate", "DEVICE:MAX");
-  auto [tLocalKernel, nLocalKernel] = sumAllMatchingTags(lpmLocalEvalKernelPredicate, "DEVICE:MAX");
-  printStatEntry("            eval kernel ", tLocalKernel, nLocalKernel, tInterpPart);
-  printStatEntry("        findpts         ", "lpm_t::integrate::find", "DEVICE:MAX", tlpm);
-  const double tFindPart = query("lpm_t::integrate::find", "DEVICE:MAX");
-  auto [tFindKernel, nFindKernel] = sumAllMatchingTags(lpmLocalKernelPredicate, "DEVICE:MAX");
-  printStatEntry("          find kernel   ", tFindKernel, nFindKernel, tFindPart);
-  printStatEntry("        delete          ", "lpm_t::deleteParticles", "DEVICE:MAX", tlpm);
-  printStatEntry("      lpm add           ", "lpm_t::addParticles", "DEVICE:MAX", tudf);
-  printStatEntry("      lpm write         ", "lpm_t::write", "DEVICE:MAX", tudf);
-
-  const double tDiv = query("udfDiv", "DEVICE:MAX");
-  printStatEntry("    udfDiv              ", "udfDiv", "DEVICE:MAX", tElapsedTimeSolve);
-
-  const double tMakef = query("makef", "DEVICE:MAX");
-  printStatEntry("    makef               ", "makef", "DEVICE:MAX", tElapsedTimeSolve);
-  printStatEntry("      udfUEqnSource     ", "udfUEqnSource", "DEVICE:MAX", tMakef);
-
-  const double tMakeq = query("makeq", "DEVICE:MAX");
-  printStatEntry("    makeq               ", "makeq", "DEVICE:MAX", tElapsedTimeSolve);
-  printStatEntry("      udfSEqnSource     ", "udfSEqnSource", "DEVICE:MAX", tMakeq);
-
-  printStatEntry("    udfProperties       ", "udfProperties", "DEVICE:MAX", tElapsedTimeSolve);
-
-  printStatEntry("    meshUpdate          ", "meshUpdate", "DEVICE:MAX", tElapsedTimeSolve);
-  const double tMesh = query("meshSolve", "DEVICE:MAX");
-  printStatEntry("    meshSolve           ", "meshSolve", "DEVICE:MAX", tElapsedTimeSolve);
-  printStatEntry("      preconditioner    ", "mesh preconditioner", "DEVICE:MAX", tMesh);
-  printStatEntry("      initial guess     ", "mesh proj", "DEVICE:MAX", tMesh);
-
-  const double tNekNek = query("neknek update boundary", "DEVICE:MAX");
-  printStatEntry("    neknek              ", "neknek update boundary", "DEVICE:MAX", tElapsedTimeSolve);
-  printStatEntry("      sync              ", "neknek sync", "DEVICE:MAX", tNekNek);
-  printStatEntry("      exchange          ", "neknek exchange", "DEVICE:MAX", tNekNek);
-  const double tExchange = query("neknek exchange", "DEVICE:MAX");
-  std::tie(tLocalKernel, nLocalKernel) = sumAllMatchingTags(neknekLocalEvalKernelPredicate, "DEVICE:MAX");
-  printStatEntry("        eval kernel     ", tLocalKernel, nLocalKernel, tExchange);
-  printStatEntry("      findpts           ", "neknek updateInterpPoints", "DEVICE:MAX", tNekNek);
-  const double tFindpts = query("neknek updateInterpPoints", "DEVICE:MAX");
-
-  if (tFindpts > 0.0) {
-    std::tie(tFindKernel, nFindKernel) = sumAllMatchingTags(neknekLocalKernelPredicate, "DEVICE:MAX");
-    printStatEntry("        find kernel     ", tFindKernel, nFindKernel, tFindpts);
-  }
-
-  const double tVelocity = query("velocitySolve", "DEVICE:MAX");
-  printStatEntry("    velocitySolve       ", "velocitySolve", "DEVICE:MAX", tElapsedTimeSolve);
-  printStatEntry("      rhs               ", "velocity rhs", "DEVICE:MAX", tVelocity);
-  printStatEntry("      preconditioner    ", "velocity preconditioner", "DEVICE:MAX", tVelocity);
-  printStatEntry("      initial guess     ", "velocity proj", "DEVICE:MAX", tVelocity);
-
-  const double tPressure = query("pressureSolve", "DEVICE:MAX");
-  printStatEntry("    pressureSolve       ", "pressureSolve", "DEVICE:MAX", tElapsedTimeSolve);
-  printStatEntry("      rhs               ", "pressure rhs", "DEVICE:MAX", tPressure);
-
-  const double tPressurePreco = query("pressure preconditioner", "DEVICE:MAX");
-  printStatEntry("      preconditioner    ", "pressure preconditioner", "DEVICE:MAX", tPressure);
-
-  for (int i = 15; i > 0; i--) {
-    const std::string tag = "pressure preconditioner smoother N=" + std::to_string(i);
-    if (m_.find(tag) == m_.end()) {
-      continue;
-    }
-    printStatEntry("        pMG smoother    ", tag, "DEVICE:MAX", tPressurePreco);
-  }
-
-  printStatEntry("        coarse grid     ", "coarseSolve", "DEVICE:MAX", tPressurePreco);
-  printStatEntry("      initial guess     ", "pressure proj", "DEVICE:MAX", tPressure);
-
-  int nScalar = 0;
-  platform->options.getArgs("NUMBER OF SCALARS", nScalar);
-
-  const double tScalar = query("scalarSolve", "DEVICE:MAX");
-  printStatEntry("    scalarSolve         ", "scalarSolve", "DEVICE:MAX", tElapsedTimeSolve);
-  printStatEntry("      rhs               ", "scalar rhs", "DEVICE:MAX", tScalar);
-
-  auto cvodeMakeQPredicate = [](const std::string &tag) {
-    bool match = tag.find("cvode_t::") != std::string::npos && tag.find("makeq") != std::string::npos;
-    // ensure children of the timer aren't doubly counted
-    return match && tag.find("makeq::") == std::string::npos;
-  };
-  auto [tMakeqCvode, nMakeqCvode] = sumAllMatchingTags(cvodeMakeQPredicate, "DEVICE:MAX");
-
-  auto cvodeUdfSEqnSourcePredicate = [](const std::string &tag) {
-    bool match = tag.find("cvode_t::") != std::string::npos && tag.find("udfSEqnSource") != std::string::npos;
-    // ensure children of the timer aren't doubly counted
-    return match && tag.find("udfSEqnSource::") == std::string::npos;
-  };
-  auto [tSEqnSourceCvode, nSEqnSourceCvode] = sumAllMatchingTags(cvodeUdfSEqnSourcePredicate, "DEVICE:MAX");
-
-  auto cvodeLocalPointSourcePredicate = [](const std::string &tag) {
-    bool match = tag.find("cvode_t::") != std::string::npos && tag.find("pointSource") != std::string::npos;
-    // ensure children of the timer aren't doubly counted
-    return match;
-  };
-  auto [tLocalPointSource, nLocalPointSource] =
-      sumAllMatchingTags(cvodeLocalPointSourcePredicate, "DEVICE:MAX");
-
-  auto cvodePropertiesPredicate = [](const std::string &tag) {
-    bool match =
-        tag.find("cvode_t::") != std::string::npos && tag.find("evaluateProperties") != std::string::npos;
-    // ensure children of the timer aren't doubly counted
-    return match && tag.find("evaluateProperties::") == std::string::npos;
-  };
-  auto [tPropCvode, nPropCvode] = sumAllMatchingTags(cvodePropertiesPredicate, "DEVICE:MAX");
-  printStatEntry("    scalarSolveCvode    ", "cvode_t::solve", "DEVICE:MAX", tElapsedTimeSolve);
-  printStatEntry("      makeq             ", tMakeqCvode, nMakeqCvode, tScalarCvode);
-  printStatEntry("        udfSEqnSource   ", tSEqnSourceCvode, nSEqnSourceCvode, tMakeqCvode);
-  printStatEntry("      local pt src      ", tLocalPointSource, nLocalPointSource, tScalarCvode);
-  printStatEntry("      udfProperties     ", tPropCvode, nPropCvode, tScalarCvode);
-
-  auto precoTimeScalars = 0.0;
-  auto precoCallsScalars = 0.0;
-  for (int is = 0; is < nScalar; is++) {
-    std::string sid = scalarDigitStr(is);
-    precoTimeScalars += query("scalar" + sid + " preconditioner", "DEVICE:MAX");
-    precoCallsScalars += count("scalar" + sid + " preconditioner");
-  }
-  set("scalar preconditioner", precoTimeScalars, precoCallsScalars);
-
-  printStatEntry("      preconditioner    ", "scalar preconditioner", "DEVICE:MAX", tScalar);
-  printStatEntry("      initial guess     ", "scalar proj", "DEVICE:MAX", tScalar);
-
-  printStatEntry("    gsMPI               ", gsTime, tElapsedTimeSolve);
-
-  printStatEntry("    dotp                ", "dotp", "DEVICE:MAX", tElapsedTimeSolve);
-
-  printStatEntry("    dotp multi          ", "dotpMulti", "DEVICE:MAX", tElapsedTimeSolve);
-
-  if (rank == 0) {
-    std::cout << std::endl;
-  }
-
-  std::cout.unsetf(std::ios::scientific);
-  std::cout.precision(outPrecisionSave);
-}
 
 void timer_t::printAll()
 {

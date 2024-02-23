@@ -1,4 +1,4 @@
-#include "nrs.hpp"
+#include "platform.hpp"
 #include "nekInterfaceAdapter.hpp"
 #include "meshNekReader.hpp"
 
@@ -263,7 +263,7 @@ mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &k
   if (mesh->N == Nfine) {
     dfloat *tmp = (dfloat *)calloc(mesh->Nlocal, sizeof(dfloat));
     mesh->ogs->o_invDegree.copyTo(tmp, mesh->Nlocal);
-    double *mult = (cht) ? (double *)nek::ptr("tmult") : (double *)nek::ptr("vmult");
+    double *mult = (cht) ? nek::ptr<double>("tmult") : nek::ptr<double>("vmult");
     dfloat sum1 = 0;
     for (int i = 0; i < mesh->Nlocal; i++) {
       sum1 += std::abs(tmp[i] - static_cast<dfloat>(mult[i]));
@@ -454,7 +454,7 @@ mesh_t *createMeshV(MPI_Comm comm, int N, int cubN, mesh_t *meshT, occa::propert
   if (mesh->N == Nfine) {
     dfloat *tmp = (dfloat *)calloc(mesh->Nlocal, sizeof(dfloat));
     mesh->ogs->o_invDegree.copyTo(tmp, mesh->Nlocal);
-    auto mult = (double *)nek::ptr("vmult");
+    auto mult = nek::ptr<double>("vmult");
     dfloat sum1 = 0;
     for (int i = 0; i < mesh->Nlocal; i++) {
       sum1 += std::abs(tmp[i] - static_cast<dfloat>(mult[i]));

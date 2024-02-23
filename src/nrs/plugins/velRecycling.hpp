@@ -18,11 +18,11 @@ void buildKernel(occa::properties kernelInfo);
 void copy();
 
 // gs-based
-void setup(nrs_t* nrs_, occa::memory o_wrk_, const hlong eOffset, const int bID_,
+void setup(occa::memory o_wrk_, const hlong eOffset, const int bID_,
            const dfloat wbar_);
 
 // interpolation-based
-void setup(nrs_t *nrs_, occa::memory o_wrk_,
+void setup(occa::memory o_wrk_,
            const dfloat xOffset, const dfloat yOffset, const dfloat zOffset, 
            const int bID_,  const dfloat wbar_);
 }

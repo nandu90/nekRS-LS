@@ -6,7 +6,6 @@ namespace
 {
 int firstTime = 1;
 occa::memory h_scratch;
-}
 
 void setup(nrs_t *nrs)
 {
@@ -33,21 +32,28 @@ void setup(nrs_t *nrs)
   firstTime = 0;
 }
 
-dfloat computeCFL(nrs_t *nrs)
+}
+
+dfloat nrs_t::computeCFL()
 {
-  mesh_t *mesh = nrs->meshV;
+  return computeCFL(this->dt[0]);
+}
+
+dfloat nrs_t::computeCFL(dfloat dt)
+{
+  mesh_t *mesh = this->meshV;
 
   if (firstTime)
-    setup(nrs);
+    setup(this);
 
   auto o_cfl = platform->o_memPool.reserve<dfloat>(mesh->Nelements);
 
-  nrs->cflKernel(mesh->Nelements,
-                 nrs->dt[0],
+  this->cflKernel(mesh->Nelements,
+                 dt,
                  mesh->o_vgeo,
-                 nrs->o_idH,
-                 nrs->fieldOffset,
-                 nrs->o_U,
+                 this->o_idH,
+                 this->fieldOffset,
+                 this->o_U,
                  mesh->o_U,
                  o_cfl);
 

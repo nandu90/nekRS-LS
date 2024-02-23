@@ -1,7 +1,7 @@
-#include <vector>
-#include "elliptic.h"
+#include "platform.hpp"
+#include "mesh.h"
 
-void createEToBV(const mesh_t* mesh, const int* EToB, occa::memory& o_EToBV)
+void createEToBV(const mesh_t* mesh, const std::vector<int>& EToB, occa::memory& o_EToBV)
 {
   const int largeNumber = 1 << 20;
 

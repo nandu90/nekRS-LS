@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.21)
 project(NekRS LANGUAGES C CXX Fortran VERSION 24.0.1)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
@@ -15,12 +15,13 @@ if(${CMAKE_INSTALL_PREFIX} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
     MESSAGE(FATAL_ERROR "The current CMAKE_INSTALL_PREFIX points at the build tree. In-place builds are not supported!")
 endif()
 
+
 include(CheckCCompilerFlag)
 include(CheckLinkerFlag)
 include(FortranCInterface)
 include(ExternalProject)
 include(FetchContent)
-include(config/utils.cmake)
+include(cmake/utils.cmake)
 
 
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
@@ -43,14 +44,15 @@ if (NOT CMAKE_CONFIGURATION_TYPES AND
 endif()
 
 #Link:https://gitlab.kitware.com/cmake/community/wikis/doc/cmake/RPATH-handling
-set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
-#set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${CMAKE_INSTALL_PREFIX}/lib")
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${CMAKE_INSTALL_PREFIX}/occa/lib")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 set (CMAKE_C_STANDARD 99)
 set (CMAKE_CXX_STANDARD 17)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 #set(MPI_C_COMPILER ${CMAKE_C_COMPILER})
 #set(MPI_CXX_COMPILER ${CMAKE_CXX_COMPILER})
@@ -79,7 +81,7 @@ endif()
 ###############################################################################
 set(NEK5000_PPLIST "PARRSB DPROCMAP" CACHE STRING
   "Preprocessor macros for Nek5000")
-set(NEKINTERFACEDIR "${CMAKE_CURRENT_SOURCE_DIR}/src/nekInterface/" CACHE PATH
+set(NEKINTERFACEDIR "${CMAKE_CURRENT_SOURCE_DIR}/src/nrs/nekInterface/" CACHE PATH
 "Directory for Nek5000 inteface source files")
 
 string(COMPARE EQUAL "${CMAKE_CXX_COMPILER_ID}" "GNU" USING_GNU)
@@ -130,7 +132,7 @@ set(OCCA_OPENCL_COMPILER_FLAGS "-w -cl-std=CL2.0 -cl-unsafe-math-optimizations -
 set(OCCA_FOUND ON)
 
 if(USING_APPLE_LLVM AND CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
-  message(FATAL_ERROR "Apple Clang compiler not supported on arm64!")
+#  message(FATAL_ERROR "Apple Clang compiler not supported on arm64!")
 endif()
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(powerpc|ppc)64le" OR CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
@@ -147,7 +149,7 @@ set(OCCA_ENABLE_OPENCL OFF CACHE BOOL "Enable OCCA OpenCL support")
 set(OCCA_ENABLE_METAL OFF CACHE BOOL "Enable OCCA Metal support")
 
 set(ENABLE_AMGX OFF CACHE BOOL "Enable NVIDIA AMGX support")
-set(ENABLE_HYPRE_GPU OFF CACHE BOOL "Enable HYPRE GPU support")
+set(ENABLE_HYPRE_GPU ON CACHE BOOL "Enable HYPRE GPU support")
 set(NEKRS_GPU_MPI ON CACHE BOOL "Enable GPU aware MPI")
 set(ENABLE_CVODE OFF CACHE BOOL "Enable CVODE support")
 
@@ -163,8 +165,6 @@ if(NOT USING_APPLE_LLVM)
 endif()
 
 if(OpenMP_FOUND)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
   if(OpenMP_CXX_INCLUDE_DIR)
     include_directories(SYSTEM ${OpenMP_CXX_INCLUDE_DIRS})
   endif()
@@ -213,7 +213,7 @@ message("-- BSYMBOLIC_FLAG: ${BSYMBOLIC_FLAG}")
 ################################################################################
 
 # occa
-include(config/occa.cmake)
+include(cmake/occa.cmake)
 message("-- OCCA_CUDA_ENABLED: ${OCCA_CUDA_ENABLED}")
 message("-- OCCA_HIP_ENABLED: ${OCCA_HIP_ENABLED}")
 message("-- OCCA_DPCPP_ENABLED: ${OCCA_DPCPP_ENABLED}")
@@ -230,15 +230,17 @@ if(ENABLE_AMGX)
 endif()
 
 # hypre
-include(config/hypre.cmake)
+include(cmake/hypre.cmake)
 
 # external plugins
 file(GLOB plugins LIST_DIRECTORIES true ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/plugins/*)
+set(FOUND_PLUGINS "")
 set(PLUGINS_RPATH "")
 foreach(DIR ${plugins})
   get_filename_component(PLUGIN_NAME ${DIR} NAME)
   IF(IS_DIRECTORY ${DIR})
       message(NOTICE "-- Found plugin: ${PLUGIN_NAME}")
+      list(APPEND FOUND_PLUGINS ${PLUGIN_NAME})
       add_subdirectory(${DIR})
   ELSE()
       CONTINUE()
@@ -291,20 +293,22 @@ endif()
 add_subdirectory(3rd_party/lapack)
 
 # nek5000 dependencies
-include(config/nek5000.cmake)
+include(cmake/nek5000.cmake)
 
-include(config/nekrs.cmake)
+include(cmake/nekrs.cmake)
 
 # Link dependencies
-target_link_libraries(nekrs-lib PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs ${GSLIB} blas lapack ${CMAKE_DL_LIBS})
+target_link_libraries(nekrs-lib PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs ${GSLIB} blas lapack std::filesystem ${CMAKE_DL_LIBS})
+target_include_directories(nekrs-lib PRIVATE ${CMAKE_BINARY_DIR})
 if (NEKRS_BUILD_FLOAT)
-  target_link_libraries(nekrs-lib-fp32 PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs ${GSLIB} blas lapack ${CMAKE_DL_LIBS})
+  target_link_libraries(nekrs-lib-fp32 PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs ${GSLIB} blas lapack std::filesystem ${CMAKE_DL_LIBS})
+  target_include_directories(nekrs-lib-fp32 PRIVATE ${CMAKE_BINARY_DIR})
 endif()
 
 if(OpenMP_FOUND)
-  target_link_libraries(nekrs-lib PUBLIC OpenMP::OpenMP_CXX)
+target_link_libraries(nekrs-lib PRIVATE OpenMP::OpenMP_CXX)
   if (NEKRS_BUILD_FLOAT)
-    target_link_libraries(nekrs-lib-fp32 PUBLIC OpenMP::OpenMP_CXX)
+  target_link_libraries(nekrs-lib-fp32 PRIVATE OpenMP::OpenMP_CXX)
   endif()
 endif()
 
@@ -360,16 +364,28 @@ else(NEKRS_GPU_MPI)
   set(GPU_MPI "0")
 endif()
 
+find_package(Filesystem REQUIRED)
+configure_file(
+  ${CMAKE_CURRENT_LIST_DIR}/src/core/nekrsSys.hpp.in
+  ${CMAKE_BINARY_DIR}/nekrsSys.hpp
+  @ONLY)
 
 configure_file(
-  ${CMAKE_CURRENT_LIST_DIR}/config/nekrs.conf.in
+  ${CMAKE_CURRENT_LIST_DIR}/cmake/nekrs.conf.in
   ${CMAKE_INSTALL_PREFIX}/nekrs.conf
   @ONLY)
 
 file(MAKE_DIRECTORY ${CMAKE_INSTALL_PREFIX}/3rd_party)
 
 install(
-  TARGETS nekrs-lib nekrs-hypre nekrs-hypre-device nekrs-bin axhelm-bin advsub-bin fdm-bin
+  TARGETS nekrs-hypre nekrs-hypre-device axhelm-bin advsub-bin fdm-bin
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+)
+
+install(
+  TARGETS nekrs-lib nekrs-bin
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
@@ -387,21 +403,37 @@ endif()
 # Trailing slash prevents parent directory from being copied
 install(DIRECTORY scripts/ DESTINATION bin
   FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-install(DIRECTORY kernels/ DESTINATION kernels FILES_MATCHING REGEX "\.okl$|\.c|\.h$|\.hpp$|")
+
+file(GLOB_RECURSE KERNEL_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/*.okl)
+set (KERNEL_DIRS "")
+foreach(F IN LISTS KERNEL_FILES)
+  get_filename_component(KERNEL_DIR ${F} DIRECTORY)
+  list(APPEND KERNEL_DIRS ${KERNEL_DIR})
+endforeach()
+foreach(DIR IN LISTS KERNEL_DIRS)
+  file(GLOB KERNEL_DIR_FILES  RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/${DIR}/*)
+  foreach(F IN LISTS KERNEL_DIR_FILES)
+    STRING(REGEX REPLACE "/kernels/" "/" FNEW ${F})
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/${F} ${CMAKE_INSTALL_PREFIX}/kernels/${FNEW} COPYONLY)
+  endforeach()
+endforeach()
+
+install(FILES ${CMAKE_BINARY_DIR}/nekrsSys.hpp DESTINATION include/core)
 install(DIRECTORY src/ DESTINATION include FILES_MATCHING REGEX "\.hpp$|\.h$|\.tpp$")
 install(FILES src/udf/CMakeLists.txt DESTINATION udf)
-install(DIRECTORY src/nekInterface/ DESTINATION nekInterface REGEX "\.hpp$|\.cpp$" EXCLUDE)
+install(DIRECTORY src/nrs/nekInterface/ DESTINATION nekInterface REGEX "\.hpp$|\.cpp$" EXCLUDE)
 install(FILES doc/parHelp.txt DESTINATION doc)
 
 # Examples will follow a different policy -- only copy if source tree is newer than install tree
 file(GLOB_RECURSE EXAMPLE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/examples/*)
-configure_file(${CMAKE_CURRENT_LIST_DIR}/config/install_examples.cmake.in
+configure_file(${CMAKE_CURRENT_LIST_DIR}/cmake/install_examples.cmake.in
         ${CMAKE_CURRENT_BINARY_DIR}/install_examples.cmake @ONLY)
 install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/install_examples.cmake)
 
 message(NOTICE "")
 message(NOTICE "----------------- Summary -----------------")
 message(NOTICE "Installation directory: ${CMAKE_INSTALL_PREFIX}")
+message(NOTICE "plugins: ${FOUND_PLUGINS}")
 message(NOTICE "C compiler: ${CMAKE_C_COMPILER}")
 message(NOTICE "C++ compiler: ${CMAKE_CXX_COMPILER}")
 message(NOTICE "Fortran compiler: ${CMAKE_Fortran_COMPILER}")
@@ -431,10 +463,7 @@ set(TAR_NAME "nekRS-v${PROJECT_VERSION}.tar.gz")
 add_custom_target(tar
   COMMAND ${CMAKE_COMMAND}
       -DDEST_DIR=${DEST_DIR}
-      -DOCCA_SOURCE_DIR=${OCCA_SOURCE_DIR}
-      -DHYPRE_SOURCE_DIR=${HYPRE_SOURCE_DIR}
-      -DNEK5000_SOURCE_DIR=${NEK5000_SOURCE_DIR}
-      -P ${CMAKE_CURRENT_SOURCE_DIR}/config/maketar.cmake
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/maketar.cmake
   COMMAND tar -czf ${TAR_NAME} ${DEST_DIR}
   COMMAND rm -rf ${DEST_DIR}
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

@@ -1,18 +1,11 @@
-#include <cstdio>
-#include <string>
-#include <iostream>
 #include <fstream>
-#include <vector>
-#include <sstream>
-#include <map>
 #include <set>
 #include <utility>
 
-#include "nrs.hpp"
 #include "platform.hpp"
 #include "udf.hpp"
 
-#include <elliptic.h>
+#include "elliptic.hpp"
 #include "alignment.hpp"
 #include "bcMap.hpp"
 
@@ -121,10 +114,10 @@ static std::map<int, std::string> sBcIDToText = {
     {bcMap::bcTypeF, "codedFixedGradient"},
     {bcMap::bcTypeNone, "none"}};
 
-static void v_setup(std::string s);
-static void s_setup(std::string s);
+static void velocitySetup(std::string s);
+static void scalarSetup(std::string s);
 
-static void v_setup(std::string field, std::vector<std::string> slist)
+static void velocitySetup(std::string field, std::vector<std::string> slist)
 {
   int foundAligned = 0;
   int foundUnaligned = 0;
@@ -244,7 +237,7 @@ static void v_setup(std::string field, std::vector<std::string> slist)
              "Aligned together with unaligned mixed boundary types are not supported!");
 }
 
-static void s_setup(std::string field, std::vector<std::string> slist)
+static void scalarSetup(std::string field, std::vector<std::string> slist)
 {
   for (int bid = 0; bid < slist.size(); bid++) {
     std::string key = slist[bid];
@@ -321,11 +314,11 @@ void setupField(std::vector<std::string> slist, std::string field)
   fields.insert(field);
 
   if (field.compare("velocity") == 0) {
-    v_setup(field, slist);
+    velocitySetup(field, slist);
   } else if (field.compare("mesh") == 0) {
-    v_setup(field, slist);
+    velocitySetup(field, slist);
   } else if (field.compare(0, 6, "scalar") == 0) {
-    s_setup(field, slist);
+    scalarSetup(field, slist);
   } else {
     nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "unknown field %s\n", field.c_str());
   }
@@ -463,7 +456,7 @@ void deriveMeshBoundaryConditions(std::vector<std::string> velocityBCs)
 int id(int bid, std::string field)
 {
   if (bid < 1) {
-    return NO_OP;
+    return ellipticBcType::NO_OP;
   }
 
   try {
@@ -478,7 +471,7 @@ int id(int bid, std::string field)
 int ellipticType(int bid, std::string field)
 {
   if (bid < 1) {
-    return NO_OP;
+    return ellipticBcType::NO_OP;
   }
 
   try {
@@ -487,99 +480,99 @@ int ellipticType(int bid, std::string field)
       const std::string fld = (field.compare("x-velocity") == 0) ? "velocity" : "mesh";
       const int bcID = bToBc.at({fld, bid - 1});
 
-      bcType = DIRICHLET;
+      bcType = ellipticBcType::DIRICHLET;
       if (bcID == bcTypeO) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeSYMY || bcID == bcTypeSHLY) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeSYMZ || bcID == bcTypeSHLZ) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeSYM || bcID == bcTypeSHL) {
-        bcType = ZERO_NORMAL;
+        bcType = ellipticBcType::ZERO_NORMAL;
       }
       if (bcID == bcTypeONX) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeON) {
-        bcType = ZERO_TANGENTIAL;
+        bcType = ellipticBcType::ZERO_TANGENTIAL;
       }
       if (bcID == bcTypeNone) {
-        bcType = NO_OP;
+        bcType = ellipticBcType::NO_OP;
       }
     } else if (field.compare("y-velocity") == 0 || field.compare("y-mesh") == 0) {
       const std::string fld = (field.compare("y-velocity") == 0) ? "velocity" : "mesh";
       const int bcID = bToBc.at({fld, bid - 1});
 
-      bcType = DIRICHLET;
+      bcType = ellipticBcType::DIRICHLET;
       if (bcID == bcTypeO) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeSYMX || bcID == bcTypeSHLX) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeSYMZ || bcID == bcTypeSHLZ) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeSYM || bcID == bcTypeSHL) {
-        bcType = ZERO_NORMAL;
+        bcType = ellipticBcType::ZERO_NORMAL;
       }
       if (bcID == bcTypeONY) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeON) {
-        bcType = ZERO_TANGENTIAL;
+        bcType = ellipticBcType::ZERO_TANGENTIAL;
       }
       if (bcID == bcTypeNone) {
-        bcType = NO_OP;
+        bcType = ellipticBcType::NO_OP;
       }
     } else if (field.compare("z-velocity") == 0 || field.compare("z-mesh") == 0) {
       const std::string fld = (field.compare("z-velocity") == 0) ? "velocity" : "mesh";
       const int bcID = bToBc.at({fld, bid - 1});
 
-      bcType = DIRICHLET;
+      bcType = ellipticBcType::DIRICHLET;
       if (bcID == bcTypeO) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeSYMX || bcID == bcTypeSHLX) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeSYMY || bcID == bcTypeSHLY) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeSYM || bcID == bcTypeSHL) {
-        bcType = ZERO_NORMAL;
+        bcType = ellipticBcType::ZERO_NORMAL;
       }
       if (bcID == bcTypeONZ) {
-        bcType = NEUMANN;
+        bcType = ellipticBcType::NEUMANN;
       }
       if (bcID == bcTypeON) {
-        bcType = ZERO_TANGENTIAL;
+        bcType = ellipticBcType::ZERO_TANGENTIAL;
       }
       if (bcID == bcTypeNone) {
-        bcType = NO_OP;
+        bcType = ellipticBcType::NO_OP;
       }
     } else if (field.compare("pressure") == 0) {
       const int bcID = bToBc.at({"velocity", bid - 1});
-      bcType = NEUMANN;
+      bcType = ellipticBcType::NEUMANN;
       if (bcID == bcTypeO || bcID == bcTypeONX || bcID == bcTypeONY || bcID == bcTypeONZ ||
           bcID == bcTypeON) {
-        bcType = DIRICHLET;
+        bcType = ellipticBcType::DIRICHLET;
       }
       if (bcID == bcTypeNone) {
-        bcType = NO_OP;
+        bcType = ellipticBcType::NO_OP;
       }
     } else if (field.compare(0, 6, "scalar") == 0) {
       const int bcID = bToBc.at({field, bid - 1});
 
-      bcType = NEUMANN;
+      bcType = ellipticBcType::NEUMANN;
       if (bcID == bcTypeS || bcID == bcTypeINTS) {
-        bcType = DIRICHLET;
+        bcType = ellipticBcType::DIRICHLET;
       }
       if (bcID == bcTypeNone) {
-        bcType = NO_OP;
+        bcType = ellipticBcType::NO_OP;
       }
     }
 

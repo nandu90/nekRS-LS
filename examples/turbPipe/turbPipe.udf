@@ -1,7 +1,6 @@
 #include "velRecycling.hpp"
 #include "tavg.hpp"
 
-static dfloat zLen;
 static int NSLABS;
 static int NELSLAB;
 
@@ -11,10 +10,17 @@ static int NELSLAB;
 
 #endif
 
-void UDF_Setup(nrs_t *nrs)
+void UDF_Setup0(MPI_Comm comm, setupAide &options)
 {
+  platform->par->extract("casedata", "nslabs", NSLABS);
+  platform->par->extract("casedata", "nelslab", NELSLAB);
+}
+
+void UDF_Setup()
+{
+  auto nrs = dynamic_cast<nrs_t*>(platform->solver);
   mesh_t *mesh = nrs->meshV;
-  zLen = abs( 
+  const auto zLen = abs( 
               platform->linAlg->max(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm) - 
               platform->linAlg->min(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm)
             ); 
@@ -57,27 +63,28 @@ void UDF_Setup(nrs_t *nrs)
     }
   }
 
-  nrs->o_usrwrk = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset);
+  nrs->o_usrwrk.resize(nrs->NVfields * nrs->fieldOffset);
 
   // velocity recycling
   const dfloat uBulk = 1.0;
   const int bID = 1;
   dfloat zRecycLayer = 0.25 * zLen;
 #if 0
-  const hlong offset = NELSLAB * round(NSLABS * zRecycLayer / zLen);
-  velRecycling::setup(nrs, nrs->o_usrwrk, offset, bID, uBulk);
+  // does not work with current mesh
+  const hlong offset = NELSLAB * std::round(NSLABS * zRecycLayer / zLen);
+  velRecycling::setup(nrs->o_usrwrk, offset, bID, uBulk);
 #else
-  velRecycling::setup(nrs, nrs->o_usrwrk, 0.0, 0.0, zRecycLayer, bID, uBulk);
+  velRecycling::setup(nrs->o_usrwrk, 0.0, 0.0, zRecycLayer, bID, uBulk);
 #endif
 
   {
-    std::vector<std::vector<occa::memory>> tavgFields;
+    std::vector< std::vector<deviceMemory<dfloat>> > tavgFields;
 
-    auto o_u    = nrs->o_U.slice(0 * nrs->fieldOffset , nrs->fieldOffset);
-    auto o_v    = nrs->o_U.slice(1 * nrs->fieldOffset , nrs->fieldOffset);
-    auto o_w    = nrs->o_U.slice(2 * nrs->fieldOffset , nrs->fieldOffset);
+    deviceMemory<dfloat> o_u(nrs->o_U.slice(0 * nrs->fieldOffset , nrs->fieldOffset));
+    deviceMemory<dfloat> o_v(nrs->o_U.slice(1 * nrs->fieldOffset , nrs->fieldOffset));
+    deviceMemory<dfloat> o_w(nrs->o_U.slice(2 * nrs->fieldOffset , nrs->fieldOffset));
 
-    auto o_temp = nrs->cds->o_S.slice(0 * cds->fieldOffset[0], cds->fieldOffset[0]);
+    deviceMemory<dfloat> o_temp(nrs->cds->o_S.slice(0 * nrs->cds->fieldOffset[0], nrs->cds->fieldOffset[0]));
 
     tavgFields.push_back({o_u});
     tavgFields.push_back({o_v});
@@ -93,12 +100,13 @@ void UDF_Setup(nrs_t *nrs)
     tavgFields.push_back({o_v, o_w});
     tavgFields.push_back({o_w, o_v});
 
-    tavg::setup(nrs, tavgFields);
+    tavg::setup(nrs->fieldOffset, tavgFields);
   }
 }
 
-void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
+void UDF_ExecuteStep(double time, int tstep)
 {
+  auto nrs = dynamic_cast<nrs_t*>(platform->solver);
   mesh_t *mesh = nrs->meshV;
 
   velRecycling::copy();
@@ -107,7 +115,7 @@ void UDF_ExecuteStep(nrs_t *nrs, double time, int tstep)
   }
 
   if (nrs->isOutputStep) {
-    occa::memory o_UZ = nrs->o_U + 2 * nrs->fieldOffset;
+    auto o_UZ = nrs->o_U + 2 * nrs->fieldOffset;
     const dfloat ubar =
         platform->linAlg->innerProd(mesh->Nlocal, o_UZ, mesh->o_LMM, platform->comm.mpiComm) / mesh->volume;
     if (platform->comm.mpiRank == 0) {

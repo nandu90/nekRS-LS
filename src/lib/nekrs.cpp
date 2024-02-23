@@ -1,6 +1,4 @@
-#include <stdlib.h>
-#include <filesystem>
-#include <functional>
+#include "platform.hpp"
 #include "nrs.hpp"
 #include "nekInterfaceAdapter.hpp"
 #include "printHeader.hpp"
@@ -10,23 +8,19 @@
 #include "re2Reader.hpp"
 #include "configReader.hpp"
 #include "re2Reader.hpp"
-#include "timeStepper.hpp"
 #include "platform.hpp"
 #include "linAlg.hpp"
-#include "cfl.hpp"
 #include "AMGX.hpp"
 #include "hypreWrapper.hpp"
 #include "hypreWrapperDevice.hpp"
 
-namespace fs = std::filesystem;
-
-// extern variable from nekrsSys.hpp
+// define extern variable from nekrsSys.hpp
 platform_t *platform;
 
 namespace
 {
 
-static nrs_t *nrs;
+static nrs_t *nrs = nullptr;
 
 static int rank, size;
 static MPI_Comm commg, comm;
@@ -57,19 +51,11 @@ setupAide *setDefaultSettings(std::string casename)
 
   options->setArgs("FORMAT", std::string("1.0"));
 
-  options->setArgs("CONSTANT FLOW RATE", "FALSE");
+  options->setArgs("EQUATION TYPE", "NAVIERSTOKES");
+
   options->setArgs("ELEMENT TYPE", std::string("12")); /* HEX */
   options->setArgs("ELEMENT MAP", std::string("ISOPARAMETRIC"));
   options->setArgs("MESH DIMENSION", std::string("3"));
-
-  options->setArgs("NUMBER OF SCALARS", "0");
-
-  options->setArgs("BDF ORDER", "2");
-  options->setArgs("EXT ORDER", "3");
-
-  options->setArgs("SUBCYCLING STEPS", "0");
-  options->setArgs("SUBCYCLING TIME ORDER", "4");
-  options->setArgs("SUBCYCLING TIME STAGE NUMBER", "4");
 
   options->setArgs("CASENAME", casename);
   options->setArgs("UDF OKL FILE", casename + ".oudf");
@@ -85,28 +71,21 @@ setupAide *setDefaultSettings(std::string casename)
   options->setArgs("STDOUT PAR", "TRUE");
   options->setArgs("STDOUT UDF", "TRUE");
 
-  options->setArgs("ADVECTION", "TRUE");
-  options->setArgs("ADVECTION TYPE", "CUBATURE+CONVECTIVE");
-
   options->setArgs("SOLUTION OUTPUT INTERVAL", "-1");
   options->setArgs("SOLUTION OUTPUT CONTROL", "STEPS");
 
   options->setArgs("START TIME", "0.0");
 
-  options->setArgs("MIN ADJUST DT RATIO", "0.5");
-  options->setArgs("MAX ADJUST DT RATIO", "1.5");
-
-  options->setArgs("MESH SOLVER", "NONE");
-  options->setArgs("MOVING MESH", "FALSE");
-
   options->setArgs("ENABLE GS COMM OVERLAP", "TRUE");
-
-  options->setArgs("VARIABLE DT", "FALSE");
 
   options->setArgs("CHECKPOINT OUTPUT MESH", "FALSE");
 
   const auto dropTol = 5.0 * std::numeric_limits<pfloat>::epsilon();
-  options->setArgs("AMG DROP TOLERANCE", to_string_f(dropTol));
+  options->setArgs("AMG DROP TOLERANCE", to_string_f(setPrecision(dropTol,2)));
+
+  if (options->compareArgs("EQUATION TYPE", "NAVIERSTOKES") || options->compareArgs("EQUATION TYPE", "STOKES")) {
+    nrsSetDefaultSettings(options);
+  }
 
   return options;
 }
@@ -193,12 +172,16 @@ void setup(MPI_Comm commg_in,
     options->setArgs("DEVICE NUMBER", _deviceID);
   }
 
+  if (debug) {
+    options->setArgs("VERBOSE", "TRUE");
+  }
+
   // setup platform (requires THREAD MODEL)
   platform = platform_t::getInstance(*options, commg, comm);
   platform->par = par;
 
-  if (debug) {
-    platform->options.setArgs("VERBOSE", "TRUE");
+  if (options->compareArgs("EQUATION TYPE", "NAVIERSTOKES") || options->compareArgs("EQUATION TYPE", "STOKES")) {
+    nrs = new nrs_t();
   }
 
   int buildRank = rank;
@@ -232,10 +215,16 @@ void setup(MPI_Comm commg_in,
   platform->options.getArgs("UDF FILE", udfFile);
   if (!udfFile.empty()) {
     udfBuild(udfFile, platform->options);
+  }
+
+  if (platform->cacheBcast || platform->cacheLocal)
+    platform->bcastKernelSources();
+
+  if (!udfFile.empty()) {
     udfLoad();
   }
 
-  // here we might access some nek variables
+  // here we might access nek variables
   if (udf.setup0) {
     udf.setup0(comm, platform->options);
   }
@@ -272,10 +261,8 @@ void setup(MPI_Comm commg_in,
 
   platform->linAlg = linAlg_t::getInstance();
 
-  {
-    int result = 0;
-    MPI_Comm_compare(commg, comm, &result);
-    nrs = new nrs_t(comm, (result == MPI_UNEQUAL), platform->options);
+  if (nrs) {
+    nrs->init();
   }
 
   if (neknekCoupled()) {
@@ -301,7 +288,7 @@ void setup(MPI_Comm commg_in,
     int rankLocal;
     MPI_Comm_rank(platform->comm.mpiCommLocal, &rankLocal);
     if (rankLocal == 0) {
-      for (auto &entry : std::filesystem::directory_iterator(platform->tmpDir)) {
+      for (auto &entry : fs::directory_iterator(platform->tmpDir)) {
         fs::remove_all(entry.path());
       }
     }
@@ -325,7 +312,7 @@ void udfExecuteStep(double time, int tstep, int isOutputStep)
 
   platform->timer.tic("udfExecuteStep", 1);
   if (udf.executeStep) {
-    udf.executeStep(nrs, time, tstep);
+    udf.executeStep(time, tstep);
   }
   platform->timer.toc("udfExecuteStep");
 
@@ -341,36 +328,48 @@ void nekUserchk(void)
 
 double dt(int tstep)
 {
-  if (platform->options.compareArgs("VARIABLE DT", "TRUE")) {
-    if (tstep == 1) {
-      double initialDt = 0.0;
-      platform->options.getArgs("DT", initialDt);
-      if (initialDt > 0.0) {
-        nrs->dt[0] = initialDt;
-        return nrs->dt[0];
-      }
-    }
-    timeStepper::adjustDt(nrs, tstep);
+  dfloat dt_ = -1;
+  platform->options.getArgs("DT", dt_);
 
-    dfloat maxDt = 0;
-    platform->options.getArgs("MAX DT", maxDt);
-    if (maxDt > 0) {
-      nrs->dt[0] = std::min(nrs->dt[0], maxDt);
+  if (platform->options.compareArgs("VARIABLE DT", "TRUE")) {
+    if (platform->options.getArgs("DT").empty() && tstep == 1 || tstep > 1) {
+      dt_ = nrs->adjustDt(tstep);
+
+      // limit dt change
+      dfloat maxAdjustDtRatio = 1;
+      dfloat minAdjustDtRatio = 1;
+      platform->options.getArgs("MAX ADJUST DT RATIO", maxAdjustDtRatio);
+      platform->options.getArgs("MIN ADJUST DT RATIO", minAdjustDtRatio);
+ 
+      if (tstep > 1) {
+        dt_ = std::max(dt_, minAdjustDtRatio * nrs->dt[0]);
+      }
+      if (tstep > 1) {
+        dt_ = std::min(dt_, maxAdjustDtRatio * nrs->dt[0]);
+      }
+ 
+      dfloat maxDt = 0;
+      platform->options.getArgs("MAX DT", maxDt);
+      if (maxDt > 0) {
+        dt_ = std::min(nrs->dt[0], dt_);
+      }
     }
   }
 
-  nekrsCheck(nrs->dt[0] < 1e-10 || std::isnan(nrs->dt[0]) || std::isinf(nrs->dt[0]),
+  nekrsCheck(dt_ < 1e-10 || std::isnan(dt_) || std::isinf(dt_),
              platform->comm.mpiComm,
              EXIT_FAILURE,
              "Invalid time step size %.2e\n",
-             nrs->dt[0]);
+             dt_);
 
   // during a neknek simulation, sync dt across all ranks
   if (nrs->neknek) {
-    MPI_Allreduce(MPI_IN_PLACE, &nrs->dt[0], 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiCommParent);
+    MPI_Allreduce(MPI_IN_PLACE, &dt_, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiCommParent);
   }
 
-  return nrs->dt[0];
+  // limit dt to 5 significant digits
+  dt_ = setPrecision(dt_, 5);
+  return dt_;
 }
 
 double writeInterval(void)
@@ -457,7 +456,7 @@ void lastStep(int val)
   nrs->lastStep = val;
 }
 
-int lastStep(double time, int tstep, double elapsedTime)
+int lastStep(double timeNew, int tstep, double elapsedTime)
 {
   if (!platform->options.getArgs("STOP AT ELAPSED TIME").empty()) {
     double maxElaspedTime;
@@ -466,9 +465,7 @@ int lastStep(double time, int tstep, double elapsedTime)
       nrs->lastStep = 1;
     }
   } else if (endTime() >= 0) {
-    const double eps = 1e-12;
-    const double timeNew =
-        time + setPrecision(nrs->dt[0], std::numeric_limits<decltype(nrs->dt[0])>::digits10 + 1);
+    const double eps = 1e-10;
     nrs->lastStep = fabs(timeNew - endTime()) < eps || timeNew > endTime();
   } else {
     nrs->lastStep = (tstep == numSteps());
@@ -480,14 +477,9 @@ int lastStep(double time, int tstep, double elapsedTime)
   return nrs->lastStep;
 }
 
-void *nekPtr(const char *id)
+void *platformPtr(void)
 {
-  return nek::ptr(id);
-}
-
-void *nrsPtr(void)
-{
-  return nrs;
+  return platform;
 }
 
 int runTimeStatFreq()
@@ -513,7 +505,7 @@ int updateFileCheckFreq()
 
 void printRuntimeStatistics(int step)
 {
-  platform->timer.printRunStat(step);
+  platform->solver->printRunStat(step);
 }
 
 void processUpdFile()
@@ -529,9 +521,8 @@ void processUpdFile()
       fsize = ftell(f);
       fseek(f, 0, SEEK_SET);
       rbuf = new char[fsize];
-      fread(rbuf, 1, fsize, f);
+      const auto readCnt = fread(rbuf, 1, fsize, f);
       fclose(f);
-      remove(updFile.c_str());
     }
   }
 
@@ -593,7 +584,7 @@ void processUpdFile()
 
 void printInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo)
 {
-  timeStepper::printInfo(nrs, time, tstep, printStepInfo, printVerboseInfo);
+  nrs->printInfo(time, tstep, printStepInfo, printVerboseInfo);
 }
 
 void verboseInfo(bool enabled)
@@ -621,13 +612,13 @@ int exitValue()
 
 void initStep(double time, double dt, int tstep)
 {
-  timeStepper::initStep(nrs, time, dt, tstep);
+  nrs->initStep(time, dt, tstep);
   currDt = dt;
 }
 
 bool runStep(std::function<bool(int)> convergenceCheck, int corrector)
 {
-  return timeStepper::runStep(nrs, convergenceCheck, corrector);
+  return nrs->runStep(convergenceCheck, corrector);
 }
 
 bool runStep(int corrector)
@@ -636,21 +627,21 @@ bool runStep(int corrector)
   auto _nrs = &nrs;
   auto _udf = &udf;
 
-  std::function<bool(int)> convergenceCheck = [](int corrector) -> bool {
-    if (udf.timeStepConverged) {
-      return udf.timeStepConverged(nrs, corrector);
+  std::function<bool(int)> check = [](int corrector) -> bool {
+    if (nrs->userConvergenceCheck) {
+      return nrs->userConvergenceCheck(corrector);
     } else {
       return true;
     }
   };
 
-  return timeStepper::runStep(nrs, convergenceCheck, corrector);
+  return nrs->runStep(check, corrector);
 }
 
 double finishStep()
 {
-  timeStepper::finishStep(nrs);
-  return nrs->timePrevious + setPrecision(currDt, std::numeric_limits<decltype(nrs->dt[0])>::digits10 + 1);
+  nrs->finishStep();
+  return nrs->timePrevious + setPrecision(currDt, 5);
 }
 
 bool stepConverged()
@@ -670,10 +661,8 @@ int finalize()
     nek::finalize();
   }
 
-  int rankGlobal;
-  MPI_Comm_rank(platform->comm.mpiCommParent, &rankGlobal);
   MPI_Allreduce(MPI_IN_PLACE, &exitValue, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
-  if (rankGlobal == 0) {
+  if (platform->comm.mpiRank == 0) {
     std::cout << "finished with exit code " << exitValue << std::endl;
   }
 

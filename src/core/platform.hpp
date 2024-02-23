@@ -1,19 +1,17 @@
 #ifndef platform_hpp_
 #define platform_hpp_
-#include <occa.hpp>
-#include <mpi.h>
-#include "flopCounter.hpp"
+#include <set>
+#include <memory>
 #include "nekrsSys.hpp"
+#include "flopCounter.hpp"
 #include "timer.hpp"
 #include "comm.hpp"
 #include "inipp.hpp"
 #include "device.hpp"
 #include "device.tpp"
+#include "solver.hpp"
 #include "kernelRequestManager.hpp"
-#include <set>
-#include <map>
-#include <vector>
-#include <memory>
+
 class setupAide;
 class linAlg_t;
 class flopCounter_t;
@@ -21,6 +19,7 @@ class flopCounter_t;
 struct platform_t {
 public:
   platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm);
+  void bcastKernelSources();
 
   static platform_t *getInstance(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   {
@@ -48,6 +47,7 @@ public:
   occa::memoryPool o_memPool;
   kernelRequestManager_t kernels;
   inipp::Ini *par;
+  solver_t *solver;
   bool serial;
   linAlg_t *linAlg;
   std::unique_ptr<flopCounter_t> flopCounter;
@@ -59,7 +59,11 @@ public:
 
   occa::kernel copyDfloatToPfloatKernel;
   occa::kernel copyPfloatToDfloatKernel;
+  occa::kernel copyDfloatToDoubleKernel;
 
   void compileKernels();
 };
 #endif
+
+#include "occaWrapper.hpp"
+

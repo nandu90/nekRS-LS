@@ -1,7 +1,7 @@
 #if !defined(nekrs_re2reader_hpp_)
 #define nekrs_re2reader_hpp_
 
-#include "nrs.hpp"
+#include "nekrsSys.hpp"
 
 namespace re2 
 {

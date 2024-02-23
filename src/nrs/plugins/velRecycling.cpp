@@ -29,7 +29,7 @@ static bool setupCalled = false;
 int Nblock;
 } // namespace
 
-static void setup(nrs_t *nrs_, occa::memory &o_wrk_, const int bID_, const dfloat wbar_)
+static void _setup(occa::memory &o_wrk_, const int bID_, const dfloat wbar_)
 {
   static bool isInitialized = false;
   if (isInitialized) {
@@ -37,7 +37,7 @@ static void setup(nrs_t *nrs_, occa::memory &o_wrk_, const int bID_, const dfloa
   }
   isInitialized = true;
 
-  nrs = nrs_;
+  nrs = dynamic_cast<nrs_t*>(platform->solver);
   o_wrk = o_wrk_;
   bID = bID_;
   wbar = wbar_;
@@ -112,16 +112,21 @@ void velRecycling::copy()
   auto flux = mesh->surfaceIntegralVector(nrs->fieldOffset, o_bID.length(), o_bID, o_wrk);
 
   const dfloat scale = -wbar * area / flux[0];
+  nekrsCheck(std::isnan(scale) || std::isinf(scale), 
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "unreasonable scaling factor!");
+
   platform->linAlg->scale(nrs->NVfields * nrs->fieldOffset, scale, o_wrk);
 }
 
-void velRecycling::setup(nrs_t *nrs_,
-                         occa::memory o_wrk_,
+void velRecycling::setup(occa::memory o_wrk_,
                          const hlong eOffset,
                          const int bID_,
                          const dfloat wbar_)
 {
-  setup(nrs_, o_wrk_, bID_, wbar_);
+  _setup(o_wrk_, bID_, wbar_);
 
   mesh_t *mesh = nrs->meshV;
 
@@ -160,15 +165,14 @@ void velRecycling::setup(nrs_t *nrs_,
   free(ids);
 }
 
-void velRecycling::setup(nrs_t *nrs_,
-                         occa::memory o_wrk_,
+void velRecycling::setup(occa::memory o_wrk_,
                          const dfloat xOffset,
                          const dfloat yOffset,
                          const dfloat zOffset,
                          const int bID_,
                          const dfloat wbar_)
 {
-  setup(nrs_, o_wrk_, bID_, wbar_);
+  _setup(o_wrk_, bID_, wbar_);
 
   mesh_t *mesh = nrs->meshV;
 
@@ -208,7 +212,7 @@ void velRecycling::setup(nrs_t *nrs_,
   }
   o_maskIds.copyFrom(maskIds.data());
 
-  interp = new pointInterpolation_t(nrs);
+  interp = new pointInterpolation_t(mesh);
 
   auto o_xBid = platform->device.malloc<dfloat>(nPoints, xBid.data());
   auto o_yBid = platform->device.malloc<dfloat>(nPoints, yBid.data());

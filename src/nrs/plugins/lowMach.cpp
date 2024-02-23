@@ -57,7 +57,7 @@ void lowMach::buildKernel(occa::properties kernelInfo)
   buildKernelCalled = true;
 }
 
-void lowMach::setup(nrs_t *nrs, dfloat alpha_, occa::memory &o_beta_, occa::memory &o_kappa_)
+void lowMach::setup(dfloat alpha_, const occa::memory& o_beta_, const occa::memory& o_kappa_)
 {
   static bool isInitialized = false;
   if (isInitialized) {
@@ -65,15 +65,15 @@ void lowMach::setup(nrs_t *nrs, dfloat alpha_, occa::memory &o_beta_, occa::memo
   }
   isInitialized = true;
 
-  _nrs = nrs;
+  _nrs = dynamic_cast<nrs_t*>(platform->solver);;
 
   alpha0 = alpha_;
-  nrs->alpha0Ref = alpha0;
+  _nrs->alpha0Ref = alpha0;
   o_beta = o_beta_;
   o_kappa = o_kappa_;
 
   the_linAlg = platform->linAlg;
-  mesh_t *mesh = nrs->meshV;
+  mesh_t *mesh = _nrs->meshV;
   int err = 1;
   if (platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE")) {
     err = 0;
@@ -96,8 +96,9 @@ void lowMach::setup(nrs_t *nrs, dfloat alpha_, occa::memory &o_beta_, occa::memo
   setupCalled = true;
 }
 
-void lowMach::qThermalSingleComponent(double time, occa::memory &o_div)
+void lowMach::qThermalSingleComponent(double time)
 {
+  auto o_div = _nrs->o_div;
   nekrsCheck(!setupCalled || !buildKernelCalled,
              MPI_COMM_SELF,
              EXIT_FAILURE,
@@ -110,13 +111,11 @@ void lowMach::qThermalSingleComponent(double time, occa::memory &o_div)
   mesh_t *mesh = nrs->meshV;
   linAlg_t *linAlg = platform->linAlg;
 
-  bool rhsCVODE = false;
   std::string scope = "udfDiv::";
+
+  bool rhsCVODE = false;
   if (cds->cvode) {
     rhsCVODE = cds->cvode->isRhsEvaluation();
-    if (rhsCVODE) {
-      scope = cds->cvode->scope() + "::";
-    }
   }
 
   auto o_gradT = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
@@ -131,9 +130,12 @@ void lowMach::qThermalSingleComponent(double time, occa::memory &o_div)
 
   auto o_src = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
   platform->linAlg->fill(mesh->Nlocal, 0.0, o_src);
-  if (udf.sEqnSource) {
+  if (cds->userSource) {
     platform->timer.tic(scope + "udfSEqnSource", 1);
-    udf.sEqnSource(nrs, time, cds->o_S, o_src);
+    auto o_saveFS = cds->o_NLT;
+    cds->o_NLT = o_src;
+    cds->userSource(time);
+    cds->o_NLT = o_saveFS;
     platform->timer.toc(scope + "udfSEqnSource");
   }
 
@@ -161,9 +163,15 @@ void lowMach::qThermalSingleComponent(double time, occa::memory &o_div)
   double surfaceFlops = 0.0;
 
   if (nrs->pSolver) {
-    if (!nrs->pSolver->allNeumann) {
+    if (!nrs->pSolver->nullSpace()) {
       return;
     }
+
+    nekrsCheck(rhsCVODE,
+               MPI_COMM_SELF,
+               EXIT_FAILURE,
+               "%s\n",
+               "computing p0th and dp0thdt using CVODE is not supported!");
 
     const auto termQ = [&]() {
       auto o_tmp = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
@@ -186,7 +194,7 @@ void lowMach::qThermalSingleComponent(double time, occa::memory &o_div)
     double p0thHelperFlops = 4 * mesh->Nlocal;
 
     const auto flux =
-        mesh->surfaceIntegralVector(nrs->fieldOffset, o_bID.length(), o_bID, rhsCVODE ? nrs->o_U : nrs->o_Ue);
+        mesh->surfaceIntegralVector(nrs->fieldOffset, o_bID.length(), o_bID, nrs->o_Ue);
     const auto termV = std::accumulate(flux.begin(), flux.end(), 0.0);
 
     double surfaceFluxFlops = 13 * mesh->Nq * mesh->Nq;
@@ -197,24 +205,21 @@ void lowMach::qThermalSingleComponent(double time, occa::memory &o_div)
     o_tmp1.free();
     o_tmp2.free();
 
-    const auto *coeff = rhsCVODE ? nrs->cvode->coeffBDF() : nrs->coeffBDF;
+    const auto *coeff = nrs->coeffBDF;
     dfloat Saqpq = 0.0;
     for (int i = 0; i < nrs->nBDF; ++i) {
       Saqpq += coeff[i] * nrs->p0th[i];
     }
 
-    const auto g0 = rhsCVODE ? nrs->cvode->g0() : nrs->g0;
-    const auto dt = rhsCVODE ? nrs->cvode->dt() : nrs->dt[0];
+    const auto g0 = nrs->g0;
+    const auto dt = nrs->dt[0];
 
     const auto pcoef = (g0 - dt * prhs);
     const auto p0thn = Saqpq / pcoef;
 
-    // only update p0th when not inside a CVODE evaluation
-    if (!rhsCVODE) {
-      nrs->p0th[2] = nrs->p0th[1];
-      nrs->p0th[1] = nrs->p0th[0];
-      nrs->p0th[0] = p0thn;
-    }
+    nrs->p0th[2] = nrs->p0th[1];
+    nrs->p0th[1] = nrs->p0th[0];
+    nrs->p0th[0] = p0thn;
 
     nrs->dp0thdt = prhs * p0thn;
 

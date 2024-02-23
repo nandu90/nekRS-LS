@@ -1,17 +1,6 @@
-#include <cstdio>
-#include <string>
-#include <vector>
-#include <iostream>
-#include <fstream>
-#include <unistd.h>
-#include <getopt.h>
-
-#include <stdlib.h>
+#include "nekrsSys.hpp"
 
 #include "inipp.hpp"
-#include "nrs.hpp"
-#include <filesystem>
-namespace fs = std::filesystem;
 
 #define UPPER(a)                                                                                             \
 {                                                                                                            \
@@ -51,7 +40,7 @@ void configRead(MPI_Comm comm)
       fsize = ftell(f);
       fseek(f, 0, SEEK_SET);
       rbuf = new char[fsize];
-      fread(rbuf, 1, fsize, f);
+      const auto readCnt = fread(rbuf, 1, fsize, f);
       fclose(f);
     }
     MPI_Bcast(&fsize, sizeof(fsize), MPI_BYTE, 0, comm);
@@ -116,7 +105,9 @@ void configRead(MPI_Comm comm)
 
   ini.extract("general", "nekrs_udf_includes", buf);
   if (getenv("NEKRS_UDF_INCLUDES")) {
-    buf = std::string(getenv("NEKRS_UDF_INCLUDES")) + " " + buf;
+    if (!buf.empty()) {
+      buf = std::string(getenv("NEKRS_UDF_INCLUDES")) + " " + buf;
+    }
   }
   if (!buf.empty()) {
     setenv("NEKRS_UDF_INCLUDES", buf.c_str(), 1);
@@ -124,7 +115,9 @@ void configRead(MPI_Comm comm)
 
   ini.extract("general", "nekrs_udf_libs", buf);
   if (getenv("NEKRS_UDF_LDFLAGS")) {
-    buf = std::string(getenv("NEKRS_UDF_LDFLAGS")) + " " + buf;
+    if (!buf.empty()) {
+      buf = std::string(getenv("NEKRS_UDF_LDFLAGS")) + " " + buf;
+    }
   }
   if (!buf.empty()) {
     setenv("NEKRS_UDF_LDFLAGS", buf.c_str(), 1);

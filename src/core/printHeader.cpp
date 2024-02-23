@@ -1,5 +1,4 @@
-#include <stdlib.h>
-#include "nrs.hpp"
+#include "nekrsSys.hpp"
 
 void printHeader()
 {
@@ -9,7 +8,7 @@ void printHeader()
             << R"( / / / //  __// ,<  / _, _/___/ / )" << std::endl
             << R"(/_/ /_/ \___//_/|_|/_/ |_|/____/  )"
             << "v" << NEKRS_VERSION << "." << NEKRS_SUBVERSION << "." << NEKRS_PATCHVERSION 
-	    << " (" GITCOMMITHASH << ")" << std::endl
+	    << " (" << GITCOMMITHASH << ")" << std::endl
             << std::endl
             << "COPYRIGHT (c) 2019-2024 UCHICAGO ARGONNE, LLC" << std::endl
             << std::endl;

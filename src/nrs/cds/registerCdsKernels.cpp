@@ -1,4 +1,3 @@
-#include <nrs.hpp>
 #include <compileKernels.hpp>
 #include "re2Reader.hpp"
 #include "benchmarkAdvsub.hpp"
@@ -93,36 +92,12 @@ void registerCdsKernels(occa::properties kernelInfoBC)
     fileName = oklpath + "/core/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, meshProps);
 
-    {
-      occa::properties prop = kernelInfo;
-      const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
-      prop["defines/p_MovingMesh"] = movingMesh;
-      prop["defines/p_nEXT"] = nEXT;
-      prop["defines/p_nBDF"] = nBDF;
-      if (Nsubsteps)
-        prop["defines/p_SUBCYCLING"] = 1;
-      else
-        prop["defines/p_SUBCYCLING"] = 0;
-
-      kernelName = "sumMakef";
-      fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
-      platform->kernels.add(section + kernelName, fileName, prop);
-    }
-
     kernelName = "neumannBC" + suffix;
     fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, kernelInfoBC);
     kernelName = "dirichletBC";
     fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
     platform->kernels.add(section + kernelName, fileName, kernelInfoBC);
-
-    kernelName = "setEllipticCoeff";
-    fileName = oklpath + "/core/" + kernelName + ".okl";
-    platform->kernels.add(section + kernelName, fileName, kernelInfo);
-
-    kernelName = "filterRT" + suffix;
-    fileName = oklpath + "/nrs/cds/regularization/" + kernelName + ".okl";
-    platform->kernels.add(section + kernelName, fileName, meshProps);
 
     kernelName = "nStagesSum3";
     fileName = oklpath + "/core/" + kernelName + ".okl";
@@ -170,4 +145,6 @@ void registerCdsKernels(occa::properties kernelInfoBC)
       platform->kernels.add(section + kernelName, fileName, prop);
     }
   }
+
+  registerCvodeKernels();
 }

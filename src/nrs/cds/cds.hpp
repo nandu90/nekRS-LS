@@ -1,41 +1,54 @@
 #ifndef CDS_H
 #define CDS_H
 
-#include "nekrsSys.hpp"
-#include "mesh3D.h"
-#include "elliptic.h"
-#include "neknek.hpp"
+#include "platform.hpp"
+#include "solver.hpp"
+#include "elliptic.hpp"
 #include "cvode.hpp"
 
 struct cdsConfig_t {
+
   int Nscalar;
   mesh_t *mesh;
   mesh_t *meshV;
-  int dim;
   dfloat *g0;
-  dfloat *idt;
   dfloat *dt;
   int nBDF;
+  dfloat *coeffBDF;
   occa::memory o_coeffBDF;
   int nEXT;
+  dfloat *coeffEXT;
   occa::memory o_coeffEXT;
-  occa::memory *o_usrwrk;
+  deviceMemory<dfloat> *o_usrwrk;
   dlong vFieldOffset;
   dlong vCubatureOffset;
   dlong fieldOffset;
   int Nsubsteps;
-  occa::memory o_ellipticCoeff;
   occa::memory o_U;
   occa::memory o_Ue;
   occa::memory o_Urst;
-  occa::memory o_relUrst;
+  occa::memory o_relUrst; 
+
+  bool dpdt;
+  dfloat *dp0thdt;
+  dfloat *alpha0Ref;
 };
 
-struct cds_t {
+class cds_t : public solver_t {
+
+using userSource_t = std::function<void(double)>;
+using userProperties_t = std::function<void(double)>;
+
+public:
   static constexpr double targetTimeBenchmark{0.2};
 
   cds_t(cdsConfig_t &cfg);
-  occa::memory solve(int i, double time, int stage);
+  void solve(double time, int stage);
+  void makeNLT(double time, int tstep, occa::memory& o_Subcycling);
+  occa::memory advectionSubcyling(int nEXT, double time, int scalarIdx);
+
+  userSource_t userSource = nullptr;
+  userProperties_t userProperties = nullptr;
 
   std::vector<mesh_t *> mesh;
   std::vector<dlong> fieldOffset;
@@ -43,23 +56,23 @@ struct cds_t {
   occa::memory o_fieldOffsetScan;
   dlong fieldOffsetSum;
   mesh_t *meshV;
-  std::vector<elliptic_t *> solver;
-  neknek_t *neknek = nullptr;
+  std::vector<elliptic *> solver;
   cvode_t *cvode = nullptr;
 
   bool anyCvodeSolver = false;
   bool anyEllipticSolver = false;
 
-  int NVfields;
-  int NSfields;
+  bool cht = false;
+
+  int NVfields = 3;
+  int NSfields = 0;
 
   oogs_t *gsh, *gshT;
 
   dlong vFieldOffset;
   dlong vCubatureOffset;
-  dfloat *idt;
-  dfloat *dt;
-  dfloat *g0;
+  dfloat *dt = nullptr;
+  dfloat *g0 = nullptr;
 
   int nEXT;
   int nBDF;
@@ -69,23 +82,25 @@ struct cds_t {
   occa::memory o_compute;
   occa::memory o_cvodeSolve;
 
-  dfloat *S;
+  dfloat *S = nullptr;
 
-  int filterNc;
   std::vector<dfloat> filterS;
-  dfloat *filterM;
   occa::memory o_applyFilterRT;
   occa::memory o_filterS;
   occa::memory o_filterRT;
-  int applyFilter;
+  int applyFilter = 0;
 
-  int Nsubsteps;
+  int Nsubsteps = 0;
 
-  int *EToB;
+  bool dpdt = false;
+  dfloat *dp0thdt = nullptr;
+  dfloat *alpha0Ref = nullptr;
+
+  int *EToB = nullptr;
   occa::memory o_EToB;
   dlong EToBOffset;
 
-  occa::memory *o_usrwrk;
+  deviceMemory<dfloat> *o_usrwrk;
 
   occa::memory o_U;
   occa::memory o_Ue;
@@ -93,13 +108,13 @@ struct cds_t {
   occa::memory o_Urst;
 
   occa::memory o_S, o_Se;
-  occa::memory o_prop, o_ellipticCoeff;
+  occa::memory o_prop;
   occa::memory o_rho, o_diff;
-  occa::memory o_FS, o_BF, o_BFDiag;
+  occa::memory o_NLT, o_BF, o_LHSDiag;
 
+  dfloat *coeffEXT, *coeffBDF;
   occa::memory o_coeffEXT, o_coeffBDF;
 
-  occa::kernel sumMakefKernel;
   occa::kernel subCycleStrongCubatureVolumeKernel;
   occa::kernel subCycleStrongVolumeKernel;
   occa::kernel filterRTKernel;
@@ -112,7 +127,6 @@ struct cds_t {
   occa::kernel advectMeshVelocityKernel;
   occa::kernel neumannBCKernel;
   occa::kernel dirichletBCKernel;
-  occa::kernel setEllipticCoeffKernel;
   occa::kernel maskCopyKernel;
   occa::kernel maskCopy2Kernel;
 

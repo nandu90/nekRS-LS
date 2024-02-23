@@ -195,19 +195,21 @@ void udfAutoKernels(const std::string &udfFileCache,
     return fbuffer.str();
   }();
 
-  std::vector<std::string> kernelNameList;
-  std::regex exp(R"(\s*@kernel\s*void\s*([\S]*)\s*\()");
+  std::set<std::string> kernelNameList;
+  std::regex rexp(R"(\s*@kernel\s*void\s*([\S]*)\s*\()");
   std::smatch res;
 
   {
-    std::regex_token_iterator<std::string::iterator> rend; // default constructor = end-of-sequence:
-    std::regex_token_iterator<std::string::iterator> token(buffer.begin(), buffer.end(), exp, 1);
-
-    while (token != rend) {
+    std::regex_token_iterator<std::string::iterator> end; // default constructor = end-of-sequence:
+    std::regex_token_iterator<std::string::iterator> token(buffer.begin(), buffer.end(), rexp, 1);
+    while (token != end) {
       const auto kernelName = *token++;
-      kernelNameList.push_back(kernelName);
-      f << "static occa::kernel " << kernelName << ";\n";
+      kernelNameList.insert(kernelName);
     }
+  }
+
+  for (auto entry : kernelNameList) {
+      f << "static occa::kernel " << entry << ";\n";
   }
 
   f << "void UDF_AutoLoadKernels(occa::properties& kernelInfo)" << std::endl << "{" << std::endl;
@@ -234,7 +236,7 @@ void udfBuild(const std::string &_udfFile, setupAide &options)
   const std::string installDir(getenv("NEKRS_HOME"));
   const std::string udf_dir = installDir + "/udf";
   const std::string cache_dir(getenv("NEKRS_CACHE_DIR"));
-  const std::string udfLib = cache_dir + "/udf/libUDF.so";
+  const std::string udfLib = cache_dir + "/udf/libudf.so";
   const std::string udfFileCache = cache_dir + "/udf/udf.cpp";
   const std::string udfHashFile = cache_dir + "/udf/udf.hash";
   const std::string oudfFileCache = cache_dir + "/udf/udf.okl";
@@ -356,12 +358,28 @@ void udfBuild(const std::string &_udfFile, setupAide &options)
           f.close();
         }
 
+        auto solverIncludes = []()
+        {
+          std::string txt;
+          if (platform->solver->id() == "nrs") {
+             txt  = "#include \"nrs.hpp\"";
+             txt += "\n"; 
+             txt += "const auto nrs = dynamic_cast<nrs_t*>(platform->solver);";
+             txt += "\n"; 
+          }
+
+          return txt;
+        };
+
         // generate udfFileCache
         {
           std::ofstream f(udfFileCache, std::ios::trunc);
           f << "#include \"udf.hpp\"" << std::endl
-            << "#include \"udfHelper.hpp\"" << std::endl
             << "#include \"udfAutoLoadKernel.hpp\"" << std::endl
+
+            << solverIncludes()
+
+            << "#include \"udfHelper.hpp\"" << std::endl
             << "#include \"" << udfFile << "\"" << std::endl;
 
           // autoload plugins
@@ -491,6 +509,7 @@ void udfBuild(const std::string &_udfFile, setupAide &options)
     return 0;
   }();
 
+  // some BC kernels will include this file
   options.setArgs("OKL FILE CACHE", oudfFileCache);
   if (platform->cacheBcast || platform->cacheLocal) {
     options.setArgs("OKL FILE CACHE", std::string(platform->tmpDir + "/udf/udf.okl"));
@@ -517,7 +536,7 @@ void *udfLoadFunction(const char *fname, int errchk)
       cache_dir = fs::path(platform->tmpDir);
     }
 
-    const auto udfLib = std::string(fs::path(cache_dir) / "udf/libUDF.so");
+    const auto udfLib = std::string(fs::path(cache_dir) / "udf/libudf.so");
 
     if (platform->comm.mpiRank == 0 && platform->verbose) {
       std::cout << "loading " << udfLib << std::endl;

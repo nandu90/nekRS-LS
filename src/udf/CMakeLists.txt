@@ -25,21 +25,21 @@ set(INCLUDE_DIRS
   ${NEKRS_INSTALL_DIR}/include/mesh
   ${NEKRS_INSTALL_DIR}/include/core
   ${NEKRS_INSTALL_DIR}/include/core/io
+  ${NEKRS_INSTALL_DIR}/include/core/linAlg
   ${NEKRS_INSTALL_DIR}/include/utils
   ${NEKRS_INSTALL_DIR}/include/udf
   ${NEKRS_INSTALL_DIR}/include/plugins
   ${NEKRS_INSTALL_DIR}/include/nrs
+  ${NEKRS_INSTALL_DIR}/include/nrs/io
   ${NEKRS_INSTALL_DIR}/include/nrs/plugins
-  ${NEKRS_INSTALL_DIR}/include/setup
-  ${NEKRS_INSTALL_DIR}/include/navierStokes
-  ${NEKRS_INSTALL_DIR}/include/solvers/elliptic
-  ${NEKRS_INSTALL_DIR}/include/solvers/cvode
-  ${NEKRS_INSTALL_DIR}/include/nekInterface
-  ${NEKRS_INSTALL_DIR}/include/nrs/cds
+  ${NEKRS_INSTALL_DIR}/include/nrs/nekInterface
+  ${NEKRS_INSTALL_DIR}/include/nrs/neknek
   ${NEKRS_INSTALL_DIR}/include/nrs/bdry
-  ${NEKRS_INSTALL_DIR}/include/nrs/regularization
-  ${NEKRS_INSTALL_DIR}/include/linAlg
-  ${NEKRS_INSTALL_DIR}/include/neknek
+  ${NEKRS_INSTALL_DIR}/include/setup
+  ${NEKRS_INSTALL_DIR}/include/elliptic
+  ${NEKRS_INSTALL_DIR}/include/nrs/cds
+  ${NEKRS_INSTALL_DIR}/include/nrs/cds/cvode
+  ${NEKRS_INSTALL_DIR}/include/nrs/cds/regularization
   ${NEKRS_INSTALL_DIR}/include/pointInterpolation
   ${NEKRS_INSTALL_DIR}/include/pointInterpolation/findpts
   ${NEKRS_INSTALL_DIR}/occa/include
@@ -50,14 +50,18 @@ add_library(OKL EXCLUDE_FROM_ALL okl.cpp)
 target_include_directories(OKL PRIVATE $ENV{NEKRS_UDF_INCLUDES} ${INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(OKL PRIVATE -D__okl__)
 
-add_library(UDF SHARED udf.cpp)
-target_include_directories(UDF PRIVATE $ENV{NEKRS_UDF_INCLUDES} ${INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(udf SHARED udf.cpp)
+target_include_directories(udf PRIVATE $ENV{NEKRS_UDF_INCLUDES} ${INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(NEKRS_USE_DFLOAT_FLOAT)
-  target_compile_definitions(UDF PUBLIC -DNEKRS_USE_DFLOAT_FLOAT)
+  target_compile_definitions(udf PUBLIC -DNEKRS_USE_DFLOAT_FLOAT)
 endif()
 
 if(APPLE)
-    target_link_libraries(UDF "-Wl,-undefined -Wl,dynamic_lookup")
+    target_link_libraries(udf "-Wl,-undefined -Wl,dynamic_lookup")
 endif()
-target_link_libraries(UDF "$ENV{NEKRS_UDF_LDFLAGS}")
+target_link_libraries(udf "$ENV{NEKRS_UDF_LDFLAGS}")
+
+if(EXISTS "udf.cmake") 
+    include(udf.cmake)
+endif()

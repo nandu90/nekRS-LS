@@ -317,8 +317,7 @@ void findpts_t::findptsLocal(int *const code,
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic(timerName + "findptsLocal::localKernel", 0);
   }
-  dlong multiSess = useMultiSessionSupport;
-  this->localKernel(useMultiSessionSupport,
+  this->localKernel(static_cast<dlong>(useMultiSessionSupport),
                     sessionId,
                     sessionIdMatch,
                     pn,
@@ -419,8 +418,8 @@ void findpts_t::findptsLocal(int *const code,
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic(timerName + "findptsLocal::localKernel", 0);
   }
-  dlong multiSess = useMultiSessionSupport;
-  this->localKernel(useMultiSessionSupport,
+
+  this->localKernel(static_cast<dlong>(useMultiSessionSupport),
                     sessionId,
                     sessionIdMatch,
                     pn,
@@ -1193,6 +1192,7 @@ void findpts_t::find(data_t *const findPtsData,
   /* look locally first */
   const auto timerNameSave = timerName;
   timerName = timerName + "find::";
+
   findptsLocal(code_base,
                el_base,
                elsid.data(),

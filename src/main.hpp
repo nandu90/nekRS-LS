@@ -17,7 +17,6 @@
 #include <fcntl.h>
 #include <chrono>
 #include <csignal>
-#include <filesystem>
 
 #include "inipp.hpp"
 #include "stacktrace.hpp"
@@ -47,19 +46,20 @@ struct session_t {
   std::string setupFile;
 };
 
-std::vector<std::string> serializeString(const std::string sin, char dlim)
+
+bool file_exist(const std::string& fileName)
 {
-  std::vector<std::string> slist;
-  std::string s(sin);
-  s.erase(std::remove_if(s.begin(), s.end(), ::isspace), s.end());
-  std::stringstream ss;
-  ss.str(s);
-  while (ss.good()) {
-    std::string substr;
-    std::getline(ss, substr, dlim);
-    if(!substr.empty()) slist.push_back(substr);
-  }
-  return slist;
+    std::ifstream infile(fileName);
+    return infile.good();
+}
+
+long int file_size(const std::string& filename)
+{
+    FILE *p_file = fopen(filename.c_str(),"rb");
+    fseek(p_file,0,SEEK_END);
+    auto size = ftell(p_file);
+    fclose(p_file);
+    return size;
 }
 
 cmdOptions* processCmdLineOptions(int argc, char** argv, const MPI_Comm &comm)
@@ -134,21 +134,6 @@ cmdOptions* processCmdLineOptions(int argc, char** argv, const MPI_Comm &comm)
         err = 1;
       }
     }
-
-    if(cmdOpt->setupFile.empty() && cmdOpt->multiSessionFile.empty()){
-      int cnt = 0;
-      for (auto &p : std::filesystem::directory_iterator{"."})
-      {
-        if (p.path().extension() == ".par") {
-          cmdOpt->setupFile.assign(p.path().stem().string());
-          cnt++; 
-        }
-      }
-      if(cnt > 1) {
-        std::cout << "Multiple .par files found!\n"; 
-        err++; 
-      }
-    }
   }
 
   for(auto opt: {&cmdOpt->multiSessionFile, &cmdOpt->setupFile, &cmdOpt->deviceID, &cmdOpt->backend})
@@ -204,7 +189,7 @@ std::map<std::string, std::map<std::string, std::string>> readPar(const std::str
 
   int err = 0;
   if (rank == 0) {
-    if (!std::filesystem::exists(setupFile)) {
+    if (!file_exist(setupFile)) {
       std::cerr << "Cannot find setup file " << setupFile << std::endl;
       err++;
     }
@@ -216,7 +201,7 @@ std::map<std::string, std::map<std::string, std::string>> readPar(const std::str
 
   long fsize;
   if (rank == 0) {
-    fsize = std::filesystem::file_size(setupFile);  
+    fsize = file_size(setupFile);  
   }
   MPI_Bcast(&fsize, sizeof(fsize), MPI_BYTE, 0, comm);
   auto fileBuf = (char *) std::malloc(fsize * sizeof(char));
@@ -267,6 +252,21 @@ MPI_Comm setupSession(cmdOptions *cmdOpt, const MPI_Comm &comm)
     MPI_Bcast(buf, bufSize * sizeof(char), MPI_BYTE, 0, comm);
     multiSessionFileContent = std::string(buf);
     free(buf);
+
+    auto serializeString = [](const std::string sin, char dlim)
+    {
+      std::vector<std::string> slist;
+      std::string s(sin);
+      s.erase(std::remove_if(s.begin(), s.end(), ::isspace), s.end());
+      std::stringstream ss;
+      ss.str(s);
+      while (ss.good()) {
+        std::string substr;
+        std::getline(ss, substr, dlim);
+        if(!substr.empty()) slist.push_back(substr);
+      }
+      return slist;
+    };
 
     auto list = serializeString(multiSessionFileContent, ';');
     auto sessionList = new session_t[list.size()];
