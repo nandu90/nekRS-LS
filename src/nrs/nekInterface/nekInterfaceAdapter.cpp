@@ -40,6 +40,10 @@ static void (*nek_setup_ptr)(int *,
                              int *,
                              int *,
                              int *,
+                             int *,
+                             int *,
+                             int *,
+                             int *,
                              double *,
                              double *,
                              double *,
@@ -347,7 +351,7 @@ void set_usr_handles(const char *session_in, int verbose)
       (void (*)(int *, char *, char *, char *, int, int, int))dlsym(handle, fname("nekf_bootstrap"));
   check_error(dlerror());
   nek_setup_ptr =
-      (void (*)(int *, int *, int *, int *, int *, double *, double *, double *, double *, double *, int *))
+      (void (*)(int *, int *, int *, int *, int *, int *, int *, int *, int *, double *, double *, double *, double *, double *, int *))
           dlsym(handle, fname("nekf_setup"));
   check_error(dlerror());
   nek_uic_ptr = (void (*)(int *))dlsym(handle, fname("nekf_uic"));
@@ -824,7 +828,32 @@ int setup(nrs_t *nrs_in)
   // for now velocityExists is always true
   int velocityExists = (options->getArgs("VELOCITY SOLVER").empty()) ? 0 : 1;
 
+  const int cht = (nekData.nelv != nekData.nelt && nscal) ? 1 : 0;
+
+  auto boundaryIDMap = [&](bool vMesh = false)
+  {
+    const std::string prefix = (cht && vMesh) ? "MESHV " : "MESH ";
+
+    std::vector<std::string> list;
+    options->getArgs(prefix + "BOUNDARY ID MAP", list, ",");
+ 
+    std::vector<int> map;
+    for(auto& entry : list) {
+      map.push_back(std::stoi(entry)); 
+    }
+    return map;
+  };
+
+  auto bMapV = boundaryIDMap(true);
+  int bMapVSize = bMapV.size();
+  auto bMapT = boundaryIDMap();
+  int bMapTSize = (cht) ? bMapT.size() : 0;
+
   (*nek_setup_ptr)(&velocityExists,
+                   bMapV.data(),
+                   &bMapVSize,
+                   bMapT.data(),
+                   &bMapTSize,
                    &nscal,
                    scalarCompute,
                    &nBcRead,
@@ -878,11 +907,6 @@ int setup(nrs_t *nrs_in)
   nekData.boundaryID = ptr<int>("boundaryID");
   nekData.boundaryIDt = ptr<int>("boundaryIDt");
 
-
-  int cht = 0;
-  if (nekData.nelv != nekData.nelt && nscal) {
-    cht = 1;
-  }
 
   if (bcMap::useNekBCs() && nrs->numberActiveFields() > 0) {
     if (rank == 0) {

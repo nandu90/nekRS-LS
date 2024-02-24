@@ -175,6 +175,8 @@ static std::vector<std::string> meshKeys = {
     {"partitioner"},
     {"file"},
     {"connectivitytol"},
+    {"boundaryidmapV"},
+    {"boundaryidmap"},
     {"writetofieldfile"},
 };
 
@@ -2045,6 +2047,15 @@ void parseMeshSection(const int rank, setupAide &options, inipp::Ini *par)
     std::string meshConTol;
     if (par->extract("mesh", "connectivitytol", meshConTol)) {
       options.setArgs("MESH CONNECTIVITY TOL", meshConTol);
+    }
+
+    std::string boundaryIDs;
+    if (par->extract("mesh", "boundaryidmap", boundaryIDs)) {
+      options.setArgs("MESH BOUNDARY ID MAP", boundaryIDs);
+    }
+
+    if (par->extract("mesh", "boundaryidmapV", boundaryIDs)) {
+      options.setArgs("MESHV BOUNDARY ID MAP", boundaryIDs);
     }
 
     {

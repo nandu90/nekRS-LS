@@ -103,7 +103,8 @@ c-----------------------------------------------------------------------
       return
       end
 c-----------------------------------------------------------------------
-      subroutine nekf_setup(ifflow_in,
+      subroutine nekf_setup(ifflow_in, 
+     $                      bIDMap, bIDMapSize, bIDtMap, bIDtMapSize,
      $                      npscal_in, idpss_in, p32, mpart, contol,
      $                      rho, mue, rhoCp, lambda, stsform) 
 
@@ -111,6 +112,11 @@ c-----------------------------------------------------------------------
       include 'TOTAL'
       include 'DOMAIN'
       include 'NEKINTF'
+
+      integer bIDMapSize
+      integer bIDtMapSize
+      integer bIDMap(bIDMapSize)
+      integer bIDtMap(bIDtMapSize)
 
       integer iftmsh_in, ifflow_in, mpart, p32
       integer idpss_in(*)
@@ -123,6 +129,7 @@ c-----------------------------------------------------------------------
       integer*8 vertex
 
       etimes = dnekclock_sync()
+
 
       call read_re2_hdr(ifbswap, .true.)
 
@@ -140,7 +147,7 @@ c-----------------------------------------------------------------------
       param(99) = -1 ! no dealiasing to save mem
 
       fluid_partitioner = mpart
-      solid_partitioner = 1 ! RCB 
+      solid_partitioner = 1 ! fixed to RCB 
       connectivityTol = contol
 
       ifflow = .true.
@@ -171,13 +178,26 @@ c-----------------------------------------------------------------------
       call mapelpr 
       call read_re2_data(ifbswap, .true., .true., .true.)
 
+#if 0
+      if(nid.eq.0) then
+        write(6,*) 'bIDMap', bIDMap
+        write(6,*) 'bIDtMap', bIDtMap
+      endif
+#endif
+
       ifld_bId = 2
       if(ifflow) ifld_bId = 1
       do iel = 1,nelv
       do ifc = 1,2*ndim
          boundaryID(ifc,iel) = -1
-         if(bc(5,ifc,iel,ifld_bId).gt.0)
-     $     boundaryID(ifc,iel) = bc(5,ifc,iel,ifld_bId)
+         if(bc(5,ifc,iel,ifld_bId).gt.0) then
+           boundaryID(ifc,iel) = bc(5,ifc,iel,ifld_bId)
+           idx = ibsearch(bIDMap, bIDMapSize, bc(5,ifc,iel,ifld_bId))
+           if(idx.gt.0) then
+             boundaryID(ifc,iel) = idx 
+           endif
+           bc(5,ifc,iel,ifld_bId) = boundaryID(ifc,iel)
+         endif
       enddo
       enddo
 
@@ -185,8 +205,14 @@ c-----------------------------------------------------------------------
         do iel = 1,nelt
         do ifc = 1,2*ndim
          boundaryIDt(ifc,iel) = -1
-         if(bc(5,ifc,iel,2).gt.0)
-     $     boundaryIDt(ifc,iel) = bc(5,ifc,iel,2)
+         if(bc(5,ifc,iel,2).gt.0) then
+           boundaryIDt(ifc,iel) = bc(5,ifc,iel,2)
+           idx = ibsearch(bIDtMap, bIDtMapSize, bc(5,ifc,iel,2))
+           if(idx.gt.0) then 
+             boundaryIDt(ifc,iel) = idx
+           endif
+           bc(5,ifc,iel,2) = boundaryIDt(ifc,iel)
+         endif
         enddo
         enddo
       endif

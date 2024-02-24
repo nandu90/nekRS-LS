@@ -160,6 +160,9 @@ regularization
 
 partitioner                 rbc, rsb, rbc+rsb [D]                      partitioning method
 
+boundaryIDMap               <int>, <int>, ...                          map ids to 1,2,3,... 
+boundaryIDMapV              <int>, <int>, ...                          required for cht case 
+
 connectivityTol             <float>
                             0.2 [D]
 
