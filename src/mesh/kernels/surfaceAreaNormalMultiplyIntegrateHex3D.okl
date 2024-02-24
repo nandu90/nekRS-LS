@@ -7,16 +7,16 @@ if (t < bs) {                                                                   
   }                                                                                                          \
 }
 
-@kernel void surfaceIntegral(const dlong Nelements,
-                             const dlong Nfields,
-                             const dlong fieldOffset,
-                             const dlong nbID,
-                             const dlong *bID,
-                             @ restrict const dfloat *sgeo,
-                             @ restrict const dlong *vmapM,
-                             @ restrict const int *EToBM,
-                             @ restrict const dfloat *U,
-                             @ restrict dfloat *sumU)
+@kernel void surfaceAreaNormalMultiplyIntegrateHex3D(const dlong Nelements,
+                                                     const dlong Nfields,
+                                                     const dlong fieldOffset,
+                                                     const dlong nbID,
+                                                     const dlong *bID,
+                                                     @ restrict const dfloat *sgeo,
+                                                     @ restrict const dlong *vmapM,
+                                                     @ restrict const int *EToBM,
+                                                     @ restrict const dfloat *U,
+                                                     @ restrict dfloat *sumU)
 {
   for (dlong e = 0; e < Nelements; e++; @outer(0)) {
     for (int fldStart = 0; fldStart < Nfields; fldStart += p_fieldBlockSize) {
@@ -39,7 +39,7 @@ if (t < bs) {                                                                   
 
                   const dlong idM = vmapM[sid];
                   const dfloat sWJ = sgeo[sid * p_Nsgeo + p_WSJID];
-#if p_vector
+#if p_ndot
                   const dfloat nx = sgeo[sid * p_Nsgeo + p_NXID];
                   const dfloat ny = sgeo[sid * p_Nsgeo + p_NYID];
                   const dfloat nz = sgeo[sid * p_Nsgeo + p_NZID];
@@ -48,7 +48,7 @@ if (t < bs) {                                                                   
 #pragma unroll p_fieldBlockSize
                   for (int fld = 0; fld < p_fieldBlockSize; fld++) {
                     if (fldStart + fld < Nfields) { 
-#if p_vector
+#if p_ndot
                       const dfloat _U = U[idM + 0 * fieldOffset] * nx + 
                                         U[idM + 1 * fieldOffset] * ny +
                                         U[idM + 2 * fieldOffset] * nz;

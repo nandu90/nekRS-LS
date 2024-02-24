@@ -30,14 +30,14 @@ void registerMeshKernels(occa::properties kernelInfoBC)
 
     {
       auto prop = kernelInfo;
-      prop["defines/p_vector"] = 0;
-      kernelName = "surfaceIntegral";
+      prop["defines/p_ndot"] = 0;
+      kernelName = "surfaceAreaNormalMultiplyIntegrateHex3D";
       fileName = oklpath + "/mesh/" + kernelName + ".okl";
-      platform->kernels.add(meshPrefix + kernelName + orderSuffix, fileName, prop);
+      platform->kernels.add(meshPrefix + kernelName, fileName, prop);
 
-      prop["defines/p_vector"] = 1;
-      kernelName = "surfaceIntegralVector";
-      platform->kernels.add(meshPrefix + kernelName + orderSuffix, fileName, prop);
+      prop["defines/p_ndot"] = 1;
+      kernelName = "surfaceAreaNormalMultiplyIntegrateHex3D-ndot";
+      platform->kernels.add(meshPrefix + kernelName, fileName, prop);
     }
 
     kernelName = "setBIDHex3D";

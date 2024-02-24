@@ -56,24 +56,19 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
   std::vector<int> bidWall = {1};
   occa::memory o_bidWall = platform->device.malloc<int>(bidWall.size(), bidWall.data());
 
-  auto o_Sij = platform->o_memPool.reserve<dfloat>(2 * nrs->NVfields * nrs->fieldOffset);
-  nrs->strainRate(true, nrs->o_U, o_Sij);
+  auto o_Sij = nrs->strainRate();
 
-  const auto drag = nrs->viscousDrag(bidWall.size(), o_bidWall, o_Sij);
+  const auto [Fviscous, Fpressure] = nrs->aeroForces(bidWall.size(), o_bidWall, o_Sij);
   o_Sij.free();
 
   auto o_tmp = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
   platform->linAlg->fill(mesh->Nlocal, 1.0, o_tmp);
-  const auto areaWall = mesh->surfaceIntegral(bidWall.size(), o_bidWall, o_tmp);
+  const auto areaWall = mesh->surfaceAreaMultiplyIntegrate(bidWall.size(), o_bidWall, o_tmp);
 
   // https://turbulence.oden.utexas.edu/channel2015/data/LM_Channel_2000_mean_prof.dat
   const auto utauRef = 4.58794e-02;
-  const auto utau = sqrt(drag / areaWall.at(0));
+  const auto utau = sqrt(std::abs(Fviscous[0]) / areaWall.at(0));
   const auto utauErr = std::abs((utau - utauRef) / utauRef);
 
-  if (platform->comm.mpiRank == 0) {
-    printf("tau: %g; relative error = %g\n", utau, utauErr);
-  }
-
-  (fabs(utauErr) < EPS) ? (CiPassTest()) : (CiFailTest());
+  CiEvalTest("tau", fabs(utauErr) < EPS, "with relative LinfErr:" + to_string_f(utauErr));
 }

@@ -72,7 +72,7 @@ set(NRS_SRC
     src/udf/compileUDFKernels.cpp
     src/nrs/nekInterface/nekInterfaceAdapter.cpp
     src/nrs/postProcessing/strainRotationRate.cpp
-    src/nrs/postProcessing/viscousDrag.cpp
+    src/nrs/postProcessing/aeroForces.cpp
     src/nrs/postProcessing/Qcriterion.cpp
     src/nrs/cds/cvode/registerCvodeKernels.cpp
     src/nrs/cds/cvode/cvode.cpp

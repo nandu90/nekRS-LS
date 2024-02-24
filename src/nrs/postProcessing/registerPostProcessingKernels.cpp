@@ -16,17 +16,18 @@ void registerPostProcessingKernels()
   const int Np = Nq * Nq * Nq;
 
   auto kernelInfo = platform->kernelInfo + meshKernelProperties(N);
+  const std::string section = "nrs-";
 
   kernelInfo["includes"].asArray();
 
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR");
   std::string kernelName, fileName;
 
-  kernelName = "drag";
+  kernelName = "aeroForces";
   fileName = oklpath + "/nrs/postProcessing/" + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, kernelInfo);
+  platform->kernels.add(section + kernelName, fileName, kernelInfo);
 
   kernelName = "Qcriterion";
   fileName = oklpath + "/nrs/postProcessing/" + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, kernelInfo);
+  platform->kernels.add(section + kernelName, fileName, kernelInfo);
 }

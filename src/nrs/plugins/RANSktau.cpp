@@ -183,12 +183,11 @@ void RANSktau::updateSourceTerms()
 
   occa::memory o_OiOjSk = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
   occa::memory o_SijMag2 = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
-  occa::memory o_SijOij = platform->o_memPool.reserve<dfloat>(3 * nrs->NVfields * nrs->fieldOffset);
 
   occa::memory o_FS = cds->o_NLT + cds->fieldOffsetScan[kFieldIndex];
   occa::memory o_LHSDiag = cds->o_LHSDiag + cds->fieldOffsetScan[kFieldIndex];
 
-  nrs->strainRotationRate(true, true, nrs->o_U, o_SijOij);
+  auto o_SijOij = nrs->strainRotationRate();
 
   SijMag2OiOjSkKernel(mesh->Nelements * mesh->Np, nrs->fieldOffset, 1, o_SijOij, o_OiOjSk, o_SijMag2);
 

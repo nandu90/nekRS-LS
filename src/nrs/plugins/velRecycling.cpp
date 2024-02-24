@@ -58,7 +58,7 @@ static void _setup(occa::memory &o_wrk_, const int bID_, const dfloat wbar_)
 
   auto o_tmp = platform->device.malloc<dfloat>(mesh->Nlocal);
   platform->linAlg->fill(mesh->Nlocal, 1.0, o_tmp);
-  area = mesh->surfaceIntegral(o_bID.length(), o_bID, o_tmp).at(0);
+  area = mesh->surfaceAreaMultiplyIntegrate(o_bID.length(), o_bID, o_tmp).at(0);
 
   setupCalled = true;
 }
@@ -109,7 +109,7 @@ void velRecycling::copy()
     oogs::startFinish(o_wrk, nrs->NVfields, nrs->fieldOffset, ogsDfloat, ogsAdd, ogs);
   }
 
-  auto flux = mesh->surfaceIntegralVector(nrs->fieldOffset, o_bID.length(), o_bID, o_wrk);
+  auto flux = mesh->surfaceAreaNormalMultiplyIntegrate(nrs->fieldOffset, o_bID.length(), o_bID, o_wrk);
 
   const dfloat scale = -wbar * area / flux[0];
   nekrsCheck(std::isnan(scale) || std::isinf(scale), 

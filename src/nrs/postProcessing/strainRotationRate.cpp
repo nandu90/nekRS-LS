@@ -1,34 +1,47 @@
 #include "nrs.hpp"
 
-void nrs_t::strainRotationRate(bool smooth, bool rotationRate, const occa::memory &o_U, occa::memory &o_SO)
+static occa::memory _strainRotationRate(nrs_t* nrs, bool rotationRate, const occa::memory &o_U, bool smooth)
 {
-  mesh_t *mesh = this->meshV;
+  mesh_t *mesh = nrs->meshV;
 
-  const int nFields = (rotationRate) ? 2 * this->NVfields + this->NVfields : 2 * this->NVfields;
+  const int nFields = (rotationRate) ? 2 * nrs->NVfields + nrs->NVfields : 2 * nrs->NVfields;
 
-  nekrsCheck(o_SO.length() < (nFields * this->fieldOffset),
-             MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "o_SO too small to store %d fields!\n",
-             nFields);
+  auto o_SO = platform->o_memPool.reserve<dfloat>(nFields * nrs->fieldOffset);
 
-  this->SijOijKernel(mesh->Nelements,
-                     this->fieldOffset,
-                     (int)rotationRate,
-                     (int)smooth,
-                     mesh->o_vgeo,
-                     mesh->o_D,
-                     o_U,
-                     o_SO);
+  nrs->SijOijKernel(mesh->Nelements,
+                    nrs->fieldOffset,
+                    static_cast<int>(rotationRate),
+                    static_cast<int>(smooth),
+                    mesh->o_vgeo,
+                    mesh->o_D,
+                    o_U,
+                    o_SO);
 
   if (smooth) {
-    oogs::startFinish(o_SO, nFields, this->fieldOffset, ogsDfloat, ogsAdd, this->gsh);
+    oogs::startFinish(o_SO, nFields, nrs->fieldOffset, ogsDfloat, ogsAdd, nrs->gsh);
 
-    platform->linAlg->axmyMany(mesh->Nlocal, nFields, this->fieldOffset, 0, 1.0, mesh->o_invLMM, o_SO);
+    platform->linAlg->axmyMany(mesh->Nlocal, nFields, nrs->fieldOffset, 0, 1.0, mesh->o_invLMM, o_SO);
   }
+
+  return o_SO;
 }
 
-void nrs_t::strainRate(bool smooth, const occa::memory &o_U, occa::memory &o_S)
+occa::memory nrs_t::strainRotationRate(bool smooth)
 {
-  strainRotationRate(smooth, false, o_U, o_S);
+  return _strainRotationRate(this, true, this->o_U, smooth);
+}
+
+occa::memory nrs_t::strainRotationRate(const occa::memory &o_U, bool smooth)
+{
+  return _strainRotationRate(this, true, o_U, smooth);
+}
+
+occa::memory nrs_t::strainRate(bool smooth)
+{
+  return _strainRotationRate(this, false, this->o_U, smooth);
+}
+
+occa::memory nrs_t::strainRate(const occa::memory &o_U, bool smooth)
+{
+  return _strainRotationRate(this, false, o_U, smooth);
 }

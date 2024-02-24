@@ -169,9 +169,6 @@ static void loadKernels(mesh_t *mesh)
   const std::string meshPrefix = "mesh-";
   const std::string orderSuffix = "_" + std::to_string(mesh->N);
 
-  mesh->surfaceIntegralKernel = platform->kernels.get(meshPrefix + "surfaceIntegral" + orderSuffix);
-  mesh->surfaceIntegralVectorKernel =
-      platform->kernels.get(meshPrefix + "surfaceIntegralVector" + orderSuffix);
   mesh->geometricFactorsKernel = platform->kernels.get(meshPrefix + "geometricFactorsHex3D" + orderSuffix);
   mesh->surfaceGeometricFactorsKernel =
       platform->kernels.get(meshPrefix + "surfaceGeometricFactorsHex3D" + orderSuffix);
@@ -330,7 +327,6 @@ mesh_t *createMeshMG(mesh_t *_mesh, int Nc)
   const std::string meshPrefix = "pMGmesh-";
   const std::string orderSuffix = "_" + std::to_string(mesh->N);
 
-  mesh->surfaceIntegralKernel = nullptr;
   mesh->velocityDirichletKernel = nullptr;
   mesh->geometricFactorsKernel = platform->kernels.get(meshPrefix + "geometricFactorsHex3D" + orderSuffix);
   mesh->surfaceGeometricFactorsKernel = nullptr;

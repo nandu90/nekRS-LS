@@ -9,6 +9,7 @@
 * CHT nek-nek support (solid overlaps)
 * HIP support for BoomerAMG
 * Intel GPU support
+* Aero forces
 * Various bug fixes
 
 ## Good to know

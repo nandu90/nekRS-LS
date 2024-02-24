@@ -37,16 +37,6 @@
 #define HEXAHEDRA 12
 
 struct mesh_t {
-  std::vector<dfloat> surfaceIntegral(int nbID, const occa::memory &o_bID, const occa::memory &o_fld);
-  std::vector<dfloat>
-  surfaceIntegralVector(dlong offsetFld, int nbID, const occa::memory &o_bID, const occa::memory &o_fld);
-
-  std::vector<dfloat> surfaceIntegralMany(int Nfields,
-                                          dlong offsetFld,
-                                          int nbID,
-                                          const occa::memory &o_bID,
-                                          const occa::memory &o_fld);
-
   // Distance pseudo function
   // type refers to the type of distance function
   //   type = "cheap_dist" : nek5000-style cheap_dist
@@ -71,6 +61,24 @@ struct mesh_t {
   void surfaceGeometricFactors();
 
   void computeInvLMM();
+
+  std::vector<dfloat> surfaceAreaMultiplyIntegrate(int nbID, 
+                                                   const occa::memory &o_bID, 
+                                                   const occa::memory &o_fld);
+
+  std::vector<dfloat> surfaceAreaNormalMultiplyIntegrate(int Nfields,
+                                                         dlong fieldOffset,
+                                                         int nbID,
+                                                         const occa::memory &o_bID,
+                                                         const occa::memory &o_fld);
+
+  std::vector<dfloat> surfaceAreaNormalMultiplyIntegrate(dlong fieldOffset,
+                                                         int nbID,
+                                                         const occa::memory &o_bID,
+                                                         const occa::memory &o_fld);
+
+  occa::memory surfaceAreaMultiply(int nbID, const occa::memory &o_bID, const occa::memory &o_fld);
+
 
   int nAB;
   dfloat *coeffAB; // coefficients for AB integration
@@ -201,14 +209,13 @@ struct mesh_t {
   occa::memory& o_Jw = o_LMM;
   occa::memory& o_invAJw = o_invLMM;
 
-  // mesh velocity
   occa::memory o_U;
   occa::memory o_Ue;
-  dfloat *U; // host shadow of mesh velocity
+  dfloat *U = nullptr;
 
   occa::memory o_D;
 
-  occa::memory o_DW; // tensor product differentiation matrix (for Hexes)
+  occa::memory o_DW;
   occa::memory o_DT;
 
   occa::memory o_vgeo, o_sgeo;
@@ -248,8 +255,6 @@ struct mesh_t {
   occa::kernel nStagesSumVectorKernel;
   occa::kernel velocityDirichletKernel;
 
-  occa::kernel surfaceIntegralKernel;
-  occa::kernel surfaceIntegralVectorKernel;
   occa::kernel setBIDKernel;
   occa::kernel distanceKernel;
   occa::kernel hlongSumKernel;
@@ -314,7 +319,6 @@ void planarAvg(mesh_t *mesh,
                dlong offset,
                occa::memory &o_avg);
 
-// print out parallel partition i
 void meshPartitionStatistics(mesh_t *mesh);
 
 void meshParallelGatherScatterSetup(mesh_t *mesh,
@@ -327,9 +331,6 @@ void meshParallelGatherScatterSetup(mesh_t *mesh,
 void meshFree(mesh_t *);
 
 void printMeshMetrics(mesh_t *mesh);
-
-void occaTimerTic(occa::device device, std::string name);
-void occaTimerToc(occa::device device, std::string name);
 
 extern "C" {
 void dgesv_(int *N, int *NRHS, double *A, int *LDA, int *IPIV, double *B, int *LDB, int *INFO);

@@ -210,14 +210,16 @@ public:
 
   int numberActiveFields();
 
-  dfloat viscousDrag(int nbID, const occa::memory &o_bID, occa::memory &o_Sij);
+  std::tuple< std::vector<dfloat>, std::vector<dfloat> > 
+  aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_ = o_NULL);
 
   //       ( SO0          )         (     SO8  SO7)
   // Sij = ( SO3  SO1     )  Oij =  (          SO6)
   //       ( SO5  SO4  SO2)         (             )
-  void strainRotationRate(bool smooth, bool rotationRate, const occa::memory &o_U, occa::memory &o_SO);
-
-  void strainRate(bool smooth, const occa::memory &o_U, occa::memory &o_S);
+  occa::memory strainRotationRate(const occa::memory &o_U, bool smooth = true);
+  occa::memory strainRotationRate(bool smooth = true);
+  occa::memory strainRate(const occa::memory &o_U, bool smooth = true);
+  occa::memory strainRate(bool smooth = true);
 
   void Qcriterion(const occa::memory &o_U, occa::memory &o_Q);
 
