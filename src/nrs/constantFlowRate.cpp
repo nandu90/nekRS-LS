@@ -147,8 +147,8 @@ bool checkIfRecompute(nrs_t *nrs, int tstep)
 
   bool adjustFlowRate = false;
 
+  // did the properties change?
   occa::memory o_propDelta = platform->o_memPool.reserve<dfloat>(nPropertyFields * nrs->fieldOffset);
-
   platform->linAlg->axpbyzMany(mesh->Nlocal,
                                nPropertyFields,
                                nrs->fieldOffset,
@@ -172,6 +172,13 @@ bool checkIfRecompute(nrs_t *nrs, int tstep)
   adjustFlowRate |= platform->options.compareArgs("MOVING MESH", "TRUE");
   adjustFlowRate |= tstep <= std::max(nrs->nEXT, nrs->nBDF);
   adjustFlowRate |= abs(nrs->dt[0] - nrs->dt[1]) > TOL;
+
+  static dfloat prevFlowRate = 0;
+  if (std::abs(flowRate - prevFlowRate) > TOL) {
+    adjustFlowRate |= true;
+    prevFlowRate = flowRate;
+  }
+
   return adjustFlowRate;
 }
 
@@ -198,8 +205,7 @@ void nrs_t::flowRatePrintInfo(bool verboseInfo)
 
   dfloat err = std::abs(userSpecifiedFlowRate - finalFlowRate);
 
-  // scale is invariant to uBulk/volumetric flow rate, since it's a unitless ratio
-  dfloat scale = constantFlowScale;
+  dfloat scale = constantFlowScale; // rho * meanGradP
 
   if (!platform->options.compareArgs("CONSTANT FLOW RATE TYPE", "VOLUMETRIC")) {
     flowRateType = "uBulk";
@@ -357,6 +363,10 @@ bool nrs_t::adjustFlowRate(int tstep, double time)
   }
 
   if (recomputeBaseFlowRate) {
+    if (platform->verbose && platform->comm.mpiComm == 0) {
+      std::cout << "recomputing base flow rate\n";
+    }
+
     auto getSolverData = [](elliptic *solver)
     {
       if (solver) {
