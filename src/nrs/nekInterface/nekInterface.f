@@ -44,7 +44,8 @@ c-----------------------------------------------------------------------
       call initdat
       call files
 
-      call usrdat0
+      call usrdat0 ! user may call nekrs_registerPtr
+                   ! which we access in UDF_Setup0
 
       lp = 0 !ltrunc(PATH,132)
       call chcopy(re2fle1(lp+1),mesh_in,len(mesh_in))
@@ -136,6 +137,7 @@ c-----------------------------------------------------------------------
       if(ndim.eq.2) call exitti('Mesh has to be 3D!$', ndim) 
 
       call setDefaultParam
+
       loglevel   = 1
       cpfld(1,2) = rho
       cpfld(1,1) = mue
@@ -171,6 +173,7 @@ c-----------------------------------------------------------------------
         enddo 
       endif
 
+      call usrdat0 ! call again just in case user want to change some params 
 
       call bcastParam
       call chkParam

@@ -11,13 +11,13 @@ struct cdsConfig_t {
   int Nscalar;
   mesh_t *mesh;
   mesh_t *meshV;
-  dfloat *g0;
-  dfloat *dt;
+  dfloat *g0 = nullptr;
+  dfloat *dt = nullptr;
   int nBDF;
-  dfloat *coeffBDF;
+  dfloat *coeffBDF = nullptr;
   occa::memory o_coeffBDF;
   int nEXT;
-  dfloat *coeffEXT;
+  dfloat *coeffEXT = nullptr;
   occa::memory o_coeffEXT;
   deviceMemory<dfloat> *o_usrwrk;
   dlong vFieldOffset;
@@ -29,9 +29,9 @@ struct cdsConfig_t {
   occa::memory o_Urst;
   occa::memory o_relUrst; 
 
-  bool dpdt;
-  dfloat *dp0thdt;
-  dfloat *alpha0Ref;
+  bool dpdt = false;
+  dfloat *dp0thdt = nullptr;
+  dfloat *alpha0Ref = nullptr;
 };
 
 class cds_t : public solver_t {

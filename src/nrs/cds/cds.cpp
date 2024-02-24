@@ -92,6 +92,10 @@ cds_t::cds_t(cdsConfig_t& cfg)
   this->mesh[0] = cfg.mesh;
   this->meshV = cfg.meshV;
 
+  this->dpdt = cfg.dpdt;
+  this->dp0thdt = cfg.dp0thdt;
+  this->alpha0Ref = cfg.alpha0Ref;
+
   auto mesh = this->mesh[0];
   this->cht = (mesh != this->meshV) ? true : false;
 
