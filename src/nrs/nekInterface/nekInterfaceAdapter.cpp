@@ -768,6 +768,7 @@ void bootstrap()
       printf("done\n");
       fflush(stdout);
     }
+
   }
 }
 
@@ -828,7 +829,9 @@ int setup(nrs_t *nrs_in)
   // for now velocityExists is always true
   int velocityExists = (options->getArgs("VELOCITY SOLVER").empty()) ? 0 : 1;
 
-  const int cht = (nekData.nelv != nekData.nelt && nscal) ? 1 : 0;
+  int nelgt, nelgv;
+  re2::nelg(options->getArgs("MESH FILE"), nelgt, nelgv, platform->comm.mpiComm);
+  const int cht = (nelgt > nelgv) && nscal;
 
   auto boundaryIDMap = [&](bool vMesh = false)
   {
@@ -907,7 +910,6 @@ int setup(nrs_t *nrs_in)
   nekData.boundaryID = ptr<int>("boundaryID");
   nekData.boundaryIDt = ptr<int>("boundaryIDt");
 
-
   if (bcMap::useNekBCs() && nrs->numberActiveFields() > 0) {
     if (rank == 0) {
       printf("importing BCs from nek\n");
@@ -918,6 +920,7 @@ int setup(nrs_t *nrs_in)
     if (nrs->flow) {
       if (rank == 0) {
         printf(" velocity\n");
+        fflush(stdout);
       }
 
       int isTMesh = 0;
@@ -949,12 +952,10 @@ int setup(nrs_t *nrs_in)
 
       if (rank == 0) {
         printf(" scalar%02d\n", is);
+        fflush(stdout);
       }
 
-      int isTMesh = 0;
-      if (cht && is == 0) {
-        isTMesh = 1;
-      }
+      int isTMesh = (cht && is == 0) ? 1 : 0;
       int nIDs = (*nek_nbid_ptr)(&isTMesh);
 
       int *map = (int *)calloc(nIDs, sizeof(int));

@@ -1003,7 +1003,7 @@ c
 
       ! check if boundaryIDs match between all fields
       do ifld = 2,nfield
-        if(idpss(ifld-1).lt.0 .or. iftmsh(ifld)) goto 199
+        if(idpss(ifld-1).lt.0 .or. iftmsh(ifld)) goto 50 
         call izero(cnt, size(cnt))
 
         do iel = 1,nelv
