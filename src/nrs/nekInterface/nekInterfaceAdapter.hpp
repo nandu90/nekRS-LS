@@ -115,7 +115,8 @@ void outfld(const char *filename,
             const occa::memory& o_p,
             const occa::memory& o_s,
             int NSfields,
-            int Nro = 0);
+            int Nro = 0,
+            bool uniform = false);
 void uic(int ifield);
 void finalize(void);
 void xm1N(dfloat *x, dfloat *y, dfloat *z, int Nq, dlong Nelements);

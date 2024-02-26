@@ -6,7 +6,6 @@
 #include "elliptic.hpp"
 #include "cds.hpp"
 #include "neknek.hpp"
-#include "fldFile.hpp"
 #include "randomVector.hpp"
 
 class nrs_t : public solver_t {
@@ -222,6 +221,11 @@ public:
   occa::memory strainRate(bool smooth = true);
 
   void Qcriterion(const occa::memory &o_U, occa::memory &o_Q);
+
+  void writeFld(double t, int step, int Nout = 0, bool uniform = false);
+  void writeFld(double t, int step, std::string suffix, int Nout = 0, bool uniform = false);
+  void writeFld(double t, int step, int outXYZ, int FP64, int Nout = 0, bool uniform = false);
+  void writeFld(double t, int step, int outXYZ, int FP64, std::string suffix, int Nout = 0, bool uniform = false);
 
   void finalize();
 

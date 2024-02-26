@@ -2,6 +2,7 @@
 #include "tavg.hpp"
 #include "platform.hpp"
 #include "linAlg.hpp"
+#include "fld.hpp"
 
 // private members
 namespace
@@ -206,7 +207,7 @@ void tavg::outfld(int _outXYZ, int FP64)
   }
 
   if (userFieldList.size()) {
-    writeFld("tavg", atime, outfldCounter, outXYZ, FP64, o_NULL, o_NULL, o_AVG, userFieldList.size());
+    fld::write("tavg", atime, outfldCounter, outXYZ, FP64, o_NULL, o_NULL, o_AVG, userFieldList.size());
   }
 
   atime = 0; // reset

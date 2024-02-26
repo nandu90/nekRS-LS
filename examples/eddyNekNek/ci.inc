@@ -195,7 +195,7 @@ void vizNekNekField(nrs_t *nrs)
   }
 
   auto o_Uviz = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset, Uviz.data());
-  writeFld("viz", 0.0, 0, 1, 1, o_Uviz, o_null, o_null, 0);
+  fld::write("viz", 0.0, 0, 1, 1, o_Uviz, o_null, o_null, 0);
 }
 
 void ciTestInitialStep(nrs_t *nrs, double time, int tstep)

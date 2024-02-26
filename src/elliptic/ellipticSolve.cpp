@@ -28,7 +28,6 @@
 #include "ellipticPrecon.h"
 #include "platform.hpp"
 #include "linAlg.hpp"
-#include "fldFile.hpp"
 
 void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const occa::memory &o_lambda1, const occa::memory &o_rhs, occa::memory o_x)
 {

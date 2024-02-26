@@ -99,7 +99,8 @@ void outfld(const char *filename,
             const occa::memory &o_pp,
             const occa::memory &o_ss,
             int NSfields,
-            int Nro)
+            int Nro, 
+            bool uniform)
 {
   occa::memory o_u, o_p, o_s;
   if (o_uu.isInitialized()) {
@@ -120,18 +121,21 @@ void outfld(const char *filename,
   const int stepSave = *(nekData.istep);
   *(nekData.istep) = step;
 
-  platform->timer.tic("checkpointing", 1);
-
   // nek5000 writes all fields using nelt
   // note, nrs->fieldOffset >= nelt*nxyz
   auto mesh = nrs->_mesh;
   dlong Nlocal = mesh->Nelements * mesh->Np;
+
+  nekrsCheck(Nro > 0 && Nro != mesh->N && !uniform, MPI_COMM_SELF, EXIT_FAILURE, 
+             "%s\n", "Different polynomial order supported for uniform grid only");
 
   // nek5000 uses lelv = lelt
   const dlong nekFieldOffset = nekData.lelt * mesh->Np;
 
   const auto p0thSave = *(nekData.p0th);
   *(nekData.p0th) = nrs->p0th[0];
+
+  platform->timer.tic("checkpointing", 1);
 
   std::vector<double> vx(Nlocal);
   std::vector<double> vy(Nlocal);
@@ -196,9 +200,11 @@ void outfld(const char *filename,
     so = 1;
   }
 
+  int nxReg = Nro + 1;
+
   (*nek_setio_ptr)(&t, &xo, &vo, &po, &so, &NSfields, &FP64);
   (*nek_outfld_ptr)((char *)filename, 
-                    &Nro, 
+                    &nxReg, 
                     vx.data(), 
                     vy.data(), 
                     vz.data(), 
@@ -481,6 +487,8 @@ void mkSIZE(int lx1,
       sprintf(line, "      parameter (mxprev=%d)\n", 1);
     } else if (strstr(line, "parameter (lgmres=") != NULL) {
       sprintf(line, "      parameter (lgmres=%d)\n", 1);
+    } else if (strstr(line, "parameter (lxo=") != NULL) {
+      sprintf(line, "      parameter (lxo=%d)\n", lx1+4);
     } else if (strstr(line, "parameter (lorder=") != NULL) {
       sprintf(line, "      parameter (lorder=%d)\n", 1);
     } else if (strstr(line, "parameter (lhis=") != NULL) {

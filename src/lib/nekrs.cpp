@@ -425,7 +425,7 @@ void outfld(double time, int step, std::string suffix)
     platform->options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
   }
 
-  writeFld(nrs, time, step, suffix);
+  nrs->writeFld(time, step, suffix);
   lastOutputTime = time;
   firstOutfld = 0;
 

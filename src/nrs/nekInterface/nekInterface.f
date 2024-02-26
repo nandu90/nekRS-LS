@@ -371,13 +371,14 @@ c-----------------------------------------------------------------------
      &              , ur2(lxo*lxo*lxo*lelt)
      &              , ur3(lxo*lxo*lxo*lelt)
 
-      rego = .false.
-      if(nrg_in.gt.0) rego = .true.
+      rego = .false. ! dump on regular (uniform) mesh
+      if(nrg_in.gt.1) rego = .true.
 
       if(nio.eq.0) then
         if(rego) then
-          WRITE(6,1001) istep,time,nrg_in
- 1001     FORMAT(/,i9,1pe12.4,' Writing checkpoint Nrg=', i2)
+          WRITE(6,1001) istep,time,nrg_in-1
+ 1001     FORMAT(/,i9,1pe12.4,
+     $    ' Writing checkpoint to uniform grid N=', i2)
         else
           WRITE(6,1002) istep,time
  1002     FORMAT(/,i9,1pe12.4,' Writing checkpoint')
@@ -395,7 +396,7 @@ c-----------------------------------------------------------------------
       nxo  = lx1
       nyo  = ly1
       nzo  = lz1
-      if (rego) then ! dump on regular (uniform) mesh
+      if (rego) then
          if (nrg_in.gt.lxo) then
             if (nid.eq.0) write(6,*) 
      &         'WARNING: nrg too large, reset to lxo!'
@@ -428,9 +429,9 @@ c-----------------------------------------------------------------------
          offs = offs0 + ldim*strideB
          call byte_set_view(offs,ifh_mbyte)
          if (rego) then
-            call map2reg(ur1,nrg,xm1,nout)
-            call map2reg(ur2,nrg,ym1,nout)
-            if (if3d) call map2reg(ur3,nrg,zm1,nout)
+            call map2reg(ur1,nxo,xm1,nout)
+            call map2reg(ur2,nxo,ym1,nout)
+            if (if3d) call map2reg(ur3,nxo,zm1,nout)
             call mfo_outv(ur1,ur2,ur3,nout,nxo,nyo,nzo)
          else
             call mfo_outv(xm1,ym1,zm1,nout,nxo,nyo,nzo)
@@ -442,9 +443,9 @@ c-----------------------------------------------------------------------
          offs = offs0 + ioflds*stride + ldim*strideB
          call byte_set_view(offs,ifh_mbyte)
          if (rego) then
-             call map2reg(ur1,nrg,vx_in,nout)
-             call map2reg(ur2,nrg,vy_in,nout)
-             if (if3d) call map2reg(ur3,nrg,vz_in,nout)
+             call map2reg(ur1,nxo,vx_in,nout)
+             call map2reg(ur2,nxo,vy_in,nout)
+             if (if3d) call map2reg(ur3,nxo,vz_in,nout)
              call mfo_outv(ur1,ur2,ur3,nout,nxo,nyo,nzo) 
          else
             call mfo_outv(vx_in,vy_in,vz_in,nout,nxo,nyo,nzo)
@@ -456,7 +457,7 @@ c-----------------------------------------------------------------------
          offs = offs0 + ioflds*stride + strideB
          call byte_set_view(offs,ifh_mbyte)
          if (rego) then
-            call map2reg(ur1,nrg,pm1_in,nout)
+            call map2reg(ur1,nxo,pm1_in,nout)
             call mfo_outs(ur1,nout,nxo,nyo,nzo)
          else
             call mfo_outs(pm1_in,nout,nxo,nyo,nzo)
@@ -468,7 +469,7 @@ c-----------------------------------------------------------------------
          offs = offs0 + ioflds*stride + strideB
          call byte_set_view(offs,ifh_mbyte)
          if (rego) then
-            call map2reg(ur1,nrg,t_in,nout)
+            call map2reg(ur1,nxo,t_in,nout)
             call mfo_outs(ur1,nout,nxo,nyo,nzo)
          else
             call mfo_outs(t_in,nout,nxo,nyo,nzo)
@@ -481,7 +482,7 @@ c-----------------------------------------------------------------------
            offs = offs0 + ioflds*stride + strideB
            call byte_set_view(offs,ifh_mbyte)
            if (rego) then
-              call map2reg(ur1,nrg,ps_in(1,1,1,1,k),nout)
+              call map2reg(ur1,nxo,ps_in(1,1,1,1,k),nout)
               call mfo_outs(ur1,nout,nxo,nyo,nzo)
            else
               call mfo_outs(ps_in(1,1,1,1,k),nout,nxo,nyo,nzo)

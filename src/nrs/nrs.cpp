@@ -9,6 +9,7 @@
 #include "cds.hpp"
 #include "advectionSubCycling.hpp"
 #include "elliptic.hpp"
+#include "fld.hpp"
 
 static void computeDivUErr(nrs_t *nrs, dfloat &divUErrVolAvg, dfloat &divUErrL2)
 {
@@ -1363,3 +1364,36 @@ void nrs_t::printInfo(double time, int tstep, bool printStepInfo, bool printVerb
              "Unreasonable CFL!");
 }
 
+void nrs_t::writeFld(double t, int step, int outXYZ, int FP64, std::string suffix, int Nout, bool uniform) 
+{
+  int Nscalar = 0;
+  occa::memory o_s;
+  if(this->Nscalar) {
+    o_s = this->cds->o_S;
+    Nscalar = this->Nscalar;
+  }
+  fld::write(suffix, t, step, outXYZ, FP64, this->o_U, this->o_P, o_s, Nscalar, Nout, uniform); 
+}
+
+void nrs_t::writeFld(double t, int step, int outXYZ, int FP64, int Nout, bool uniform) 
+{
+  this->writeFld(t, step, outXYZ, FP64, "", Nout, uniform);
+}
+
+void nrs_t::writeFld(double t, int step, std::string suffix, int Nout, bool uniform) 
+{
+  std::string precision;
+  platform->options.getArgs("CHECKPOINT PRECISION", precision);
+  int FP64 = 0;
+  if(precision == "DP" || precision == "FP64") FP64 = 1;
+
+  int outXYZ = 1;
+  if(platform->options.compareArgs("CHECKPOINT OUTPUT MESH", "FALSE")) outXYZ = 0;
+
+  this->writeFld(t, step, outXYZ, FP64, suffix, Nout, uniform); 
+}
+
+void nrs_t::writeFld(double t, int step, int Nout, bool uniform) 
+{
+  this->writeFld(t, step, "", Nout, uniform);
+}
