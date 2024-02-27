@@ -569,7 +569,7 @@ void cvode_t::initialize()
     nekrsCheck(true,
                platform->comm.mpiComm,
                EXIT_FAILURE,
-               "CVODE SOLVER %s not supported!\n",
+               "CVODE linear solver %s is not supported!\n",
                linearSolverType.c_str());
   }
 

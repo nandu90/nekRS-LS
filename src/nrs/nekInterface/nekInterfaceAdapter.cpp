@@ -26,7 +26,7 @@ static void (*useric_ptr)(void);
 static void (*userqtl_ptr)(void);
 static void (*usrsetvert_ptr)(void);
 
-static void (*nek_outfld_ptr)(char *, int *, double*, double*, double*, double*, double*, double*, int*, int);
+static void (*nek_outfld_ptr)(char *, int *, int *, double*, double*, double*, double*, double*, double*, int*, int);
 static void (*nek_resetio_ptr)(void);
 static void (*nek_setio_ptr)(double *, int *, int *, int *, int *, int *, int *);
 static void (*nek_uic_ptr)(int *);
@@ -99,7 +99,7 @@ void outfld(const char *filename,
             const occa::memory &o_pp,
             const occa::memory &o_ss,
             int NSfields,
-            int Nro, 
+            int Nout, 
             bool uniform)
 {
   occa::memory o_u, o_p, o_s;
@@ -125,9 +125,6 @@ void outfld(const char *filename,
   // note, nrs->fieldOffset >= nelt*nxyz
   auto mesh = nrs->_mesh;
   dlong Nlocal = mesh->Nelements * mesh->Np;
-
-  nekrsCheck(Nro > 0 && Nro != mesh->N && !uniform, MPI_COMM_SELF, EXIT_FAILURE, 
-             "%s\n", "Different polynomial order supported for uniform grid only");
 
   // nek5000 uses lelv = lelt
   const dlong nekFieldOffset = nekData.lelt * mesh->Np;
@@ -200,19 +197,26 @@ void outfld(const char *filename,
     so = 1;
   }
 
-  int nxReg = Nro + 1;
 
   (*nek_setio_ptr)(&t, &xo, &vo, &po, &so, &NSfields, &FP64);
-  (*nek_outfld_ptr)((char *)filename, 
-                    &nxReg, 
-                    vx.data(), 
-                    vy.data(), 
-                    vz.data(), 
-                    pr.data(), 
-                    temp.data(), 
-                    ps.data(), 
-                    &nps, 
-                    strlen(filename));
+
+  {
+    int nxo = Nout + 1;
+    int ifreg = uniform;
+
+    (*nek_outfld_ptr)((char *)filename, 
+                      &nxo,
+                      &ifreg,           
+                      vx.data(), 
+                      vy.data(), 
+                      vz.data(), 
+                      pr.data(), 
+                      temp.data(), 
+                      ps.data(), 
+                      &nps, 
+                      strlen(filename));
+  }
+
   (*nek_resetio_ptr)();
 
   platform->timer.toc("checkpointing");
@@ -364,7 +368,7 @@ void set_usr_handles(const char *session_in, int verbose)
   check_error(dlerror());
   nek_end_ptr = (void (*)(void))dlsym(handle, fname("nekf_end"));
   check_error(dlerror());
-  nek_outfld_ptr = (void (*)(char *, int *, double*, double*, double*, double*, double*, double*, int*, int))dlsym(handle, fname("nekf_outfld"));
+  nek_outfld_ptr = (void (*)(char *, int *, int *, double*, double*, double*, double*, double*, double*, int*, int))dlsym(handle, fname("nekf_outfld"));
   check_error(dlerror());
   nek_resetio_ptr = (void (*)(void))dlsym(handle, fname("nekf_resetio"));
   check_error(dlerror());

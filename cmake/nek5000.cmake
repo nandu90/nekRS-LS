@@ -1,8 +1,4 @@
-message(CHECK_START "Checking for a supported Fortran compiler")
-string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "GNU" USING_GNU)
-string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "IntelLLVM" USING_INTEL_LLVM)
-string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "NVHPC" USING_NVHPC)
-string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "Flang" USING_FLANG)
+message(CHECK_START "Checking for a supported Nek5000 Fortran compiler")
 
 if(USING_GNU OR USING_INTEL_LLVM OR USING_NVHPC OR USING_FLANG)
   message(CHECK_PASS "Found the ${CMAKE_Fortran_COMPILER_ID} Fortran compiler")

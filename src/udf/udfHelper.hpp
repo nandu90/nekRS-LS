@@ -13,7 +13,6 @@ static void CiPassTest(const std::string& txt)
 
 static void CiFailTest(const std::string& txt, const std::string suffix = "")
 {
-  static int cnt = 0;
   if (platform->comm.mpiRank == 0)
     printf("CI test %s failed %s\n", txt.c_str(), suffix.c_str());
     failCnt++;

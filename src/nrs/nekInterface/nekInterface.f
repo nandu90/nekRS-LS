@@ -346,8 +346,9 @@ c-----------------------------------------------------------------------
       return
       end
 c-----------------------------------------------------------------------
-      subroutine nekf_outfld(prefix, nrg_in, vx_in, vy_in, vz_in,
-     &                       pm1_in, t_in, ps_in, nps_in)
+      subroutine nekf_outfld(prefix, nxo_in, rego_in,
+     $                       vx_in, vy_in, vz_in,
+     $                       pm1_in, t_in, ps_in, nps_in)
 
       include 'SIZE'
       include 'TOTAL'
@@ -355,7 +356,8 @@ c-----------------------------------------------------------------------
       include 'NEKINTF'
 
       character prefix*(*)
-      integer nrg_in
+      integer nxo_int
+      integer rego_in
 
       real vx_in(*), vy_in(*), vz_in(*)
       real pm1_in(*)
@@ -366,22 +368,34 @@ c-----------------------------------------------------------------------
       integer*8 offs0,offs,nbyte,stride,strideB,nxyzo8
       logical ifxyo_s
       logical rego
- 
-      common /SCRUZ/  ur1(lxo*lxo*lxo*lelt)
+
+      common /vrthov/ ur1(lxo*lxo*lxo*lelt)
      &              , ur2(lxo*lxo*lxo*lelt)
      &              , ur3(lxo*lxo*lxo*lelt)
 
-      rego = .false. ! dump on regular (uniform) mesh
-      if(nrg_in.gt.1) rego = .true.
+      rego = .false.
+      if(rego_in.ne.0) rego = .true.
+
+      if(nxo_in.le.1) then
+        nxo = nx1
+      else
+        nxo = nxo_in
+      endif
+
+      if (nxo.gt.lxo) then
+        if (nid.eq.0) write(6,*) 
+     &               'WARNING: nxo too large, reset to lxo!'
+        nxo = lxo
+      endif
 
       if(nio.eq.0) then
         if(rego) then
-          WRITE(6,1001) istep,time,nrg_in-1
+          WRITE(6,1001) istep,time,nxo-1
  1001     FORMAT(/,i9,1pe12.4,
      $    ' Writing checkpoint to uniform grid N=', i2)
         else
-          WRITE(6,1002) istep,time
- 1002     FORMAT(/,i9,1pe12.4,' Writing checkpoint')
+          WRITE(6,1002) istep,time,nxo-1
+ 1002     FORMAT(/,i9,1pe12.4,' Writing checkpoint N=', i2)
         endif
       endif
 
@@ -393,20 +407,9 @@ c-----------------------------------------------------------------------
       ifxyo_  = ifxyo
 
       nout = nelt
-      nxo  = lx1
-      nyo  = ly1
-      nzo  = lz1
-      if (rego) then
-         if (nrg_in.gt.lxo) then
-            if (nid.eq.0) write(6,*) 
-     &         'WARNING: nrg too large, reset to lxo!'
-            nrg_in = lxo
-         endif
-         nxo  = nrg_in
-         nyo  = nxo 
-         nzo  = 1
-         if(if3d) nzo = nxo 
-      endif
+      nyo  = nxo 
+      nzo  = nxo 
+
       offs0 = iHeaderSize + 4 + isize*nelgt
 
       ierr=0
@@ -428,76 +431,54 @@ c-----------------------------------------------------------------------
       if (ifxyo) then
          offs = offs0 + ldim*strideB
          call byte_set_view(offs,ifh_mbyte)
-         if (rego) then
-            call map2reg(ur1,nxo,xm1,nout)
-            call map2reg(ur2,nxo,ym1,nout)
-            if (if3d) call map2reg(ur3,nxo,zm1,nout)
-            call mfo_outv(ur1,ur2,ur3,nout,nxo,nyo,nzo)
-         else
-            call mfo_outv(xm1,ym1,zm1,nout,nxo,nyo,nzo)
-         endif
+         call interp_fld_n(ur1,nxo,xm1,rego)
+         call interp_fld_n(ur2,nxo,ym1,rego)
+         call interp_fld_n(ur3,nxo,zm1,rego)
+         call mfo_outv(ur1,ur2,ur3,nout,nxo,nyo,nzo)
          ioflds = ioflds + ldim
       endif
 
       if (ifvo ) then
          offs = offs0 + ioflds*stride + ldim*strideB
          call byte_set_view(offs,ifh_mbyte)
-         if (rego) then
-             call map2reg(ur1,nxo,vx_in,nout)
-             call map2reg(ur2,nxo,vy_in,nout)
-             if (if3d) call map2reg(ur3,nxo,vz_in,nout)
-             call mfo_outv(ur1,ur2,ur3,nout,nxo,nyo,nzo) 
-         else
-            call mfo_outv(vx_in,vy_in,vz_in,nout,nxo,nyo,nzo)
-         endif
+         call interp_fld_n(ur1,nxo,vx_in,rego)
+         call interp_fld_n(ur2,nxo,vy_in,rego)
+         call interp_fld_n(ur3,nxo,vz_in,rego)
+         call mfo_outv(ur1,ur2,ur3,nout,nxo,nyo,nzo)
          ioflds = ioflds + ldim
       endif
 
       if (ifpo ) then
          offs = offs0 + ioflds*stride + strideB
          call byte_set_view(offs,ifh_mbyte)
-         if (rego) then
-            call map2reg(ur1,nxo,pm1_in,nout)
-            call mfo_outs(ur1,nout,nxo,nyo,nzo)
-         else
-            call mfo_outs(pm1_in,nout,nxo,nyo,nzo)
-         endif
+         call interp_fld_n(ur1,nxo,pm1_in,rego)
+         call mfo_outs(ur1,nout,nxo,nyo,nzo)
          ioflds = ioflds + 1
       endif
 
       if (ifto ) then
          offs = offs0 + ioflds*stride + strideB
          call byte_set_view(offs,ifh_mbyte)
-         if (rego) then
-            call map2reg(ur1,nxo,t_in,nout)
-            call mfo_outs(ur1,nout,nxo,nyo,nzo)
-         else
-            call mfo_outs(t_in,nout,nxo,nyo,nzo)
-         endif
+         call interp_fld_n(ur1,nxo,t_in,rego)
+         call mfo_outs(ur1,nout,nxo,nyo,nzo)
          ioflds = ioflds + 1
       endif
 
       do k=1,nps_in
-         if(.true.) then
-           offs = offs0 + ioflds*stride + strideB
-           call byte_set_view(offs,ifh_mbyte)
-           if (rego) then
-              call map2reg(ur1,nxo,ps_in(1,1,1,1,k),nout)
-              call mfo_outs(ur1,nout,nxo,nyo,nzo)
-           else
-              call mfo_outs(ps_in(1,1,1,1,k),nout,nxo,nyo,nzo)
-           endif
-           ioflds = ioflds + 1
-         endif
+         offs = offs0 + ioflds*stride + strideB
+         call byte_set_view(offs,ifh_mbyte)
+         call interp_fld_n(ur1,nxo,ps_in(1,1,1,1,k),rego)
+         call mfo_outs(ur1,nout,nxo,nyo,nzo)
+         ioflds = ioflds + 1
       enddo
       dnbyte = 1.*ioflds*nout*wdsizo*nxo*nyo*nzo
 
+      ! add meta data (bounding boxes) to the end of the file
       if (if3d) then
          offs0   = offs0 + ioflds*stride
          strideB = nelB *2*4   ! min/max single precision
          stride  = nelgt*2*4
          ioflds  = 0
-         ! add meta data to the end of the file
          if (ifxyo) then
             offs = offs0 + ldim*strideB
             call byte_set_view(offs,ifh_mbyte)
@@ -1291,4 +1272,48 @@ c-----------------------------------------------------------------------
 
       return
       end
+c-----------------------------------------------------------------------
+      subroutine interp_fld_n(xn,n,xm,ifreg)   
+c     Interpolate xm(m,m,m,...) to xn(n,n,n,...) (GLL-->GLL)
 
+      include 'SIZE'
+      include 'INPUT'
+
+      real xn(*),xm(*)
+      logical ifreg
+      parameter (ldw=32*lx1*lx1*lz1)
+      real work(ldw) ! Assumes size of map is < than single element
+      integer im, in
+      integer e
+
+      m = nx1
+
+      if (ifreg) then
+        call map2reg(xn,n,xm,nelt)
+        return
+      endif
+
+      if (n.eq.m) then
+        call copy(xn,xm,m**ldim*nelt) 
+        return
+      endif
+
+      mstride = m**ldim
+      if (mstride.gt.ldw)
+     $   call exitti('ABORT. ldw small in map_fld$',mstride)
+
+      nstride = n**ldim
+      if (nstride.gt.ldw)
+     $   call exitti('ABORT. ldw small in map_fld$',nstride)
+
+      im = 1
+      in = 1
+      do e = 1,nelt
+         call map_m_to_n(xn(in),n,xm(im),m,if3d,work,ldw)
+         im = im + mstride
+         in = in + nstride
+      enddo
+
+      return
+      end
+c-----------------------------------------------------------------------
