@@ -32,6 +32,7 @@ set(INCLUDE_DIRS
   ${NEKRS_INSTALL_DIR}/include/nrs
   ${NEKRS_INSTALL_DIR}/include/nrs/io
   ${NEKRS_INSTALL_DIR}/include/nrs/plugins
+  ${NEKRS_INSTALL_DIR}/include/nrs/postProcessing
   ${NEKRS_INSTALL_DIR}/include/nrs/nekInterface
   ${NEKRS_INSTALL_DIR}/include/nrs/neknek
   ${NEKRS_INSTALL_DIR}/include/nrs/bdry

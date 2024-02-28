@@ -1,12 +1,12 @@
 #include "nrs.hpp"
+#include "aeroForce.hpp"
 
 namespace
 {
 static std::vector<dfloat> tmp;
 } // namespace
 
-std::tuple< std::vector<dfloat>, std::vector<dfloat> >
-nrs_t::aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_)
+aeroForce *nrs_t::aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_)
 {
   mesh_t *mesh = this->meshV;
 
@@ -14,6 +14,11 @@ nrs_t::aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij
   if (!o_Sij.isInitialized()) { 
     o_Sij = this->strainRate();
   } 
+
+  auto af = new aeroForce();
+
+  auto o_rho = af->rho();
+  if (!o_rho.isInitialized()) o_rho = this->o_rho;
 
   auto o_forces = platform->o_memPool.reserve<dfloat>(2 * mesh->dim * mesh->Nelements);
 
@@ -25,7 +30,7 @@ nrs_t::aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij
          mesh->o_sgeo,
          mesh->o_vmapM,
          mesh->o_EToB,
-         this->o_rho,
+         o_rho,
          this->o_mue,
          this->o_P,
          o_Sij,
@@ -48,8 +53,8 @@ nrs_t::aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij
 
   MPI_Allreduce(MPI_IN_PLACE, sum.data(), sum.size(), MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
   
-  std::vector<dfloat> sumViscous{sum[0], sum[1], sum[2]};
-  std::vector<dfloat> sumPressure{sum[3], sum[4], sum[5]};
+  af->forceViscous({sum[0], sum[1], sum[2]});
+  af->forcePressure({sum[3], sum[4], sum[5]});
 
-  return {sumViscous, sumPressure};
+  return af; 
 }

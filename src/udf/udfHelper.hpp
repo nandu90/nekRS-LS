@@ -7,14 +7,14 @@ static std::vector <std::tuple<std::string, bool> > ciTestList;
 static void CiPassTest(const std::string& txt)
 {
   if (platform->comm.mpiRank == 0)
-    printf("CI test %s passed\n", txt.c_str());
+    printf("CI test <%s> passed\n", txt.c_str());
     if(!failCnt) platform->exitValue = 0;
 }
 
 static void CiFailTest(const std::string& txt, const std::string suffix = "")
 {
   if (platform->comm.mpiRank == 0)
-    printf("CI test %s failed %s\n", txt.c_str(), suffix.c_str());
+    printf("CI test <%s> failed %s\n", txt.c_str(), suffix.c_str());
     failCnt++;
     if(failCnt) platform->exitValue = 1;
 }

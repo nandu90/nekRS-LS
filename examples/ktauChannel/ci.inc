@@ -58,7 +58,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
 
   auto o_Sij = nrs->strainRate();
 
-  const auto [Fviscous, Fpressure] = nrs->aeroForces(bidWall.size(), o_bidWall, o_Sij);
+  auto forces = nrs->aeroForces(bidWall.size(), o_bidWall, o_Sij);
   o_Sij.free();
 
   auto o_tmp = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
@@ -67,7 +67,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
 
   // https://turbulence.oden.utexas.edu/channel2015/data/LM_Channel_2000_mean_prof.dat
   const auto utauRef = 4.58794e-02;
-  const auto utau = sqrt(std::abs(Fviscous[0]) / areaWall.at(0));
+  const auto utau = sqrt(std::abs(forces->forceViscous()[0]) / areaWall.at(0));
   const auto utauErr = std::abs((utau - utauRef) / utauRef);
 
   CiEvalTest("tau", fabs(utauErr) < EPS, "with relative LinfErr:" + to_string_f(utauErr));

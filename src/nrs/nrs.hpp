@@ -7,6 +7,7 @@
 #include "cds.hpp"
 #include "neknek.hpp"
 #include "randomVector.hpp"
+#include "aeroForce.hpp"
 
 class nrs_t : public solver_t {
 
@@ -209,8 +210,7 @@ public:
 
   int numberActiveFields();
 
-  std::tuple< std::vector<dfloat>, std::vector<dfloat> > 
-  aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_ = o_NULL);
+  aeroForce *aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_ = o_NULL); 
 
   //       ( SO0          )         (     SO8  SO7)
   // Sij = ( SO3  SO1     )  Oij =  (          SO6)

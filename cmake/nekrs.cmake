@@ -92,6 +92,7 @@ set(NRS_INCLUDE
     src/nrs/bdry
     src/nrs/io
     src/nrs/neknek
+    src/nrs/postProcessing
     src/nrs/cds
     src/nrs/cds/regularization
     src/nrs/cds/cvode
