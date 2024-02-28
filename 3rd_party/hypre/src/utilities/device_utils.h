@@ -129,6 +129,9 @@ using hypre_DeviceItem = void*;
 
 #if defined(HYPRE_USING_ROCSPARSE)
 #include <rocsparse/rocsparse.h>
+#if !defined(ROCSPARSE_VERSION)
+#define ROCSPARSE_VERSION (ROCSPARSE_VERSION_MAJOR * 100000 + ROCSPARSE_VERSION_MINOR * 100 + ROCSPARSE_VERSION_PATCH)
+#endif
 #endif
 
 #if defined(HYPRE_USING_ROCSOLVER)
@@ -443,6 +446,8 @@ using hypre_DeviceItem = sycl::nd_item<3>;
 #define hypre_rocsparse_csrilu0_buffer_size    rocsparse_scsrilu0_buffer_size
 #define hypre_rocsparse_csrilu0_analysis       rocsparse_scsrilu0_analysis
 #define hypre_rocsparse_csrilu0                rocsparse_scsrilu0
+#define hypre_rocsparse_csritilu0_compute      rocsparse_scsritilu0_compute
+#define hypre_rocsparse_csritilu0_history      rocsparse_scsritilu0_history
 
 /* rocSOLVER */
 
@@ -500,6 +505,8 @@ using hypre_DeviceItem = sycl::nd_item<3>;
 #define hypre_rocsparse_csrilu0_buffer_size    rocsparse_dcsrilu0_buffer_size
 #define hypre_rocsparse_csrilu0_analysis       rocsparse_dcsrilu0_analysis
 #define hypre_rocsparse_csrilu0                rocsparse_dcsrilu0
+#define hypre_rocsparse_csritilu0_compute      rocsparse_dcsritilu0_compute
+#define hypre_rocsparse_csritilu0_history      rocsparse_dcsritilu0_history
 
 /* rocSOLVER */
 
@@ -681,7 +688,7 @@ struct hypre_DeviceData
 #else
    HYPRE_Int                         device;
 #endif
-   hypre_int                         device_max_shmem_per_block[2];
+   hypre_int                         device_max_shmem_per_block[3];
    /* by default, hypre puts GPU computations in this stream
     * Do not be confused with the default (null) stream */
    HYPRE_Int                         compute_stream_num;
@@ -717,6 +724,7 @@ struct hypre_DeviceData
 #define hypre_DeviceDataDevice(data)                         ((data) -> device)
 #define hypre_DeviceDataDeviceMaxWorkGroupSize(data)         ((data) -> device_max_work_group_size)
 #define hypre_DeviceDataDeviceMaxShmemPerBlock(data)         ((data) -> device_max_shmem_per_block)
+#define hypre_DeviceDataDeviceMaxShmemPerBlockInited(data)  (((data) -> device_max_shmem_per_block)[2])
 #define hypre_DeviceDataComputeStreamNum(data)               ((data) -> compute_stream_num)
 #define hypre_DeviceDataReduceBuffer(data)                   ((data) -> reduce_buffer)
 #define hypre_DeviceDataSpgemmUseVendor(data)                ((data) -> spgemm_use_vendor)

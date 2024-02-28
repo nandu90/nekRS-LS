@@ -21,6 +21,7 @@ void *
 hypre_BoomerAMGCreate( void )
 {
    hypre_ParAMGData  *amg_data;
+   hypre_Solver      *base;
 
    /* setup params */
    HYPRE_Int    max_levels;
@@ -104,6 +105,10 @@ hypre_BoomerAMGCreate( void )
    HYPRE_Int    ilu_lower_jacobi_iters;
    HYPRE_Int    ilu_upper_jacobi_iters;
    HYPRE_Int    ilu_reordering_type;
+   HYPRE_Int    ilu_iter_setup_type;
+   HYPRE_Int    ilu_iter_setup_option;
+   HYPRE_Int    ilu_iter_setup_max_iter;
+   HYPRE_Real   ilu_iter_setup_tolerance;
 
    HYPRE_Int    fsai_algo_type;
    HYPRE_Int    fsai_local_solve_type;
@@ -222,6 +227,10 @@ hypre_BoomerAMGCreate( void )
    ilu_lower_jacobi_iters = 5;
    ilu_upper_jacobi_iters = 5;
    ilu_reordering_type = 1;
+   ilu_iter_setup_type = 0;
+   ilu_iter_setup_option = 10;
+   ilu_iter_setup_max_iter = 20;
+   ilu_iter_setup_tolerance = 1.e-3;
 
    /* FSAI smoother params */
 #if defined (HYPRE_USING_CUDA) || defined (HYPRE_USING_HIP)
@@ -234,11 +243,11 @@ hypre_BoomerAMGCreate( void )
    {
       fsai_algo_type = hypre_NumThreads() > 4 ? 2 : 1;
    }
-   fsai_local_solve_type = 1;
-   fsai_max_steps = 5;
-   fsai_max_step_size = 3;
-   fsai_max_nnz_row = fsai_max_steps * fsai_max_step_size;
-   fsai_num_levels = 2;
+   fsai_local_solve_type = 0;
+   fsai_max_steps = 4;
+   fsai_max_step_size = 2;
+   fsai_max_nnz_row = 8;
+   fsai_num_levels = 1;
    fsai_threshold = 0.01;
    fsai_eig_maxiter = 5;
    fsai_kap_tolerance = 0.001;
@@ -311,6 +320,12 @@ hypre_BoomerAMGCreate( void )
     *-----------------------------------------------------------------------*/
 
    amg_data = hypre_CTAlloc(hypre_ParAMGData, 1, HYPRE_MEMORY_HOST);
+   base     = (hypre_Solver*) amg_data;
+
+   /* Set base solver function pointers */
+   hypre_SolverSetup(base)   = (HYPRE_PtrToSolverFcn)  HYPRE_BoomerAMGSetup;
+   hypre_SolverSolve(base)   = (HYPRE_PtrToSolverFcn)  HYPRE_BoomerAMGSolve;
+   hypre_SolverDestroy(base) = (HYPRE_PtrToDestroyFcn) HYPRE_BoomerAMGDestroy;
 
    /* memory location will be reset at the setup */
    hypre_ParAMGDataMemoryLocation(amg_data) = memory_location;
@@ -384,6 +399,10 @@ hypre_BoomerAMGCreate( void )
    hypre_BoomerAMGSetILUUpperJacobiIters(amg_data, ilu_upper_jacobi_iters);
    hypre_BoomerAMGSetILUMaxIter(amg_data, ilu_max_iter);
    hypre_BoomerAMGSetILULocalReordering(amg_data, ilu_reordering_type);
+   hypre_BoomerAMGSetILUIterSetupType(amg_data, ilu_iter_setup_type);
+   hypre_BoomerAMGSetILUIterSetupOption(amg_data, ilu_iter_setup_option);
+   hypre_BoomerAMGSetILUIterSetupMaxIter(amg_data, ilu_iter_setup_max_iter);
+   hypre_BoomerAMGSetILUIterSetupTolerance(amg_data, ilu_iter_setup_tolerance);
    hypre_BoomerAMGSetFSAIAlgoType(amg_data, fsai_algo_type);
    hypre_BoomerAMGSetFSAILocalSolveType(amg_data, fsai_local_solve_type);
    hypre_BoomerAMGSetFSAIMaxSteps(amg_data, fsai_max_steps);
@@ -4139,6 +4158,7 @@ hypre_BoomerAMGSetEuSparseA( void     *data,
    return hypre_error_flag;
 }
 
+
 HYPRE_Int
 hypre_BoomerAMGSetEuBJ( void     *data,
                         HYPRE_Int       eu_bj)
@@ -4154,6 +4174,7 @@ hypre_BoomerAMGSetEuBJ( void     *data,
 
    return hypre_error_flag;
 }
+
 HYPRE_Int
 hypre_BoomerAMGSetILUType( void     *data,
                            HYPRE_Int       ilu_type)
@@ -4169,6 +4190,7 @@ hypre_BoomerAMGSetILUType( void     *data,
 
    return hypre_error_flag;
 }
+
 HYPRE_Int
 hypre_BoomerAMGSetILULevel( void     *data,
                             HYPRE_Int       ilu_lfil)
@@ -4184,6 +4206,7 @@ hypre_BoomerAMGSetILULevel( void     *data,
 
    return hypre_error_flag;
 }
+
 HYPRE_Int
 hypre_BoomerAMGSetILUDroptol( void     *data,
                               HYPRE_Real       ilu_droptol)
@@ -4199,6 +4222,7 @@ hypre_BoomerAMGSetILUDroptol( void     *data,
 
    return hypre_error_flag;
 }
+
 HYPRE_Int
 hypre_BoomerAMGSetILUTriSolve( void     *data,
                                HYPRE_Int    ilu_tri_solve)
@@ -4214,6 +4238,7 @@ hypre_BoomerAMGSetILUTriSolve( void     *data,
 
    return hypre_error_flag;
 }
+
 HYPRE_Int
 hypre_BoomerAMGSetILULowerJacobiIters( void     *data,
                                        HYPRE_Int    ilu_lower_jacobi_iters)
@@ -4245,6 +4270,7 @@ hypre_BoomerAMGSetILUUpperJacobiIters( void     *data,
 
    return hypre_error_flag;
 }
+
 HYPRE_Int
 hypre_BoomerAMGSetILUMaxIter( void     *data,
                               HYPRE_Int       ilu_max_iter)
@@ -4260,6 +4286,7 @@ hypre_BoomerAMGSetILUMaxIter( void     *data,
 
    return hypre_error_flag;
 }
+
 HYPRE_Int
 hypre_BoomerAMGSetILUMaxRowNnz( void     *data,
                                 HYPRE_Int       ilu_max_row_nnz)
@@ -4275,6 +4302,7 @@ hypre_BoomerAMGSetILUMaxRowNnz( void     *data,
 
    return hypre_error_flag;
 }
+
 HYPRE_Int
 hypre_BoomerAMGSetILULocalReordering( void     *data,
                                       HYPRE_Int       ilu_reordering_type)
@@ -4287,6 +4315,70 @@ hypre_BoomerAMGSetILULocalReordering( void     *data,
       return hypre_error_flag;
    }
    hypre_ParAMGDataILULocalReordering(amg_data) = ilu_reordering_type;
+
+   return hypre_error_flag;
+}
+
+HYPRE_Int
+hypre_BoomerAMGSetILUIterSetupType( void     *data,
+                                    HYPRE_Int       ilu_iter_setup_type)
+{
+   hypre_ParAMGData  *amg_data = (hypre_ParAMGData*) data;
+
+   if (!amg_data)
+   {
+      hypre_error_in_arg(1);
+      return hypre_error_flag;
+   }
+   hypre_ParAMGDataILUIterSetupType(amg_data) = ilu_iter_setup_type;
+
+   return hypre_error_flag;
+}
+
+HYPRE_Int
+hypre_BoomerAMGSetILUIterSetupOption( void     *data,
+                                      HYPRE_Int       ilu_iter_setup_option)
+{
+   hypre_ParAMGData  *amg_data = (hypre_ParAMGData*) data;
+
+   if (!amg_data)
+   {
+      hypre_error_in_arg(1);
+      return hypre_error_flag;
+   }
+   hypre_ParAMGDataILUIterSetupOption(amg_data) = ilu_iter_setup_option;
+
+   return hypre_error_flag;
+}
+
+HYPRE_Int
+hypre_BoomerAMGSetILUIterSetupMaxIter( void     *data,
+                                       HYPRE_Int       ilu_iter_setup_max_iter)
+{
+   hypre_ParAMGData  *amg_data = (hypre_ParAMGData*) data;
+
+   if (!amg_data)
+   {
+      hypre_error_in_arg(1);
+      return hypre_error_flag;
+   }
+   hypre_ParAMGDataILUIterSetupMaxIter(amg_data) = ilu_iter_setup_max_iter;
+
+   return hypre_error_flag;
+}
+
+HYPRE_Int
+hypre_BoomerAMGSetILUIterSetupTolerance( void     *data,
+                                         HYPRE_Real       ilu_iter_setup_tolerance)
+{
+   hypre_ParAMGData  *amg_data = (hypre_ParAMGData*) data;
+
+   if (!amg_data)
+   {
+      hypre_error_in_arg(1);
+      return hypre_error_flag;
+   }
+   hypre_ParAMGDataILUIterSetupTolerance(amg_data) = ilu_iter_setup_tolerance;
 
    return hypre_error_flag;
 }

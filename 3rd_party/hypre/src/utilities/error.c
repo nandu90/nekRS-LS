@@ -8,7 +8,7 @@
 #include "_hypre_utilities.h"
 
 /* Global variable for error handling */
-hypre_Error hypre__global_error = {0, 0, NULL, 0, 0};
+hypre_Error hypre__global_error = {0, 0, 0, NULL, 0, 0};
 
 /*--------------------------------------------------------------------------
  * Process the error raised on the given line of the given source file
@@ -23,7 +23,7 @@ hypre_error_handler(const char *filename, HYPRE_Int line, HYPRE_Int ierr, const 
    /* Store the error code */
    err.error_flag |= ierr;
 
-#ifdef HYPRE_PRINT_ERRORS
+#if defined(HYPRE_PRINT_ERRORS)
 
    /* Error format strings without and with a message */
    const char  fmt_wo[] = "hypre error in file \"%s\", line %d, error code = %d\n";
@@ -76,9 +76,53 @@ hypre_error_handler(const char *filename, HYPRE_Int line, HYPRE_Int ierr, const 
 
    /* Free buffer */
    hypre_TFree(buffer, HYPRE_MEMORY_HOST);
-#endif
+#else
+   HYPRE_UNUSED_VAR(filename);
+   HYPRE_UNUSED_VAR(line);
+   HYPRE_UNUSED_VAR(msg);
+#endif /* if defined(HYPRE_PRINT_ERRORS) */
 
    hypre__global_error = err;
+}
+
+/*--------------------------------------------------------------------------
+ *--------------------------------------------------------------------------*/
+
+void
+hypre_error_code_save(void)
+{
+   /* Store the current error code in a temporary variable */
+   hypre_error_temp_flag = hypre_error_flag;
+
+   /* Reset current error code */
+   HYPRE_ClearAllErrors();
+}
+
+/*--------------------------------------------------------------------------
+ *--------------------------------------------------------------------------*/
+
+void
+hypre_error_code_restore(void)
+{
+   /* Restore hypre's error code */
+   hypre_error_flag = hypre_error_temp_flag;
+
+   /* Reset temporary error code */
+   hypre_error_temp_flag = 0;
+}
+
+/*--------------------------------------------------------------------------
+ *--------------------------------------------------------------------------*/
+
+HYPRE_Int
+HYPRE_GetGlobalError(MPI_Comm comm)
+{
+   HYPRE_Int global_error_flag;
+
+   hypre_MPI_Allreduce(&hypre_error_flag, &global_error_flag, 1,
+                       HYPRE_MPI_INT, hypre_MPI_BOR, comm);
+
+   return global_error_flag;
 }
 
 /*--------------------------------------------------------------------------

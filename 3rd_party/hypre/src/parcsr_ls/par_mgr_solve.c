@@ -25,9 +25,9 @@ hypre_MGRSolve( void               *mgr_vdata,
 {
 
    MPI_Comm              comm = hypre_ParCSRMatrixComm(A);
-   hypre_ParMGRData   *mgr_data = (hypre_ParMGRData*) mgr_vdata;
+   hypre_ParMGRData     *mgr_data = (hypre_ParMGRData*) mgr_vdata;
 
-   hypre_ParCSRMatrix  **A_array = (mgr_data -> A_array);
+   hypre_ParCSRMatrix **A_array = (mgr_data -> A_array);
    hypre_ParVector    **F_array = (mgr_data -> F_array);
    hypre_ParVector    **U_array = (mgr_data -> U_array);
 
@@ -35,10 +35,10 @@ hypre_MGRSolve( void               *mgr_vdata,
    HYPRE_Int            logging = (mgr_data -> logging);
    HYPRE_Int            print_level = (mgr_data -> print_level);
    HYPRE_Int            max_iter = (mgr_data -> max_iter);
-   HYPRE_Real           *norms = (mgr_data -> rel_res_norms);
-   hypre_ParVector      *Vtemp = (mgr_data -> Vtemp);
+   HYPRE_Real          *norms = (mgr_data -> rel_res_norms);
+   hypre_ParVector     *Vtemp = (mgr_data -> Vtemp);
    //   hypre_ParVector      *Utemp = (mgr_data -> Utemp);
-   hypre_ParVector      *residual;
+   hypre_ParVector     *residual = NULL;
 
    HYPRE_Complex        fp_zero = 0.0;
    HYPRE_Complex        fp_one = 1.0;
@@ -108,7 +108,7 @@ hypre_MGRSolve( void               *mgr_vdata,
    {
       if (logging > 1)
       {
-         hypre_ParVectorCopy(F_array[0], residual );
+         hypre_ParVectorCopy(F_array[0], residual);
          if (tol > hypre_cabs(fp_zero))
          {
             hypre_ParCSRMatrixMatvec(fp_neg_one, A_array[0], U_array[0], fp_one, residual);
@@ -507,6 +507,7 @@ hypre_MGRCycle( void              *mgr_vdata,
 {
    MPI_Comm               comm;
    hypre_ParMGRData      *mgr_data = (hypre_ParMGRData*) mgr_vdata;
+   hypre_Solver          *aff_base;
 
    HYPRE_Int              local_size;
    HYPRE_Int              level;
@@ -523,6 +524,7 @@ hypre_MGRCycle( void              *mgr_vdata,
    hypre_ParCSRMatrix   **A_array    = (mgr_data -> A_array);
    hypre_ParCSRMatrix   **RT_array   = (mgr_data -> RT_array);
    hypre_ParCSRMatrix   **P_array    = (mgr_data -> P_array);
+   hypre_ParCSRMatrix   **R_array    = (mgr_data -> R_array);
 #if defined(HYPRE_USING_GPU)
    hypre_ParCSRMatrix   **B_array    = (mgr_data -> B_array);
    hypre_ParCSRMatrix   **B_FF_array = (mgr_data -> B_FF_array);
@@ -572,7 +574,6 @@ hypre_MGRCycle( void              *mgr_vdata,
    HYPRE_Int             *restrict_type  = (mgr_data -> restrict_type);
    HYPRE_Int              pre_smoothing  = (mgr_data -> global_smooth_cycle) == 1 ? 1 : 0;
    HYPRE_Int              post_smoothing = (mgr_data -> global_smooth_cycle) == 2 ? 1 : 0;
-   HYPRE_Int              use_air = 0;
    HYPRE_Int              my_id;
    char                   region_name[1024];
    char                   msg[1024];
@@ -984,10 +985,23 @@ hypre_MGRCycle( void              *mgr_vdata,
             if (Frelax_type[level] == 2)
             {
                /* Do F-relaxation using AMG */
-               fine_grid_solver_solve((mgr_data -> aff_solver)[fine_grid],
-                                      A_ff_array[fine_grid],
-                                      F_fine_array[coarse_grid],
-                                      U_fine_array[coarse_grid]);
+               if (level == 0)
+               {
+                  /* TODO (VPM): unify with the next block */
+                  fine_grid_solver_solve((mgr_data -> aff_solver)[fine_grid],
+                                         A_ff_array[fine_grid],
+                                         F_fine_array[coarse_grid],
+                                         U_fine_array[coarse_grid]);
+               }
+               else
+               {
+                  aff_base = (hypre_Solver*) (mgr_data -> aff_solver)[level];
+
+                  hypre_SolverSolve(aff_base)((HYPRE_Solver) (mgr_data -> aff_solver)[level],
+                                              (HYPRE_Matrix) A_ff_array[level],
+                                              (HYPRE_Vector) F_fine_array[level + 1],
+                                              (HYPRE_Vector) U_fine_array[level + 1]);
+               }
             }
             else
             {
@@ -1042,19 +1056,13 @@ hypre_MGRCycle( void              *mgr_vdata,
          hypre_GpuProfilingPopRange();
          HYPRE_ANNOTATE_REGION_END("%s", region_name);
 
-         if ((restrict_type[fine_grid] == 4) ||
-             (restrict_type[fine_grid] == 5))
-         {
-            use_air = 1;
-         }
-
          hypre_sprintf(region_name, "Restrict");
          hypre_GpuProfilingPushRange(region_name);
          HYPRE_ANNOTATE_REGION_BEGIN("%s", region_name);
-         if (use_air)
+         if (R_array[fine_grid])
          {
             /* no transpose necessary for R */
-            hypre_ParCSRMatrixMatvec(fp_one, RT_array[fine_grid], Vtemp,
+            hypre_ParCSRMatrixMatvec(fp_one, R_array[fine_grid], Vtemp,
                                      fp_zero, F_array[coarse_grid]);
          }
          else

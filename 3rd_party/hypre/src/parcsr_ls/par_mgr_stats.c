@@ -256,6 +256,9 @@ hypre_MGRGetRestrictionName(hypre_ParMGRData  *mgr_data,
       case 13:
          return "CPR-like";
 
+      case 14:
+         return "Blk-ColLumped";
+
       default:
          return "Classical";
    }
@@ -272,7 +275,7 @@ hypre_MGRGetCoarseGridName(hypre_ParMGRData  *mgr_data,
    switch (hypre_ParMGRDataCoarseGridMethodI(mgr_data, level))
    {
       case 0:
-         return "RAP";
+         return "Glk-RAP";
 
       case 1:
          return "NG-BlkDiag";
@@ -285,6 +288,9 @@ hypre_MGRGetCoarseGridName(hypre_ParMGRData  *mgr_data,
 
       case 4:
          return "NG-ApproxInv";
+
+      case 5:
+         return "Glk-RAI";
 
       default:
          return "Unknown";
@@ -364,7 +370,7 @@ hypre_MGRSetupStats(void *mgr_vdata)
    }
 #ifdef HYPRE_USING_DSUPERLU
    else if ((HYPRE_PtrToParSolverFcn) hypre_ParMGRDataCoarseGridSolverSetup(mgr_data) ==
-            hypre_MGRDirectSolverSetup)
+            (HYPRE_PtrToParSolverFcn) hypre_MGRDirectSolverSetup)
    {
       /* TODO (VPM): Set SuperLU solver specifics */
       num_sublevels_amg[coarsest_mgr_level] = 0;

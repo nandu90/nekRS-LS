@@ -77,6 +77,16 @@ typedef float                  hypre_float;
 typedef double                 hypre_double;
 
 /*--------------------------------------------------------------------------
+ * Define macros
+ *--------------------------------------------------------------------------*/
+
+/* Macro for silencing unused variable warning */
+#define HYPRE_UNUSED_VAR(var) ((void) var)
+
+/* Macro for marking deprecated functions */
+#define HYPRE_DEPRECATED(reason) _Pragma(reason)
+
+/*--------------------------------------------------------------------------
  * Define various functions
  *--------------------------------------------------------------------------*/
 
@@ -121,6 +131,12 @@ typedef double                 hypre_double;
 #else
 #define hypre_pow pow
 #endif
+#endif
+
+/* Macro for ceiling division. It assumes non-negative dividend and positive divisor.
+   The result of this macro might need to be casted to an integer type depending on the use case */
+#ifndef hypre_ceildiv
+#define hypre_ceildiv(a, b) (((a) + (b) - 1) / (b))
 #endif
 
 #ifndef hypre_ceil
@@ -204,6 +220,39 @@ typedef double                 hypre_double;
 #endif
 
 #endif /* hypre_GENERAL_HEADER */
+/******************************************************************************
+ * Copyright (c) 1998 Lawrence Livermore National Security, LLC and other
+ * HYPRE Project Developers. See the top-level COPYRIGHT file for details.
+ *
+ * SPDX-License-Identifier: (Apache-2.0 OR MIT)
+ ******************************************************************************/
+
+#ifndef HYPRE_BASE_HEADER
+#define HYPRE_BASE_HEADER
+
+/******************************************************************************
+ *
+ * Base private solver struct
+ *
+ *****************************************************************************/
+
+typedef struct
+{
+   HYPRE_PtrToSolverFcn   setup;
+   HYPRE_PtrToSolverFcn   solve;
+   HYPRE_PtrToDestroyFcn  destroy;
+
+} hypre_Solver;
+
+/*--------------------------------------------------------------------------
+ * Accessor functions for the hypre_Solver structure
+ *--------------------------------------------------------------------------*/
+
+#define hypre_SolverSetup(data)       ((data) -> setup)
+#define hypre_SolverSolve(data)       ((data) -> solve)
+#define hypre_SolverDestroy(data)     ((data) -> destroy)
+
+#endif /* HYPRE_BASE_HEADER */
 /******************************************************************************
  * Copyright (c) 1998 Lawrence Livermore National Security, LLC and other
  * HYPRE Project Developers. See the top-level COPYRIGHT file for details.
@@ -457,6 +506,7 @@ HYPRE_Int hypre_ParPrintf(MPI_Comm comm, const char *format, ...);
 typedef struct
 {
    HYPRE_Int  error_flag;
+   HYPRE_Int  temp_error_flag;
    HYPRE_Int  print_to_memory;
    char      *memory;
    HYPRE_Int  mem_sz;
@@ -466,16 +516,19 @@ typedef struct
 
 extern hypre_Error hypre__global_error;
 #define hypre_error_flag  hypre__global_error.error_flag
+#define hypre_error_temp_flag  hypre__global_error.temp_error_flag
 
 /*--------------------------------------------------------------------------
  * HYPRE error macros
  *--------------------------------------------------------------------------*/
 
 void hypre_error_handler(const char *filename, HYPRE_Int line, HYPRE_Int ierr, const char *msg);
+void hypre_error_code_save(void);
+void hypre_error_code_restore(void);
 
-#define hypre_error(IERR)  hypre_error_handler(__FILE__, __LINE__, IERR, NULL)
-#define hypre_error_w_msg(IERR, msg)  hypre_error_handler(__FILE__, __LINE__, IERR, msg)
-#define hypre_error_in_arg(IARG)  hypre_error(HYPRE_ERROR_ARG | IARG<<3)
+#define hypre_error(IERR) hypre_error_handler(__FILE__, __LINE__, IERR, NULL)
+#define hypre_error_w_msg(IERR, msg) hypre_error_handler(__FILE__, __LINE__, IERR, msg)
+#define hypre_error_in_arg(IARG) hypre_error(HYPRE_ERROR_ARG | IARG<<3)
 
 #if defined(HYPRE_DEBUG)
 /* host assert */
@@ -500,7 +553,6 @@ void hypre_error_handler(const char *filename, HYPRE_Int line, HYPRE_Int ierr, c
 #endif
 
 #endif /* hypre_ERROR_HEADER */
-
 /******************************************************************************
  * Copyright (c) 1998 Lawrence Livermore National Security, LLC and other
  * HYPRE Project Developers. See the top-level COPYRIGHT file for details.
@@ -568,6 +620,7 @@ extern "C" {
 #define MPI_MAX             hypre_MPI_MAX
 #define MPI_LOR             hypre_MPI_LOR
 #define MPI_LAND            hypre_MPI_LAND
+#define MPI_BOR             hypre_MPI_BOR
 #define MPI_SUCCESS         hypre_MPI_SUCCESS
 #define MPI_STATUSES_IGNORE hypre_MPI_STATUSES_IGNORE
 
@@ -681,6 +734,7 @@ typedef HYPRE_Int  hypre_MPI_Info;
 #define  hypre_MPI_MAX 2
 #define  hypre_MPI_LOR 3
 #define  hypre_MPI_LAND 4
+#define  hypre_MPI_BOR 5
 #define  hypre_MPI_SUCCESS 0
 #define  hypre_MPI_STATUSES_IGNORE 0
 
@@ -729,6 +783,7 @@ typedef MPI_User_function    hypre_MPI_User_function;
 #define  hypre_MPI_MIN MPI_MIN
 #define  hypre_MPI_MAX MPI_MAX
 #define  hypre_MPI_LOR MPI_LOR
+#define  hypre_MPI_BOR MPI_BOR
 #define  hypre_MPI_SUCCESS MPI_SUCCESS
 #define  hypre_MPI_STATUSES_IGNORE MPI_STATUSES_IGNORE
 
@@ -1618,7 +1673,7 @@ typedef struct
 
 } hypre_DataExchangeResponse;
 
-HYPRE_Int hypre_CreateBinaryTree(HYPRE_Int, HYPRE_Int, hypre_BinaryTree*);
+HYPRE_Int hypre_CreateBinaryTree(HYPRE_Int, HYPRE_Int, hypre_BinaryTree**);
 HYPRE_Int hypre_DestroyBinaryTree(hypre_BinaryTree*);
 HYPRE_Int hypre_DataExchangeList(HYPRE_Int num_contacts, HYPRE_Int *contact_proc_list,
                                  void *contact_send_buf, HYPRE_Int *contact_send_buf_starts, HYPRE_Int contact_obj_size,
@@ -1626,7 +1681,6 @@ HYPRE_Int hypre_DataExchangeList(HYPRE_Int num_contacts, HYPRE_Int *contact_proc
                                  HYPRE_Int rnum, MPI_Comm comm, void **p_response_recv_buf, HYPRE_Int **p_response_recv_buf_starts);
 
 #endif /* end of header */
-
 /******************************************************************************
  * Copyright (c) 1998 Lawrence Livermore National Security, LLC and other
  * HYPRE Project Developers. See the top-level COPYRIGHT file for details.
@@ -1737,6 +1791,11 @@ typedef struct
    HYPRE_Int              struct_comm_recv_buffer_size;
    HYPRE_Int              struct_comm_send_buffer_size;
 
+   /* GPU MPI */
+#if defined(HYPRE_USING_GPU) || defined(HYPRE_USING_DEVICE_OPENMP)
+   HYPRE_Int              use_gpu_aware_mpi;
+#endif
+
 #if defined(HYPRE_USING_GPU)
    hypre_DeviceData      *device_data;
    HYPRE_Int              device_gs_method; /* device G-S options */
@@ -1779,6 +1838,7 @@ typedef struct
 
 #define hypre_HandleDeviceData(hypre_handle)                     ((hypre_handle) -> device_data)
 #define hypre_HandleDeviceGSMethod(hypre_handle)                 ((hypre_handle) -> device_gs_method)
+#define hypre_HandleUseGpuAwareMPI(hypre_handle)                 ((hypre_handle) -> use_gpu_aware_mpi)
 
 #define hypre_HandleCurandGenerator(hypre_handle)                hypre_DeviceDataCurandGenerator(hypre_HandleDeviceData(hypre_handle))
 #define hypre_HandleCublasHandle(hypre_handle)                   hypre_DeviceDataCublasHandle(hypre_HandleDeviceData(hypre_handle))
@@ -1794,6 +1854,7 @@ typedef struct
 #define hypre_HandleDevice(hypre_handle)                         hypre_DeviceDataDevice(hypre_HandleDeviceData(hypre_handle))
 #define hypre_HandleDeviceMaxWorkGroupSize(hypre_handle)         hypre_DeviceDataDeviceMaxWorkGroupSize(hypre_HandleDeviceData(hypre_handle))
 #define hypre_HandleDeviceMaxShmemPerBlock(hypre_handle)         hypre_DeviceDataDeviceMaxShmemPerBlock(hypre_HandleDeviceData(hypre_handle))
+#define hypre_HandleDeviceMaxShmemPerBlockInited(hypre_handle)   hypre_DeviceDataDeviceMaxShmemPerBlockInited(hypre_HandleDeviceData(hypre_handle))
 #define hypre_HandleComputeStreamNum(hypre_handle)               hypre_DeviceDataComputeStreamNum(hypre_HandleDeviceData(hypre_handle))
 #define hypre_HandleReduceBuffer(hypre_handle)                   hypre_DeviceDataReduceBuffer(hypre_HandleDeviceData(hypre_handle))
 #define hypre_HandleSpgemmUseVendor(hypre_handle)                hypre_DeviceDataSpgemmUseVendor(hypre_HandleDeviceData(hypre_handle))
@@ -1935,8 +1996,35 @@ typedef struct
  *--------------------------------------------------------------------------*/
 
 #define hypre_IntArrayData(array)                  ((array) -> data)
+#define hypre_IntArrayDataI(array, i)              ((array) -> data[i])
 #define hypre_IntArraySize(array)                  ((array) -> size)
 #define hypre_IntArrayMemoryLocation(array)        ((array) -> memory_location)
+
+/******************************************************************************
+ *
+ * hypre_IntArrayArray: struct for holding an array of hypre_IntArray
+ *
+ *****************************************************************************/
+
+/*--------------------------------------------------------------------------
+ * hypre_IntArrayArray
+ *--------------------------------------------------------------------------*/
+
+typedef struct
+{
+   hypre_IntArray       **entries;
+   HYPRE_Int              size;
+} hypre_IntArrayArray;
+
+/*--------------------------------------------------------------------------
+ * Accessor functions for the IntArrayArray structure
+ *--------------------------------------------------------------------------*/
+
+#define hypre_IntArrayArrayEntries(array)           ((array) -> entries)
+#define hypre_IntArrayArrayEntryI(array, i)         ((array) -> entries[i])
+#define hypre_IntArrayArrayEntryIData(array, i)     ((array) -> entries[i] -> data)
+#define hypre_IntArrayArrayEntryIDataJ(array, i, j) ((array) -> entries[i] -> data[j])
+#define hypre_IntArrayArraySize(array)              ((array) -> size)
 
 #endif
 /******************************************************************************
@@ -1996,6 +2084,8 @@ HYPRE_Int hypre_GetDeviceCount(hypre_int *device_count);
 HYPRE_Int hypre_GetDeviceLastError(void);
 HYPRE_Int hypre_UmpireInit(hypre_Handle *hypre_handle_);
 HYPRE_Int hypre_UmpireFinalize(hypre_Handle *hypre_handle_);
+HYPRE_Int hypre_GetDeviceMaxShmemSize(hypre_int device_id, hypre_int *max_size_ptr,
+                                      hypre_int *max_size_optin_ptr);
 
 /* matrix_stats.h */
 hypre_MatrixStats* hypre_MatrixStatsCreate( void );
@@ -2294,6 +2384,8 @@ HYPRE_Int hypre_CurandUniformSingle( HYPRE_Int n, float *urand, HYPRE_Int set_se
 
 HYPRE_Int hypre_ResetDeviceRandGenerator( hypre_ulonglongint seed, hypre_ulonglongint offset );
 
+HYPRE_Int hypre_bind_device_id(HYPRE_Int device_id_in, HYPRE_Int myid,
+                               HYPRE_Int nproc, MPI_Comm comm);
 HYPRE_Int hypre_bind_device(HYPRE_Int myid, HYPRE_Int nproc, MPI_Comm comm);
 
 /* nvtx.c */
@@ -2329,6 +2421,8 @@ HYPRE_Int hypre_SetUseGpuRand( HYPRE_Int use_gpurand );
 HYPRE_Int hypre_SetGaussSeidelMethod( HYPRE_Int gs_method );
 HYPRE_Int hypre_SetUserDeviceMalloc(GPUMallocFunc func);
 HYPRE_Int hypre_SetUserDeviceMfree(GPUMfreeFunc func);
+HYPRE_Int hypre_SetGpuAwareMPI( HYPRE_Int use_gpu_aware_mpi );
+HYPRE_Int hypre_GetGpuAwareMPI(void);
 
 /* int_array.c */
 hypre_IntArray* hypre_IntArrayCreate( HYPRE_Int size );
@@ -2352,6 +2446,16 @@ HYPRE_Int hypre_IntArrayCount( hypre_IntArray *v, HYPRE_Int value,
                                HYPRE_Int *num_values_ptr );
 HYPRE_Int hypre_IntArrayInverseMapping( hypre_IntArray *v, hypre_IntArray **w_ptr );
 HYPRE_Int hypre_IntArrayNegate( hypre_IntArray *v );
+HYPRE_Int hypre_IntArraySeparateByValue( HYPRE_Int num_values, HYPRE_Int *values,
+                                         HYPRE_Int *sizes, hypre_IntArray *v,
+                                         hypre_IntArrayArray **w_ptr );
+hypre_IntArrayArray* hypre_IntArrayArrayCreate( HYPRE_Int num_entries, HYPRE_Int *sizes );
+HYPRE_Int hypre_IntArrayArrayDestroy( hypre_IntArrayArray *w );
+HYPRE_Int hypre_IntArrayArrayInitializeIn( hypre_IntArrayArray *w,
+                                           HYPRE_MemoryLocation  memory_location );
+HYPRE_Int hypre_IntArrayArrayInitialize( hypre_IntArrayArray *w );
+HYPRE_Int hypre_IntArrayArrayMigrate( hypre_IntArrayArray *w,
+                                      HYPRE_MemoryLocation memory_location );
 
 /* int_array_device.c */
 #if defined(HYPRE_USING_GPU) || defined(HYPRE_USING_DEVICE_OPENMP)
@@ -2361,6 +2465,9 @@ HYPRE_Int hypre_IntArrayCountDevice ( hypre_IntArray *v, HYPRE_Int value,
 HYPRE_Int hypre_IntArrayInverseMappingDevice( hypre_IntArray *v, hypre_IntArray *w );
 HYPRE_Int hypre_IntArrayNegateDevice( hypre_IntArray *v );
 HYPRE_Int hypre_IntArraySetInterleavedValuesDevice( hypre_IntArray *v, HYPRE_Int cycle );
+HYPRE_Int hypre_IntArraySeparateByValueDevice( HYPRE_Int num_values, HYPRE_Int *values,
+                                               HYPRE_Int *sizes, hypre_IntArray *v,
+                                               hypre_IntArrayArray *w );
 #endif
 
 /* memory_tracker.c */
@@ -2860,6 +2967,8 @@ hypre_UnorderedIntMapFindCloserFreeBucket( hypre_UnorderedIntMap  *m,
                                            hypre_HopscotchBucket **free_bucket,
                                            HYPRE_Int *free_dist)
 {
+   HYPRE_UNUSED_VAR(m);
+
    hypre_HopscotchBucket* move_bucket = *free_bucket - (HYPRE_HOPSCOTCH_HASH_HOP_RANGE - 1);
    HYPRE_Int move_free_dist;
    for (move_free_dist = HYPRE_HOPSCOTCH_HASH_HOP_RANGE - 1; move_free_dist > 0; --move_free_dist)
@@ -2901,8 +3010,8 @@ hypre_UnorderedIntMapFindCloserFreeBucket( hypre_UnorderedIntMap  *m,
             #pragma omp flush
 #endif
 
-            move_bucket->hopInfo |= (1U << move_free_dist);
-            move_bucket->hopInfo &= ~(1U << move_new_free_dist);
+            move_bucket->hopInfo = move_bucket->hopInfo | (1U << move_free_dist);
+            move_bucket->hopInfo = move_bucket->hopInfo & ~(1U << move_new_free_dist);
 
             *free_bucket = new_free_bucket;
             *free_dist -= move_free_dist - move_new_free_dist;
@@ -2936,6 +3045,8 @@ hypre_UnorderedBigIntMapFindCloserFreeBucket( hypre_UnorderedBigIntMap   *m,
                                               hypre_BigHopscotchBucket **free_bucket,
                                               HYPRE_Int *free_dist)
 {
+   HYPRE_UNUSED_VAR(m);
+
    hypre_BigHopscotchBucket* move_bucket = *free_bucket - (HYPRE_HOPSCOTCH_HASH_HOP_RANGE - 1);
    HYPRE_Int move_free_dist;
    for (move_free_dist = HYPRE_HOPSCOTCH_HASH_HOP_RANGE - 1; move_free_dist > 0; --move_free_dist)
@@ -2977,8 +3088,8 @@ hypre_UnorderedBigIntMapFindCloserFreeBucket( hypre_UnorderedBigIntMap   *m,
             #pragma omp flush
 #endif
 
-            move_bucket->hopInfo |= (1U << move_free_dist);
-            move_bucket->hopInfo &= ~(1U << move_new_free_dist);
+            move_bucket->hopInfo = move_bucket->hopInfo | (1U << move_free_dist);
+            move_bucket->hopInfo = move_bucket->hopInfo & ~(1U << move_new_free_dist);
 
             *free_bucket = new_free_bucket;
             *free_dist -= move_free_dist - move_new_free_dist;
@@ -3570,10 +3681,10 @@ hypre_UnorderedIntMapPutIfAbsent( hypre_UnorderedIntMap *m,
       {
          if (free_dist < HYPRE_HOPSCOTCH_HASH_HOP_RANGE)
          {
-            free_bucket->data     = data;
-            free_bucket->key      = key;
-            free_bucket->hash     = hash;
-            startBucket->hopInfo |= 1U << free_dist;
+            free_bucket->data    = data;
+            free_bucket->key     = key;
+            free_bucket->hash    = hash;
+            startBucket->hopInfo = startBucket->hopInfo | (1U << free_dist);
 #ifdef HYPRE_CONCURRENT_HOPSCOTCH
             omp_unset_lock(&segment->lock);
 #endif
@@ -3652,10 +3763,10 @@ hypre_UnorderedBigIntMapPutIfAbsent( hypre_UnorderedBigIntMap *m,
       {
          if (free_dist < HYPRE_HOPSCOTCH_HASH_HOP_RANGE)
          {
-            free_bucket->data     = data;
-            free_bucket->key      = key;
-            free_bucket->hash     = hash;
-            startBucket->hopInfo |= 1U << free_dist;
+            free_bucket->data    = data;
+            free_bucket->key     = key;
+            free_bucket->hash    = hash;
+            startBucket->hopInfo = startBucket->hopInfo | (1U << free_dist);
 #ifdef HYPRE_CONCURRENT_HOPSCOTCH
             omp_unset_lock(&segment->lock);
 #endif

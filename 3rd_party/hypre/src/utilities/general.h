@@ -37,6 +37,16 @@ typedef float                  hypre_float;
 typedef double                 hypre_double;
 
 /*--------------------------------------------------------------------------
+ * Define macros
+ *--------------------------------------------------------------------------*/
+
+/* Macro for silencing unused variable warning */
+#define HYPRE_UNUSED_VAR(var) ((void) var)
+
+/* Macro for marking deprecated functions */
+#define HYPRE_DEPRECATED(reason) _Pragma(reason)
+
+/*--------------------------------------------------------------------------
  * Define various functions
  *--------------------------------------------------------------------------*/
 
@@ -81,6 +91,12 @@ typedef double                 hypre_double;
 #else
 #define hypre_pow pow
 #endif
+#endif
+
+/* Macro for ceiling division. It assumes non-negative dividend and positive divisor.
+   The result of this macro might need to be casted to an integer type depending on the use case */
+#ifndef hypre_ceildiv
+#define hypre_ceildiv(a, b) (((a) + (b) - 1) / (b))
 #endif
 
 #ifndef hypre_ceil
