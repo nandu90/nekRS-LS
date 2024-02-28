@@ -1,29 +1,28 @@
 set(HYPRE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/hypre)
-set(HYPRE_FLAGS_EXTRA -fPIC)
 
+set(HYPRE_FLAGS_EXTRA "-fPIC")
 if("${CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY}" STREQUAL "")
   if(USING_NVHPC)
     # CMake doesn't populate this flag correctly - at least for the moment
-    set(CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY -fvisibility=)
+    set(CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY "-fvisibility=")
   else()
     message(WARNING "Cannot identify visibility compiler flag!")
   endif()
 endif()
-string(APPEND HYPRE_FLAGS_EXTRA "${CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY}hidden")
+string(APPEND HYPRE_FLAGS_EXTRA " ${CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY}hidden")
+
 
 set(HYPRE_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/HYPRE_BUILD-prefix)
 set(HYPRE_BUILD_DIR ${HYPRE_INSTALL_DIR}/src/HYPRE_BUILD)
-
-
 ExternalProject_Add(
    HYPRE_BUILD
    URL "${HYPRE_SOURCE_DIR}" 
    CONFIGURE_COMMAND cd ${HYPRE_BUILD_DIR}/src && ./configure 
-   --prefix=${HYPRE_INSTALL_DIR}
-   --with-extra-CFLAGS=${HYPRE_FLAGS_EXTRA}
-   --with-extra-CXXFLAGS=${HYPRE_FLAGS_EXTRA}
-   --disable-shared --enable-single --enable-mixedint --disable-fortran
-   ${HYPRE_CONFIGURE_FLAGS}
+     --prefix=${HYPRE_INSTALL_DIR}
+     --with-extra-CFLAGS=${HYPRE_FLAGS_EXTRA}
+     --with-extra-CXXFLAGS=${HYPRE_FLAGS_EXTRA}
+     --disable-shared --enable-single --enable-mixedint --disable-fortran
+     ${HYPRE_CONFIGURE_FLAGS}
    BUILD_COMMAND "" 
    INSTALL_COMMAND cd ${HYPRE_BUILD_DIR}/src && $(MAKE) install
 )
@@ -34,6 +33,7 @@ target_include_directories(nekrs-hypre PRIVATE ${HYPRE_INSTALL_DIR}/include)
 target_link_libraries(nekrs-hypre PUBLIC MPI::MPI_C 
                                   PRIVATE ${HYPRE_INSTALL_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}HYPRE.a)
 set_target_properties(nekrs-hypre PROPERTIES CXX_VISIBILITY_PRESET hidden)
+
 
 if(ENABLE_HYPRE_GPU AND (OCCA_CUDA_ENABLED OR OCCA_HIP_ENABLED))
 
@@ -46,23 +46,24 @@ if(OCCA_CUDA_ENABLED)
   set(HYPRE_COMPILER_CXX_FLAGS ${HYPRE_FLAGS_EXTRA})
   set(HYPRE_DEVICE_COMPILER_FLAGS "")
 
-  set(HYPRE_DEP CUDA::cudart)
-  string(APPEND HYPRE_DEP CUDA::curand)
-  string(APPEND HYPRE_DEP CUDA::cublas)
-  string(APPEND HYPRE_DEP CUDA::cusparse)
-  string(APPEND HYPRE_DEP CUDA::cusolver)
+  set(HYPRE_DEP "CUDA::cudart")
+  list(APPEND HYPRE_DEP "CUDA::curand")
+  list(APPEND HYPRE_DEP "CUDA::cublas")
+  list(APPEND HYPRE_DEP "CUDA::cusparse")
+  list(APPEND HYPRE_DEP "CUDA::cusolver")
 
-  set(HYPRE_CONFIGURE_FLAGS --with-cuda)
-  if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "11.1.0")
-    string(APPEND HYPRE_CONFIGURE_FLAGS "--with-gpu-arch='70 80'")
-  endif()
+  set(HYPRE_BACKEND --with-cuda)
 
   if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "12.0.0")
-    string(APPEND HYPRE_CONFIGURE_FLAGS "--with-gpu-arch='70 80 90'")
-    string(APPEND HYPRE_CONFIGURE_FLAGS --enable-device-malloc-async)
+    set(HYPRE_DEVICE_ARCH "HYPRE_CUDA_SM=70 80 90")
+    set(HYPRE_CONFIGURE_FLAGS "--enable-device-malloc-async")
+  else()
+    set(HYPRE_DEVICE_ARCH "HYPRE_CUDA_SM=70 80")
   endif()
+
 elseif(OCCA_HIP_ENABLED)
   enable_language(HIP)
+
   set(HYPRE_DEVICE_COMPILER ${CMAKE_HIP_COMPILER})
   set(HYPRE_COMPILER_C_FLAGS ${HYPRE_FLAGS_EXTRA})
   set(HYPRE_COMPILER_CXX_FLAGS ${HYPRE_FLAGS_EXTRA})
@@ -73,21 +74,20 @@ elseif(OCCA_HIP_ENABLED)
   find_package(rocsparse REQUIRED)
   find_package(rocsolver REQUIRED)
 
-  set(HYPRE_DEP roc::rocrand)
-  string(APPEND HYPRE_DEP roc::rocblas)
-  string(APPEND HYPRE_DEP roc::rocsparse)
-  string(APPEND HYPRE_DEP roc::rocsolver)
+  set(HYPRE_DEP "roc::rocrand")
+  list(APPEND HYPRE_DEP "roc::rocblas")
+  list(APPEND HYPRE_DEP "roc::rocsparse")
+  list(APPEND HYPRE_DEP "roc::rocsolver")
 
-  set(HYPRE_CONFIGURE_FLAGS --with-hip)
+  set(HYPRE_BACKEND "--with-hip")
 endif()
 
 if(NEKRS_GPU_MPI)
-  string(APPEND HYPRE_CONFIGURE_FLAGS --enable-gpu-aware-mpi)
+  list(APPEND HYPRE_CONFIGURE_FLAGS --enable-gpu-aware-mpi)
 endif()
 
   set(HYPRE_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/HYPRE_BUILD_DEVICE-prefix)
   set(HYPRE_BUILD_DIR ${HYPRE_INSTALL_DIR}/src/HYPRE_BUILD_DEVICE)
-
   ExternalProject_Add(
    HYPRE_BUILD_DEVICE
    URL "${HYPRE_SOURCE_DIR}" 
@@ -98,6 +98,7 @@ endif()
      --with-extra-CXXFLAGS=${HYPRE_COMPILER_CXX_FLAGS}
      --with-extra-CUFLAGS=${HYPRE_DEVICE_COMPILER_FLAGS}
      --disable-shared --enable-single --enable-mixedint --disable-fortran
+     ${HYPRE_BACKEND} ${HYPRE_DEVICE_ARCH}
      ${HYPRE_CONFIGURE_FLAGS}
    BUILD_COMMAND "" 
    INSTALL_COMMAND cd ${HYPRE_BUILD_DIR}/src && $(MAKE) install
@@ -120,9 +121,13 @@ else()
   target_link_libraries(nekrs-hypre-device PUBLIC libocca MPI::MPI_C) 
 endif()
 
+unset(HYPRE_DEVICE_COMPILER)
 unset(HYPRE_BUILD_DIR)
 unset(HYPRE_SOURCE_DIR)
 unset(HYPRE_CONFIGURE_FLAGS) 
 unset(HYPRE_INSTALL_DIR)
 unset(HYPRE_FLAGS_EXTRA)
+unset(HYPRE_COMPILER_C_FLAGS)
+unset(HYPRE_COMPILER_CXX_FLAGS)
+unset(HYPRE_DEVICE_COMPILER_FLAGS)
 unset(HYPRE_DEP)
