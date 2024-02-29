@@ -193,95 +193,129 @@ void ogs::initKernels(MPI_Comm comm, occa::device device, ogsBuildKernel_t build
 
   occa::properties props = ogs::kernelInfo;
 
-  {
-    occa::properties props2 = ogs::kernelInfo;
+  props["includes"] += oklpath + "/ogsDefs.h";
 
-    props2["includes"] += oklpath + "/ogsDefs.h";
-    props2["defines/p_gatherNodesPerBlock"] = gatherNodesPerBlock;
-    props2["defines/init_"
-           "float"
-           "_add"] = (float)0;
-    props2["defines/init_"
-           "float"
-           "_add"] = (float)0;
-    props2["defines/init_"
-           "float"
-           "_min"] = (float)std::numeric_limits<float>::max();
-    props2["defines/init_"
-           "float"
-           "_max"] = (float)-std::numeric_limits<float>::max();
-    props2["defines/init_"
-           "double"
-           "_add"] = (double)0;
-    props2["defines/init_"
-           "double"
-           "_min"] = (double)std::numeric_limits<double>::max();
-    props2["defines/init_"
-           "double"
-           "_max"] = (double)-std::numeric_limits<double>::max();
-    ogs::gatherScatterNewKernel_floatAdd =
-        buildKernel(oklpath + "gatherScatterNew.okl", "gatherScatter_float_add", props2);
-    ogs::gatherScatterNewKernel_doubleAdd =
-        buildKernel(oklpath + "gatherScatterNew.okl", "gatherScatter_double_add", props2);
-    ogs::gatherScatterNewKernel_doubleMin =
-        buildKernel(oklpath + "gatherScatterNew.okl", "gatherScatter_double_min", props2);
-    ogs::gatherScatterNewKernel_doubleMax =
-        buildKernel(oklpath + "gatherScatterNew.okl", "gatherScatter_double_max", props2);
-  }
+  props["defines/init_"
+        "float"
+        "_add"] = (float)0;
+  props["defines/init_"
+        "float"
+        "_mul"] = (float)1;
+  props["defines/init_"
+        "float"
+        "_min"] = (float)std::numeric_limits<float>::max();
+  props["defines/init_"
+        "float"
+        "_max"] = (float)std::numeric_limits<float>::lowest();
 
+  props["defines/init_"
+        "double"
+        "_add"] = (double)0;
+  props["defines/init_"
+        "double"
+        "_mul"] = (double)1;
+  props["defines/init_"
+        "double"
+        "_min"] = (double)std::numeric_limits<double>::max();
+  props["defines/init_"
+         "double"
+         "_max"] = (double)std::numeric_limits<double>::lowest();
+
+  props["defines/init_"
+        "int"
+        "_add"] = (int)0;
+  props["defines/init_"
+        "int"
+        "_mul"] = (int)1;
+  props["defines/init_"
+        "int"
+        "_min"] = (int)std::numeric_limits<int>::max();
+  props["defines/init_"
+         "int"
+         "_max"] = (int)std::numeric_limits<int>::lowest();
+
+  props["defines/init_"
+        "longlongint"
+        "_add"] = (long long int)0;
+  props["defines/init_"
+        "longlongint"
+        "_mul"] = (long long int)1;
+  props["defines/init_"
+        "longlongint"
+        "_min"] = (long long int)std::numeric_limits<long long int>::max();
+  props["defines/init_"
+         "longlongint"
+         "_max"] = (long long int)std::numeric_limits<long long int>::lowest();
+
+
+  // gatherScatter
+  props["defines/p_GSTYPE"] = "float";
+  props["defines/p_gatherNodesPerBlock"] = gatherNodesPerBlock;
+
+  props["defines/p_GSOP"] = "add";
   ogs::gatherScatterKernel_floatAdd =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_floatAdd", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_float_add", props);
+  ogs::gatherScatterNewKernel_floatAdd =
+      buildKernel(oklpath + "gatherScatterNew.okl", "gatherScatter_float_add", props);
+  props["defines/p_GSOP"] = "mul";
   ogs::gatherScatterKernel_floatMul =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_floatMul", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_float_mul", props);
+  props["defines/p_GSOP"] = "min";
   ogs::gatherScatterKernel_floatMin =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_floatMin", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_float_min", props);
+  props["defines/p_GSOP"] = "max";
   ogs::gatherScatterKernel_floatMax =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_floatMax", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_float_max", props);
 
+  props["defines/p_GSTYPE"] = "double";
+  props["defines/p_gatherNodesPerBlock"] = gatherNodesPerBlock;
+
+  props["defines/p_GSOP"] = "add";
   ogs::gatherScatterKernel_doubleAdd =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_doubleAdd", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_double_add", props);
+  ogs::gatherScatterNewKernel_doubleAdd =
+      buildKernel(oklpath + "gatherScatterNew.okl", "gatherScatter_double_add", props);
+  props["defines/p_GSOP"] = "mul";
   ogs::gatherScatterKernel_doubleMul =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_doubleMul", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_double_mul", props);
+  props["defines/p_GSOP"] = "min";
   ogs::gatherScatterKernel_doubleMin =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_doubleMin", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_double_min", props);
+  ogs::gatherScatterNewKernel_doubleMin =
+      buildKernel(oklpath + "gatherScatterNew.okl", "gatherScatter_double_min", props);
+  props["defines/p_GSOP"] = "max";
   ogs::gatherScatterKernel_doubleMax =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_doubleMax", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_double_max", props);
+  ogs::gatherScatterNewKernel_doubleMax =
+      buildKernel(oklpath + "gatherScatterNew.okl", "gatherScatter_double_max", props);
 
-  ogs::gatherScatterKernel_intAdd = buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_intAdd", props);
-  ogs::gatherScatterKernel_intMul = buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_intMul", props);
-  ogs::gatherScatterKernel_intMin = buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_intMin", props);
-  ogs::gatherScatterKernel_intMax = buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_intMax", props);
+  props["defines/p_GSTYPE"] = "int";
 
+  props["defines/p_GSOP"] = "add";
+  ogs::gatherScatterKernel_intAdd = buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_int_add", props);
+  props["defines/p_GSOP"] = "mul";
+  ogs::gatherScatterKernel_intMul = buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_int_mul", props);
+  props["defines/p_GSOP"] = "min";
+  ogs::gatherScatterKernel_intMin = buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_int_min", props);
+  props["defines/p_GSOP"] = "max";
+  ogs::gatherScatterKernel_intMax = buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_int_max", props);
+
+  props["defines/p_GSTYPE"] = "long long int";
+
+  props["defines/p_GSOP"] = "add";
   ogs::gatherScatterKernel_longAdd =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_longAdd", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_longlongint_add", props);
+  props["defines/p_GSOP"] = "mul";
   ogs::gatherScatterKernel_longMul =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_longMul", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_longlongint_mul", props);
+  props["defines/p_GSOP"] = "min";
   ogs::gatherScatterKernel_longMin =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_longMin", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_longlongint_min", props);
+  props["defines/p_GSOP"] = "max";
   ogs::gatherScatterKernel_longMax =
-      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_longMax", props);
+      buildKernel(oklpath + "gatherScatter.okl", "gatherScatter_longlongint_max", props);
 
-#if 0
-      ogs::gatherScatterVecKernel_floatAdd = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_floatAdd", props);
-      ogs::gatherScatterVecKernel_floatMul = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_floatMul", props);
-      ogs::gatherScatterVecKernel_floatMin = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_floatMin", props);
-      ogs::gatherScatterVecKernel_floatMax = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_floatMax", props);
-
-      ogs::gatherScatterVecKernel_doubleAdd = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_doubleAdd", props);
-      ogs::gatherScatterVecKernel_doubleMul = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_doubleMul", props);
-      ogs::gatherScatterVecKernel_doubleMin = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_doubleMin", props);
-      ogs::gatherScatterVecKernel_doubleMax = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_doubleMax", props);
-
-      ogs::gatherScatterVecKernel_intAdd = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_intAdd", props);
-      ogs::gatherScatterVecKernel_intMul = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_intMul", props);
-      ogs::gatherScatterVecKernel_intMin = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_intMin", props);
-      ogs::gatherScatterVecKernel_intMax = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_intMax", props);
-
-      ogs::gatherScatterVecKernel_longAdd = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_longAdd", props);
-      ogs::gatherScatterVecKernel_longMul = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_longMul", props);
-      ogs::gatherScatterVecKernel_longMin = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_longMin", props);
-      ogs::gatherScatterVecKernel_longMax = buildKernel(oklpath + "gatherScatterVec.okl", "gatherScatterVec_longMax", props);
-#endif
+  // gatherScatterMany
 
   ogs::gatherScatterManyKernel_floatAdd =
       buildKernel(oklpath + "gatherScatterMany.okl", "gatherScatterMany_floatAdd", props);
@@ -320,6 +354,8 @@ void ogs::initKernels(MPI_Comm comm, occa::device device, ogsBuildKernel_t build
   ogs::gatherScatterManyKernel_longMax =
       buildKernel(oklpath + "gatherScatterMany.okl", "gatherScatterMany_longMax", props);
 
+  // gather
+
   ogs::gatherKernel_floatAdd = buildKernel(oklpath + "gather.okl", "gather_floatAdd", props);
   ogs::gatherKernel_doubleAdd = buildKernel(oklpath + "gather.okl", "gather_doubleAdd", props);
   ogs::gatherKernel_intAdd = buildKernel(oklpath + "gather.okl", "gather_intAdd", props);
@@ -341,27 +377,7 @@ void ogs::initKernels(MPI_Comm comm, occa::device device, ogsBuildKernel_t build
   ogs::gatherKernel_longMin = buildKernel(oklpath + "gather.okl", "gather_longMin", props);
   ogs::gatherKernel_longMax = buildKernel(oklpath + "gather.okl", "gather_longMax", props);
 
-#if 0
-      ogs::gatherVecKernel_floatAdd = buildKernel(oklpath + "gatherVec.okl", "gatherVec_floatAdd", props);
-      ogs::gatherVecKernel_floatMul = buildKernel(oklpath + "gatherVec.okl", "gatherVec_floatMul", props);
-      ogs::gatherVecKernel_floatMin = buildKernel(oklpath + "gatherVec.okl", "gatherVec_floatMin", props);
-      ogs::gatherVecKernel_floatMax = buildKernel(oklpath + "gatherVec.okl", "gatherVec_floatMax", props);
-
-      ogs::gatherVecKernel_doubleAdd = buildKernel(oklpath + "gatherVec.okl", "gatherVec_doubleAdd", props);
-      ogs::gatherVecKernel_doubleMul = buildKernel(oklpath + "gatherVec.okl", "gatherVec_doubleMul", props);
-      ogs::gatherVecKernel_doubleMin = buildKernel(oklpath + "gatherVec.okl", "gatherVec_doubleMin", props);
-      ogs::gatherVecKernel_doubleMax = buildKernel(oklpath + "gatherVec.okl", "gatherVec_doubleMax", props);
-
-      ogs::gatherVecKernel_intAdd = buildKernel(oklpath + "gatherVec.okl", "gatherVec_intAdd", props);
-      ogs::gatherVecKernel_intMul = buildKernel(oklpath + "gatherVec.okl", "gatherVec_intMul", props);
-      ogs::gatherVecKernel_intMin = buildKernel(oklpath + "gatherVec.okl", "gatherVec_intMin", props);
-      ogs::gatherVecKernel_intMax = buildKernel(oklpath + "gatherVec.okl", "gatherVec_intMax", props);
-
-      ogs::gatherVecKernel_longAdd = buildKernel(oklpath + "gatherVec.okl", "gatherVec_longAdd", props);
-      ogs::gatherVecKernel_longMul = buildKernel(oklpath + "gatherVec.okl", "gatherVec_longMul", props);
-      ogs::gatherVecKernel_longMin = buildKernel(oklpath + "gatherVec.okl", "gatherVec_longMin", props);
-      ogs::gatherVecKernel_longMax = buildKernel(oklpath + "gatherVec.okl", "gatherVec_longMax", props);
-#endif
+  // gatherMany
 
   ogs::gatherManyKernel_floatAdd = buildKernel(oklpath + "gatherMany.okl", "gatherMany_floatAdd", props);
   ogs::gatherManyKernel_doubleAdd = buildKernel(oklpath + "gatherMany.okl", "gatherMany_doubleAdd", props);
@@ -384,17 +400,12 @@ void ogs::initKernels(MPI_Comm comm, occa::device device, ogsBuildKernel_t build
   ogs::gatherManyKernel_longMin = buildKernel(oklpath + "gatherMany.okl", "gatherMany_longMin", props);
   ogs::gatherManyKernel_longMax = buildKernel(oklpath + "gatherMany.okl", "gatherMany_longMax", props);
 
+  // scatter
+
   ogs::scatterKernel_float = buildKernel(oklpath + "scatter.okl", "scatter_float", props);
   ogs::scatterKernel_double = buildKernel(oklpath + "scatter.okl", "scatter_double", props);
   ogs::scatterKernel_int = buildKernel(oklpath + "scatter.okl", "scatter_int", props);
   ogs::scatterKernel_long = buildKernel(oklpath + "scatter.okl", "scatter_long", props);
-
-#if 0
-      ogs::scatterVecKernel_float  = buildKernel(oklpath + "scatterVec.okl", "scatterVec_float", props);
-      ogs::scatterVecKernel_double = buildKernel(oklpath + "scatterVec.okl", "scatterVec_double", props);
-      ogs::scatterVecKernel_int    = buildKernel(oklpath + "scatterVec.okl", "scatterVec_int", props);
-      ogs::scatterVecKernel_long   = buildKernel(oklpath + "scatterVec.okl", "scatterVec_long", props);
-#endif
 
   ogs::scatterManyKernel_float = buildKernel(oklpath + "scatterMany.okl", "scatterMany_float", props);
   ogs::scatterManyKernel_double = buildKernel(oklpath + "scatterMany.okl", "scatterMany_double", props);

@@ -234,7 +234,7 @@ ogs_t *ogsSetup(dlong N, hlong *ids, MPI_Comm &comm,
       localGatherCounts[i] = 0;
     }
 
-    ogs->localGatherIds = (dlong*) calloc(ogs->Nlocal,sizeof(dlong));
+    ogs->localGatherIds = (dlong*) calloc(static_cast<unsigned int>(ogs->Nlocal),sizeof(dlong));
     for (dlong i=0;i<ogs->Nlocal;i++) {
       dlong gatherId = localNodes[i].newId;
       dlong offset = ogs->localGatherOffsets[gatherId];
