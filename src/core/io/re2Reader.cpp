@@ -1,4 +1,5 @@
 #include "re2Reader.hpp"
+#include <cstring>
 
 void re2::nelg(const std::string &meshFile, int &nelgt, int &nelgv, MPI_Comm comm)
 {

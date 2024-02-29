@@ -112,14 +112,8 @@ SOFTWARE.
 #ifndef OGS_HPP
 #define OGS_HPP 1
 
-#include <functional>
+#include "nekrsSys.hpp"
 #include <cstring>
-#include <math.h>
-#include <stdlib.h>
-#include <occa.hpp>
-#include <string>
-
-#include "mpi.h"
 
 #define ogsFloat  "float"
 #define ogsDouble "double"

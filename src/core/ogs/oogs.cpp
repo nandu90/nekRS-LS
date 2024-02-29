@@ -1,6 +1,5 @@
 #include <limits>
 #include <list>
-#include <occa.hpp>
 
 #include "ogstypes.h"
 #include "ogs.hpp"
@@ -294,7 +293,7 @@ void oogs::compile(const occa::device &device,
         };
   }
 
-  const auto oklpath = std::string(getenv("OGS_HOME")) + "/okl/";
+  const std::string oklpath = std::string(getenv("NEKRS_KERNEL_DIR")) + "/core/ogs/";
 
   ogs::initKernels(comm, device, buildKernel, verbose);
 
@@ -381,7 +380,7 @@ oogs_t *oogs::setup(ogs_t *ogs,
   gs->ogs = ogs;
 
   occa::device device = gs->ogs->device;
-  const auto oklpath = std::string(getenv("OGS_HOME")) + "/okl/";
+  const std::string oklpath = std::string(getenv("NEKRS_KERNEL_DIR")) + "/core/ogs/";
 
   struct gs_data *hgs = (gs_data *)ogs->haloGshSym;
   const void *execdata = hgs->r.data;

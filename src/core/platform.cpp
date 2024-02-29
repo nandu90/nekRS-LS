@@ -201,5 +201,4 @@ void platform_t::bcastKernelSources()
 
   setenv("NEKRS_HOME", std::string(NEKRS_HOME_NEW).c_str(), 1);
   setenv("NEKRS_KERNEL_DIR", std::string(NEKRS_HOME_NEW / "kernels").c_str(), 1);
-  setenv("OGS_HOME", std::string(NEKRS_HOME_NEW / "gatherScatter").c_str(), 1);
 }

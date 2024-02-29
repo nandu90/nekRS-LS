@@ -24,8 +24,6 @@ SOFTWARE.
 
 */
 
-/* compile with C compiler (not C++) */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -33,8 +31,9 @@ SOFTWARE.
 
 #include "gslib.h"
 
-void ogsHostGather(void *v, const char *type, const char *op, void *gsh){
-
+void ogsHostGather(void *v, const char *type, const char *op, void *gsh_)
+{
+  auto gsh = static_cast<gs_data*>(gsh_);
   /* need gs_float or gs_double */
   if(!strcmp(type, "float")){
     //    printf("performing string gs on %s\n", type);

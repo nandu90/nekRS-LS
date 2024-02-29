@@ -24,8 +24,6 @@ SOFTWARE.
 
 */
 
-/* compile with C compiler (not C++) */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -33,7 +31,9 @@ SOFTWARE.
 
 #include "gslib.h"
 
-void ogsHostGatherScatter(void *v, const char *type, const char *op, void *gsh){
+void ogsHostScatter(void *v, const char *type, const char *op, void *gsh_)
+{
+  auto gsh = static_cast<gs_data*>(gsh_);
 
   /* need gs_float or gs_double */
   if(!strcmp(type, "float")){
@@ -82,5 +82,5 @@ void ogsHostGatherScatter(void *v, const char *type, const char *op, void *gsh){
       gs(v, gs_long_long, gs_min, 0, gsh, 0);
     else if(!strcmp(op, "max"))
       gs(v, gs_long_long, gs_max, 0, gsh, 0);
-  }   
+  } 
 }

@@ -181,7 +181,7 @@ void ogs::initKernels(MPI_Comm comm, occa::device device, ogsBuildKernel_t build
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &size);
 
-  const auto oklpath = std::string(getenv("OGS_HOME")) + "/okl/";
+  const std::string oklpath = std::string(getenv("NEKRS_KERNEL_DIR")) + "/core/ogs/";
 
   ogs::defaultStream = device.getStream();
   ogs::dataStream = device.createStream();
@@ -195,7 +195,8 @@ void ogs::initKernels(MPI_Comm comm, occa::device device, ogsBuildKernel_t build
 
   {
     occa::properties props2 = ogs::kernelInfo;
-    props2["includes"] += std::string(getenv("OGS_HOME")) + "/include/ogsDefs.h";
+
+    props2["includes"] += oklpath + "/ogsDefs.h";
     props2["defines/p_gatherNodesPerBlock"] = gatherNodesPerBlock;
     props2["defines/init_"
            "float"

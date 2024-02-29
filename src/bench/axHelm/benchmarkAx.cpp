@@ -211,8 +211,6 @@ occa::kernel benchmarkAx(int Nelements,
       return std::make_pair(platform->device.buildKernel(fileName, newProps, suffix, true), -1.0);
     }
 
-    std::cout << "kernelVariants.size(): " << kernelVariants.size() << std::endl;
-
     auto DrV = randomVector<FPType>(Nq * Nq, 0, 1, true);
     auto ggeo = randomVector<FPType>(Np_g * Nelements * p_Nggeo, 0, 1, true);
     auto vgeo = randomVector<FPType>(Np * Nelements * p_Nvgeo, 0, 1, true);

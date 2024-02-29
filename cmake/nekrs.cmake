@@ -3,6 +3,31 @@ include(cmake/mesh.cmake)
 include(cmake/elliptic.cmake)
 include(cmake/gslib.cmake)
 
+set(OGS_SOURCES
+        src/core/ogs/ogsGather.cpp
+        src/core/ogs/ogsGatherMany.cpp
+        src/core/ogs/ogsGatherScatter.cpp
+        src/core/ogs/ogsGatherScatterMany.cpp
+        src/core/ogs/ogsGatherScatterVec.cpp
+        src/core/ogs/ogsGatherVec.cpp
+        src/core/ogs/ogsHostGather.cpp
+        src/core/ogs/ogsHostGatherMany.cpp
+        src/core/ogs/ogsHostGatherScatter.cpp
+        src/core/ogs/ogsHostGatherScatterMany.cpp
+        src/core/ogs/ogsHostGatherScatterVec.cpp
+        src/core/ogs/ogsHostGatherVec.cpp
+        src/core/ogs/ogsHostScatter.cpp
+        src/core/ogs/ogsHostScatterMany.cpp
+        src/core/ogs/ogsHostScatterVec.cpp
+        src/core/ogs/ogsHostSetup.cpp
+        src/core/ogs/ogsKernels.cpp
+        src/core/ogs/ogsMappedAlloc.cpp
+        src/core/ogs/ogsScatter.cpp
+        src/core/ogs/ogsScatterMany.cpp
+        src/core/ogs/ogsScatterVec.cpp
+        src/core/ogs/ogsSetup.cpp
+        src/core/ogs/oogs.cpp)
+
 set(NRS_SRC 
     src/lib/nekrs.cpp
     src/core/io/writeFld.cpp
@@ -99,6 +124,8 @@ set(NRS_INCLUDE
     src/core
     src/core/io
     src/core/linAlg
+    src/core/ogs
+
     src/utils
     src/lib
     src/udf
@@ -112,8 +139,6 @@ set(NRS_INCLUDE
     ${BENCH_SOURCE_DIR}/advsub
     ${MESH_SOURCE_DIR}
     ${NEKINTERFACEDIR}
-    ${OGS_SOURCE_DIR}/include
-    ${OGS_SOURCE_DIR}
     ${FINDPTS_SOURCE_DIR}
     ${ELLIPTIC_SOURCE_DIR}
     PRIVATE

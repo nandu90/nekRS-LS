@@ -67,11 +67,6 @@ void configRead(MPI_Comm comm)
     setenv("NEKRS_KERNEL_DIR", buf.c_str(), 1);
   }
 
-  buf = installDir + "/gatherScatter";
-  if (!getenv("OGS_HOME")) {
-    setenv("OGS_HOME", buf.c_str(), 1);
-  }
-
   ini.extract("general", "nekrs_gpu_mpi", buf);
   if (!getenv("NEKRS_GPU_MPI")) {
     setenv("NEKRS_GPU_MPI", buf.c_str(), 1);

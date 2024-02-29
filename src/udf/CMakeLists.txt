@@ -11,13 +11,11 @@ set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
 
 #set(CMAKE_VERBOSE_MAKEFILE on)
 
-set(OGSDIR ${NEKRS_INSTALL_DIR}/gatherScatter)
-set(FINDPTSDIR ${NEKRS_INSTALL_DIR}/pointInterpolation/findpts)
 set(GSDIR ${NEKRS_INSTALL_DIR}/gslib)
+set(FINDPTSDIR ${NEKRS_INSTALL_DIR}/pointInterpolation/findpts)
+
 set(INCLUDE_DIRS
   ${CASE_DIR}
-  ${OGSDIR}
-  ${OGSDIR}/include
   ${FINDPTSDIR}
   ${GSDIR}
   ${NEKRS_INSTALL_DIR}
@@ -25,6 +23,7 @@ set(INCLUDE_DIRS
   ${NEKRS_INSTALL_DIR}/include/mesh
   ${NEKRS_INSTALL_DIR}/include/core
   ${NEKRS_INSTALL_DIR}/include/core/io
+  ${NEKRS_INSTALL_DIR}/include/core/ogs
   ${NEKRS_INSTALL_DIR}/include/core/linAlg
   ${NEKRS_INSTALL_DIR}/include/utils
   ${NEKRS_INSTALL_DIR}/include/udf

@@ -27,25 +27,21 @@ SOFTWARE.
 #ifndef OGS_INTERFACE_H
 #define OGS_INTERFACE_H 1
 
-extern "C"
-{
-  void *ogsHostSetup(MPI_Comm comm, dlong Ngather, hlong *gatherIds, int unique, int verbose);
-  void  ogsGsUnique(hlong *gatherIds, dlong Ngather, MPI_Comm comm);
+void *ogsHostSetup(MPI_Comm comm, dlong Ngather, hlong *gatherIds, int unique, int verbose);
+void  ogsGsUnique(hlong *gatherIds, dlong Ngather, MPI_Comm comm);
 
-  void ogsHostGatherScatter    (void *v, const char *type, const char *op, void *gsh);
-  void ogsHostGatherScatterVec (void *v, const int k, const char *type, const char *op, void *gsh);
-  void ogsHostGatherScatterMany(void *v, const int k, const char *type, const char *op, void *gsh);
-  
-  void ogsHostGather    (void *v, const char *type, const char *op, void *gsh);
-  void ogsHostGatherVec (void *v, const int k, const char *type, const char *op, void *gsh);
-  void ogsHostGatherMany(void *v, const int k, const char *type, const char *op, void *gsh);
-  
-  void ogsHostScatter    (void *v, const char *type, const char *op, void *gsh);
-  void ogsHostScatterVec (void *v, const int k, const char *type, const char *op, void *gsh);
-  void ogsHostScatterMany(void *v, const int k, const char *type, const char *op, void *gsh);
-  
-  void ogsHostFree(void *gsh);
+void ogsHostGatherScatter    (void *v, const char *type, const char *op, void *gsh);
+void ogsHostGatherScatterVec (void *v, const int k, const char *type, const char *op, void *gsh);
+void ogsHostGatherScatterMany(void *const *v, const int k, const char *type, const char *op, void *gsh);
 
-}
+void ogsHostGather    (void *v, const char *type, const char *op, void *gsh);
+void ogsHostGatherVec (void *v, const int k, const char *type, const char *op, void *gsh);
+void ogsHostGatherMany(void *const *v, const int k, const char *type, const char *op, void *gsh);
+
+void ogsHostScatter    (void *v, const char *type, const char *op, void *gsh);
+void ogsHostScatterVec (void *v, const int k, const char *type, const char *op, void *gsh);
+void ogsHostScatterMany(void *const *v, const int k, const char *type, const char *op, void *gsh);
+
+void ogsHostFree(void *gsh);
 
 #endif

@@ -24,16 +24,13 @@ SOFTWARE.
 
 */
 
-/* compile with C compiler (not C++) */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
+#include "ogstypes.h"
 
 #include "gslib.h"
-
-#include "ogstypes.h"
 
 void *ogsHostSetup(MPI_Comm meshComm,
                    dlong NuniqueBases,
@@ -68,7 +65,7 @@ void *ogsHostSetup(MPI_Comm meshComm,
 
 void ogsHostFree(void *gsh){
 
-  gs_free(gsh);
+  gs_free(static_cast<gs_data*>(gsh));
 
 }
 
