@@ -120,7 +120,7 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
     }
   }
 
-  nekrsCheck(!fastestKernel.isInitialized(),
+  nekrsCheck(!fastestKernel.isInitialized() && platform->options.compareArgs("BUILD ONLY", "FALSE"),
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "%s\n",

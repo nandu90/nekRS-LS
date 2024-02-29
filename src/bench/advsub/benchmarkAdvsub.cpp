@@ -281,10 +281,12 @@ occa::kernel benchmarkAdvsub(int Nfields,
     auto newProps = props;
     newProps["defines/p_knl"] = kernelVariant;
 
-    auto kernel = platform->device.buildKernel(fileName, newProps, true);
     if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
-      return kernel;
+      platform->kernels.add(kernelName + "v" + std::to_string(kernelVariant), fileName, newProps);
+      return occa::kernel(); // dummy
     }
+
+    auto kernel = platform->device.buildKernel(fileName, newProps, true);
 
     // perform correctness check
     std::vector<dfloat> referenceResults(NU.size());

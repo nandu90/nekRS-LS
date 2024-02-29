@@ -151,9 +151,12 @@ occa::kernel benchmarkFDM(int Nelements,
       const std::string ext = platform->serial ? ".c" : ".okl";
       const std::string fileName = oklpath + "/elliptic/" + kernelName + ext;
 
+      if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
+        platform->kernels.add(kernelName + suffix + "v" + std::to_string(kernelVariant), fileName, newProps);
+        return occa::kernel(); // dummy
+      }
+
       auto kernel = platform->device.buildKernel(fileName, newProps, suffix, true);
-      if (platform->options.compareArgs("BUILD ONLY", "TRUE"))
-        return kernel;
 
       auto dumpResult = [&]() {
         std::vector<FPType> result;

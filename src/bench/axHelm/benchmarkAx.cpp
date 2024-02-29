@@ -211,6 +211,8 @@ occa::kernel benchmarkAx(int Nelements,
       return std::make_pair(platform->device.buildKernel(fileName, newProps, suffix, true), -1.0);
     }
 
+    std::cout << "kernelVariants.size(): " << kernelVariants.size() << std::endl;
+
     auto DrV = randomVector<FPType>(Nq * Nq, 0, 1, true);
     auto ggeo = randomVector<FPType>(Np_g * Nelements * p_Nggeo, 0, 1, true);
     auto vgeo = randomVector<FPType>(Np * Nelements * p_Nvgeo, 0, 1, true);
@@ -271,10 +273,12 @@ occa::kernel benchmarkAx(int Nelements,
       const std::string ext = platform->serial ? ".c" : ".okl";
       const std::string fileName = oklpath + "/elliptic/" + kernelName + ext;
 
+      if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
+        platform->kernels.add(kernelName + suffix + "v" + std::to_string(kernelVariant), fileName, newProps);
+        return occa::kernel(); // dummy
+      }
+
       auto kernel = platform->device.buildKernel(fileName, newProps, suffix, true);
-      
-      if (platform->options.compareArgs("BUILD ONLY", "TRUE"))
-        return kernel;
 
       std::vector<FPType> refResults((Ndim * Np) * Nelements);
       std::vector<FPType> results((Ndim * Np) * Nelements);
