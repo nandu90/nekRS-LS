@@ -18,7 +18,7 @@ if [ $? -eq 0 ] && [ ${NRSCONFIG_NOBUILD} -eq 0 ]; then
   cmd="cmake --build ./build --target install -j8"
   echo ""
   echo $cmd
-  read -p "Press ENTER to continue or ctrl-c to cancel"
+  read -p "Please check the summary above carefully and press ENTER to continue or ctrl-c to cancel"
 
   eval $cmd
   if [ $? -eq 0 ]; then
