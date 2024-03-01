@@ -293,26 +293,25 @@ void oogs::compile(const occa::device &device,
         };
   }
 
-  const std::string oklpath = std::string(getenv("NEKRS_KERNEL_DIR")) + "/core/ogs/";
-
   ogs::initKernels(comm, device, buildKernel, verbose);
 
+  const std::string oklpath = std::string(getenv("NEKRS_KERNEL_DIR")) + "/core/ogs/";
   occa::properties props = ogs::kernelInfo;
 
-  packBufFloatAddKernel = buildKernel(oklpath + "oogs.okl", "packBuf_floatAdd", props);
-  unpackBufFloatAddKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_floatAdd", props);
-  packBufDoubleAddKernel = buildKernel(oklpath + "oogs.okl", "packBuf_doubleAdd", props);
-  unpackBufDoubleAddKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_doubleAdd", props);
+  packBufFloatAddKernel = buildKernel(oklpath + "oogs.okl", "packBuf_float_add", props);
+  unpackBufFloatAddKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_float_add", props);
+  packBufDoubleAddKernel = buildKernel(oklpath + "oogs.okl", "packBuf_double_add", props);
+  unpackBufDoubleAddKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_double_add", props);
 
-  packBufFloatMinKernel = buildKernel(oklpath + "oogs.okl", "packBuf_floatMin", props);
-  unpackBufFloatMinKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_floatMin", props);
-  packBufDoubleMinKernel = buildKernel(oklpath + "oogs.okl", "packBuf_doubleMin", props);
-  unpackBufDoubleMinKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_doubleMin", props);
+  packBufFloatMinKernel = buildKernel(oklpath + "oogs.okl", "packBuf_float_min", props);
+  unpackBufFloatMinKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_float_min", props);
+  packBufDoubleMinKernel = buildKernel(oklpath + "oogs.okl", "packBuf_double_min", props);
+  unpackBufDoubleMinKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_double_min", props);
 
-  packBufFloatMaxKernel = buildKernel(oklpath + "oogs.okl", "packBuf_floatMax", props);
-  unpackBufFloatMaxKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_floatMax", props);
-  packBufDoubleMaxKernel = buildKernel(oklpath + "oogs.okl", "packBuf_doubleMax", props);
-  unpackBufDoubleMaxKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_doubleMax", props);
+  packBufFloatMaxKernel = buildKernel(oklpath + "oogs.okl", "packBuf_float_max", props);
+  unpackBufFloatMaxKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_float_max", props);
+  packBufDoubleMaxKernel = buildKernel(oklpath + "oogs.okl", "packBuf_double_max", props);
+  unpackBufDoubleMaxKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_double_max", props);
 
   compiled++;
 }

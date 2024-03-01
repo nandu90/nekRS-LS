@@ -25,7 +25,7 @@ SOFTWARE.
 */
 
 /* the supported types */
-typedef long long long_long;
+typedef long long int long_long;
 #if 0
 #define OGS_FOR_EACH_TYPE(macro) \
   macro(double   ) \
