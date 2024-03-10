@@ -90,19 +90,19 @@ void tavg::buildKernel(occa::properties kernelInfo)
   {
     kernelName = "EX";
     fileName = path + kernelName + extension;
-    EXKernel = platform->device.buildKernel(fileName, kernelInfo, true);
+    EXKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
 
     kernelName = "EXY";
     fileName = path + kernelName + extension;
-    EXYKernel = platform->device.buildKernel(fileName, kernelInfo, true);
+    EXYKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
 
     kernelName = "EXYZ";
     fileName = path + kernelName + extension;
-    EXYZKernel = platform->device.buildKernel(fileName, kernelInfo, true);
+    EXYZKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
 
     kernelName = "E4";
     fileName = path + kernelName + extension;
-    E4Kernel = platform->device.buildKernel(fileName, kernelInfo, true);
+    E4Kernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
   }
   buildKernelCalled = true;
 }

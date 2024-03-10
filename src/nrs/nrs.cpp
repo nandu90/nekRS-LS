@@ -37,7 +37,6 @@ static void computeDivUErr(nrs_t *nrs, dfloat &divUErrVolAvg, dfloat &divUErrL2)
   divUErrVolAvg = std::abs(divUErrVolAvg);
 }
 
-
 static void advectionFlops(mesh_t *mesh, int Nfields)
 {
   const auto cubNq = mesh->cubNq;
@@ -69,113 +68,113 @@ static void assignKernels(nrs_t *nrs)
     const std::string section = "nrs-";
 
     kernelName = "computeFieldDotNormal";
-    nrs->computeFieldDotNormalKernel = platform->kernels.get(section + kernelName);
+    nrs->computeFieldDotNormalKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "computeFaceCentroid";
-    nrs->computeFaceCentroidKernel = platform->kernels.get(section + kernelName);
+    nrs->computeFaceCentroidKernel = platform->kernelRequests.load(section + kernelName);
 
     {
       kernelName = "strongAdvectionVolume" + suffix;
-      nrs->strongAdvectionVolumeKernel = platform->kernels.get(section + kernelName);
+      nrs->strongAdvectionVolumeKernel = platform->kernelRequests.load(section + kernelName);
 
       if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
         kernelName = "strongAdvectionCubatureVolume" + suffix;
-        nrs->strongAdvectionCubatureVolumeKernel = platform->kernels.get(section + kernelName);
+        nrs->strongAdvectionCubatureVolumeKernel = platform->kernelRequests.load(section + kernelName);
       }
     }
 
     kernelName = "curl" + suffix;
-    nrs->curlKernel = platform->kernels.get(section + kernelName);
+    nrs->curlKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "SijOij" + suffix;
-    nrs->SijOijKernel = platform->kernels.get(section + kernelName);
+    nrs->SijOijKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "gradientVolume" + suffix;
-    nrs->gradientVolumeKernel = platform->kernels.get("core-" + kernelName);
+    nrs->gradientVolumeKernel = platform->kernelRequests.load("core-" + kernelName);
 
     kernelName = "wGradientVolume" + suffix;
-    nrs->wgradientVolumeKernel = platform->kernels.get("core-" + kernelName);
+    nrs->wgradientVolumeKernel = platform->kernelRequests.load("core-" + kernelName);
 
     kernelName = "wDivergenceVolume" + suffix;
-    nrs->wDivergenceVolumeKernel = platform->kernels.get("core-" + kernelName);
+    nrs->wDivergenceVolumeKernel = platform->kernelRequests.load("core-" + kernelName);
 
     kernelName = "divergenceVolume" + suffix;
-    nrs->divergenceVolumeKernel = platform->kernels.get("core-" + kernelName);
+    nrs->divergenceVolumeKernel = platform->kernelRequests.load("core-" + kernelName);
 
     kernelName = "vectorFilterRT" + suffix;
-    nrs->filterRTKernel = platform->kernels.get("core-" + kernelName);
+    nrs->filterRTKernel = platform->kernelRequests.load("core-" + kernelName);
 
     kernelName = "sumMakef";
-    nrs->sumMakefKernel = platform->kernels.get(section + kernelName);
+    nrs->sumMakefKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "divergenceSurface" + suffix;
-    nrs->divergenceSurfaceKernel = platform->kernels.get(section + kernelName);
+    nrs->divergenceSurfaceKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "advectMeshVelocity" + suffix;
-    nrs->advectMeshVelocityKernel = platform->kernels.get(section + kernelName);
+    nrs->advectMeshVelocityKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "pressureRhs" + suffix;
-    nrs->pressureRhsKernel = platform->kernels.get(section + kernelName);
+    nrs->pressureRhsKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "pressureStress" + suffix;
-    nrs->pressureStressKernel = platform->kernels.get(section + kernelName);
+    nrs->pressureStressKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "pressureDirichletBC" + suffix;
-    nrs->pressureDirichletBCKernel = platform->kernels.get(section + kernelName);
+    nrs->pressureDirichletBCKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "velocityRhs" + suffix;
-    nrs->velocityRhsKernel = platform->kernels.get(section + kernelName);
+    nrs->velocityRhsKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "averageNormalBcType";
-    nrs->averageNormalBcTypeKernel = platform->kernels.get(section + kernelName);
+    nrs->averageNormalBcTypeKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "fixZeroNormalMask";
-    nrs->fixZeroNormalMaskKernel = platform->kernels.get(section + kernelName);
+    nrs->fixZeroNormalMaskKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "applyZeroNormalMask";
-    nrs->applyZeroNormalMaskKernel = platform->kernels.get(section + kernelName);
+    nrs->applyZeroNormalMaskKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "initializeZeroNormalMask";
-    nrs->initializeZeroNormalMaskKernel = platform->kernels.get(section + kernelName);
+    nrs->initializeZeroNormalMaskKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "velocityDirichletBC" + suffix;
-    nrs->velocityDirichletBCKernel = platform->kernels.get(section + kernelName);
+    nrs->velocityDirichletBCKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "velocityNeumannBC" + suffix;
-    nrs->velocityNeumannBCKernel = platform->kernels.get(section + kernelName);
+    nrs->velocityNeumannBCKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "UrstCubature" + suffix;
-    nrs->UrstCubatureKernel = platform->kernels.get(section + kernelName);
+    nrs->UrstCubatureKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "Urst" + suffix;
-    nrs->UrstKernel = platform->kernels.get(section + kernelName);
+    nrs->UrstKernel = platform->kernelRequests.load(section + kernelName);
 
     if (nrs->Nsubsteps) {
       if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
         kernelName = "subCycleStrongCubatureVolume" + suffix;
-        nrs->subCycleStrongCubatureVolumeKernel = platform->kernels.get(section + kernelName);
+        nrs->subCycleStrongCubatureVolumeKernel = platform->kernelRequests.load(section + kernelName);
       }
       kernelName = "subCycleStrongVolume" + suffix;
-      nrs->subCycleStrongVolumeKernel = platform->kernels.get(section + kernelName);
+      nrs->subCycleStrongVolumeKernel = platform->kernelRequests.load(section + kernelName);
     }
 
     kernelName = "extrapolate";
-    nrs->extrapolateKernel = platform->kernels.get(section + kernelName);
+    nrs->extrapolateKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "maskCopy";
-    nrs->maskCopyKernel = platform->kernels.get(section + kernelName);
+    nrs->maskCopyKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "maskCopy2";
-    nrs->maskCopy2Kernel = platform->kernels.get(section + kernelName);
+    nrs->maskCopy2Kernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "mask";
-    nrs->maskKernel = platform->kernels.get(section + kernelName);
+    nrs->maskKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "cfl" + suffix;
-    nrs->cflKernel = platform->kernels.get(section + kernelName);
+    nrs->cflKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "pressureAddQtl";
-    nrs->pressureAddQtlKernel = platform->kernels.get(section + kernelName);
+    nrs->pressureAddQtlKernel = platform->kernelRequests.load(section + kernelName);
   }
 }
 
@@ -185,11 +184,14 @@ int nrs_t::numberActiveFields()
   platform->options.getArgs("NUMBER OF SCALARS", Nscalar);
 
   int fields = 0;
-  if(!platform->options.compareArgs("VELOCITY SOLVER", "NONE")) fields++;
-  for(int is = 0; is < Nscalar; ++is){
+  if (!platform->options.compareArgs("VELOCITY SOLVER", "NONE")) {
+    fields++;
+  }
+  for (int is = 0; is < Nscalar; ++is) {
     std::string sid = scalarDigitStr(is);
-    if(!platform->options.compareArgs("SCALAR" + sid + " SOLVER", "NONE"))
+    if (!platform->options.compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
       fields++;
+    }
   }
   return fields;
 }
@@ -204,22 +206,33 @@ occa::memory nrs_t::advectionSubcycling(int nEXT, double time)
   const auto nFields = this->NVfields;
   const auto fieldOffset = this->fieldOffset;
   const auto fieldOffsetSum = nFields * fieldOffset;
-  const auto meshOffset = this->fieldOffset; // used for mesh->o_invLMM and mesh->o_divU in case of moving mesh
+  const auto meshOffset =
+      this->fieldOffset; // used for mesh->o_invLMM and mesh->o_divU in case of moving mesh
 
   auto o_U = this->o_U;
 
   auto o_Urst = (movingMesh) ? this->o_relUrst : this->o_Urst;
-  auto opKernel = (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) ? 
-                  this->subCycleStrongCubatureVolumeKernel :
-                  this->subCycleStrongVolumeKernel;
+  auto opKernel = (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE"))
+                      ? this->subCycleStrongCubatureVolumeKernel
+                      : this->subCycleStrongVolumeKernel;
 
-  return advectionSubcyclingRK(mesh, mesh,
-                               time, this->dt, this->Nsubsteps, this->coeffBDF, nEXT,
-                               nFields, opKernel, gsh,
-                               meshOffset, fieldOffset, this->cubatureOffset, fieldOffsetSum,
-                               o_Urst, o_U);
+  return advectionSubcyclingRK(mesh,
+                               mesh,
+                               time,
+                               this->dt,
+                               this->Nsubsteps,
+                               this->coeffBDF,
+                               nEXT,
+                               nFields,
+                               opKernel,
+                               gsh,
+                               meshOffset,
+                               fieldOffset,
+                               this->cubatureOffset,
+                               fieldOffsetSum,
+                               o_Urst,
+                               o_U);
 }
-
 
 void nrs_t::printMinMax()
 {
@@ -316,7 +329,7 @@ void nrs_t::printMinMax()
   }
 }
 
-void nrsSetDefaultSettings(setupAide* options)
+void nrsSetDefaultSettings(setupAide *options)
 {
   options->setArgs("CONSTANT FLOW RATE", "FALSE");
 
@@ -384,7 +397,7 @@ void nrs_t::init()
   }
 
   platform->options.getArgs("SUBCYCLING STEPS", this->Nsubsteps);
- 
+
   // g0 * dt required for Helmholtz coefficient (eigenvalues for Chebyshev during setup)
   this->g0 = 1;
   this->dt[0] = 1e-2;
@@ -585,7 +598,8 @@ void nrs_t::init()
         cnt++;
       }
     }
-    this->o_EToBMeshVelocity = platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces, this->EToBMeshVelocity);
+    this->o_EToBMeshVelocity =
+        platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces, this->EToBMeshVelocity);
   }
 
   if (platform->options.compareArgs("VELOCITY REGULARIZATION METHOD", "HPFRT")) {
@@ -630,8 +644,10 @@ void nrs_t::init()
 
     this->cds = new cds_t(cfg);
     if (this->cds->cvode) {
-      this->cds->cvode->setEvaluateProperties(std::bind(&nrs_t::evaluateProperties, this, std::placeholders::_1));
-      this->cds->cvode->setEvaluateDivergence(std::bind(&nrs_t::evaluateDivergence, this, std::placeholders::_1));
+      this->cds->cvode->setEvaluateProperties(
+          std::bind(&nrs_t::evaluateProperties, this, std::placeholders::_1));
+      this->cds->cvode->setEvaluateDivergence(
+          std::bind(&nrs_t::evaluateDivergence, this, std::placeholders::_1));
     }
   }
 
@@ -660,10 +676,12 @@ void nrs_t::init()
   fflush(stdout);
 
   if (this->cds) {
-    if (this->userScalarSource)
+    if (this->userScalarSource) {
       cds->userSource = this->userScalarSource;
-    if (this->userProperties)
+    }
+    if (this->userProperties) {
       cds->userProperties = this->userProperties;
+    }
   }
 
   // in case the user modifies mesh in udf.setup
@@ -713,8 +731,7 @@ void nrs_t::init()
   this->printMinMax();
 
   // setup elliptic solvers
-  auto createEToB = [](std::string field, mesh_t *mesh) 
-  {
+  auto createEToB = [](std::string field, mesh_t *mesh) {
     std::vector<int> EToB(mesh->Nelements * mesh->Nfaces);
     for (dlong e = 0; e < mesh->Nelements; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
@@ -809,20 +826,21 @@ void nrs_t::init()
             platform->device.malloc<dfloat>(this->uvwSolver->Nfields() * this->uvwSolver->fieldOffset());
         this->o_EToBVVelocity = platform->device.malloc<int>(this->meshV->Nlocal);
         createEToBV(this->meshV, this->uvwSolver->EToB(), this->o_EToBVVelocity);
-        auto o_EToB = platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * this->uvwSolver->Nfields(),
-                                                   this->uvwSolver->EToB().data());
+        auto o_EToB =
+            platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * this->uvwSolver->Nfields(),
+                                         this->uvwSolver->EToB().data());
         createZeroNormalMask(this, mesh, o_EToB, this->o_EToBVVelocity, this->o_zeroNormalMaskVelocity);
 
-        auto applyZeroNormalMaskLambda = [this, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) 
-         {
-           applyZeroNormalMask(this,
-                               mesh,
-                               Nelements,
-                               o_elementList,
-                               this->uvwSolver->o_EToB(),
-                               this->o_zeroNormalMaskVelocity,
-                               o_x);
-         };
+        auto applyZeroNormalMaskLambda =
+            [this, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) {
+              applyZeroNormalMask(this,
+                                  mesh,
+                                  Nelements,
+                                  o_elementList,
+                                  this->uvwSolver->o_EToB(),
+                                  this->o_zeroNormalMaskVelocity,
+                                  o_x);
+            };
         this->uvwSolver->applyZeroNormalMask(applyZeroNormalMaskLambda);
       }
     } else {
@@ -856,7 +874,9 @@ void nrs_t::init()
     auto EToB = createEToB("pressure", mesh);
 
     this->pSolver = new elliptic("pressure", mesh, this->fieldOffset, EToB, o_lambda0, o_NULL);
-    if (cds) cds->dpdt = this->pSolver->nullSpace();
+    if (cds) {
+      cds->dpdt = this->pSolver->nullSpace();
+    }
 
   } // flow
 
@@ -892,16 +912,16 @@ void nrs_t::init()
                                                  this->meshSolver->EToB().data());
       createEToBV(mesh, this->meshSolver->EToB(), this->o_EToBVMeshVelocity);
       createZeroNormalMask(this, mesh, o_EToB, this->o_EToBVMeshVelocity, this->o_zeroNormalMaskMeshVelocity);
-      auto applyZeroNormalMaskLambda = [this, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) 
-      {
-        applyZeroNormalMask(this,
-                            mesh,
-                            Nelements,
-                            o_elementList,
-                            this->meshSolver->o_EToB(),
-                            this->o_zeroNormalMaskMeshVelocity,
-                            o_x);
-      };
+      auto applyZeroNormalMaskLambda =
+          [this, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) {
+            applyZeroNormalMask(this,
+                                mesh,
+                                Nelements,
+                                o_elementList,
+                                this->meshSolver->o_EToB(),
+                                this->o_zeroNormalMaskMeshVelocity,
+                                o_x);
+          };
       this->meshSolver->applyZeroNormalMask(applyZeroNormalMaskLambda);
     }
   }
@@ -913,20 +933,24 @@ void nrs_t::printRunStat(int step)
   auto comm_ = platform->comm.mpiComm;
 
   platform->timer.set("velocity proj",
-      platform->timer.query("velocity proj pre", "DEVICE:MAX") + platform->timer.query("velocity proj post", "DEVICE:MAX"),
-      platform->timer.count("velocity proj pre"));
+                      platform->timer.query("velocity proj pre", "DEVICE:MAX") +
+                          platform->timer.query("velocity proj post", "DEVICE:MAX"),
+                      platform->timer.count("velocity proj pre"));
 
   platform->timer.set("pressure proj",
-      platform->timer.query("pressure proj pre", "DEVICE:MAX") + platform->timer.query("pressure proj post", "DEVICE:MAX"),
-      platform->timer.count("pressure proj pre"));
+                      platform->timer.query("pressure proj pre", "DEVICE:MAX") +
+                          platform->timer.query("pressure proj post", "DEVICE:MAX"),
+                      platform->timer.count("pressure proj pre"));
 
   platform->timer.set("scalar proj",
-      platform->timer.query("scalar proj pre", "DEVICE:MAX") + platform->timer.query("scalar proj post", "DEVICE:MAX"),
-      platform->timer.count("scalar proj pre"));
+                      platform->timer.query("scalar proj pre", "DEVICE:MAX") +
+                          platform->timer.query("scalar proj post", "DEVICE:MAX"),
+                      platform->timer.count("scalar proj pre"));
 
   platform->timer.set("mesh proj",
-      platform->timer.query("mesh proj pre", "DEVICE:MAX") + platform->timer.query("mesh proj post", "DEVICE:MAX"),
-      platform->timer.count("mesh proj pre"));
+                      platform->timer.query("mesh proj pre", "DEVICE:MAX") +
+                          platform->timer.query("mesh proj post", "DEVICE:MAX"),
+                      platform->timer.count("mesh proj pre"));
 
   double gsTime = ogsTime(/* reportHostTime */ true);
   MPI_Allreduce(MPI_IN_PLACE, &gsTime, 1, MPI_DOUBLE, MPI_MAX, comm_);
@@ -989,19 +1013,26 @@ void nrs_t::printRunStat(int step)
     return tag.find("neknek_t::") != std::string::npos && tag.find("localEvalKernel") != std::string::npos;
   };
 
-  platform->timer.printStatEntry("    checkpointing       ", "checkpointing", "DEVICE:MAX", tElapsedTimeSolve);
-  platform->timer.printStatEntry("    udfExecuteStep      ", "udfExecuteStep", "DEVICE:MAX", tElapsedTimeSolve);
+  platform->timer.printStatEntry("    checkpointing       ",
+                                 "checkpointing",
+                                 "DEVICE:MAX",
+                                 tElapsedTimeSolve);
+  platform->timer.printStatEntry("    udfExecuteStep      ",
+                                 "udfExecuteStep",
+                                 "DEVICE:MAX",
+                                 tElapsedTimeSolve);
   const double tudf = platform->timer.query("udfExecuteStep", "DEVICE:MAX");
   platform->timer.printStatEntry("      lpm integrate     ", "lpm_t::integrate", "DEVICE:MAX", tudf);
   const double tlpm = platform->timer.query("lpm_t::integrate", "DEVICE:MAX");
   platform->timer.printStatEntry("        userRHS         ", "lpm_t::integrate::userRHS", "DEVICE:MAX", tlpm);
   const double tParticleRHS = platform->timer.query("lpm_t::integrate::userRHS", "DEVICE:MAX");
   platform->timer.printStatEntry("          interpolate   ",
-                 "lpm_t::integrate::userRHS::interpolate",
-                 "DEVICE:MAX",
-                 tParticleRHS);
+                                 "lpm_t::integrate::userRHS::interpolate",
+                                 "DEVICE:MAX",
+                                 tParticleRHS);
   const double tInterpPart = platform->timer.query("lpm_t::integrate::userRHS::interpolate", "DEVICE:MAX");
-  auto [tLocalKernel, nLocalKernel] = platform->timer.sumAllMatchingTags(lpmLocalEvalKernelPredicate, "DEVICE:MAX");
+  auto [tLocalKernel, nLocalKernel] =
+      platform->timer.sumAllMatchingTags(lpmLocalEvalKernelPredicate, "DEVICE:MAX");
   platform->timer.printStatEntry("            eval kernel ", tLocalKernel, nLocalKernel, tInterpPart);
   platform->timer.printStatEntry("        findpts         ", "lpm_t::integrate::find", "DEVICE:MAX", tlpm);
   const double tFindPart = platform->timer.query("lpm_t::integrate::find", "DEVICE:MAX");
@@ -1022,7 +1053,10 @@ void nrs_t::printRunStat(int step)
   platform->timer.printStatEntry("    makeq               ", "makeq", "DEVICE:MAX", tElapsedTimeSolve);
   platform->timer.printStatEntry("      udfSEqnSource     ", "udfSEqnSource", "DEVICE:MAX", tMakeq);
 
-  platform->timer.printStatEntry("    udfProperties       ", "udfProperties", "DEVICE:MAX", tElapsedTimeSolve);
+  platform->timer.printStatEntry("    udfProperties       ",
+                                 "udfProperties",
+                                 "DEVICE:MAX",
+                                 tElapsedTimeSolve);
 
   platform->timer.printStatEntry("    meshUpdate          ", "meshUpdate", "DEVICE:MAX", tElapsedTimeSolve);
   const double tMesh = platform->timer.query("meshSolve", "DEVICE:MAX");
@@ -1031,32 +1065,52 @@ void nrs_t::printRunStat(int step)
   platform->timer.printStatEntry("      initial guess     ", "mesh proj", "DEVICE:MAX", tMesh);
 
   const double tNekNek = platform->timer.query("neknek update boundary", "DEVICE:MAX");
-  platform->timer.printStatEntry("    neknek              ", "neknek update boundary", "DEVICE:MAX", tElapsedTimeSolve);
+  platform->timer.printStatEntry("    neknek              ",
+                                 "neknek update boundary",
+                                 "DEVICE:MAX",
+                                 tElapsedTimeSolve);
   platform->timer.printStatEntry("      sync              ", "neknek sync", "DEVICE:MAX", tNekNek);
   platform->timer.printStatEntry("      exchange          ", "neknek exchange", "DEVICE:MAX", tNekNek);
   const double tExchange = platform->timer.query("neknek exchange", "DEVICE:MAX");
-  std::tie(tLocalKernel, nLocalKernel) = platform->timer.sumAllMatchingTags(neknekLocalEvalKernelPredicate, "DEVICE:MAX");
+  std::tie(tLocalKernel, nLocalKernel) =
+      platform->timer.sumAllMatchingTags(neknekLocalEvalKernelPredicate, "DEVICE:MAX");
   platform->timer.printStatEntry("        eval kernel     ", tLocalKernel, nLocalKernel, tExchange);
-  platform->timer.printStatEntry("      findpts           ", "neknek updateInterpPoints", "DEVICE:MAX", tNekNek);
+  platform->timer.printStatEntry("      findpts           ",
+                                 "neknek updateInterpPoints",
+                                 "DEVICE:MAX",
+                                 tNekNek);
   const double tFindpts = platform->timer.query("neknek updateInterpPoints", "DEVICE:MAX");
 
   if (tFindpts > 0.0) {
-    std::tie(tFindKernel, nFindKernel) = platform->timer.sumAllMatchingTags(neknekLocalKernelPredicate, "DEVICE:MAX");
+    std::tie(tFindKernel, nFindKernel) =
+        platform->timer.sumAllMatchingTags(neknekLocalKernelPredicate, "DEVICE:MAX");
     platform->timer.printStatEntry("        find kernel     ", tFindKernel, nFindKernel, tFindpts);
   }
 
   const double tVelocity = platform->timer.query("velocitySolve", "DEVICE:MAX");
-  platform->timer.printStatEntry("    velocitySolve       ", "velocitySolve", "DEVICE:MAX", tElapsedTimeSolve);
+  platform->timer.printStatEntry("    velocitySolve       ",
+                                 "velocitySolve",
+                                 "DEVICE:MAX",
+                                 tElapsedTimeSolve);
   platform->timer.printStatEntry("      rhs               ", "velocity rhs", "DEVICE:MAX", tVelocity);
-  platform->timer.printStatEntry("      preconditioner    ", "velocity preconditioner", "DEVICE:MAX", tVelocity);
+  platform->timer.printStatEntry("      preconditioner    ",
+                                 "velocity preconditioner",
+                                 "DEVICE:MAX",
+                                 tVelocity);
   platform->timer.printStatEntry("      initial guess     ", "velocity proj", "DEVICE:MAX", tVelocity);
 
   const double tPressure = platform->timer.query("pressureSolve", "DEVICE:MAX");
-  platform->timer.printStatEntry("    pressureSolve       ", "pressureSolve", "DEVICE:MAX", tElapsedTimeSolve);
+  platform->timer.printStatEntry("    pressureSolve       ",
+                                 "pressureSolve",
+                                 "DEVICE:MAX",
+                                 tElapsedTimeSolve);
   platform->timer.printStatEntry("      rhs               ", "pressure rhs", "DEVICE:MAX", tPressure);
 
   const double tPressurePreco = platform->timer.query("pressure preconditioner", "DEVICE:MAX");
-  platform->timer.printStatEntry("      preconditioner    ", "pressure preconditioner", "DEVICE:MAX", tPressure);
+  platform->timer.printStatEntry("      preconditioner    ",
+                                 "pressure preconditioner",
+                                 "DEVICE:MAX",
+                                 tPressure);
 
   auto tags = platform->timer.tags();
   for (int i = 15; i > 0; i--) {
@@ -1089,7 +1143,8 @@ void nrs_t::printRunStat(int step)
     // ensure children of the timer aren't doubly counted
     return match && tag.find("udfSEqnSource::") == std::string::npos;
   };
-  auto [tSEqnSourceCvode, nSEqnSourceCvode] = platform->timer.sumAllMatchingTags(cvodeUdfSEqnSourcePredicate, "DEVICE:MAX");
+  auto [tSEqnSourceCvode, nSEqnSourceCvode] =
+      platform->timer.sumAllMatchingTags(cvodeUdfSEqnSourcePredicate, "DEVICE:MAX");
 
   auto cvodeLocalPointSourcePredicate = [](const std::string &tag) {
     bool match = tag.find("cvode_t::") != std::string::npos && tag.find("pointSource") != std::string::npos;
@@ -1106,10 +1161,16 @@ void nrs_t::printRunStat(int step)
     return match && tag.find("evaluateProperties::") == std::string::npos;
   };
   auto [tPropCvode, nPropCvode] = platform->timer.sumAllMatchingTags(cvodePropertiesPredicate, "DEVICE:MAX");
-  platform->timer.printStatEntry("    scalarSolveCvode    ", "cvode_t::solve", "DEVICE:MAX", tElapsedTimeSolve);
+  platform->timer.printStatEntry("    scalarSolveCvode    ",
+                                 "cvode_t::solve",
+                                 "DEVICE:MAX",
+                                 tElapsedTimeSolve);
   platform->timer.printStatEntry("      makeq             ", tMakeqCvode, nMakeqCvode, tScalarCvode);
   platform->timer.printStatEntry("        udfSEqnSource   ", tSEqnSourceCvode, nSEqnSourceCvode, tMakeqCvode);
-  platform->timer.printStatEntry("      local pt src      ", tLocalPointSource, nLocalPointSource, tScalarCvode);
+  platform->timer.printStatEntry("      local pt src      ",
+                                 tLocalPointSource,
+                                 nLocalPointSource,
+                                 tScalarCvode);
   platform->timer.printStatEntry("      udfProperties     ", tPropCvode, nPropCvode, tScalarCvode);
 
   auto precoTimeScalars = 0.0;
@@ -1137,7 +1198,6 @@ void nrs_t::printRunStat(int step)
   std::cout.unsetf(std::ios::scientific);
   std::cout.precision(outPrecisionSave);
 }
-
 
 void nrs_t::finalize()
 {
@@ -1171,7 +1231,7 @@ void nrs_t::finalize()
   }
 }
 
-void nrs_t::makeNLT(double time, int tstep, occa::memory& o_Usubcycling)
+void nrs_t::makeNLT(double time, int tstep, occa::memory &o_Usubcycling)
 {
   mesh_t *mesh = this->meshV;
   const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
@@ -1184,7 +1244,12 @@ void nrs_t::makeNLT(double time, int tstep, occa::memory& o_Usubcycling)
   }
 
   if (platform->options.compareArgs("VELOCITY REGULARIZATION METHOD", "HPFRT")) {
-    this->filterRTKernel(mesh->Nelements, this->o_filterRT, this->filterS, this->fieldOffset, this->o_U, this->o_NLT);
+    this->filterRTKernel(mesh->Nelements,
+                         this->o_filterRT,
+                         this->filterS,
+                         this->fieldOffset,
+                         this->o_U,
+                         this->o_NLT);
     double flops = 24 * mesh->Np * mesh->Nq + 3 * mesh->Np;
     flops *= static_cast<double>(mesh->Nelements);
     platform->flopCounter->add("velocityFilterRT", flops);
@@ -1192,12 +1257,12 @@ void nrs_t::makeNLT(double time, int tstep, occa::memory& o_Usubcycling)
 
   if (movingMesh && !this->Nsubsteps) {
     this->advectMeshVelocityKernel(mesh->Nelements,
-                                  mesh->o_vgeo,
-                                  mesh->o_D,
-                                  this->fieldOffset,
-                                  mesh->o_U,
-                                  this->o_U,
-                                  this->o_NLT);
+                                   mesh->o_vgeo,
+                                   mesh->o_D,
+                                   this->fieldOffset,
+                                   mesh->o_U,
+                                   this->o_U,
+                                   this->o_NLT);
     double flops = 54 * mesh->Np * mesh->Nq + 63 * mesh->Np;
     flops *= static_cast<double>(mesh->Nelements);
     platform->flopCounter->add("velocity advectMeshVelocity", flops);
@@ -1211,23 +1276,23 @@ void nrs_t::makeNLT(double time, int tstep, occa::memory& o_Usubcycling)
 
       if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
         this->strongAdvectionCubatureVolumeKernel(mesh->Nelements,
-                                                 mesh->o_vgeo,
-                                                 mesh->o_cubDiffInterpT,
-                                                 mesh->o_cubInterpT,
-                                                 mesh->o_cubProjectT,
-                                                 this->fieldOffset,
-                                                 this->cubatureOffset,
-                                                 this->o_U,
-                                                 this->o_Urst,
-                                                 o_adv);
+                                                  mesh->o_vgeo,
+                                                  mesh->o_cubDiffInterpT,
+                                                  mesh->o_cubInterpT,
+                                                  mesh->o_cubProjectT,
+                                                  this->fieldOffset,
+                                                  this->cubatureOffset,
+                                                  this->o_U,
+                                                  this->o_Urst,
+                                                  o_adv);
       } else {
         this->strongAdvectionVolumeKernel(mesh->Nelements,
-                                         mesh->o_vgeo,
-                                         mesh->o_D,
-                                         this->fieldOffset,
-                                         this->o_U,
-                                         this->o_Urst,
-                                         o_adv);
+                                          mesh->o_vgeo,
+                                          mesh->o_D,
+                                          this->fieldOffset,
+                                          this->o_U,
+                                          this->o_Urst,
+                                          o_adv);
       }
 
       platform->linAlg->axpby(this->NVfields * this->fieldOffset, -1.0, o_adv, 1.0, this->o_NLT);
@@ -1251,8 +1316,7 @@ void nrs_t::printInfo(double time, int tstep, bool printStepInfo, bool printVerb
     computeDivUErr(this, divUErrVolAvg, divUErrL2);
   }
 
-  auto printSolverInfo = [](elliptic* solver, const std::string& name)
-  {
+  auto printSolverInfo = [](elliptic *solver, const std::string &name) {
     const auto [prevProjVecs, nProjVecs] = solver->projectionCounters();
     if (nProjVecs > 0) {
       if (prevProjVecs > 0) {
@@ -1286,7 +1350,6 @@ void nrs_t::printInfo(double time, int tstep, bool printStepInfo, bool printVerb
       }
 
       if (this->neknek) {
-        
         printf("%-10s: sync %.2e  exchange %.2e\n", "neknek", this->neknek->tSync(), this->neknek->tExch());
       }
 
@@ -1301,14 +1364,11 @@ void nrs_t::printInfo(double time, int tstep, bool printStepInfo, bool printVerb
           printSolverInfo(this->vSolver, "V");
           printSolverInfo(this->wSolver, "W");
         }
-        printf("%-10s: %.2e  %.2e\n",
-               "divUErr",
-               divUErrVolAvg,
-               divUErrL2);
+        printf("%-10s: %.2e  %.2e\n", "divUErr", divUErrVolAvg, divUErrL2);
       }
 
       if (this->meshSolver) {
-          printSolverInfo(this->meshSolver, "MSH");
+        printSolverInfo(this->meshSolver, "MSH");
       }
     }
 
@@ -1336,7 +1396,10 @@ void nrs_t::printInfo(double time, int tstep, bool printStepInfo, bool printVerb
         if (this->uvwSolver) {
           printf("  UVW: %d", this->uvwSolver->Niter());
         } else {
-          printf("  U: %d  V: %d  W: %d", this->uSolver->Niter(), this->vSolver->Niter(), this->wSolver->Niter());
+          printf("  U: %d  V: %d  W: %d",
+                 this->uSolver->Niter(),
+                 this->vSolver->Niter(),
+                 this->wSolver->Niter());
         }
       }
       if (this->meshSolver) {
@@ -1364,36 +1427,40 @@ void nrs_t::printInfo(double time, int tstep, bool printStepInfo, bool printVerb
              "Unreasonable CFL!");
 }
 
-void nrs_t::writeFld(double t, int step, int outXYZ, int FP64, std::string suffix, int Nout, bool uniform) 
+void nrs_t::writeFld(double t, int step, int outXYZ, int FP64, std::string suffix, int Nout, bool uniform)
 {
   int Nscalar = 0;
   occa::memory o_s;
-  if(this->Nscalar) {
+  if (this->Nscalar) {
     o_s = this->cds->o_S;
     Nscalar = this->Nscalar;
   }
-  fld::write(suffix, t, step, outXYZ, FP64, this->o_U, this->o_P, o_s, Nscalar, Nout, uniform); 
+  fld::write(suffix, t, step, outXYZ, FP64, this->o_U, this->o_P, o_s, Nscalar, Nout, uniform);
 }
 
-void nrs_t::writeFld(double t, int step, int outXYZ, int FP64, int Nout, bool uniform) 
+void nrs_t::writeFld(double t, int step, int outXYZ, int FP64, int Nout, bool uniform)
 {
   this->writeFld(t, step, outXYZ, FP64, "", Nout, uniform);
 }
 
-void nrs_t::writeFld(double t, int step, std::string suffix, int Nout, bool uniform) 
+void nrs_t::writeFld(double t, int step, std::string suffix, int Nout, bool uniform)
 {
   std::string precision;
   platform->options.getArgs("CHECKPOINT PRECISION", precision);
   int FP64 = 0;
-  if(precision == "DP" || precision == "FP64") FP64 = 1;
+  if (precision == "DP" || precision == "FP64") {
+    FP64 = 1;
+  }
 
   int outXYZ = 1;
-  if(platform->options.compareArgs("CHECKPOINT OUTPUT MESH", "FALSE")) outXYZ = 0;
+  if (platform->options.compareArgs("CHECKPOINT OUTPUT MESH", "FALSE")) {
+    outXYZ = 0;
+  }
 
-  this->writeFld(t, step, outXYZ, FP64, suffix, Nout, uniform); 
+  this->writeFld(t, step, outXYZ, FP64, suffix, Nout, uniform);
 }
 
-void nrs_t::writeFld(double t, int step, int Nout, bool uniform) 
+void nrs_t::writeFld(double t, int step, int Nout, bool uniform)
 {
   this->writeFld(t, step, "", Nout, uniform);
 }

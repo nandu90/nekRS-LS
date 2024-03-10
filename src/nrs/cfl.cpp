@@ -13,7 +13,7 @@ void setup(nrs_t *nrs)
   h_scratch = platform->device.mallocHost<dfloat>(mesh->Nelements);
 
   if (nrs->elementType == QUADRILATERALS || nrs->elementType == HEXAHEDRA) {
-    auto dH = (dfloat *) calloc((mesh->N + 1), sizeof(dfloat));
+    std::vector<dfloat> dH(mesh->N + 1);
 
     for (int n = 0; n < (mesh->N + 1); n++) {
       if (n == 0)
@@ -26,8 +26,8 @@ void setup(nrs_t *nrs)
     for (int n = 0; n < (mesh->N + 1); n++)
       dH[n] = 1.0 / dH[n];
 
-    nrs->o_idH = platform->device.malloc<dfloat>((mesh->N + 1), dH);
-    free(dH);
+    nrs->o_idH = platform->device.malloc<dfloat>(mesh->N + 1);
+    nrs->o_idH.copyFrom(dH.data());
   }
   firstTime = 0;
 }

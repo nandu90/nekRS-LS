@@ -135,15 +135,16 @@ void fusedPlanarAvg(mesh_t *mesh,
       globalElement[element] = ge;
     }
 
-    o_locToGlobE = platform->device.malloc<dlong>(mesh->Nelements, globalElement.data());
+    o_locToGlobE = platform->device.malloc<dlong>(mesh->Nelements);
+    o_locToGlobE.copyFrom(globalElement.data());
   }
 
   auto upperCaseDir = direction;
   std::transform(upperCaseDir.begin(), upperCaseDir.end(), upperCaseDir.begin(), ::toupper);
   std::sort(upperCaseDir.begin(), upperCaseDir.end());
 
-  auto gatherPlanarValuesKernel = platform->kernels.get("gatherPlanarValues" + upperCaseDir);
-  auto scatterPlanarValuesKernel = platform->kernels.get("scatterPlanarValues" + upperCaseDir);
+  auto gatherPlanarValuesKernel = platform->kernelRequests.load("gatherPlanarValues" + upperCaseDir);
+  auto scatterPlanarValuesKernel = platform->kernelRequests.load("scatterPlanarValues" + upperCaseDir);
 
   platform->linAlg->fill(Nlocal, 0.0, o_scratch);
 

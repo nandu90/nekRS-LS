@@ -44,7 +44,7 @@ occa::kernel benchmarkFDM(int Nelements,
                           bool runAutotuner,
                           std::string suffix)
 {
-  if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
+  if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
     Nelements = 1;
   }
 
@@ -75,6 +75,11 @@ occa::kernel benchmarkFDM(int Nelements,
     props["defines/p_restrict"] = 0;
   }
 
+  const std::string oklpath(getenv("NEKRS_KERNEL_DIR"));
+  const std::string kernelName = "fusedFDM";
+  const std::string fileName = oklpath + "/elliptic/" + kernelName;
+  const std::string ext = platform->serial ? ".c" : ".okl";
+
   auto benchmarkFDMWithPrecision = [&](auto sampleWord) {
     using FPType = decltype(sampleWord);
     const auto wordSize = sizeof(FPType);
@@ -90,17 +95,25 @@ occa::kernel benchmarkFDM(int Nelements,
       }
     }
 
-    const std::string oklpath(getenv("NEKRS_KERNEL_DIR"));
+    auto buildKernel = [&props, &fileName, &ext, &kernelName, &suffix](int ver)
+    {
+      auto newProps = props;
+      newProps["defines/p_knl"] = ver;
+      const auto verSuffix = "_v" + std::to_string(ver);
+
+      if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
+        const auto reqName = "fdm::" + std::string(newProps.hash().getString());
+        platform->kernelRequests.add(reqName, fileName + ext, newProps, suffix);
+        return occa::kernel();
+      } else {
+        return platform->device.buildKernel(fileName + ext, kernelName + verSuffix, newProps, suffix, MPI_COMM_SELF);
+      }
+    };
+
+    auto referenceKernel = buildKernel(kernelVariants.front());
 
     if (!runAutotuner) {
-      auto newProps = props;
-      newProps["defines/p_knl"] = kernelVariants.front();
-
-      const std::string kernelName = "fusedFDM";
-      const std::string ext = platform->serial ? ".c" : ".okl";
-      const std::string fileName = oklpath + "/elliptic/" + kernelName + ext;
-
-      return std::make_pair(platform->device.buildKernel(fileName, newProps, suffix, true), -1.0);
+      return std::make_pair(referenceKernel, -1.0);
     }
 
     auto Sx = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0, 1, true);
@@ -124,18 +137,6 @@ occa::kernel benchmarkFDM(int Nelements,
     auto o_u = platform->device.malloc(Nelements * Np_e * wordSize, u.data());
     auto o_invDegree = platform->device.malloc(Nelements * Np_e * sizeof(dfloat), invDegree.data());
 
-    occa::kernel referenceKernel;
-    {
-      auto newProps = props;
-      newProps["defines/p_knl"] = kernelVariants.front();
-
-      const std::string kernelName = "fusedFDM";
-      const std::string ext = platform->serial ? ".c" : ".okl";
-      const std::string fileName = oklpath + "/elliptic/" + kernelName + ext;
-
-      referenceKernel = platform->device.buildKernel(fileName, newProps, suffix, true);
-    }
-
     auto kernelRunner = [&](occa::kernel &kernel) {
       if (useRAS)
         kernel(Nelements, o_elementList, o_Su, o_Sx, o_Sy, o_Sz, o_invL, o_invDegree, o_u);
@@ -144,19 +145,8 @@ occa::kernel benchmarkFDM(int Nelements,
     };
 
     auto fdmKernelBuilder = [&](int kernelVariant) {
-      auto newProps = props;
-      newProps["defines/p_knl"] = kernelVariant;
-
-      const std::string kernelName = "fusedFDM";
-      const std::string ext = platform->serial ? ".c" : ".okl";
-      const std::string fileName = oklpath + "/elliptic/" + kernelName + ext;
-
-      if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
-        platform->kernels.add(kernelName + suffix + "v" + std::to_string(kernelVariant), fileName, newProps);
-        return occa::kernel(); // dummy
-      }
-
-      auto kernel = platform->device.buildKernel(fileName, newProps, suffix, true);
+      auto kernel = buildKernel(kernelVariant);
+      if (!kernel.isInitialized()) return occa::kernel();
 
       auto dumpResult = [&]() {
         std::vector<FPType> result;
@@ -247,7 +237,7 @@ occa::kernel benchmarkFDM(int Nelements,
         benchmarkKernel(fdmKernelBuilder, kernelRunner, printCallBack, kernelVariants, NtestsOrTargetTime);
 
     if (kernelAndTime.first.properties().has("defines/p_knl") &&
-        platform->options.compareArgs("BUILD ONLY", "FALSE")) {
+        !platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
       int bestKernelVariant = static_cast<int>(kernelAndTime.first.properties()["defines/p_knl"]);
 
       // print only the fastest kernel

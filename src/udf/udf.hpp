@@ -40,6 +40,6 @@ void udfBuild(const std::string& udfFile, setupAide &options);
 void udfLoad();
 void udfEcho();
 void *udfLoadFunction(const char *fname, int errchk);
-occa::kernel oudfBuildKernel(occa::properties kernelInfo, const char *function);
+occa::kernel oudfBuildKernel(occa::properties kernelInfo, const std::string& kernelName);
 
 #endif

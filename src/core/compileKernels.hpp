@@ -3,7 +3,9 @@
 
 #include "platform.hpp"
 
-occa::properties compileUDFKernels();
+occa::properties registerUDFKernels();
+void loadUDFKernels();
+
 void registerCoreKernels();
 void registerLinAlgKernels();
 void registerPostProcessingKernels();

@@ -104,6 +104,10 @@ namespace occa {
                                       const hash_t hash,
                                       const occa::json &props) = 0;
 
+    virtual void buildSource(const std::string& fileName, 
+                             const hash_t hash, 
+                             const occa::json& properties) = 0;
+
     virtual modeKernel_t* buildKernelFromBinary(const std::string &filename,
                                                 const std::string &kernelName,
                                                 const occa::json &props) = 0;

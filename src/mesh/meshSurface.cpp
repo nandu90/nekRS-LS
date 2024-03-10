@@ -34,20 +34,37 @@ std::vector<dfloat> integral(mesh_t *mesh,
     sum = (dfloat *)calloc(Nfields * mesh->Nelements, sizeof(dfloat));
   }
 
-  std::string knlName = "mesh-surfaceAreaNormalMultiplyIntegrateHex3D";
-  if (ndot) knlName += "-ndot"; 
-  const auto kernel = platform->kernels.get(knlName);
-                                 
-  kernel(mesh->Nelements,
-         Nfields,
-         fieldOffset,
-         nbID,
-         o_bID,
-         mesh->o_sgeo,
-         mesh->o_vmapM,
-         mesh->o_EToB,
-         o_fld,
-         o_sumFace);
+  if (ndot) {
+    static occa::kernel kernel;
+    if (!kernel.isInitialized()) {
+      kernel = platform->kernelRequests.load("mesh-surfaceAreaNormalMultiplyIntegrateHex3D-ndot");
+    }
+    kernel(mesh->Nelements,
+           Nfields,
+           fieldOffset,
+           nbID,
+           o_bID,
+           mesh->o_sgeo,
+           mesh->o_vmapM,
+           mesh->o_EToB,
+           o_fld,
+           o_sumFace);
+  } else {
+    static occa::kernel kernel;
+    if (!kernel.isInitialized()) {
+      kernel = platform->kernelRequests.load("mesh-surfaceAreaNormalMultiplyIntegrateHex3D");
+    }
+    kernel(mesh->Nelements,
+           Nfields,
+           fieldOffset,
+           nbID,
+           o_bID,
+           mesh->o_sgeo,
+           mesh->o_vmapM,
+           mesh->o_EToB,
+           o_fld,
+           o_sumFace);
+  }
 
   o_sumFace.copyTo(sumFace, Nfields * mesh->Nelements);
 
@@ -69,7 +86,8 @@ std::vector<dfloat> integral(mesh_t *mesh,
 
 } // namespace
 
-std::vector<dfloat> mesh_t::surfaceAreaMultiplyIntegrate(int nbID, const occa::memory &o_bID, const occa::memory &o_fld)
+std::vector<dfloat>
+mesh_t::surfaceAreaMultiplyIntegrate(int nbID, const occa::memory &o_bID, const occa::memory &o_fld)
 {
   return integral(this, 1, static_cast<dlong>(0), false, nbID, o_bID, o_fld);
 }
@@ -91,20 +109,15 @@ std::vector<dfloat> mesh_t::surfaceAreaNormalMultiplyIntegrate(dlong fieldOffset
   return integral(this, 1, fieldOffset, true, nbID, o_bID, o_fld);
 }
 
-
 occa::memory mesh_t::surfaceAreaMultiply(int nbID, const occa::memory &o_bID, const occa::memory &o_fld)
 {
-  auto o_out = platform->o_memPool.reserve<dfloat>(this->Nlocal); 
+  auto o_out = platform->o_memPool.reserve<dfloat>(this->Nlocal);
 
-  const auto kernel = platform->kernels.get("mesh-surfaceAreaMultiplyHex3D");
-  kernel(this->Nelements,
-         nbID,
-         o_bID,
-         this->o_sgeo,
-         this->o_vmapM,
-         this->o_EToB,
-         o_fld,
-         o_out);
+  static occa::kernel kernel;
+  if (!kernel.isInitialized()) {
+    kernel = platform->kernelRequests.load("mesh-surfaceAreaMultiplyHex3D");
+  }
+  kernel(this->Nelements, nbID, o_bID, this->o_sgeo, this->o_vmapM, this->o_EToB, o_fld, o_out);
 
   return o_out;
 }

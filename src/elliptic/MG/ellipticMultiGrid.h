@@ -76,10 +76,6 @@ public:
   int DownLegChebyshevDegree;
   int UpLegChebyshevDegree;
 
-  inline static pfloat* smootherResidual;
-  inline static occa::memory o_smootherResidual;
-  inline static occa::memory o_smootherResidual2;
-  inline static occa::memory o_smootherUpdate;
   occa::kernel preFDMKernel;
   occa::kernel fusedFDMKernel;
   occa::kernel postFDMKernel;
@@ -123,11 +119,12 @@ public:
           bool _isCoarse = false
           );
   //build a level and connect it to the previous one
-  pMGLevel(elliptic_t* ellipticBase, //finest level
+  pMGLevel(elliptic_t* ellipticBase,         //finest level
           mesh_t** meshLevels,
           elliptic_t* ellipticFine,          //previous level
-          elliptic_t* ellipticCoarse,          //current level
-          int Nf, int Nc,
+          elliptic_t* ellipticCoarse,        //current level
+          int Nf, 
+          int Nc,
           setupAide options_,
           MPI_Comm comm_,
           bool _isCoarse = false

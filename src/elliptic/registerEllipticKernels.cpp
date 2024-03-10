@@ -19,15 +19,15 @@ void registerGMRESKernels(const std::string &section, int Nfields)
 
   std::string kernelName = "gramSchmidtOrthogonalization";
   fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernels.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
+  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
 
   kernelName = "updatePGMRESSolution";
   fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernels.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
+  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
 
   kernelName = "fusedResidualAndNorm";
   fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernels.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
+  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
 }
 
 void registerCombinedPCGKernels(const std::string &section, int Nfields)
@@ -44,11 +44,11 @@ void registerCombinedPCGKernels(const std::string &section, int Nfields)
 
   std::string kernelName = "combinedPCGPreMatVec";
   fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernels.add(sectionIdentifier + kernelName, fileName, combinedPCGInfo);
+  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, combinedPCGInfo);
 
   kernelName = "combinedPCGUpdateConvergedSolution";
   fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernels.add(sectionIdentifier + kernelName, fileName, combinedPCGInfo);
+  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, combinedPCGInfo);
 
   combinedPCGInfo["defines/p_nReduction"] = CombinedPCGId::nReduction;
   combinedPCGInfo["defines/p_gamma"] = CombinedPCGId::gamma;
@@ -61,7 +61,7 @@ void registerCombinedPCGKernels(const std::string &section, int Nfields)
 
   kernelName = "combinedPCGPostMatVec";
   fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernels.add(sectionIdentifier + kernelName, fileName, combinedPCGInfo);
+  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, combinedPCGInfo);
 }
 
 } // namespace
@@ -133,14 +133,14 @@ void registerEllipticKernels(std::string section, int poissonEquation)
 
       kernelName = "multiScaledAddwOffset";
       fileName = oklpath + kernelName + extension;
-      platform->kernels.add(sectionIdentifier + kernelName, fileName, properties);
+      platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, properties);
       kernelName = "accumulate";
       fileName = oklpath + kernelName + extension;
-      platform->kernels.add(sectionIdentifier + kernelName, fileName, properties);
+      platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, properties);
 
       kernelName = "fusedCopyDfloatToPfloat";
       fileName = oklpath + kernelName + extension;
-      platform->kernels.add(kernelName, fileName, properties);
+      platform->kernelRequests.add(kernelName, fileName, properties);
     }
   }
 
@@ -149,11 +149,11 @@ void registerEllipticKernels(std::string section, int poissonEquation)
     std::string fileName;
 
     fileName = oklpath + "mask.okl";
-    platform->kernels.add("mask", fileName, kernelInfo);
+    platform->kernelRequests.add("mask", fileName, kernelInfo);
 
     occa::properties pfloatKernelInfo = kernelInfo;
     pfloatKernelInfo["defines/dfloat"] = pfloatString;
-    platform->kernels.add("maskPfloat", fileName, pfloatKernelInfo);
+    platform->kernelRequests.add("maskPfloat", fileName, pfloatKernelInfo);
   }
 
   kernelInfo["defines/p_Nfields"] = Nfields;
@@ -197,24 +197,24 @@ void registerEllipticKernels(std::string section, int poissonEquation)
                                 stressForm,
                                 verbosity,
                                 targetTimeBenchmark,
-                                platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true,
-                                "");
+                                platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
 
-
-    std::string kernelNamePrefix = (poissonEquation) ? "poisson-" : ""; 
-    kernelNamePrefix += "elliptic";
-    if (blockSolver)
-      kernelNamePrefix += (stressForm) ? "Stress" : "Block";
-
-    kernelName = "AxCoeff";
-    if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR"))
-      kernelName += "Trilinear";
-    kernelName += suffix;
-
-    platform->kernels.add(kernelNamePrefix + "Partial" + kernelName, axKernel);
+    if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
+      std::string kernelNamePrefix = (poissonEquation) ? "poisson-" : ""; 
+      kernelNamePrefix += "elliptic";
+      if (blockSolver)
+        kernelNamePrefix += (stressForm) ? "Stress" : "Block";
+ 
+      kernelName = "AxCoeff";
+      if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR"))
+        kernelName += "Trilinear";
+      kernelName += suffix;
+ 
+      platform->kernelRequests.add(kernelNamePrefix + "Partial" + kernelName, axKernel);
+    }
   }
 
   // PCG update
   fileName = oklpath + "ellipticBlockUpdatePCG" + fileNameExtension;
-  platform->kernels.add(sectionIdentifier + "ellipticBlockUpdatePCG", fileName, kernelInfo);
+  platform->kernelRequests.add(sectionIdentifier + "ellipticBlockUpdatePCG", fileName, kernelInfo);
 }

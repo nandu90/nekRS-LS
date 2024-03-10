@@ -13,16 +13,16 @@ void registerNekNekKernels()
 
   std::string kernelName = "copyNekNekPoints";
   std::string fileName = oklpath + "/nrs/neknek/" + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, platform->kernelInfo);
+  platform->kernelRequests.add(kernelName, fileName, platform->kernelInfo);
 
   auto surfaceFluxKernelInfo = platform->kernelInfo;
   surfaceFluxKernelInfo += meshKernelProperties(N);
   bcMap::addKernelConstants(surfaceFluxKernelInfo);
   kernelName = "computeFlux";
   fileName = oklpath + "/nrs/neknek/" + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, surfaceFluxKernelInfo);
+  platform->kernelRequests.add(kernelName, fileName, surfaceFluxKernelInfo);
 
   kernelName = "fixSurfaceFlux";
   fileName = oklpath + "/nrs/neknek/" + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, surfaceFluxKernelInfo);
+  platform->kernelRequests.add(kernelName, fileName, surfaceFluxKernelInfo);
 }

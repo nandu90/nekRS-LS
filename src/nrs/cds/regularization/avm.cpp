@@ -72,13 +72,13 @@ void setup(cds_t *cds)
   std::string kernelName;
 
   kernelName = "relativeMassHighestMode";
-  relativeMassHighestModeKernel = platform->kernels.get(kernelName);
+  relativeMassHighestModeKernel = platform->kernelRequests.load(kernelName);
 
   kernelName = "computeMaxVisc";
-  computeMaxViscKernel = platform->kernels.get(kernelName);
+  computeMaxViscKernel = platform->kernelRequests.load(kernelName);
 
   kernelName = "interpolateP1";
-  interpolateP1Kernel = platform->kernels.get(kernelName);
+  interpolateP1Kernel = platform->kernelRequests.load(kernelName);
 }
 
 occa::memory computeEps(cds_t *cds, const double time, const dlong scalarIndex, occa::memory o_S)

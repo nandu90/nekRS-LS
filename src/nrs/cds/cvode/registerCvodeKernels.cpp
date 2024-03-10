@@ -34,39 +34,39 @@ void registerCvodeKernels()
 
   kernelName = "extrapolate";
   fileName = oklpath + "/core/" + kernelName + ".okl";
-  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
+  platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "mask";
   fileName = oklpath + "/core/" + kernelName + ".okl";
-  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
+  platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);
  
   kernelName = "errorWeight";
   fileName = oklpath + "/nrs/cds/cvode/" + kernelName + ".okl";
-  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
+  platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "mapToMaskedPoint";
   fileName = oklpath + "/nrs/cds/cvode/" + kernelName + ".okl";
-  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
+  platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "extrapolateDirichlet";
   fileName = oklpath + "/nrs/cds/cvode/" + kernelName + ".okl";
-  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
+  platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "axpby";
   fileName = oklpath + "/nrs/cds/cvode/" + kernelName + ".okl";
-  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
+  platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "axmyz";
   fileName = oklpath + "/nrs/cds/cvode/" + kernelName + ".okl";
-  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
+  platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "linearCombination";
   fileName = oklpath + "/nrs/cds/cvode/" + kernelName + ".okl";
-  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
+  platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   kernelName = "innerProdMulti";
   fileName = oklpath + "/nrs/cds/cvode/" + kernelName + ".okl";
-  platform->kernels.add(prefix + kernelName, fileName, platform->kernelInfo);
+  platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);
 
   {
     auto prop = platform->kernelInfo;
@@ -74,10 +74,10 @@ void registerCvodeKernels()
     fileName = oklpath + "/nrs/cds/cvode/" + kernelName + ".okl";
  
     prop["defines/p_addPointSource"] = 0; 
-    platform->kernels.add(prefix + "rhoDiv", fileName, prop);
+    platform->kernelRequests.add(prefix + "rhoDiv", fileName, prop);
  
     prop["defines/p_addPointSource"] = 1; 
-    platform->kernels.add(prefix + kernelName, fileName, prop);
+    platform->kernelRequests.add(prefix + kernelName, fileName, prop);
   }
 
   int N;
@@ -96,5 +96,5 @@ void registerCvodeKernels()
   kernelName = "weakLaplacianHex3D";
   fileName = oklpath + "/core/" + kernelName + ".okl";
 
-  platform->kernels.add(prefix + kernelName, fileName, prop);
+  platform->kernelRequests.add(prefix + kernelName, fileName, prop);
 }

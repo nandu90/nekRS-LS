@@ -27,7 +27,6 @@ static void advectionFlops(mesh_t *mesh, int Nfields)
   platform->flopCounter->add("advection", flopCount);
 }
 
-
 occa::memory cds_t::advectionSubcyling(int nEXT, double time, int scalarIdx)
 {
   const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
@@ -36,28 +35,39 @@ occa::memory cds_t::advectionSubcyling(int nEXT, double time, int scalarIdx)
   const auto gsh = this->gsh;
 
   const auto nFields = 1;
-  const auto fieldOffset = this->fieldOffset[scalarIdx]; 
+  const auto fieldOffset = this->fieldOffset[scalarIdx];
   const auto fieldOffsetSum = this->fieldOffsetSum;
-  const auto meshOffset = this->fieldOffset[0]; // used for mesh->o_invLMM and mesh->o_divU in case of moving mesh
+  const auto meshOffset =
+      this->fieldOffset[0]; // used for mesh->o_invLMM and mesh->o_divU in case of moving mesh
 
-  auto o_U = this->o_S.slice(this->fieldOffsetScan[scalarIdx], 
-                             fieldOffset);
+  auto o_U = this->o_S.slice(this->fieldOffsetScan[scalarIdx], fieldOffset);
 
   auto o_Urst = (movingMesh) ? this->o_relUrst : this->o_Urst;
-  auto opKernel = (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) ?
-                  this->subCycleStrongCubatureVolumeKernel :  
-                  this->subCycleStrongVolumeKernel;
+  auto opKernel = (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE"))
+                      ? this->subCycleStrongCubatureVolumeKernel
+                      : this->subCycleStrongVolumeKernel;
 
-  return advectionSubcyclingRK(mesh, this->meshV,
-                               time, this->dt, this->Nsubsteps, this->coeffBDF, nEXT,
-                               nFields, opKernel, gsh,
-                               meshOffset, fieldOffset, this->vCubatureOffset, fieldOffsetSum,
-                               o_Urst, o_U);
+  return advectionSubcyclingRK(mesh,
+                               this->meshV,
+                               time,
+                               this->dt,
+                               this->Nsubsteps,
+                               this->coeffBDF,
+                               nEXT,
+                               nFields,
+                               opKernel,
+                               gsh,
+                               meshOffset,
+                               fieldOffset,
+                               this->vCubatureOffset,
+                               fieldOffsetSum,
+                               o_Urst,
+                               o_U);
 }
 
-cds_t::cds_t(cdsConfig_t& cfg)
+cds_t::cds_t(cdsConfig_t &cfg)
 {
-  auto& options = platform->options;
+  auto &options = platform->options;
   const std::string section = "cds-";
   platform_t *platform = platform_t::getInstance();
 
@@ -111,8 +121,10 @@ cds_t::cds_t(cdsConfig_t& cfg)
 
   this->o_fieldOffsetScan = platform->device.malloc<dlong>(this->NSfields, this->fieldOffsetScan.data());
 
-  this->gsh =  oogs::setup(mesh->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO) ;
-  this->gshT = (mesh != this->meshV) ? oogs::setup(mesh->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO) : this->gsh;
+  this->gsh = oogs::setup(mesh->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO);
+  this->gshT = (mesh != this->meshV)
+                   ? oogs::setup(mesh->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO)
+                   : this->gsh;
 
   this->S = (dfloat *)calloc(std::max(this->nBDF, this->nEXT) * this->fieldOffsetSum, sizeof(dfloat));
 
@@ -232,7 +244,9 @@ cds_t::cds_t(cdsConfig_t& cfg)
         filterS = -1.0 * fabs(filterS);
         this->filterS[is] = filterS;
 
-        this->o_filterRT.copyFrom(lowPassFilterSetup(this->mesh[is], filterNc), Nmodes * Nmodes, is * Nmodes * Nmodes);
+        this->o_filterRT.copyFrom(lowPassFilterSetup(this->mesh[is], filterNc),
+                                  Nmodes * Nmodes,
+                                  is * Nmodes * Nmodes);
 
         applyFilterRT[is] = 1;
         this->applyFilter = 1;
@@ -251,37 +265,37 @@ cds_t::cds_t(cdsConfig_t& cfg)
   const std::string suffix = "Hex3D";
   {
     kernelName = "strongAdvectionVolume" + suffix;
-    this->strongAdvectionVolumeKernel = platform->kernels.get(section + kernelName);
+    this->strongAdvectionVolumeKernel = platform->kernelRequests.load(section + kernelName);
 
     if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
       kernelName = "strongAdvectionCubatureVolume" + suffix;
-      this->strongAdvectionCubatureVolumeKernel = platform->kernels.get(section + kernelName);
+      this->strongAdvectionCubatureVolumeKernel = platform->kernelRequests.load(section + kernelName);
     }
 
     kernelName = "advectMeshVelocity" + suffix;
-    this->advectMeshVelocityKernel = platform->kernels.get(section + kernelName);
+    this->advectMeshVelocityKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "maskCopy";
-    this->maskCopyKernel = platform->kernels.get(section + kernelName);
+    this->maskCopyKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "maskCopy2";
-    this->maskCopy2Kernel = platform->kernels.get(section + kernelName);
+    this->maskCopy2Kernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "neumannBC" + suffix;
-    this->neumannBCKernel = platform->kernels.get(section + kernelName);
+    this->neumannBCKernel = platform->kernelRequests.load(section + kernelName);
     kernelName = "dirichletBC";
-    this->dirichletBCKernel = platform->kernels.get(section + kernelName);
+    this->dirichletBCKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "filterRT" + suffix;
-    this->filterRTKernel = platform->kernels.get("core-" + kernelName);
+    this->filterRTKernel = platform->kernelRequests.load("core-" + kernelName);
 
     if (this->Nsubsteps) {
       if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
         kernelName = "subCycleStrongCubatureVolume" + suffix;
-        this->subCycleStrongCubatureVolumeKernel = platform->kernels.get(section + kernelName);
+        this->subCycleStrongCubatureVolumeKernel = platform->kernelRequests.load(section + kernelName);
       }
       kernelName = "subCycleStrongVolume" + suffix;
-      this->subCycleStrongVolumeKernel = platform->kernels.get(section + kernelName);
+      this->subCycleStrongVolumeKernel = platform->kernelRequests.load(section + kernelName);
     }
   }
 
@@ -290,7 +304,7 @@ cds_t::cds_t(cdsConfig_t& cfg)
   }
 }
 
-void cds_t::makeNLT(double time, int tstep, occa::memory& o_Usubcycling)
+void cds_t::makeNLT(double time, int tstep, occa::memory &o_Usubcycling)
 {
   if (this->userSource) {
     platform->timer.tic("udfSEqnSource", 1);
@@ -308,19 +322,18 @@ void cds_t::makeNLT(double time, int tstep, occa::memory& o_Usubcycling)
     auto mesh = (is) ? this->meshV : this->mesh[0];
     const dlong isOffset = this->fieldOffsetScan[is];
 
-
     if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPFRT")) {
-      const auto fieldOffset = this->fieldOffset[0]; // same for all scalars 
+      const auto fieldOffset = this->fieldOffset[0]; // same for all scalars
       this->filterRTKernel(this->meshV->Nelements,
-                          is,
-                          1,
-                          fieldOffset,
-                          this->o_applyFilterRT,
-                          this->o_filterRT,
-                          this->o_filterS,
-                          this->o_rho,
-                          this->o_S,
-                          this->o_NLT);
+                           is,
+                           1,
+                           fieldOffset,
+                           this->o_applyFilterRT,
+                           this->o_filterRT,
+                           this->o_filterS,
+                           this->o_rho,
+                           this->o_S,
+                           this->o_NLT);
 
       double flops = 6 * mesh->Np * mesh->Nq + 4 * mesh->Np;
       flops *= static_cast<double>(mesh->Nelements);
@@ -330,14 +343,14 @@ void cds_t::makeNLT(double time, int tstep, occa::memory& o_Usubcycling)
     const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
     if (movingMesh && !this->Nsubsteps) {
       this->advectMeshVelocityKernel(this->meshV->Nelements,
-                                    mesh->o_vgeo,
-                                    mesh->o_D,
-                                    isOffset,
-                                    this->vFieldOffset,
-                                    this->o_rho,
-                                    mesh->o_U,
-                                    this->o_S,
-                                    this->o_NLT);
+                                     mesh->o_vgeo,
+                                     mesh->o_D,
+                                     isOffset,
+                                     this->vFieldOffset,
+                                     this->o_rho,
+                                     mesh->o_U,
+                                     this->o_S,
+                                     this->o_NLT);
       double flops = 18 * mesh->Np * mesh->Nq + 21 * mesh->Np;
       flops *= static_cast<double>(mesh->Nelements);
       platform->flopCounter->add("scalar advectMeshVelocity", flops);
@@ -349,38 +362,37 @@ void cds_t::makeNLT(double time, int tstep, occa::memory& o_Usubcycling)
       } else {
         if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
           this->strongAdvectionCubatureVolumeKernel(this->meshV->Nelements,
-                                                   1,
-                                                   0, /* weighted */
-                                                   0, /* sharedRho */
-                                                   mesh->o_vgeo,
-                                                   mesh->o_cubDiffInterpT,
-                                                   mesh->o_cubInterpT,
-                                                   mesh->o_cubProjectT,
-                                                   this->o_compute + is,
-                                                   this->o_fieldOffsetScan + is,
-                                                   this->vFieldOffset,
-                                                   this->vCubatureOffset,
-                                                   this->o_S,
-                                                   this->o_Urst,
-                                                   this->o_rho,
-                                                   this->o_NLT);
+                                                    1,
+                                                    0, /* weighted */
+                                                    0, /* sharedRho */
+                                                    mesh->o_vgeo,
+                                                    mesh->o_cubDiffInterpT,
+                                                    mesh->o_cubInterpT,
+                                                    mesh->o_cubProjectT,
+                                                    this->o_compute + is,
+                                                    this->o_fieldOffsetScan + is,
+                                                    this->vFieldOffset,
+                                                    this->vCubatureOffset,
+                                                    this->o_S,
+                                                    this->o_Urst,
+                                                    this->o_rho,
+                                                    this->o_NLT);
         } else {
           this->strongAdvectionVolumeKernel(this->meshV->Nelements,
-                                           1,
-                                           0, /* weighted */
-                                           mesh->o_vgeo,
-                                           mesh->o_D,
-                                           this->o_compute + is,
-                                           this->o_fieldOffsetScan + is,
-                                           this->vFieldOffset,
-                                           this->o_S,
-                                           this->o_Urst,
-                                           this->o_rho,
-                                           this->o_NLT);
+                                            1,
+                                            0, /* weighted */
+                                            mesh->o_vgeo,
+                                            mesh->o_D,
+                                            this->o_compute + is,
+                                            this->o_fieldOffsetScan + is,
+                                            this->vFieldOffset,
+                                            this->o_S,
+                                            this->o_Urst,
+                                            this->o_rho,
+                                            this->o_NLT);
         }
         advectionFlops(this->mesh[0], 1);
       }
     }
   }
 }
-

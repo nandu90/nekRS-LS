@@ -68,6 +68,7 @@ public:
 
     virtual void prolongate(occa::memory o_x, occa::memory o_Px) = 0;
 
+
     virtual void Report() = 0;
   };
 
@@ -130,6 +131,10 @@ public:
   void Run(occa::memory o_rhs, occa::memory o_x);
 
   void Report();
+
+  void allocateWorkStorage();
+
+  void freeWorkStorage();
 
 private:
   void runVcycle(int k);

@@ -69,7 +69,8 @@ maskedFaceIds(mesh_t *mesh,
     }
   }
   if (Nmasked) {
-    o_maskIds = platform->device.malloc<dlong>(Nmasked, maskIds.data());
+    o_maskIds = platform->device.malloc<dlong>(Nmasked);
+    o_maskIds.copyFrom(maskIds.data());
   }
 
   NmaskedLocal = 0;
@@ -99,7 +100,8 @@ maskedFaceIds(mesh_t *mesh,
     }
   }
   if (NmaskedLocal) {
-    o_maskIdsLocal = platform->device.malloc<dlong>(NmaskedLocal, localMaskIds.data());
+    o_maskIdsLocal = platform->device.malloc<dlong>(NmaskedLocal);
+    o_maskIdsLocal.copyFrom(localMaskIds.data());
   }
 
   NmaskedGlobal = 0;
@@ -128,7 +130,8 @@ maskedFaceIds(mesh_t *mesh,
     }
   }
   if (NmaskedGlobal) {
-    o_maskIdsGlobal = platform->device.malloc<dlong>(NmaskedGlobal, globalMaskIds.data());
+    o_maskIdsGlobal = platform->device.malloc<dlong>(NmaskedGlobal);
+    o_maskIdsGlobal.copyFrom(globalMaskIds.data());
   }
 
 

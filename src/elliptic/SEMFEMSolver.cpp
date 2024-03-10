@@ -20,10 +20,10 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
   const bool useDevice = elliptic->options.compareArgs("COARSE SOLVER LOCATION", "DEVICE");
 
   if (!gatherKernel.isInitialized()) {
-    gatherKernel = platform->kernels.get("gather");
+    gatherKernel = platform->kernelRequests.load("gather");
   }
   if (!scatterKernel.isInitialized()) {
-    scatterKernel = platform->kernels.get("scatter");
+    scatterKernel = platform->kernelRequests.load("scatter");
   }
 
   mesh_t *mesh = elliptic->mesh;
@@ -58,7 +58,8 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
   const dlong numRows = matrix->rowEnd - matrix->rowStart + 1;
   numRowsSEMFEM = numRows;
 
-  o_dofMap = platform->device.malloc<long long>(numRows, matrix->dofMap);
+  o_dofMap = platform->device.malloc<long long>(numRows);
+  o_dofMap.copyFrom(matrix->dofMap);
 
   o_SEMFEMBuffer1 = platform->device.malloc<pfloat>(numRows);
   o_SEMFEMBuffer2 = platform->device.malloc<pfloat>(numRows);

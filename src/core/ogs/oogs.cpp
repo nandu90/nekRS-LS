@@ -6,6 +6,8 @@
 #include "ogsKernels.hpp"
 #include "ogsInterface.h"
 
+#include "platform.hpp"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -29,7 +31,6 @@ static constexpr unsigned send = 1 ^ transpose;
 static int OGS_MPI_SUPPORT = 0;
 static int OGS_OVERLAP = 1;
 static int OGS_SYNC_RECV = 0;
-static int compiled = 0;
 
 typedef enum { mode_plain, mode_vec, mode_many, mode_dry_run } gs_mode;
 
@@ -280,40 +281,118 @@ void oogs::sync_recv(int val)
   OGS_SYNC_RECV = val;  
 }
 
-void oogs::compile(const occa::device &device,
-                   ogsBuildKernel_t buildKernel,
-                   std::string mode,
-                   MPI_Comm comm,
-                   bool verbose)
+void oogs::registerKernels()
 {
-  if (!buildKernel) {
-    buildKernel =
-        [device](const std::string &fileName, const std::string &kernelName, const occa::properties &props) {
-          return device.buildKernel(fileName, kernelName, props);
-        };
+  ogs::defaultStream = platform->device.occaDevice().getStream();
+  ogs::dataStream = platform->device.occaDevice().createStream();
+
+  occa::properties& props = ogs::kernelInfo;
+
+  static bool firstTime = true;
+  if (firstTime) {
+    props["defines"].asObject();
+    props["includes"].asArray();
+    props["header"].asArray();
+    props["flags"].asObject();
+ 
+    props["defines/ "
+          "p_blockSize"] = BLOCKSIZE;
+    props["defines/ "
+          "dlong"] = dlongString;
+    props["defines/ "
+          "hlong"] = hlongString;
+ 
+    if ("OpenCL" == platform->device.mode())
+      props["defines/"
+            "hlong"] = "long";
+
+    props["includes"] += std::string(getenv("NEKRS_KERNEL_DIR")) + "/core/ogs/ogsDefs.h";
+ 
+    props["defines/init_"
+          "float"
+          "_add"] = (float)0;
+    props["defines/init_"
+          "float"
+          "_mul"] = (float)1;
+    props["defines/init_"
+          "float"
+          "_min"] = (float)std::numeric_limits<float>::max();
+    props["defines/init_"
+          "float"
+          "_max"] = (float)std::numeric_limits<float>::lowest();
+ 
+    props["defines/init_"
+          "double"
+          "_add"] = (double)0;
+    props["defines/init_"
+          "double"
+          "_mul"] = (double)1;
+    props["defines/init_"
+          "double"
+          "_min"] = (double)std::numeric_limits<double>::max();
+    props["defines/init_"
+           "double"
+           "_max"] = (double)std::numeric_limits<double>::lowest();
+ 
+    props["defines/init_"
+          "int"
+          "_add"] = (int)0;
+    props["defines/init_"
+          "int"
+          "_mul"] = (int)1;
+    props["defines/init_"
+          "int"
+          "_min"] = (int)std::numeric_limits<int>::max();
+    props["defines/init_"
+           "int"
+           "_max"] = (int)std::numeric_limits<int>::lowest();
+ 
+    props["defines/init_"
+          "long_long"
+          "_add"] = (long long int)0;
+    props["defines/init_"
+          "long_long"
+          "_mul"] = (long long int)1;
+    props["defines/init_"
+          "long_long"
+          "_min"] = (long long int)std::numeric_limits<long long int>::max();
+    props["defines/init_"
+           "long_long"
+           "_max"] = (long long int)std::numeric_limits<long long int>::lowest();
+ 
+    props["defines/p_gatherNodesPerBlock"] = ogs::gatherNodesPerBlock;
+    firstTime = false;
   }
 
-  ogs::initKernels(comm, device, buildKernel, verbose);
+  ogs::initKernels();
 
-  const std::string oklpath = std::string(getenv("NEKRS_KERNEL_DIR")) + "/core/ogs/";
-  occa::properties props = ogs::kernelInfo;
+  auto buildKernel = [&props](const std::string& kernelName)
+  {
+    const auto oklpath = std::string(getenv("NEKRS_KERNEL_DIR")) + "/core/ogs/";
+    const auto fileName = oklpath + "oogs.okl";
+    if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
+      const auto reqName = "oogs::" + std::string(props.hash().getString());;
+      platform->kernelRequests.add(reqName, fileName, props); 
+      return occa::kernel();
+    } else {
+      return platform->device.buildKernel(fileName, kernelName, props, MPI_COMM_SELF);
+    }
+  };
 
-  packBufFloatAddKernel = buildKernel(oklpath + "oogs.okl", "packBuf_float_add", props);
-  unpackBufFloatAddKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_float_add", props);
-  packBufDoubleAddKernel = buildKernel(oklpath + "oogs.okl", "packBuf_double_add", props);
-  unpackBufDoubleAddKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_double_add", props);
+  packBufFloatAddKernel = buildKernel("packBuf_float_add");
+  unpackBufFloatAddKernel = buildKernel("unpackBuf_float_add");
+  packBufDoubleAddKernel = buildKernel("packBuf_double_add");
+  unpackBufDoubleAddKernel = buildKernel("unpackBuf_double_add");
 
-  packBufFloatMinKernel = buildKernel(oklpath + "oogs.okl", "packBuf_float_min", props);
-  unpackBufFloatMinKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_float_min", props);
-  packBufDoubleMinKernel = buildKernel(oklpath + "oogs.okl", "packBuf_double_min", props);
-  unpackBufDoubleMinKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_double_min", props);
+  packBufFloatMinKernel = buildKernel("packBuf_float_min");
+  unpackBufFloatMinKernel = buildKernel("unpackBuf_float_min");
+  packBufDoubleMinKernel = buildKernel("packBuf_double_min");
+  unpackBufDoubleMinKernel = buildKernel("unpackBuf_double_min");
 
-  packBufFloatMaxKernel = buildKernel(oklpath + "oogs.okl", "packBuf_float_max", props);
-  unpackBufFloatMaxKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_float_max", props);
-  packBufDoubleMaxKernel = buildKernel(oklpath + "oogs.okl", "packBuf_double_max", props);
-  unpackBufDoubleMaxKernel = buildKernel(oklpath + "oogs.okl", "unpackBuf_double_max", props);
-
-  compiled++;
+  packBufFloatMaxKernel = buildKernel("packBuf_float_max");
+  unpackBufFloatMaxKernel = buildKernel("unpackBuf_float_max");
+  packBufDoubleMaxKernel = buildKernel("packBuf_double_max");
+  unpackBufDoubleMaxKernel = buildKernel("unpackBuf_double_max");
 }
 
 void reallocBuffers(int unit_size, oogs_t *gs)

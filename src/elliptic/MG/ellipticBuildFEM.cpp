@@ -447,9 +447,11 @@ void ellipticBuildFEMGalerkinHex3D(elliptic_t* elliptic,
   q = (dfloat*)calloc(meshf->Np * mesh->Nelements,sizeof(dfloat));
   Aq = (dfloat*)calloc(meshf->Np * mesh->Nelements,sizeof(dfloat));
 
-  occa::memory o_q = platform->device.malloc<dfloat>(meshf->Nlocal, q);
+  occa::memory o_q = platform->device.malloc<dfloat>(meshf->Nlocal);
+  o_q.copyFrom(q);
   occa::memory o_qPfloat = platform->device.malloc<pfloat>(meshf->Nlocal);
-  occa::memory o_Aq = platform->device.malloc<dfloat>(meshf->Nlocal,Aq);
+  occa::memory o_Aq = platform->device.malloc<dfloat>(meshf->Nlocal);
+  o_Aq.copyFrom(Aq);
   occa::memory o_AqPfloat = platform->device.malloc<pfloat>(meshf->Nlocal);
 
   for(int jj = 0; jj < mesh->Np; jj++)

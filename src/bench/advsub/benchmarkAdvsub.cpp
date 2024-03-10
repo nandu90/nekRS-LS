@@ -70,7 +70,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
                              T NtestsOrTargetTime,
                              bool runAutotuner)
 {
-  if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
+  if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
     Nelements = 1;
   }
 
@@ -141,36 +141,13 @@ occa::kernel benchmarkAdvsub(int Nfields,
   props["includes"] += interpDataFile.c_str();
   props["includes"] += diffInterpDataFile.c_str();
 
-  std::string fileName = oklpath + "/nrs/readCubDMatrix.okl";
-  auto readCubDMatrixKernel = platform->device.buildKernel(fileName, props, true);
-
-  fileName = oklpath + "/nrs/readIMatrix.okl";
-  auto readIMatrixKernel = platform->device.buildKernel(fileName, props, true);
-
-  std::string kernelName;
-  if (dealias) {
-    kernelName = "subCycleStrongCubatureVolumeHex3D";
-  } else {
-    kernelName = "subCycleStrongVolumeHex3D";
-  }
-
   if (platform->device.mode() == "dpcpp") {
     props["simd_length"] = 16;
   }
 
-  const std::string ext = (platform->device.mode() == "Serial") ? ".c" : ".okl";
-  fileName = oklpath + "/nrs/" + kernelName + ext;
-
-  if (isScalar) {
-    fileName = oklpath + "/nrs/cds/" + kernelName + ext;
-  }
-
-  if (!dealias) {
-    fileName = oklpath + "/nrs/" + kernelName + ".okl";
-    if (isScalar) {
-      fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
-    }
-  }
+  const std::string ext = (platform->device.mode() == "Serial" && dealias) ? ".c" : ".okl";
+  const std::string kernelName = std::string("subCycleStrong") + ((dealias) ? "Cubature" : "") + std::string("VolumeHex3D");
+  const std::string fileName = oklpath + ((isScalar) ? "/nrs/cds/" : "/nrs/") +  kernelName + ext;
 
   std::vector<int> kernelVariants = {0};
   if (!platform->serial && dealias) {
@@ -200,17 +177,25 @@ occa::kernel benchmarkAdvsub(int Nfields,
     }
   }
 
-  if (!runAutotuner) {
-    auto newProps = props;
-    newProps["defines/p_knl"] = kernelVariants.front();
-    return platform->device.buildKernel(fileName, newProps, true);
-  }
-
-  occa::kernel referenceKernel;
+  auto buildKernel = [&props, &fileName, &kernelName](int ver)
   {
     auto newProps = props;
-    newProps["defines/p_knl"] = kernelVariants.front();
-    referenceKernel = platform->device.buildKernel(fileName, newProps, true);
+    newProps["defines/p_knl"] = ver;
+    const auto verSuffix = "_v" + std::to_string(ver);
+
+    if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
+      const auto reqName = "fdm::" + std::string(newProps.hash().getString());
+      platform->kernelRequests.add(reqName, fileName, newProps);
+      return occa::kernel();
+    } else {
+      return platform->device.buildKernel(fileName, kernelName + verSuffix, newProps, MPI_COMM_SELF);
+    }
+  };
+
+  auto referenceKernel = buildKernel(kernelVariants.front());
+
+  if (!runAutotuner) {
+    return referenceKernel;
   }
 
   const auto wordSize = sizeof(dfloat);
@@ -237,8 +222,27 @@ occa::kernel benchmarkAdvsub(int Nfields,
   auto o_BdivW = platform->device.malloc(BdivW.size() * wordSize, BdivW.data());
 
   // popular cubD, cubInterpT with correct data
-  readCubDMatrixKernel(o_cubD);
-  readIMatrixKernel(o_cubInterpT);
+
+  auto buildKernel2 = [&props, &oklpath](const std::string& _fileName)
+  {
+    const auto fileName = oklpath + _fileName;
+    auto newProps = props;
+
+    if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
+      const auto reqName = std::string(fs::path(fileName).filename()) + "::" + std::string(newProps.hash().getString());
+      platform->kernelRequests.add(reqName, fileName, props);
+      return occa::kernel();
+    } else {
+      return platform->device.buildKernel(fileName, props, MPI_COMM_SELF);
+    }
+  };
+
+  auto readCubDMatrixKernel = buildKernel2("/nrs/readCubDMatrix.okl");
+  auto readIMatrixKernel = buildKernel2("/nrs/readIMatrix.okl");
+  if(readCubDMatrixKernel.isInitialized() && readIMatrixKernel.isInitialized()) {
+    readCubDMatrixKernel(o_cubD);
+    readIMatrixKernel(o_cubInterpT);
+  }
 
   auto kernelRunner = [&](occa::kernel &subcyclingKernel) {
     const auto c0 = 0.1;
@@ -278,15 +282,8 @@ occa::kernel benchmarkAdvsub(int Nfields,
   };
 
   auto advSubKernelBuilder = [&](int kernelVariant) {
-    auto newProps = props;
-    newProps["defines/p_knl"] = kernelVariant;
-
-    if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
-      platform->kernels.add(kernelName + "v" + std::to_string(kernelVariant), fileName, newProps);
-      return occa::kernel(); // dummy
-    }
-
-    auto kernel = platform->device.buildKernel(fileName, newProps, true);
+    auto kernel = buildKernel(kernelVariant);
+    if (!kernel.isInitialized()) return occa::kernel();
 
     // perform correctness check
     std::vector<dfloat> referenceResults(NU.size());
@@ -382,11 +379,11 @@ occa::kernel benchmarkAdvsub(int Nfields,
       benchmarkKernel(advSubKernelBuilder, kernelRunner, printCallBack, kernelVariants, NtestsOrTargetTime);
 
   if (kernelAndTime.first.properties().has("defines/p_knl") &&
-      platform->options.compareArgs("BUILD ONLY", "FALSE")) {
-    int bestKernelVariant = static_cast<int>(kernelAndTime.first.properties()["defines/p_knl"]);
+      !platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
 
     // print only the fastest kernel
     if (verbosity == 1) {
+      int bestKernelVariant = static_cast<int>(kernelAndTime.first.properties()["defines/p_knl"]);
       printPerformanceInfo(bestKernelVariant, kernelAndTime.second, 0, false);
     }
   }

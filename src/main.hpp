@@ -30,6 +30,7 @@ struct cmdOptions
 {
   int buildOnly = 0;
   int ciMode = 0;
+  int attach = 0;
   int debug = 0;
   int sizeTarget = 0;
   std::string multiSessionFile;
@@ -82,6 +83,7 @@ cmdOptions* processCmdLineOptions(int argc, char** argv, const MPI_Comm &comm)
         {"cimode", required_argument, 0, 'c'},
         {"build-only", optional_argument, 0, 'b'},
         {"debug", no_argument, 0, 'd'},
+        {"attach", no_argument, 0, 'a'},
         {"backend", required_argument, 0, 't'},
         {"device-id", required_argument, 0, 'i'},
         {"help", optional_argument, 0, 'h'},
@@ -119,6 +121,10 @@ cmdOptions* processCmdLineOptions(int argc, char** argv, const MPI_Comm &comm)
       case 'd':
         cmdOpt->debug = 1;
         break;
+      case 'a':
+        cmdOpt->attach = 1;
+        cmdOpt->debug = 1;
+        break;
       case 'i':
         cmdOpt->deviceID.assign(optarg);
         break;
@@ -151,6 +157,7 @@ cmdOptions* processCmdLineOptions(int argc, char** argv, const MPI_Comm &comm)
   MPI_Bcast(&cmdOpt->sizeTarget, sizeof(cmdOpt->sizeTarget), MPI_BYTE, 0, comm);
   MPI_Bcast(&cmdOpt->ciMode, sizeof(cmdOpt->ciMode), MPI_BYTE, 0, comm);
   MPI_Bcast(&cmdOpt->debug, sizeof(cmdOpt->debug), MPI_BYTE, 0, comm);
+  MPI_Bcast(&cmdOpt->attach, sizeof(cmdOpt->attach), MPI_BYTE, 0, comm);
 
   if(cmdOpt->setupFile.empty() && cmdOpt->multiSessionFile.empty())
     printHelp++;
@@ -166,9 +173,10 @@ cmdOptions* processCmdLineOptions(int argc, char** argv, const MPI_Comm &comm)
         if (f.is_open()) std::cout << f.rdbuf();
         f.close();
       } else {
-        std::cout << "usage: ./nekrs [--help <par>] "
+        std::cout << "usage: ./nekrs "
+                  << "[ --help <par> ] "
                   << "--setup <par|sess file> "
-                  << "[ --build-only <#procs> ] [ --cimode <id> ] [ --debug ] "
+                  << "[ --build-only <#procs> ] [ --cimode <id> ] [ --debug ] [ --attach ] "
                   << "[ --backend <CPU|CUDA|HIP|DPCPP|OPENCL> ] [ --device-id <id|LOCAL-RANK> ]"
                   << "\n";
       }

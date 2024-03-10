@@ -195,7 +195,7 @@ namespace ogs {
   extern occa::stream defaultStream;
   extern occa::stream dataStream;
 
-  void initKernels(MPI_Comm comm, occa::device device, ogsBuildKernel_t buildKernel, bool verbose = false);
+  void initKernels();
 
   extern occa::properties kernelInfo;
 

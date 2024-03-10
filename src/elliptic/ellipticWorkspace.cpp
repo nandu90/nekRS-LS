@@ -13,6 +13,25 @@ void ellipticAllocateWorkspace(elliptic_t *elliptic)
   if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
     elliptic->o_v = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
   }
+
+#if 1
+  if (elliptic->gmresData) {
+    const auto flexible = elliptic->gmresData->flexible;
+    const auto nRestartVectors = elliptic->gmresData->nRestartVectors;
+    elliptic->gmresData->o_V = 
+      platform->o_memPool.reserve<dfloat>(static_cast<size_t>(elliptic->fieldOffset) * elliptic->Nfields * nRestartVectors);
+    elliptic->gmresData->o_Z = 
+      platform->o_memPool.reserve<dfloat>(static_cast<size_t>(elliptic->fieldOffset) * elliptic->Nfields * ((flexible) ? nRestartVectors : 1));
+  }
+#endif
+
+#if 1
+  if (elliptic->precon) {
+    if (elliptic->precon->MGSolver) {
+      elliptic->precon->MGSolver->allocateWorkStorage();
+    }
+  }
+#endif 
 }
 
 void ellipticFreeWorkspace(elliptic_t *elliptic)
@@ -27,5 +46,19 @@ void ellipticFreeWorkspace(elliptic_t *elliptic)
   if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
     elliptic->o_v.free();
   }
+#if 1
+  if (elliptic->gmresData) {
+    if(elliptic->gmresData->o_V.isInitialized()) elliptic->gmresData->o_V.free();
+    if(elliptic->gmresData->o_Z.isInitialized()) elliptic->gmresData->o_Z.free();
+  }
+#endif
+
+#if 1
+  if (elliptic->precon) {
+    if (elliptic->precon->MGSolver) {
+      elliptic->precon->MGSolver->freeWorkStorage();
+    }
+  }
+#endif 
 }
 

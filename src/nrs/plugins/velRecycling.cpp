@@ -78,11 +78,11 @@ void velRecycling::buildKernel(occa::properties kernelInfo)
   {
     kernelName = "setBCVectorValue";
     fileName = path + kernelName + extension;
-    setBCVectorValueKernel = platform->device.buildKernel(fileName, kernelInfo, true);
+    setBCVectorValueKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
 
     kernelName = "velRecyclingMaskCopy";
     fileName = path + kernelName + extension;
-    maskCopyKernel = platform->device.buildKernel(fileName, kernelInfo, true);
+    maskCopyKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
   }
 
   buildKernelCalled = true;

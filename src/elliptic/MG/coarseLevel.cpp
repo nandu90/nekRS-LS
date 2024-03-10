@@ -71,7 +71,7 @@ void MGSolver_t::coarseLevel_t::setupSolver(
 
   const std::string kernelName = "vectorDotStar";
   if (!vectorDotStarKernel.isInitialized()) {
-    vectorDotStarKernel = platform->kernels.get(kernelName);
+    vectorDotStarKernel = platform->kernelRequests.load(kernelName);
   }
 
   o_xBuffer = platform->device.malloc<pfloat>(N);

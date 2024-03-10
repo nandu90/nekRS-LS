@@ -1,4 +1,3 @@
-
 /*---------------------------------------------------------------------------*\
    Copyright (c) 2019-2024, UCHICAGO ARGONNE, LLC.
 
@@ -129,7 +128,7 @@ int main(int argc, char** argv)
   }
   MPI_Barrier(comm);
 
-  if (cmdOpt->debug) {
+  if (cmdOpt->attach) {
     fprintf(stderr, "rank %d: pid<%d>\n", rank, getpid());
     MPI_Barrier(comm);
     if (rank == 0) {
@@ -139,8 +138,6 @@ int main(int argc, char** argv)
   }
 
   try {
-    if (cmdOpt->debug) feraiseexcept(FE_ALL_EXCEPT);
- 
     { // change working dir
       const size_t last_slash = cmdOpt->setupFile.rfind('/') + 1;
       const std::string casepath = cmdOpt->setupFile.substr(0,last_slash);
@@ -222,8 +219,6 @@ int main(int argc, char** argv)
       if (nekrs::writeInterval() < 0) outputStep = 0;
       nekrs::outputStep(outputStep);
  
-      if (tStep <= 1000) nekrs::verboseInfo(true); 
- 
       nekrs::initStep(time, dt, tStep);
       
       int corrector = 1;
@@ -293,10 +288,10 @@ int main(int argc, char** argv)
   catch(const std::exception& ex)
   {
     std::cerr << ex.what() << std::endl;
-#if 0
-    MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-#else
-    throw;
-#endif
+    if (cmdOpt->debug) {
+      throw;
+    } else {
+      MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
   }
 }

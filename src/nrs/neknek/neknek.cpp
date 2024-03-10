@@ -38,7 +38,6 @@ bool neknekCoupled()
       if (isInt) {
         intFound = 1;
       }
-
     }
   }
 
@@ -129,12 +128,14 @@ void neknek_t::findIntPoints()
       for (dlong f = 0; f < mesh->Nfaces; ++f) {
         auto bID = mesh->EToB[f + mesh->Nfaces * e];
         auto bcType = bcMap::id(bID, field);
-        if(isIntBc(bcType, field)) intFound = 1;
+        if (isIntBc(bcType, field)) {
+          intFound = 1;
+        }
       }
     }
     MPI_Allreduce(MPI_IN_PLACE, &intFound, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
     if (!intFound) {
-     this->fields.erase(std::remove(this->fields.begin(), this->fields.end(), field), this->fields.end());
+      this->fields.erase(std::remove(this->fields.begin(), this->fields.end(), field), this->fields.end());
     }
   }
 
@@ -214,10 +215,14 @@ void neknek_t::findIntPoints()
   const auto verboseLevel = pointInterpolation_t::VerbosityLevel::Detailed;
   this->interpolator->find(verboseLevel);
 
-  this->o_x_ = platform->device.malloc<dfloat>(this->npt_, neknekX.data());
-  this->o_y_ = platform->device.malloc<dfloat>(this->npt_, neknekY.data());
-  this->o_z_ = platform->device.malloc<dfloat>(this->npt_, neknekZ.data());
-  this->o_session_ = platform->device.malloc<dlong>(this->npt_, session.data());
+  this->o_x_ = platform->device.malloc<dfloat>(this->npt_);
+  this->o_x_.copyFrom(neknekX.data());
+  this->o_y_ = platform->device.malloc<dfloat>(this->npt_);
+  this->o_y_.copyFrom(neknekY.data());
+  this->o_z_ = platform->device.malloc<dfloat>(this->npt_);
+  this->o_z_.copyFrom(neknekZ.data());
+  this->o_session_ = platform->device.malloc<dlong>(this->npt_);
+  this->o_session_.copyFrom(session.data());
 }
 
 void neknek_t::setup()
@@ -271,7 +276,7 @@ void neknek_t::setup()
   for (auto &&field : this->fields) {
     if (field.find("scalar") != std::string::npos) {
       const auto id = std::stoi(field.substr(std::string("scalar").length()));
-      if(id+1 > this->Nscalar_) {
+      if (id + 1 > this->Nscalar_) {
         this->fields.erase(std::remove(this->fields.begin(), this->fields.end(), field), this->fields.end());
       }
     }
@@ -291,7 +296,9 @@ void neknek_t::setup()
   // check if fields across all sessions match
   {
     std::string s;
-    for (auto &&field : this->fields) s += field;
+    for (auto &&field : this->fields) {
+      s += field;
+    }
 
     SHA1 sha;
     sha.update(s);
@@ -302,12 +309,16 @@ void neknek_t::setup()
     unsigned long intHashMin;
     unsigned long intHashMax;
 
-    MPI_Allreduce(&intHash, &intHashMin,1, MPI_UNSIGNED_LONG, MPI_MIN, platform->comm.mpiCommParent);
-    MPI_Allreduce(&intHash, &intHashMax,1, MPI_UNSIGNED_LONG, MPI_MAX, platform->comm.mpiCommParent);
+    MPI_Allreduce(&intHash, &intHashMin, 1, MPI_UNSIGNED_LONG, MPI_MIN, platform->comm.mpiCommParent);
+    MPI_Allreduce(&intHash, &intHashMax, 1, MPI_UNSIGNED_LONG, MPI_MAX, platform->comm.mpiCommParent);
 
-    nekrsCheck(intHashMin != intHashMax, platform->comm.mpiCommParent, EXIT_FAILURE, "%s\n", "neknek fields do not match across all sessions");
+    nekrsCheck(intHashMin != intHashMax,
+               platform->comm.mpiCommParent,
+               EXIT_FAILURE,
+               "%s\n",
+               "neknek fields do not match across all sessions");
   }
-  
+
   if (platform->comm.mpiRank == 0) {
     std::cout << "done\n";
   }
@@ -331,9 +342,9 @@ neknek_t::neknek_t(nrs_t *nrs_, dlong nsessions, dlong sessionID)
 
   this->setup();
 
-  this->copyNekNekPointsKernel = platform->kernels.get("copyNekNekPoints");
-  this->computeFluxKernel = platform->kernels.get("computeFlux");
-  this->fixSurfaceFluxKernel = platform->kernels.get("fixSurfaceFlux");
+  this->copyNekNekPointsKernel = platform->kernelRequests.load("copyNekNekPoints");
+  this->computeFluxKernel = platform->kernelRequests.load("computeFlux");
+  this->fixSurfaceFluxKernel = platform->kernelRequests.load("fixSurfaceFlux");
 }
 
 void neknek_t::updateBoundary(int tstep, int stage)
@@ -387,7 +398,6 @@ void neknek_t::updateBoundary(int tstep, int stage)
       N = this->Nscalar_ * this->fieldOffset_;
       this->o_S_.copyFrom(this->o_S_, N, (s - 1) * N, (s - 2) * N);
     }
-
 
     if (this->npt_) {
       if (std::find(this->fields.begin(), this->fields.end(), "velocity") != this->fields.end()) {

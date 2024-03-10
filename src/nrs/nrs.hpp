@@ -210,7 +210,7 @@ public:
 
   int numberActiveFields();
 
-  aeroForce *aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_ = o_NULL); 
+  AeroForce *aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_ = o_NULL); 
 
   //       ( SO0          )         (     SO8  SO7)
   // Sij = ( SO3  SO1     )  Oij =  (          SO6)

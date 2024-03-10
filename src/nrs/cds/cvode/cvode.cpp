@@ -1,7 +1,7 @@
 #include "platform.hpp"
 #include "cvode.hpp"
 #include "elliptic.hpp"
-#include "maskedFaceIds.hpp" 
+#include "maskedFaceIds.hpp"
 #include "inipp.hpp"
 #include "nekInterfaceAdapter.hpp"
 #include "udf.hpp"
@@ -70,7 +70,6 @@ void check_retval(void *returnvalue, const char *funcname, int opt)
   }
 }
 
-
 } // namespace
 
 cvode_t::cvode_t(cds_t *_cds)
@@ -81,7 +80,7 @@ cvode_t::cvode_t(cds_t *_cds)
     std::cout << "initializing CVODE ...\n";
   }
 
-  this->fieldOffset = cds->fieldOffset[0]; // same for all scalars 
+  this->fieldOffset = cds->fieldOffset[0]; // same for all scalars
 
   o_coeffExt = platform->device.malloc<dfloat>(maxTimestepperOrder);
 
@@ -160,23 +159,23 @@ cvode_t::cvode_t(cds_t *_cds)
   YLVec->fieldOffsets(lengths_);
   YdotLVec->fieldOffsets(lengths_);
 
-  o_scalarIds = platform->device.malloc<dlong>(scalarIds.size(), scalarIds.data());
-  o_cvodeScalarIds = platform->device.malloc<dlong>(cvodeScalarIds.size(), cvodeScalarIds.data());
+  o_scalarIds = platform->device.malloc<dlong>(scalarIds.size(), this->scalarIds.data());
+  o_cvodeScalarIds = platform->device.malloc<dlong>(cvodeScalarIds.size(), this->cvodeScalarIds.data());
 
   setupDirichletMask();
 
-  this->weakLaplacianKernel = platform->kernels.get("cvode_t::weakLaplacianHex3D");
-  this->extrapolateDirichletKernel = platform->kernels.get("cvode_t::extrapolateDirichlet");
-  this->mapToMaskedPointKernel = platform->kernels.get("cvode_t::mapToMaskedPoint");
-  this->errorWeightKernel = platform->kernels.get("cvode_t::errorWeight");
-  this->fusedAddRhoDivKernel = platform->kernels.get("cvode_t::rhoDiv");
+  this->weakLaplacianKernel = platform->kernelRequests.load("cvode_t::weakLaplacianHex3D");
+  this->extrapolateDirichletKernel = platform->kernelRequests.load("cvode_t::extrapolateDirichlet");
+  this->mapToMaskedPointKernel = platform->kernelRequests.load("cvode_t::mapToMaskedPoint");
+  this->errorWeightKernel = platform->kernelRequests.load("cvode_t::errorWeight");
+  this->fusedAddRhoDivKernel = platform->kernelRequests.load("cvode_t::rhoDiv");
 
-  this->maskKernel = platform->kernels.get("cvode_t::mask");
-  this->extrapolateKernel = platform->kernels.get("cvode_t::extrapolate");
+  this->maskKernel = platform->kernelRequests.load("cvode_t::mask");
+  this->extrapolateKernel = platform->kernelRequests.load("cvode_t::extrapolate");
 
   const std::string suffix = "Hex3D";
-  this->UrstCubatureKernel = platform->kernels.get("nrs-UrstCubature" + suffix); 
-  this->UrstKernel = platform->kernels.get("nrs-Urst" + suffix);
+  this->UrstCubatureKernel = platform->kernelRequests.load("nrs-UrstCubature" + suffix);
+  this->UrstKernel = platform->kernelRequests.load("nrs-Urst" + suffix);
 
   isInitialized = false;
 
@@ -360,7 +359,6 @@ void cvode_t::initialize()
   }
   isInitialized = true;
 
-
   int retval;
 
 #ifdef ENABLE_CVODE
@@ -515,7 +513,8 @@ void cvode_t::initialize()
     absTols[is] = absTolScalar;
   }
 
-  this->o_absTol = platform->device.malloc<dfloat>(this->Nscalar, absTols.data());
+  this->o_absTol = platform->device.malloc<dfloat>(this->Nscalar);
+  this->o_absTol.copyFrom(absTols.data());
 
   if (platform->options.getArgs("CVODE DQ SIGMA").empty()) {
     this->sigScale = -1;
@@ -716,12 +715,7 @@ void cvode_t::setupDirichletMask()
 
   { // setup masked gs handle
     const auto [Nmasked_, o_maskIds_, NmaskedLocal, o_maskIdsLocal, NmaskedGlobal, o_maskIdsGlobal] =
-      maskedFaceIds(mesh,
-                    mesh->Nlocal,
-                    Nscalar,
-                    fieldOffset,
-                    EToB.data(),
-                    ellipticBcType::DIRICHLET);
+        maskedFaceIds(mesh, mesh->Nlocal, Nscalar, fieldOffset, EToB.data(), ellipticBcType::DIRICHLET);
 
     this->Nmasked = Nmasked_;
     this->o_maskIds = o_maskIds_;
@@ -914,12 +908,12 @@ void cvode_t::defaultRHS(double time, double t0, const LVector_t<dfloat> &o_y, L
     o_coeffExt.copyFrom(_coeffEXT.data(), maxTimestepperOrder);
 
     this->extrapolateKernel(cds->meshV->Nlocal,
-                           cds->NVfields,
-                           extOrder,
-                           fieldOffset,
-                           o_coeffExt,
-                           this->o_U0,
-                           cds->o_U);
+                            cds->NVfields,
+                            extOrder,
+                            fieldOffset,
+                            o_coeffExt,
+                            this->o_U0,
+                            cds->o_U);
 
     if (movingMesh) {
 
@@ -943,12 +937,12 @@ void cvode_t::defaultRHS(double time, double t0, const LVector_t<dfloat> &o_y, L
 
       mesh->move();
       this->extrapolateKernel(mesh->Nlocal,
-                             cds->NVfields,
-                             extOrder,
-                             fieldOffset,
-                             o_coeffExt,
-                             o_meshU0,
-                             mesh->o_U);
+                              cds->NVfields,
+                              extOrder,
+                              fieldOffset,
+                              o_coeffExt,
+                              o_meshU0,
+                              mesh->o_U);
     }
 
     computeUrst();
@@ -1039,29 +1033,29 @@ void cvode_t::defaultRHS(double time, double t0, const LVector_t<dfloat> &o_y, L
   // using evaluateDivergence as divergence is required to compute those quantities
   auto addDpdtTerm = false;
   if (cds->dpdt) {
-      addDpdtTerm = true;
+    addDpdtTerm = true;
 
-      if (!(isJacobianEvaluation() && recycleProperties)) {
-        if (detailedTimersEnabled) {
-          platform->timer.tic(timerScope + "::dp0thdt", 0);
-        }
-
-        this->evaluateDivergence(time);
-
-        o_rhoCpAvg.copyFrom(cds->o_rho);
-        if (chtCVODE) {
-          auto mesh = cds->mesh[minCvodeScalarId];
-          platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_rhoCpAvg);
-          oogs::startFinish(o_rhoCpAvg, 1, fieldOffset, ogsDfloat, ogsAdd, cds->gshT);
-          platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_rhoCpAvg);
-        }
-
-        // do not re-evaluate convection + filtering term (ignore updated rho)
-
-        if (detailedTimersEnabled) {
-          platform->timer.toc(timerScope + "::dp0thdt");
-        }
+    if (!(isJacobianEvaluation() && recycleProperties)) {
+      if (detailedTimersEnabled) {
+        platform->timer.tic(timerScope + "::dp0thdt", 0);
       }
+
+      this->evaluateDivergence(time);
+
+      o_rhoCpAvg.copyFrom(cds->o_rho);
+      if (chtCVODE) {
+        auto mesh = cds->mesh[minCvodeScalarId];
+        platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_rhoCpAvg);
+        oogs::startFinish(o_rhoCpAvg, 1, fieldOffset, ogsDfloat, ogsAdd, cds->gshT);
+        platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_rhoCpAvg);
+      }
+
+      // do not re-evaluate convection + filtering term (ignore updated rho)
+
+      if (detailedTimersEnabled) {
+        platform->timer.toc(timerScope + "::dp0thdt");
+      }
+    }
   }
 
   // weight FS by inverse assembled mass matrix, add pointSource and finally divide by "rho"
@@ -1721,7 +1715,7 @@ void cvode_t::setLocalPointSource(userLocalPointSourceE_t _userLocalPointSource)
              "%s",
              "o_pointSource not initialized!\n");
 
-  this->fusedAddRhoDivKernel = platform->kernels.get("cvode_t::fusedAddRhoDiv");
+  this->fusedAddRhoDivKernel = platform->kernelRequests.load("cvode_t::fusedAddRhoDiv");
 }
 
 void cvode_t::setLocalPointSource(userLocalPointSourceL_t _userLocalPointSource)
@@ -1734,7 +1728,7 @@ void cvode_t::setLocalPointSource(userLocalPointSourceL_t _userLocalPointSource)
              "%s",
              "o_pointSource not initialized!\n");
 
-  this->fusedAddRhoDivKernel = platform->kernels.get("cvode_t::fusedAddRhoDiv");
+  this->fusedAddRhoDivKernel = platform->kernelRequests.load("cvode_t::fusedAddRhoDiv");
 }
 
 void cvode_t::computeUrst()
@@ -1748,23 +1742,21 @@ void cvode_t::computeUrst()
 
   if (cubature) {
     this->UrstCubatureKernel(mesh->Nelements,
-                            static_cast<int>(relative),
-                            mesh->o_cubvgeo,
-                            mesh->o_cubInterpT,
-                            fieldOffset,
-                            cds->vCubatureOffset,
-                            cds->o_U,
-                            mesh->o_U,
-                            o_Urst);
-  }
-  else {
+                             static_cast<int>(relative),
+                             mesh->o_cubvgeo,
+                             mesh->o_cubInterpT,
+                             fieldOffset,
+                             cds->vCubatureOffset,
+                             cds->o_U,
+                             mesh->o_U,
+                             o_Urst);
+  } else {
     this->UrstKernel(mesh->Nelements,
-                    static_cast<int>(relative),
-                    mesh->o_vgeo,
-                    fieldOffset,
-                    cds->o_U,
-                    mesh->o_U,
-                    o_Urst);
+                     static_cast<int>(relative),
+                     mesh->o_vgeo,
+                     fieldOffset,
+                     cds->o_U,
+                     mesh->o_U,
+                     o_Urst);
   }
 }
-

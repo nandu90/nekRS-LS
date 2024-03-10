@@ -2,8 +2,9 @@
 #include "compileKernels.hpp"
 #include "udf.hpp"
 
-occa::properties compileUDFKernels()
+occa::properties registerUDFKernels()
 {
+  const auto registerOnly = platform->options.compareArgs("REGISTER ONLY", "TRUE") ? true : false;
   const bool buildNodeLocal = platform->cacheLocal;
 
   std::string installDir;
@@ -14,7 +15,7 @@ occa::properties compileUDFKernels()
 
   MPI_Barrier(platform->comm.mpiComm);
   const double tStart = MPI_Wtime();
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank == 0 && !registerOnly) {
     std::cout << "loading udf kernels ... " << std::endl;
   }
 
@@ -24,9 +25,9 @@ occa::properties compileUDFKernels()
 
   if (udf.loadKernels) {
     udf.loadKernels(kernelInfo);
-    // kernelInfoBC might now may include user-defined props
   }
 
+  // envoke after udf.loadKernels as the user may have modified kernelInfo
   if (udf.autoloadKernels) {
     udf.autoloadKernels(kernelInfo);
   }
@@ -38,25 +39,32 @@ occa::properties compileUDFKernels()
 
   udf.autoloadPlugins(kernelInfo);
 
-  // just to bail out early in case included source doesn't compile
-  {
-    const std::string dummyKernelName = "compileUDFKernelsTest";
-    const std::string dummyKernelStr =
-        std::string("@kernel void compileUDFKernelsTest(int N) {"
-                    "  for (int i = 0; i < N; ++i; @tile(64, @outer, @inner)) {}"
-                    "}");
-
-    if (platform->comm.mpiRank == 0) {
-      platform->device.occaDevice().buildKernelFromString(dummyKernelStr, dummyKernelName, kernelInfo);
-    }
-  }
-
   MPI_Barrier(platform->comm.mpiComm);
   const double loadTime = MPI_Wtime() - tStart;
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank == 0 && !registerOnly) {
     printf("done (%gs)\n", loadTime);
   }
   fflush(stdout);
 
   return static_cast<occa::properties>(kernelInfo);
+}
+
+occa::kernel oudfBuildKernel(occa::properties kernelInfo, const std::string& kernelName)
+{
+  const auto registerOnly = platform->options.compareArgs("REGISTER ONLY", "TRUE") ? true : false;
+
+  std::string oudfCache;
+  platform->options.getArgs("OKL FILE CACHE", oudfCache);
+  if (platform->verbose && platform->comm.mpiRank == 0 && !registerOnly) { 
+    std::cout << kernelName << std::endl;
+  }
+
+  const auto fileName = oudfCache;
+  if (registerOnly) {
+    const auto reqName = "udf";
+    platform->kernelRequests.add(reqName, fileName, kernelInfo);
+    return occa::kernel();
+  } else {
+    return platform->device.buildKernel(fileName, kernelName, kernelInfo, MPI_COMM_SELF);
+  }
 }

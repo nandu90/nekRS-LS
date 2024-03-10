@@ -19,7 +19,7 @@ class flopCounter_t;
 struct platform_t {
 public:
   platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm);
-  void bcastKernelSources();
+  void bcastJITSourceFiles();
 
   static platform_t *getInstance(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   {
@@ -45,7 +45,7 @@ public:
   occa::properties kernelInfo;
   timer::timer_t timer;
   occa::memoryPool o_memPool;
-  kernelRequestManager_t kernels;
+  kernelRequestManager_t kernelRequests;
   inipp::Ini *par;
   solver_t *solver;
   bool serial;
@@ -60,8 +60,6 @@ public:
   occa::kernel copyDfloatToPfloatKernel;
   occa::kernel copyPfloatToDfloatKernel;
   occa::kernel copyDfloatToDoubleKernel;
-
-  void compileKernels();
 };
 #endif
 

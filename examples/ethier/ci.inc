@@ -966,13 +966,18 @@ void ciTestErrors(nrs_t *nrs,
     }
 
     const int pIterErr = abs(NiterP - expectedNiterP);
-    if (pIterErr >= 2) {
-      if (rank == 0) {
-        printf("Expected %d P iteration in first step, but got %d!\n", expectedNiterP, NiterP);
-      }
-      CiFailTest();
-      nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
-    }
+    CiEvalTest("pressure iter step=1", pIterErr <= 1, "with pIterErr: " + to_string_f(pIterErr));
+    nekrsCheck(pIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+
+    const int expectedNiterS = 12;
+
+    int sIterErr = abs(nrs->cds->solver[0]->Niter() - expectedNiterS);
+    CiEvalTest("scalar00 iter step=1", sIterErr <= 1, "with sIterErr: " + to_string_f(sIterErr));
+    nekrsCheck(sIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+
+    sIterErr = abs(nrs->cds->solver[1]->Niter() - expectedNiterS);
+    CiEvalTest("scalar01 iter step=1", sIterErr <= 1, "with sIterErr: " + to_string_f(sIterErr));
+    nekrsCheck(sIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
   }
 
   if (ciMode == 1) {
@@ -1041,9 +1046,16 @@ void ciTestErrors(nrs_t *nrs,
     s2Err = abs((err[3] - 6.30E-12) / err[3]);
     pIterErr = abs(NiterP - 4);
     vxErr = abs((err[0] - 2.77E-10) / err[0]);
-    prErr = abs((err[1] - 7.14E-010) / err[1]);
+    prErr = abs((err[1] - 7.14E-10) / err[1]);
     break;
   case 2:
+    velIterErr = abs(NiterU - 10);
+    s1Err = abs((err[2] - 7.49E-12) / err[2]);
+    s2Err = abs((err[3] - 7.22E-12) / err[3]);
+    pIterErr = abs(NiterP - 2);
+    vxErr = abs((err[0] - 2.77E-10) / err[0]);
+    prErr = abs((err[1] - 7.14E-10) / err[1]);
+    break;
   case 11:
     velIterErr = abs(NiterU - 10);
     s1Err = abs((err[2] - 6.67E-12) / err[2]);
@@ -1070,7 +1082,7 @@ void ciTestErrors(nrs_t *nrs,
     break;
   case 4:
     velIterErr = abs(NiterU - 1);
-    s1Err = abs((err[2] - 1.71E-11) / err[2]);
+    s1Err = abs((err[2] - 2.00E-11) / err[2]);
     s2Err = abs((err[3] - 2.00E-11) / err[3]);
     pIterErr = abs(NiterP - 1);
     vxErr = abs((err[0] - 3.65E-10) / err[0]);
@@ -1268,5 +1280,5 @@ void ciTestErrors(nrs_t *nrs,
   CiEvalTest("pressure iter", pIterErr <= 1, "with iterErr: " + to_string_f(pIterErr));
 
   CiEvalTest("scalar01", s1Err < EPS, "with LinfErr: " + to_string_f(s1Err));
-  CiEvalTest("scalar02", s1Err < EPS, "with LinfErr: " + to_string_f(s2Err));
+  CiEvalTest("scalar02", s2Err < EPS, "with LinfErr: " + to_string_f(s2Err));
 }

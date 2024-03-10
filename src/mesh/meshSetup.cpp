@@ -169,18 +169,19 @@ static void loadKernels(mesh_t *mesh)
   const std::string meshPrefix = "mesh-";
   const std::string orderSuffix = "_" + std::to_string(mesh->N);
 
-  mesh->geometricFactorsKernel = platform->kernels.get(meshPrefix + "geometricFactorsHex3D" + orderSuffix);
+  mesh->geometricFactorsKernel =
+      platform->kernelRequests.load(meshPrefix + "geometricFactorsHex3D" + orderSuffix);
   mesh->surfaceGeometricFactorsKernel =
-      platform->kernels.get(meshPrefix + "surfaceGeometricFactorsHex3D" + orderSuffix);
+      platform->kernelRequests.load(meshPrefix + "surfaceGeometricFactorsHex3D" + orderSuffix);
   mesh->cubatureGeometricFactorsKernel =
-      platform->kernels.get(meshPrefix + "cubatureGeometricFactorsHex3D" + orderSuffix);
+      platform->kernelRequests.load(meshPrefix + "cubatureGeometricFactorsHex3D" + orderSuffix);
 
-  mesh->setBIDKernel = platform->kernels.get(meshPrefix + "setBIDHex3D" + orderSuffix);
-  mesh->distanceKernel = platform->kernels.get(meshPrefix + "distanceHex3D" + orderSuffix);
-  mesh->hlongSumKernel = platform->kernels.get("hlong-" + meshPrefix + "sum" + orderSuffix);
+  mesh->setBIDKernel = platform->kernelRequests.load(meshPrefix + "setBIDHex3D");
+  mesh->distanceKernel = platform->kernelRequests.load(meshPrefix + "distanceHex3D");
+  mesh->hlongSumKernel = platform->kernelRequests.load("hlong-" + meshPrefix + "sum");
 
-  mesh->velocityDirichletKernel = platform->kernels.get(meshPrefix + "velocityDirichletBCHex3D");
-  mesh->nStagesSumVectorKernel = platform->kernels.get(meshPrefix + "nStagesSumVector");
+  mesh->velocityDirichletKernel = platform->kernelRequests.load(meshPrefix + "velocityDirichletBCHex3D");
+  mesh->nStagesSumVectorKernel = platform->kernelRequests.load(meshPrefix + "nStagesSumVector");
 }
 
 mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &kernelInfo)
@@ -220,6 +221,10 @@ mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &k
       printf(", over-integration order cubN: %d", mesh->cubNq - 1);
     }
     printf("\n");
+  }
+
+  if (platform->comm.mpiRank == 0 && mesh->N < 5) {
+    std::cout << std::endl << "    WARNING: N < 5 may degrade performance!" << std::endl;
   }
 
   loadKernels(mesh);
@@ -328,7 +333,8 @@ mesh_t *createMeshMG(mesh_t *_mesh, int Nc)
   const std::string orderSuffix = "_" + std::to_string(mesh->N);
 
   mesh->velocityDirichletKernel = nullptr;
-  mesh->geometricFactorsKernel = platform->kernels.get(meshPrefix + "geometricFactorsHex3D" + orderSuffix);
+  mesh->geometricFactorsKernel =
+      platform->kernelRequests.load(meshPrefix + "geometricFactorsHex3D" + orderSuffix);
   mesh->surfaceGeometricFactorsKernel = nullptr;
   mesh->cubatureGeometricFactorsKernel = nullptr;
   mesh->nStagesSumVectorKernel = nullptr;

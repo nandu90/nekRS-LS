@@ -564,14 +564,6 @@ void udfLoad()
   *(void **)(&udf.executeStep) = udfLoadFunction("UDF_ExecuteStep", 0);
 }
 
-occa::kernel oudfBuildKernel(occa::properties kernelInfo, const char *function)
-{
-  std::string oudfCache;
-  platform->options.getArgs("OKL FILE CACHE", oudfCache);
-
-  return platform->device.buildKernel(oudfCache.c_str(), function, kernelInfo);
-}
-
 void udfEcho()
 {
   const std::string cache_dir(getenv("NEKRS_CACHE_DIR"));

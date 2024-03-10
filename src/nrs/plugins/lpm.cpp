@@ -14,8 +14,8 @@
 #include <inttypes.h>
 
 lpm_t::lpm_t(dfloat bb_tol_, dfloat newton_tol_)
-    : nrs(dynamic_cast<nrs_t*>(platform->solver)), solverOrder(nrs->nEXT), bb_tol(bb_tol_), newton_tol(newton_tol_),
-      interp(std::make_unique<pointInterpolation_t>(nrs->meshV, bb_tol, newton_tol))
+    : nrs(dynamic_cast<nrs_t *>(platform->solver)), solverOrder(nrs->nEXT), bb_tol(bb_tol_),
+      newton_tol(newton_tol_), interp(std::make_unique<pointInterpolation_t>(nrs->meshV, bb_tol, newton_tol))
 {
   nekrsCheck(!kernelsRegistered_,
              platform->comm.mpiComm,
@@ -48,8 +48,8 @@ lpm_t::lpm_t(dfloat bb_tol_, dfloat newton_tol_)
   registerDOF("y");
   registerDOF("z");
 
-  nStagesSumManyKernel = platform->kernels.get("nStagesSumMany");
-  remapParticlesKernel = platform->kernels.get("remapParticles");
+  nStagesSumManyKernel = platform->kernelRequests.load("nStagesSumMany");
+  remapParticlesKernel = platform->kernelRequests.load("remapParticles");
 
   setTimerLevel(timerLevel);
   setTimerName(timerName);
@@ -782,7 +782,6 @@ void lpm_t::integrateRK4()
   deviceMemory<dfloat> o_k3_(o_k3);
   deviceMemory<dfloat> o_k4_(o_k4);
   deviceMemory<dfloat> o_y_(o_y);
-
 
   platform->timer.tic(timerName + "integrate::userRHS", 1);
   userRHS_(nrs, this, time, o_y_, userdata_, o_k1_);
@@ -1937,7 +1936,7 @@ void lpm_t::registerKernels(occa::properties &kernelInfo)
 
   kernelName = "remapParticles";
   fileName = oklpath + "/nrs/plugins/" + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, kernelInfo);
+  platform->kernelRequests.add(kernelName, fileName, kernelInfo);
 }
 
 void lpm_t::setTimerLevel(TimerLevel level)

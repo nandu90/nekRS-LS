@@ -2,6 +2,10 @@
 #include "nekInterfaceAdapter.hpp"
 #include "fld.hpp"
 
+namespace fld
+{
+ElementFilter elementFilter;
+}
 
 void fld::write(std::string suffix, double t, int step, int outXYZ, int FP64,
               const occa::memory& o_s, int NSfields, int Nout, bool uniform)

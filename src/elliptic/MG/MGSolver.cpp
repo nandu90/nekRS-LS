@@ -249,3 +249,26 @@ void MGSolver_t::runAdditiveVcycle()
     prolongateV(this);
   }
 }
+
+void MGSolver_t::allocateWorkStorage()
+{
+  for (int k = 0; k < numLevels; k++) {
+    levels[k]->o_res = platform->o_memPool.reserve<pfloat>(levels[k]->Ncols);
+    // allocate coarse levels only
+    if (k) {
+      levels[k]->o_x = platform->o_memPool.reserve<pfloat>(levels[k]->Ncols);
+      levels[k]->o_rhs = platform->o_memPool.reserve<pfloat>(levels[k]->Nrows);
+    }
+  }
+}
+
+void MGSolver_t::freeWorkStorage()
+{
+  for (int k = 0; k < numLevels; k++) {
+    levels[k]->o_res.free();
+    if (k) {
+      levels[k]->o_x.free();
+      levels[k]->o_rhs.free();
+    }
+  }
+}

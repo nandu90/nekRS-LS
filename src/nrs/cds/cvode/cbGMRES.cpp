@@ -202,12 +202,12 @@ void cbGMRESSetup(SUNLinearSolver S)
 
   static_assert(sizeof(realtype) == sizeof(dfloat), "realtype has to match dfloat!");
 
-  auto &kernels = platform->kernels;
+  auto &kernelRequests = platform->kernelRequests;
   const std::string prefix = "cvode_t::";
-  axpbyKernel = kernels.get(prefix + "axpby");
-  axmyzKernel = kernels.get(prefix + "axmyz");
-  linearCombinationKernel = kernels.get(prefix + "linearCombination");
-  innerProdMultiKernel = kernels.get(prefix + "innerProdMulti");
+  axpbyKernel = kernelRequests.load(prefix + "axpby");
+  axmyzKernel = kernelRequests.load(prefix + "axmyz");
+  linearCombinationKernel = kernelRequests.load(prefix + "linearCombination");
+  innerProdMultiKernel = kernelRequests.load(prefix + "innerProdMulti");
 
   N = N_VGetLocalLength(xcor);
 

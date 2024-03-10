@@ -831,7 +831,7 @@ void fem_assembly(hypreWrapper::IJ_t &hypreIJ)
 
 void load()
 {
-  computeStiffnessMatrixKernel = platform->kernels.get("computeStiffnessMatrix");
+  computeStiffnessMatrixKernel = platform->kernelRequests.load("computeStiffnessMatrix");
 }
 
 void mesh_connectivity(int v_coord[8][3], int t_map[8][4])

@@ -967,9 +967,9 @@ void pMGLevel::build(elliptic_t *pSolver)
 
   {
     const std::string suffix = std::string("_") + std::to_string(Nq_e - 1) + std::string("pfloat");
-    preFDMKernel = platform->kernels.get("preFDM" + suffix);
-    fusedFDMKernel = platform->kernels.get("fusedFDM" + suffix);
-    postFDMKernel = platform->kernels.get("postFDM" + suffix);
+    preFDMKernel = platform->kernelRequests.load("preFDM" + suffix);
+    fusedFDMKernel = platform->kernelRequests.load("fusedFDM" + suffix);
+    postFDMKernel = platform->kernelRequests.load("postFDM" + suffix);
   }
 
   ogs = (void *)elliptic->oogs;

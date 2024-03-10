@@ -261,8 +261,8 @@ SolutionProjection::SolutionProjection(elliptic_t &elliptic,
   const std::string sectionIdentifier = std::to_string(Nfields) + "-";
 
   {
-    multiScaledAddwOffsetKernel = platform->kernels.get(sectionIdentifier + "multiScaledAddwOffset");
-    accumulateKernel = platform->kernels.get(sectionIdentifier + "accumulate");
+    multiScaledAddwOffsetKernel = platform->kernelRequests.load(sectionIdentifier + "multiScaledAddwOffset");
+    accumulateKernel = platform->kernelRequests.load(sectionIdentifier + "accumulate");
   }
 
   matvecOperator = [&](const occa::memory &o_x, occa::memory &o_Ax) {

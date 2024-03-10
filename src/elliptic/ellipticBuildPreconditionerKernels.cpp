@@ -29,9 +29,9 @@
 #include "platform.hpp"
 #include "linAlg.hpp"
 
-void ellipticBuildPreconditionerKernels(elliptic_t* elliptic)
+void ellipticBuildPreconditionerKernels(elliptic_t *elliptic)
 {
-  mesh_t* mesh = elliptic->mesh;
+  mesh_t *mesh = elliptic->mesh;
 
   std::string prefix = "Hex3D";
   std::string kernelName;
@@ -40,25 +40,23 @@ void ellipticBuildPreconditionerKernels(elliptic_t* elliptic)
 
   {
     kernelName = "mask";
-    mesh->maskKernel =
-      platform->kernels.get(kernelName + orderSuffix);
+    mesh->maskKernel = platform->kernelRequests.load(kernelName + orderSuffix);
 
-    mesh->maskPfloatKernel =
-      platform->kernels.get(kernelName + orderSuffix + "pfloat");
+    mesh->maskPfloatKernel = platform->kernelRequests.load(kernelName + orderSuffix + "pfloat");
 
     kernelName = "updateChebyshev";
-    elliptic->updateChebyshevKernel = platform->kernels.get(kernelName + orderSuffix);
+    elliptic->updateChebyshevKernel = platform->kernelRequests.load(kernelName + orderSuffix);
 
     kernelName = "updateFourthKindChebyshev";
-    elliptic->updateFourthKindChebyshevKernel = platform->kernels.get(kernelName + orderSuffix);
+    elliptic->updateFourthKindChebyshevKernel = platform->kernelRequests.load(kernelName + orderSuffix);
 
     kernelName = "ellipticBlockBuildDiagonalHex3D";
     const std::string poissonPrefix = elliptic->poisson ? "poisson-" : "";
     elliptic->ellipticBlockBuildDiagonalKernel =
-        platform->kernels.get(poissonPrefix + kernelName + orderSuffix);
+        platform->kernelRequests.load(poissonPrefix + kernelName + orderSuffix);
 
     kernelName = "ellipticBlockBuildDiagonalPfloatHex3D";
     elliptic->ellipticBlockBuildDiagonalPfloatKernel =
-        platform->kernels.get(poissonPrefix + kernelName + orderSuffix);
+        platform->kernelRequests.load(poissonPrefix + kernelName + orderSuffix);
   }
 }

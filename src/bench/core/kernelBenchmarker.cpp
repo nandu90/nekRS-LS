@@ -78,16 +78,18 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
   occa::kernel fastestKernel;
   double fastestTime = std::numeric_limits<double>::max();
 
+  const auto check = !platform->options.compareArgs("REGISTER ONLY", "TRUE") && !platform->options.compareArgs("BUILD ONLY", "TRUE");
+
   for (auto &&kernelVariant : kernelVariants) {
 
     MPI_Barrier(platform->comm.mpiComm);
     auto candidateKernel = kernelBuilder(kernelVariant);
 
     if (!candidateKernel.isInitialized()) {
-      continue; // remove variant if it doesn't compile
+      continue; // no need to proceed
     }
 
-    if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
+    if (check) {
 
       // warmup
       double elapsed = run(1, kernelRunner, candidateKernel);
@@ -120,7 +122,7 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
     }
   }
 
-  nekrsCheck(!fastestKernel.isInitialized() && platform->options.compareArgs("BUILD ONLY", "FALSE"),
+  nekrsCheck(!fastestKernel.isInitialized() && check,
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "%s\n",

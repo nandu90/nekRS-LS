@@ -6,6 +6,18 @@
 #include "flopCounter.hpp"
 #include "fileUtils.hpp"
 
+std::string createOptionsPrefix(std::string section)
+{
+  std::string prefix = section + std::string(" ");
+  if (section.find("temperature") != std::string::npos) {
+    prefix = std::string("scalar00 ");
+  }
+  std::transform(prefix.begin(), prefix.end(), prefix.begin(), [](unsigned char c) {
+    return std::toupper(c);
+  });
+  return prefix;
+}
+
 namespace
 {
 
@@ -27,7 +39,7 @@ platform_t *platform_t::singleton = nullptr;
 
 platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
     : options(_options), warpSize(32), comm(_commg, _comm), device(options, comm),
-      timer(_comm, device.occaDevice(), 0, 0), kernels(*this)
+      timer(_comm, device.occaDevice(), 0, 0), kernelRequests(*this)
 {
   int rank;
   MPI_Comm_rank(_comm, &rank);
@@ -73,6 +85,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
              "NEKRS_CACHE_LOCAL=1 and NEKRS_CACHE_BCAST=1 is incompatible!");
 
   oogs::gpu_mpi(std::stoi(getenv("NEKRS_GPU_MPI")));
+  oogs::overlap(options.compareArgs("ENABLE GS COMM OVERLAP", "FALSE") ? 0 : 1);
 
   if (getenv("OOGS_SYNC_RECV")) {
     oogs::sync_recv(std::stoi(getenv("OOGS_SYNC_RECV")));
@@ -126,6 +139,10 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   // between separate OKL inner loop blocks.
   kernelInfo["okl/add_barriers"] = false;
 
+  kernelInfo["defines/TOKEN_PASTE_(a,b)"] = std::string("a##b");
+  kernelInfo["defines/TOKEN_PASTE(a,b)"] = std::string("TOKEN_PASTE_(a,b)");
+  kernelInfo["defines/FUNC(a)"] = std::string("TOKEN_PASTE(a,SUFFIX)");
+
   kernelInfo["defines/"
              "p_NVec"] = 3;
   kernelInfo["defines/"
@@ -140,6 +157,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
              "hlong"] = hlongString;
 
   if (device.mode() == "CUDA") {
+    kernelInfo["defines/smXX"] = 1;
   }
 
   if (device.mode() == "OpenCL") {
@@ -149,12 +167,22 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 
   if (device.mode() == "HIP") {
     warpSize = 64; // can be arch specific
+    kernelInfo["defines/gfxXX"] = 1;
+  }
+
+  if (device.mode() == "dpcpp") {
+    kernelInfo["defines/XeHPC"] = 1;
   }
 
   serial = device.mode() == "Serial" || device.mode() == "OpenMP";
 
   if (serial) {
     kernelInfo["includes"] += "math.h";
+  }
+
+  const std::string floatingPointType = static_cast<std::string>(kernelInfo["defines/dfloat"]);
+  if (floatingPointType.find("float") != std::string::npos) {
+      kernelInfo["defines/FP32"] = 1;
   }
 
   const std::string extension = serial ? ".c" : ".okl";
@@ -168,7 +196,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 }
 
 // kernel source is required to compute hash during JIT compilation
-void platform_t::bcastKernelSources()
+void platform_t::bcastJITSourceFiles()
 {
   if (platform->verbose && comm.mpiRank == 0) {
     std::cout << "broadcast kernel sources to " << getenv("NEKRS_LOCAL_TMP_DIR") << std::endl; 
@@ -180,7 +208,7 @@ void platform_t::bcastKernelSources()
     auto sessionID = 0;
     options.getArgs("NEKNEK SESSION ID", sessionID);
 
-    tmpDir = fs::path(tmpDir) / fs::path(std::string("nrs_") + std::to_string(sessionID));
+    tmpDir = fs::path(tmpDir) / fs::path(std::string("nekrs_") + std::to_string(sessionID));
 
     if (comm.mpiRank == 0) {
       fs::create_directory(tmpDir);
@@ -192,7 +220,6 @@ void platform_t::bcastKernelSources()
   const auto srcPath = fs::path(getenv("NEKRS_HOME"));
   for (auto &entry : {
                        fs::path("include"),
-                       fs::path("gatherScatter"),
                        fs::path("kernels")
                      }) {
 

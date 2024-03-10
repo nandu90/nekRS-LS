@@ -73,15 +73,16 @@ void registerLinAlgKernels()
     std::tie(kernelName, nativeSerialImplementation) = nameAndSerialImpl;
     const std::string extension = (serial && nativeSerialImplementation) ? ".c" : ".okl";
     const bool pfloatKernel = (kernelName.front() == 'p') ? true : false;
+    const std::string prefix = ""; // "linAlg::"
     if (pfloatKernel) {
       occa::properties props = kernelInfo;
       props["defines/dfloat"] = pfloatString;
       std::string fileName = kernelName;
       fileName.erase(0, 1);
-      platform->kernels.add(kernelName, oklDir + fileName + extension, props);
+      platform->kernelRequests.add(prefix + kernelName, oklDir + fileName + extension, props);
     }
     else {
-      platform->kernels.add(kernelName, oklDir + kernelName + extension, kernelInfo);
+      platform->kernelRequests.add(prefix + kernelName, oklDir + kernelName + extension, kernelInfo);
     }
   }
 }

@@ -178,7 +178,8 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
       pool::o_scratch.free();
     }
     void *buffer = std::calloc(Nbytes, 1);
-    pool::o_scratch = platform->device.malloc(Nbytes, buffer);
+    pool::o_scratch = platform->device.malloc(Nbytes);
+    pool::o_scratch.copyFrom(buffer);
     std::free(buffer);
   }
 
@@ -1045,9 +1046,9 @@ findpts_t::findpts_t(MPI_Comm comm,
   this->o_hashMin.copyFrom(hashMin, dim * sizeof(dfloat));
   this->o_hashFac.copyFrom(hashFac, dim * sizeof(dfloat));
 
-  this->localEvalKernel = platform->kernels.get("findptsLocalEval");
-  this->localEvalMaskKernel = platform->kernels.get("findptsLocalEvalMask");
-  this->localKernel = platform->kernels.get("findptsLocal");
+  this->localEvalKernel = platform->kernelRequests.load("findptsLocalEval");
+  this->localEvalMaskKernel = platform->kernelRequests.load("findptsLocalEvalMask");
+  this->localKernel = platform->kernelRequests.load("findptsLocal");
 
   this->o_wtend_x = platform->device.malloc(6 * Nq * sizeof(dfloat));
   this->o_wtend_y = platform->device.malloc(6 * Nq * sizeof(dfloat));

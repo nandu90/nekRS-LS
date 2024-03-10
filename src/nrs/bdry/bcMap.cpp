@@ -381,6 +381,8 @@ void setup()
              EXIT_FAILURE,
              "%s\n",
              "boundaryTypeMap specfied for some but not all fields!");
+
+  addKernelConstants(platform->kernelInfo);
 }
 
 void deriveMeshBoundaryConditions(std::vector<std::string> velocityBCs)

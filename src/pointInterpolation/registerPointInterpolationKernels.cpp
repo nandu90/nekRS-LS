@@ -56,13 +56,13 @@ void registerPointInterpolationKernels()
 
   kernelName = "findptsLocal";
   fileName = oklpath + "/pointInterpolation/findpts/" + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, findptsKernelInfo);
+  platform->kernelRequests.add(kernelName, fileName, findptsKernelInfo);
 
   kernelName = "findptsLocalEval";
   fileName = oklpath + "/pointInterpolation/findpts/" + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, findptsKernelInfo);
+  platform->kernelRequests.add(kernelName, fileName, findptsKernelInfo);
 
   kernelName = "findptsLocalEvalMask";
   fileName = oklpath + "/pointInterpolation/findpts/" + kernelName + ".okl";
-  platform->kernels.add(kernelName, fileName, findptsKernelInfo);
+  platform->kernelRequests.add(kernelName, fileName, findptsKernelInfo);
 }

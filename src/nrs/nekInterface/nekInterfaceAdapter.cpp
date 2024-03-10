@@ -6,6 +6,7 @@
 #include "fileUtils.hpp"
 #include "re2Reader.hpp"
 #include "fileUtils.hpp"
+#include "fld.hpp"
 #include "nekInterfaceAdapter.hpp"
 
 
@@ -203,7 +204,18 @@ void outfld(const char *filename,
   {
     int nxo = Nout + 1;
     int ifreg = uniform;
+#if 0
+    auto nek_out_mask = ptr<int>("out_mask");
+    for(int i = 0; i < nekData.lelt; i++) nek_out_mask[i] = 1; 
 
+    // filter elements
+    if(fld::elementFilter.mask().size() > 0) {
+      for(int i = 0; i < nekData.lelt; i++) nek_out_mask[i] = 0; 
+      for(auto& entry : fld::elementFilter.mask()) {
+        nek_out_mask[entry] = 1;
+      }
+    }
+#endif
     (*nek_outfld_ptr)((char *)filename, 
                       &nxo,
                       &ifreg,           
@@ -215,6 +227,12 @@ void outfld(const char *filename,
                       ps.data(), 
                       &nps, 
                       strlen(filename));
+#if 0
+    // fitler reset
+    for(int i = 0; i < nekData.lelt; i++) {
+      nek_out_mask[i] = 1;
+    } 
+#endif
   }
 
   (*nek_resetio_ptr)();
@@ -585,7 +603,7 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
     MPI_Comm_rank(platform->comm.mpiCommLocal, &buildRank);
   }
 
-  const int verbose = options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
+  const int verbose = platform->verbose;
 
   const std::string installDir(getenv("NEKRS_HOME"));
   const std::string nek5000_dir = installDir + "/nek5000";
@@ -649,8 +667,11 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
         const std::string include_dirs = "./ " + case_dir + " " + installDir + "/include/nrs/bdry";
         const std::string nekInterface_dir = installDir + "/nekInterface";
         std::string make_args = "-j8 ";
+        std::string out_args = std::string(">" + makeOutput + " 2>&1");
         if (!verbose) {
           make_args += "-s ";
+        } else {
+          out_args = "";
         }
 
         if (rank == 0) {
@@ -678,7 +699,7 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
                 casename.c_str(),
                 cache_dir.c_str(),
                 nekInterface_dir.c_str(),
-                std::string(">" + makeOutput + " 2>&1").c_str());
+                out_args.c_str());
 
         if (verbose && rank == 0) {
           printf("\n%s\n", buf);

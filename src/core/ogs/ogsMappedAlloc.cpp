@@ -27,20 +27,16 @@ SOFTWARE.
 #include "ogstypes.h"
 #include "ogs.hpp"
 
-void *ogsHostMallocPinned(occa::device &device, size_t size, void *source, occa::memory &mem, occa::memory &h_mem){
-
+void *ogsHostMallocPinned(occa::device &device, size_t size, void *source, occa::memory &mem, occa::memory &h_mem)
+{
   occa::properties props;
   props["host"] = true;
   
-  if(source!=NULL)
-    mem =  device.malloc(size, source);
-  else
-    mem =  device.malloc(size);
+  mem =  device.malloc(size);
+  if(source != NULL) mem.copyFrom(source);
 
   h_mem =  device.malloc(size, props);
-  
   void *ptr = h_mem.ptr();
-  
   
  return ptr;
 }

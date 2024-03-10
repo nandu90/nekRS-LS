@@ -85,6 +85,12 @@ namespace occa {
     return kernel;
   }
 
+  void launchedModeDevice_t::buildSource(const std::string& fileName, 
+                                         const hash_t hash, 
+                                         const occa::json& props) {
+    OCCA_FORCE_ERROR("launchedModeDevice_t::buildSource is not implemented");
+  }
+
   modeKernel_t* launchedModeDevice_t::buildKernel(const std::string &filename,
                                                   const std::string &kernelName,
                                                   const hash_t kernelHash,

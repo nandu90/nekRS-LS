@@ -138,10 +138,14 @@ boomerAMG_t::boomerAMG_t(int _nRows,
       ++rowCtr;
     }
 
-    auto o_ncols = device.malloc(ncols.size() * sizeof(HYPRE_Int), ncols.data());
-    auto o_rows = device.malloc(rows.size() * sizeof(HYPRE_BigInt), rows.data());
-    auto o_cols = device.malloc(cols.size() * sizeof(HYPRE_BigInt), cols.data());
-    auto o_vals = device.malloc(vals.size() * sizeof(HYPRE_Real), vals.data());
+    auto o_ncols = device.malloc(ncols.size() * sizeof(HYPRE_Int));
+    o_ncols.copyFrom(ncols.data());
+    auto o_rows = device.malloc(rows.size() * sizeof(HYPRE_BigInt));
+    o_rows.copyFrom(rows.data());
+    auto o_cols = device.malloc(cols.size() * sizeof(HYPRE_BigInt));
+    o_cols.copyFrom(cols.data());
+    auto o_vals = device.malloc(vals.size() * sizeof(HYPRE_Real));
+    o_vals.copyFrom(vals.data());
 
     HYPRE_IJMatrixSetValues(*A,
                             rowsToSet /* values for nrows */,

@@ -15,6 +15,7 @@ void testParsingFailure();
 void testCompilingFailure();
 void testArgumentFailure();
 void testRun();
+void testBuildSource();
 
 int main(const int argc, const char **argv) {
   addVectors = occa::buildKernel(addVectorsFile,
@@ -26,6 +27,7 @@ int main(const int argc, const char **argv) {
   testCompilingFailure();
   testArgumentFailure();
   testRun();
+  testBuildSource();
 
   return 0;
 }
@@ -188,4 +190,10 @@ void testRun() {
     xy,
     str.c_str()
   );
+}
+
+void testBuildSource() {
+  occa::device occa_device({{"mode","Serial"}});
+  occa_device.buildSource(addVectorsFile);
+  occa::kernel add_vector_kernel = occa_device.buildKernel(addVectorsFile,"addVectors");
 }

@@ -573,6 +573,9 @@ namespace occa {
                              const std::string &kernelName,
                              const occa::json &props = occa::json()) const;
 
+    std::string compileSource(const std::string& fileName, 
+                              const occa::json& props = occa::json()) const;
+
     /**
      * @startDoc{buildKernelFromString}
      *

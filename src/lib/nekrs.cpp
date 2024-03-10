@@ -13,6 +13,7 @@
 #include "AMGX.hpp"
 #include "hypreWrapper.hpp"
 #include "hypreWrapperDevice.hpp"
+#include "compileKernels.hpp"
 
 // define extern variable from nekrsSys.hpp
 platform_t *platform;
@@ -50,6 +51,8 @@ setupAide *setDefaultSettings(std::string casename)
   auto options = new setupAide();
 
   options->setArgs("FORMAT", std::string("1.0"));
+
+  options->setArgs("VERBOSE SOLVER INFO", "TRUE");
 
   options->setArgs("EQUATION TYPE", "NAVIERSTOKES");
 
@@ -184,11 +187,6 @@ void setup(MPI_Comm commg_in,
     nrs = new nrs_t();
   }
 
-  int buildRank = rank;
-  if (platform->cacheLocal) {
-    MPI_Comm_rank(platform->comm.mpiCommLocal, &buildRank);
-  }
-
   if (rank == 0) {
     std::cout << "using NEKRS_HOME: " << getenv("NEKRS_HOME") << std::endl;
     std::cout << "using NEKRS_CACHE_DIR: " << getenv("NEKRS_CACHE_DIR") << std::endl;
@@ -218,15 +216,14 @@ void setup(MPI_Comm commg_in,
   }
 
   if (platform->cacheBcast || platform->cacheLocal)
-    platform->bcastKernelSources();
+    platform->bcastJITSourceFiles();
 
   if (!udfFile.empty()) {
     udfLoad();
-  }
-
-  // here we might access nek variables
-  if (udf.setup0) {
-    udf.setup0(comm, platform->options);
+    // nek variables might be accessed
+    if (udf.setup0) {
+      udf.setup0(comm, platform->options);
+    }
   }
 
   if (rank == 0) {
@@ -238,12 +235,54 @@ void setup(MPI_Comm commg_in,
     }
   }
 
-  platform->compileKernels();
+  auto loadComponents = [](bool registerOnly) 
+  {
+    platform->options.setArgs("REGISTER ONLY", (registerOnly) ? "TRUE" : "FALSE");
+    auto props = registerUDFKernels();  // includes plugins
+    static occa::properties kernelInfoUDF;
+    if (registerOnly) kernelInfoUDF = props;
 
-  oogs::overlap(platform->options.compareArgs("ENABLE GS COMM OVERLAP", "FALSE") ? 0 : 1);
+    registerCoreKernels();
+    registerPointInterpolationKernels();
+    registerMeshKernels(kernelInfoUDF);
+    if (platform->solver->id() == "nrs") registerNrsKernels(kernelInfoUDF);
+
+    platform->options.removeArgs("REGISTER ONLY");
+  };
+
+  // just register what to compile
+  loadComponents(true);
+
+  // JIT compile kernels
+  {
+    const double tStart = MPI_Wtime();
+    if (platform->comm.mpiRank == 0) {
+      printf("JIT compiling kernels (this may take awhile if they are not in cache) ...\n");
+      fflush(stdout);
+    }
+ 
+    platform->kernelRequests.compile();
+
+    MPI_Barrier(platform->comm.mpiComm);
+    const double loadTime = MPI_Wtime() - tStart;
+    platform->timer.set("compileKernels", loadTime);
+    if (platform->comm.mpiRank == 0) {
+      std::ofstream ofs;
+      ofs.open(occa::env::OCCA_CACHE_DIR + "cache/request.timestamp",
+               std::ofstream::out | std::ofstream::trunc);
+      ofs.close();
+
+      printf("done (%gs)\n\n", loadTime);
+    }
+    fflush(stdout);
+  }
 
   if (buildOnly) {
-    MPI_Barrier(platform->comm.mpiComm);
+    int buildRank = rank;
+    if (platform->cacheLocal) {
+      MPI_Comm_rank(platform->comm.mpiCommLocal, &buildRank);
+    }
+
     if (buildRank == 0) {
       std::string cache_dir;
       cache_dir.assign(getenv("NEKRS_CACHE_DIR"));
@@ -259,41 +298,30 @@ void setup(MPI_Comm commg_in,
     return;
   }
 
-  platform->linAlg = linAlg_t::getInstance();
+  // now just load
+  loadComponents(false);
 
   if (nrs) {
     nrs->init();
+
+    if (neknekCoupled()) {
+      new neknek_t(nrs, nSessions, sessionID);
+    }
   }
 
-  if (neknekCoupled()) {
-    new neknek_t(nrs, nSessions, sessionID);
-  }
+  platform->options.removeArgs("REGISTER ONLY"); // not required anymore
 
   const double setupTime = platform->timer.query("setup", "DEVICE:MAX");
   if (rank == 0) {
-    std::cout << "\nsettings:\n" << std::endl << platform->options << std::endl;
-
-    std::cout << "memoryPool size: " << platform->o_memPool.size() / 1e9 << " GB" << std::endl;
-    std::cout << "occa memory usage: " << platform->device.occaDevice().memoryAllocated() / 1e9 << " GB"
+    std::cout << "\noptions:\n" 
+              << platform->options 
+              << std::endl
+              << "occa memory usage: " << platform->device.memoryUsage() / 1e9 << " GB"
               << std::endl;
   }
   fflush(stdout);
 
   platform->flopCounter->clear();
-
-#if 1
-  if (platform->cacheBcast) {
-    MPI_Barrier(platform->comm.mpiComm);
-
-    int rankLocal;
-    MPI_Comm_rank(platform->comm.mpiCommLocal, &rankLocal);
-    if (rankLocal == 0) {
-      for (auto &entry : fs::directory_iterator(platform->tmpDir)) {
-        fs::remove_all(entry.path());
-      }
-    }
-  }
-#endif
 
   initialized = true;
 }
@@ -623,10 +651,6 @@ bool runStep(std::function<bool(int)> convergenceCheck, int corrector)
 
 bool runStep(int corrector)
 {
-
-  auto _nrs = &nrs;
-  auto _udf = &udf;
-
   std::function<bool(int)> check = [](int corrector) -> bool {
     if (nrs->userConvergenceCheck) {
       return nrs->userConvergenceCheck(corrector);

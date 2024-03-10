@@ -29,44 +29,43 @@
 #include "ellipticPrecon.h"
 #include "maskedFaceIds.hpp"
 
-namespace{
+namespace
+{
 
-std::string gen_suffix(const elliptic_t * elliptic, const char * floatString)
+std::string gen_suffix(const elliptic_t *elliptic, const char *floatString)
 {
   const std::string precision = std::string(floatString);
-  if(precision.find(pfloatString) != std::string::npos){
+  if (precision.find(pfloatString) != std::string::npos) {
     return std::string("_") + std::to_string(elliptic->mesh->N) + std::string("pfloat");
-  }
-  else{
+  } else {
     return std::string("_") + std::to_string(elliptic->mesh->N);
   }
-  
 }
 
-}
+} // namespace
 
-elliptic_t* ellipticBuildMultigridLevel(elliptic_t* fineElliptic, int Nc, int Nf)
+elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf)
 {
-  
-  elliptic_t* elliptic = new elliptic_t();
-  memcpy(elliptic,fineElliptic,sizeof(elliptic_t));
+
+  elliptic_t *elliptic = new elliptic_t();
+  memcpy(elliptic, fineElliptic, sizeof(elliptic_t));
 
   elliptic->mgLevel = true;
 
-  mesh_t* mesh = createMeshMG(fineElliptic->mesh, Nc);
+  mesh_t *mesh = createMeshMG(fineElliptic->mesh, Nc);
   elliptic->mesh = mesh;
 
   elliptic->fieldOffset = mesh->Nlocal; // assumes elliptic->Nfields == 1
 
   { // setup masked gs handle
-   ogs_t *ogs = nullptr;
-    const auto [Nmasked, o_maskIds, NmaskedLocal, o_maskIdsLocal, NmaskedGlobal, o_maskIdsGlobal] = 
-      maskedFaceIds(mesh,
-                    mesh->Nlocal,
-                    /* nFields */ 1,
-                    /* offset */ 0,
-                    elliptic->EToB,
-                    ellipticBcType::DIRICHLET);
+    ogs_t *ogs = nullptr;
+    const auto [Nmasked, o_maskIds, NmaskedLocal, o_maskIdsLocal, NmaskedGlobal, o_maskIdsGlobal] =
+        maskedFaceIds(mesh,
+                      mesh->Nlocal,
+                      /* nFields */ 1,
+                      /* offset */ 0,
+                      elliptic->EToB,
+                      ellipticBcType::DIRICHLET);
 
     elliptic->Nmasked = Nmasked;
     elliptic->o_maskIds = o_maskIds;
@@ -81,7 +80,7 @@ elliptic_t* ellipticBuildMultigridLevel(elliptic_t* fineElliptic, int Nc, int Nf
                  EXIT_FAILURE,
                  "%s\n",
                  "Creating a masked gs handle for nFields > 1 is currently not supported!");
- 
+
       std::vector<hlong> maskedGlobalIds(mesh->Nlocal);
       memcpy(maskedGlobalIds.data(), mesh->globalIds, mesh->Nlocal * sizeof(hlong));
       std::vector<dlong> maskIds(Nmasked);
@@ -89,14 +88,19 @@ elliptic_t* ellipticBuildMultigridLevel(elliptic_t* fineElliptic, int Nc, int Nf
       for (dlong n = 0; n < Nmasked; n++) {
         maskedGlobalIds[maskIds[n]] = 0;
       }
-      ogs = ogsSetup(mesh->Nlocal, maskedGlobalIds.data(), platform->comm.mpiComm, 1, platform->device.occaDevice());
+      ogs = ogsSetup(mesh->Nlocal,
+                     maskedGlobalIds.data(),
+                     platform->comm.mpiComm,
+                     1,
+                     platform->device.occaDevice());
     }
     elliptic->ogs = ogs;
     std::vector<pfloat> tmp(elliptic->mesh->Nlocal);
-    for(int i = 0; i < elliptic->mesh->Nlocal; i++) {
-       tmp[i] = (pfloat) elliptic->ogs->invDegree[i];
+    for (int i = 0; i < elliptic->mesh->Nlocal; i++) {
+      tmp[i] = (pfloat)elliptic->ogs->invDegree[i];
     }
-    elliptic->o_invDegree = platform->device.malloc<pfloat>(elliptic->mesh->Nlocal, tmp.data());
+    elliptic->o_invDegree = platform->device.malloc<pfloat>(elliptic->mesh->Nlocal);
+    elliptic->o_invDegree.copyFrom(tmp.data());
   }
 
   const std::string suffix = "Hex3D";
@@ -110,66 +114,67 @@ elliptic_t* ellipticBuildMultigridLevel(elliptic_t* fineElliptic, int Nc, int Nf
 
   const std::string poissonPrefix = elliptic->poisson ? "poisson-" : "";
 
-  if(Nc > 1 || (elliptic->options.compareArgs("MULTIGRID COARSE SOLVE", "FALSE") ||
-                elliptic->options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE"))) {
+  if (Nc > 1 || (elliptic->options.compareArgs("MULTIGRID COARSE SOLVE", "FALSE") ||
+                 elliptic->options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE"))) {
     const std::string AxSuffix = "CoeffHex3D";
     // check for trilinear
     if (elliptic->elementType != HEXAHEDRA) {
       kernelName = "ellipticPartialAx" + AxSuffix;
-      }else {
-        if(elliptic->options.compareArgs("ELEMENT MAP", "TRILINEAR"))
-          kernelName = "ellipticPartialAxTrilinear" + AxSuffix;
-        else
-          kernelName = "ellipticPartialAx" + AxSuffix;
+    } else {
+      if (elliptic->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
+        kernelName = "ellipticPartialAxTrilinear" + AxSuffix;
+      } else {
+        kernelName = "ellipticPartialAx" + AxSuffix;
       }
+    }
 
-      {
-        const std::string kernelSuffix = gen_suffix(elliptic, pfloatString);
-        elliptic->AxKernel = platform->kernels.get(poissonPrefix + kernelName + kernelSuffix);
-      }
+    {
+      const std::string kernelSuffix = gen_suffix(elliptic, pfloatString);
+      elliptic->AxKernel = platform->kernelRequests.load(poissonPrefix + kernelName + kernelSuffix);
+    }
   }
 
   elliptic->precon = new precon_t();
   precon_t *precon = elliptic->precon;
- 
+
   {
     const std::string kernelSuffix =
         std::string("_Nf_") + std::to_string(Nf) + std::string("_Nc_") + std::to_string(Nc);
 
     kernelName = "ellipticPreconCoarsen" + suffix + kernelSuffix;
-    precon->coarsenKernel = platform->kernels.get(kernelName);
+    precon->coarsenKernel = platform->kernelRequests.load(kernelName);
 
     kernelName = "ellipticPreconProlongate" + suffix + kernelSuffix;
-    precon->prolongateKernel = platform->kernels.get(kernelName);
-
+    precon->prolongateKernel = platform->kernelRequests.load(kernelName);
   }
 
   elliptic->o_lambda0 = platform->device.malloc<pfloat>(mesh->Nlocal);
-  if(fineElliptic->poisson)
+  if (fineElliptic->poisson) {
     elliptic->o_lambda1 = nullptr;
-  else
+  } else {
     elliptic->o_lambda1 = platform->device.malloc<pfloat>(mesh->Nlocal);
+  }
 
-  const int Nfq = Nf+1;
-  const int Ncq = Nc+1;
-  auto fToCInterp = (dfloat*) calloc(Nfq * Ncq, sizeof(dfloat));
+  const int Nfq = Nf + 1;
+  const int Ncq = Nc + 1;
+  auto fToCInterp = (dfloat *)calloc(Nfq * Ncq, sizeof(dfloat));
   InterpolationMatrix1D(Nf, Nfq, fineElliptic->mesh->r, Ncq, mesh->r, fToCInterp);
 
   occa::memory o_interp = platform->device.malloc<dfloat>(Nfq * Ncq, fToCInterp);
   elliptic->o_interp = platform->device.malloc<pfloat>(Nfq * Ncq);
   platform->copyDfloatToPfloatKernel(Nfq * Ncq, o_interp, elliptic->o_interp);
 
-  precon->coarsenKernel(mesh->Nelements, elliptic->o_interp, 
-                        fineElliptic->o_lambda0, elliptic->o_lambda0);
-  if(!fineElliptic->poisson)
-    precon->coarsenKernel(mesh->Nelements, elliptic->o_interp, 
-                          fineElliptic->o_lambda1, elliptic->o_lambda1);
+  precon->coarsenKernel(mesh->Nelements, elliptic->o_interp, fineElliptic->o_lambda0, elliptic->o_lambda0);
+  if (!fineElliptic->poisson) {
+    precon->coarsenKernel(mesh->Nelements, elliptic->o_interp, fineElliptic->o_lambda1, elliptic->o_lambda1);
+  }
 
   free(fToCInterp);
 
-
   MPI_Barrier(platform->comm.mpiComm);
-  if(platform->comm.mpiRank == 0) printf("done (%gs)\n", MPI_Wtime() - tStartLoadKernel);
+  if (platform->comm.mpiRank == 0) {
+    printf("done (%gs)\n", MPI_Wtime() - tStartLoadKernel);
+  }
   fflush(stdout);
 
   return elliptic;

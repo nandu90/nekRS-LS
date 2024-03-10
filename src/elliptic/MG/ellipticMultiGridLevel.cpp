@@ -116,9 +116,9 @@ void pMGLevel::smoother(occa::memory o_x, occa::memory o_Sx, bool x_is_zero)
 
 void pMGLevel::smoothJacobi (occa::memory &o_r, occa::memory &o_x, bool xIsZero)
 {
-  occa::memory o_res = o_smootherResidual;
-  occa::memory o_Ad  = o_smootherResidual2;
-  occa::memory o_d   = o_smootherUpdate;
+  auto o_res = platform->o_memPool.reserve<pfloat>(Ncols); 
+  auto o_Ad = platform->o_memPool.reserve<pfloat>(Ncols); 
+  auto o_d = platform->o_memPool.reserve<pfloat>(Ncols); 
 
   const pfloat one = 1.0;
   const pfloat mone = -1.0;
@@ -160,9 +160,9 @@ void pMGLevel::smoothChebyshev (occa::memory &o_r, occa::memory &o_x, bool xIsZe
 
   pfloat one = 1., mone = -1., zero = 0.0;
 
-  occa::memory o_res = o_smootherResidual;
-  occa::memory o_Ad  = o_smootherResidual2;
-  occa::memory o_d   = o_smootherUpdate;
+  auto o_res = platform->o_memPool.reserve<pfloat>(Ncols);       
+  auto o_Ad = platform->o_memPool.reserve<pfloat>(Ncols); 
+  auto o_d = platform->o_memPool.reserve<pfloat>(Ncols);
 
   double flopCount = 0.0;
 
@@ -225,9 +225,9 @@ void pMGLevel::smoothFourthKindChebyshev (occa::memory &o_r, occa::memory &o_x, 
 
   pfloat one = 1., mone = -1., zero = 0.0;
 
-  occa::memory o_res = o_smootherResidual;
-  occa::memory o_Ad = o_smootherResidual2;
-  occa::memory o_d = o_smootherUpdate;
+  auto o_res = platform->o_memPool.reserve<pfloat>(Ncols);       
+  auto o_Ad = platform->o_memPool.reserve<pfloat>(Ncols); 
+  auto o_d = platform->o_memPool.reserve<pfloat>(Ncols);
 
   const auto rho = this->lambda1;
 

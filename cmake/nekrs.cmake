@@ -43,7 +43,6 @@ set(NRS_SRC
     src/core/lowPassFilter.cpp
     src/nrs/cds/regularization/avm.cpp
     src/nrs/bdry/bcMap.cpp
-    src/core/compileKernels.cpp
     src/nrs/bdry/alignment.cpp
     src/nrs/neknek/registerNekNekKernels.cpp
     src/nrs/postProcessing/registerPostProcessingKernels.cpp

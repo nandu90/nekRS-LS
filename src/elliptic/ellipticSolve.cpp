@@ -34,7 +34,6 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
   elliptic->o_lambda0 = o_lambda0;
   elliptic->o_lambda1 = o_lambda1;
 
-
   ellipticAllocateWorkspace(elliptic);
 
   setupAide &options = elliptic->options;

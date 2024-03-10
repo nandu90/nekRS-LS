@@ -71,7 +71,7 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
 
     fileName = oklpath + kernelName + fileNameExtension;
 
-    platform->kernels.add(poissonPrefix + kernelName + kernelSuffix, axKernel);
+    platform->kernelRequests.add(poissonPrefix + kernelName + kernelSuffix, axKernel);
   }
 }
 
@@ -87,7 +87,7 @@ void registerJacobiKernels(const std::string &section, int N, int poissonEquatio
   // mixed-precision axmyz
   std::string kernelName = "axmyzManyPfloat";
   std::string fileName = oklpath + kernelName + extension;
-  platform->kernels.add(kernelName, fileName, platform->kernelInfo);
+  platform->kernelRequests.add(kernelName, fileName, platform->kernelInfo);
 
   {
     auto props = platform->kernelInfo + meshKernelProperties(N);
@@ -96,7 +96,7 @@ void registerJacobiKernels(const std::string &section, int N, int poissonEquatio
     }
     kernelName = "ellipticBlockBuildDiagonal" + suffix;
     fileName = oklpath + kernelName + ".okl";
-    platform->kernels.add(poissonPrefix + kernelName, fileName, props);
+    platform->kernelRequests.add(poissonPrefix + kernelName, fileName, props);
   }
 }
 
@@ -132,7 +132,7 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
     kernelName = "geometricFactorsHex3D";
     fileName = oklpath + "/mesh/" + kernelName + ".okl";
     const std::string meshPrefix = "pMGmesh-";
-    platform->kernels.add(meshPrefix + kernelName + orderSuffix, fileName, meshKernelInfo, orderSuffix);
+    platform->kernelRequests.add(meshPrefix + kernelName + orderSuffix, fileName, meshKernelInfo, orderSuffix);
   }
 
   {
@@ -141,10 +141,10 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
 
     fileName = oklpath + "mask.okl";
     kernelName = "mask";
-    platform->kernels.add(kernelName + orderSuffix, fileName, kernelInfo, orderSuffix);
+    platform->kernelRequests.add(kernelName + orderSuffix, fileName, kernelInfo, orderSuffix);
 
     fileName = oklpath + "mask.okl";
-    platform->kernels.add(kernelName + orderSuffix + "pfloat",
+    platform->kernelRequests.add(kernelName + orderSuffix + "pfloat",
                           fileName,
                           pfloatKernelInfo,
                           orderSuffix + "pfloat");
@@ -154,11 +154,11 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
 
     kernelName = "updateChebyshev";
     fileName = oklpath + kernelName + ".okl";
-    platform->kernels.add(kernelName + orderSuffix, fileName, kernelInfo, orderSuffix);
+    platform->kernelRequests.add(kernelName + orderSuffix, fileName, kernelInfo, orderSuffix);
 
     kernelName = "updateFourthKindChebyshev";
     fileName = oklpath + kernelName + ".okl";
-    platform->kernels.add(kernelName + orderSuffix, fileName, kernelInfo, orderSuffix);
+    platform->kernelRequests.add(kernelName + orderSuffix, fileName, kernelInfo, orderSuffix);
 
     occa::properties buildDiagInfo = kernelInfo;
     if (poissonEquation)
@@ -166,12 +166,12 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
     const std::string poissonPrefix = poissonEquation ? "poisson-" : "";
     kernelName = "ellipticBlockBuildDiagonalHex3D";
     fileName = oklpath + kernelName + ".okl";
-    platform->kernels.add(poissonPrefix + kernelName + orderSuffix, fileName, buildDiagInfo, orderSuffix);
+    platform->kernelRequests.add(poissonPrefix + kernelName + orderSuffix, fileName, buildDiagInfo, orderSuffix);
     {
       occa::properties props = buildDiagInfo;
       props["defines/dfloat"] = pfloatString;
       kernelName = "ellipticBlockBuildDiagonalPfloatHex3D";
-      platform->kernels.add(poissonPrefix + kernelName + orderSuffix, fileName, props, orderSuffix);
+      platform->kernelRequests.add(poissonPrefix + kernelName + orderSuffix, fileName, props, orderSuffix);
     }
   }
 }
@@ -202,7 +202,7 @@ void registerSchwarzKernels(const std::string &section, int N)
     }
 
     fileName = oklpath + "preFDM" + extension;
-    platform->kernels.add("preFDM" + suffix, fileName, properties, suffix);
+    platform->kernelRequests.add("preFDM" + suffix, fileName, properties, suffix);
 
     int nelgt, nelgv;
     const std::string meshFile = platform->options.getArgs("MESH FILE");
@@ -219,10 +219,10 @@ void registerSchwarzKernels(const std::string &section, int N)
                                   targetTimeBenchmark,
                                   platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true,
                                   suffix);
-    platform->kernels.add("fusedFDM" + suffix, fdmKernel);
+    platform->kernelRequests.add("fusedFDM" + suffix, fdmKernel);
 
     fileName = oklpath + "postFDM" + extension;
-    platform->kernels.add("postFDM" + suffix, fileName, properties, suffix);
+    platform->kernelRequests.add("postFDM" + suffix, fileName, properties, suffix);
   }
 }
 void registerFineLevelKernels(const std::string &section, int N, int poissonEquation)
@@ -292,10 +292,10 @@ void registerMultigridLevelKernels(const std::string &section, int Nf, int N, in
 
     fileName = oklpath + "ellipticPreconCoarsen" + suffix + fileNameExtension;
     kernelName = "ellipticPreconCoarsen" + suffix;
-    platform->kernels.add(kernelName + orderSuffix, fileName, coarsenProlongateKernelInfo, orderSuffix);
+    platform->kernelRequests.add(kernelName + orderSuffix, fileName, coarsenProlongateKernelInfo, orderSuffix);
     fileName = oklpath + "ellipticPreconProlongate" + suffix + fileNameExtension;
     kernelName = "ellipticPreconProlongate" + suffix;
-    platform->kernels.add(kernelName + orderSuffix, fileName, coarsenProlongateKernelInfo, orderSuffix);
+    platform->kernelRequests.add(kernelName + orderSuffix, fileName, coarsenProlongateKernelInfo, orderSuffix);
   }
 
   if (N == 1) {
@@ -337,7 +337,7 @@ void registerMultiGridKernels(const std::string &section, int poissonEquation)
 
         std::string fileName = oklpath + "/elliptic/vectorDotStar.okl";
         std::string kernelName = "vectorDotStar";
-        platform->kernels.add(kernelName, fileName, platform->kernelInfo);
+        platform->kernelRequests.add(kernelName, fileName, platform->kernelInfo);
       }
     }
   }
@@ -357,9 +357,9 @@ void registerSEMFEMKernels(const std::string &section, int N, int poissonEquatio
   }
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/elliptic/");
   std::string fileName = oklpath + "gather.okl";
-  platform->kernels.add("gather", fileName, SEMFEMKernelProps);
+  platform->kernelRequests.add("gather", fileName, SEMFEMKernelProps);
   fileName = oklpath + "scatter.okl";
-  platform->kernels.add("scatter", fileName, SEMFEMKernelProps);
+  platform->kernelRequests.add("scatter", fileName, SEMFEMKernelProps);
   occa::properties stiffnessKernelInfo = platform->kernelInfo;
   fileName = oklpath + "computeStiffnessMatrix.okl";
   stiffnessKernelInfo["defines/p_Nq"] = Nq;
@@ -370,7 +370,7 @@ void registerSEMFEMKernels(const std::string &section, int N, int poissonEquatio
   const bool constructOnHost = !platform->device.deviceAtomic;
 
   if (!constructOnHost) {
-    platform->kernels.add("computeStiffnessMatrix", fileName, stiffnessKernelInfo);
+    platform->kernelRequests.add("computeStiffnessMatrix", fileName, stiffnessKernelInfo);
   }
 }
 

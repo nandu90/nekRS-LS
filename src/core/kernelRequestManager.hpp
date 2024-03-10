@@ -14,6 +14,12 @@ class kernelRequestManager_t
 
   struct kernelRequest_t
   {
+    std::string requestName;
+    std::string fileName;
+    std::string binaryFileName;
+    std::string suffix;
+    occa::properties props;
+
     inline bool operator==(const kernelRequest_t& other) const
     {
       return requestName == other.requestName;
@@ -34,18 +40,16 @@ class kernelRequestManager_t
     :
     requestName(m_requestName),
     fileName(m_fileName),
+    binaryFileName(std::string()),
     suffix(m_suffix),
     props(m_props)
     {}
-    std::string requestName;
-    std::string fileName;
-    std::string suffix;
-    occa::properties props;
 
     std::string to_string() const {
       std::ostringstream ss;
       ss << "requestName : " << requestName << "\n";
       ss << "fileName : " << fileName << "\n";
+      ss << "binaryFileName : " << binaryFileName << "\n";
       ss << "suffix : " << suffix << "\n";
       ss << "props : " << props << "\n";;
       return ss.str();
@@ -57,25 +61,23 @@ public:
                   const std::string& m_fileName,
                   const occa::properties& m_props,
                   std::string m_suffix = std::string(),
-                  bool assertUnique = false);
-  void add(const std::string& requestName, occa::kernel kernel){
-    requestToKernelMap[requestName] = kernel;
-  }
+                  bool checkUnique = false);
+
+  void add(const std::string& requestName, occa::kernel kernel);
   
   void compile();
 
-  occa::kernel
-  get(const std::string& request, bool checkValid = true) const;
+  occa::kernel load(const std::string& request, bool checkValid = true);
+  occa::kernel load(const std::string& request, const std::string& kernelName, bool checkValid = true);
 
-  bool
-  processed() const { return kernelsProcessed; }
+  bool processed() const { return kernelsProcessed; }
 
 private:
   const platform_t& platformRef;
   bool kernelsProcessed;
   std::set<kernelRequest_t> kernels;
+  std::map<std::string, kernelRequest_t> requestNameToRequestMap;
   std::map<std::string, occa::kernel> requestToKernelMap;
-  std::map<std::string, std::set<kernelRequest_t>> fileNameToRequestMap;
 
   void add(kernelRequest_t request, bool assertUnique = true);
 

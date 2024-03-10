@@ -30,8 +30,6 @@
 
 void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs)
 {
-  elliptic->precon = new precon_t();
-  precon_t *precon = elliptic->precon;
   const auto pre = platform->device.occaDevice().memoryAllocated();
 
   mesh_t *mesh = elliptic->mesh;
@@ -48,26 +46,28 @@ void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs)
       elliptic->levels[i] = levels.at(i);
     }
 
-    ellipticMultiGridSetup(elliptic, precon);
+    ellipticMultiGridSetup(elliptic);
   } else if (options.compareArgs("PRECONDITIONER", "SEMFEM")) {
     if (platform->comm.mpiRank == 0) {
       printf("building SEMFEM preconditioner ...\n");
     }
     fflush(stdout);
-    precon->SEMFEMSolver = new SEMFEMSolver_t(elliptic);
+    elliptic->precon = new precon_t();
+    elliptic->precon->SEMFEMSolver = new SEMFEMSolver_t(elliptic);
   } else if (options.compareArgs("PRECONDITIONER", "JACOBI")) {
     if (platform->comm.mpiRank == 0) {
       printf("building Jacobi preconditioner ... ");
     }
     fflush(stdout);
-    ellipticUpdateJacobi(elliptic, precon->o_invDiagA);
+    elliptic->precon = new precon_t();
+    ellipticUpdateJacobi(elliptic, elliptic->precon->o_invDiagA);
   } else if (options.compareArgs("PRECONDITIONER", "NONE")) {
     // nothing
   } else {
     nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Unknown preconditioner!");
   }
 
-  precon->preconBytes = platform->device.occaDevice().memoryAllocated() - pre;
+  elliptic->precon->preconBytes = platform->device.occaDevice().memoryAllocated() - pre;
 
   MPI_Barrier(platform->comm.mpiComm);
   if (platform->comm.mpiRank == 0) {

@@ -109,6 +109,12 @@ namespace occa {
       return buildKernel(filename, kernelName, kernelHash, kernelProps, false);
     }
 
+    void device::buildSource(const std::string& fileName, 
+                             const hash_t hash, 
+                             const occa::json& props) {
+      buildKernel(fileName, "", hash, props, false, true);
+    }
+
     modeKernel_t* device::buildLauncherKernel(const std::string &filename,
                                               const std::string &kernelName,
                                               const hash_t kernelHash) {
@@ -119,7 +125,8 @@ namespace occa {
                                       const std::string &kernelName,
                                       const hash_t kernelHash,
                                       const occa::json &kernelProps,
-                                      const bool isLauncherKernel) {
+                                      const bool isLauncherKernel,
+                                      bool buildOnly) {
       const std::string hashDir = io::hashDir(filename, kernelHash);
 
       const std::string &kcBinaryFile = (
@@ -133,7 +140,7 @@ namespace occa {
       const bool foundBinary = io::isFile(binaryFilename);
 
       const bool verbose = kernelProps.get("verbose", false);
-      if (foundBinary) {
+      if (foundBinary && !buildOnly) {
         if (verbose) {
           io::stdout << "Loading cached ["
                      << kernelName
@@ -388,6 +395,8 @@ namespace occa {
       );
 
       io::sync(binaryFilename);
+
+      if (buildOnly) return nullptr;
 
       modeKernel_t *k = buildKernelFromBinary(binaryFilename,
                                               kernelName,

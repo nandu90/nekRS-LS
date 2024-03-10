@@ -104,7 +104,8 @@ void setupRowBlocks(ogs_t *ogs, occa::device &device)
     }
   }
   blockRowStarts[ogs->NrowBlocks] = ogs->NlocalGather;
-  ogs->o_blockRowStarts = device.malloc((ogs->NrowBlocks+1)*sizeof(dlong), blockRowStarts);
+  ogs->o_blockRowStarts = device.malloc((ogs->NrowBlocks+1)*sizeof(dlong));
+  ogs->o_blockRowStarts.copyFrom(blockRowStarts);
   free(blockRowStarts);
 }
 

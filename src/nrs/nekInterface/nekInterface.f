@@ -99,6 +99,10 @@ c-----------------------------------------------------------------------
       call nekrs_registerPtr('ifgett', ifgett)
       call nekrs_registerPtr('ifgets', ifgets)
 
+#if 0
+      call nekrs_registerPtr('out_mask', out_mask)
+#endif
+
       call nekrs_registerPtr('cbc', cbc)
 
       return
@@ -369,6 +373,9 @@ c-----------------------------------------------------------------------
       logical ifxyo_s
       logical rego
 
+      integer cnt
+      integer*8 cntg
+
       common /vrthov/ ur1(lxo*lxo*lxo*lelt)
      &              , ur2(lxo*lxo*lxo*lelt)
      &              , ur3(lxo*lxo*lxo*lelt)
@@ -406,28 +413,37 @@ c-----------------------------------------------------------------------
       ifxyo_s = ifxyo 
       ifxyo_  = ifxyo
 
-      nout = nelt
+      nout = nelt ! dump all fields based on the t-mesh to avoid different topologies in the post-processor
       nyo  = nxo 
       nzo  = nxo 
 
-      offs0 = iHeaderSize + 4 + isize*nelgt
-
       ierr=0
       if (nid.eq.pid0) then
-         call mfo_open_files(prefix,ierr)         ! open files on i/o nodes
+         call mfo_open_files(prefix,ierr)
       endif
       call err_chk(ierr,'Error opening file in mfo_open_files. $')
       call bcast(ifxyo_,lsize)
       ifxyo = ifxyo_
-      call mfo_write_hdr                     ! create element mapping + write hdr
+      call mfo_write_hdr ! hdr + element mapping
+
+#if 0
+      cnt = 0
+      do iel = 1,nelt
+        if(out_mask(iel).ne.0) cnt = cnt + 1
+      enddo
+#else
+      cnt = nelt
+#endif
+      cntg = iglsum(cnt, 1)
 
       nxyzo8  = nxo*nyo*nzo
+
+      ! only relevant for single shared file
+      offs0 = iHeaderSize + 4 + isize*cntg
       strideB = nelB * nxyzo8*wdsizo
-      stride  = nelgt* nxyzo8*wdsizo
+      stride  = cntg * nxyzo8*wdsizo
 
       ioflds = 0
-      ! dump all fields based on the t-mesh to avoid different
-      ! topologies in the post-processor
       if (ifxyo) then
          offs = offs0 + ldim*strideB
          call byte_set_view(offs,ifh_mbyte)
@@ -471,13 +487,13 @@ c-----------------------------------------------------------------------
          call mfo_outs(ur1,nout,nxo,nyo,nzo)
          ioflds = ioflds + 1
       enddo
-      dnbyte = 1.*ioflds*nout*wdsizo*nxo*nyo*nzo
+      dnbyte = 1.*ioflds*cnt*wdsizo*nxo*nyo*nzo
 
-      ! add meta data (bounding boxes) to the end of the file
+      ! add FP32 meta data (bounding boxes) to the end of the file
       if (if3d) then
          offs0   = offs0 + ioflds*stride
-         strideB = nelB *2*4   ! min/max single precision
-         stride  = nelgt*2*4
+         strideB = nelB *2*4
+         stride  = cntg *2*4
          ioflds  = 0
          if (ifxyo) then
             offs = offs0 + ldim*strideB
@@ -511,7 +527,7 @@ c-----------------------------------------------------------------------
              ioflds = ioflds + 1
            endif
          enddo
-         dnbyte = dnbyte + 2.*ioflds*nout*wdsizo
+         dnbyte = dnbyte + 2.*ioflds*cnt*wdsizo
       endif
 
       ierr = 0
@@ -528,7 +544,7 @@ c-----------------------------------------------------------------------
       if (tio.le.0) tio=1.
 
       dnbyte = glsum(dnbyte,1)
-      dnbyte = dnbyte + iHeaderSize + 4. + isize*nelgt
+      dnbyte = dnbyte + iHeaderSize + 4. + isize*cntg
       dnbyte = dnbyte/1e9
       if(nio.eq.0) write(6,7) istep,time,dnbyte,dnbyte/tio,
      &             nfileo

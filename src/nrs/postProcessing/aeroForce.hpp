@@ -3,11 +3,11 @@
 
 #include "platform.hpp"
 
-class aeroForce
+class AeroForce
 {
 public:
-  aeroForce() {};
-  aeroForce(std::tuple< std::array<dfloat, 3>, std::array<dfloat, 3> > f) 
+  AeroForce() {};
+  AeroForce(std::tuple< std::array<dfloat, 3>, std::array<dfloat, 3> > f) 
   {
     forceV = std::get<0>(f);
     forceP = std::get<1>(f); 

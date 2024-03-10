@@ -232,8 +232,8 @@ LVector_t<FPType>::LVector_t(const std::vector<mesh_t *> &meshes, bool oallocate
   }
 
   auto suffix = LVector_t<FPType>::FPTypeString();
-  this->EToLKernel_ = platform->kernels.get("EToL" + suffix);
-  this->LToEKernel_ = platform->kernels.get("LToE" + suffix);
+  this->EToLKernel_ = platform->kernelRequests.load("EToL" + suffix);
+  this->LToEKernel_ = platform->kernelRequests.load("LToE" + suffix);
 }
 
 // =======================================================================================================
@@ -419,13 +419,13 @@ template <typename FPType> void LVector_t<FPType>::registerKernels()
   {
     auto kernelName = "EToL";
     auto fileName = oklpath + kernelName + ".okl";
-    platform->kernels.add(kernelName + suffix, fileName, kernelInfo);
+    platform->kernelRequests.add(kernelName + suffix, fileName, kernelInfo);
   }
 
   {
     auto kernelName = "LToE";
     auto fileName = oklpath + kernelName + ".okl";
-    platform->kernels.add(kernelName + suffix, fileName, kernelInfo);
+    platform->kernelRequests.add(kernelName + suffix, fileName, kernelInfo);
   }
 }
 

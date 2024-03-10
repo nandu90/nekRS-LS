@@ -25,9 +25,9 @@ void registerPostProcessingKernels()
 
   kernelName = "aeroForces";
   fileName = oklpath + "/nrs/postProcessing/" + kernelName + ".okl";
-  platform->kernels.add(section + kernelName, fileName, kernelInfo);
+  platform->kernelRequests.add(section + kernelName, fileName, kernelInfo);
 
   kernelName = "Qcriterion";
   fileName = oklpath + "/nrs/postProcessing/" + kernelName + ".okl";
-  platform->kernels.add(section + kernelName, fileName, kernelInfo);
+  platform->kernelRequests.add(section + kernelName, fileName, kernelInfo);
 }

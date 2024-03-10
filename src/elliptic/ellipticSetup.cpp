@@ -145,9 +145,10 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
   elliptic->lambda0Avg = platform->linAlg->innerProd(elliptic->mesh->Nlocal,
                                                      elliptic->mesh->o_LMM,
                                                      elliptic->o_lambda0,
-                                                     platform->comm.mpiComm) / elliptic->mesh->volume;
+                                                     platform->comm.mpiComm) /
+                         elliptic->mesh->volume;
 
-  elliptic->poisson = (elliptic->o_lambda1.isInitialized()) ? 0 : 1; 
+  elliptic->poisson = (elliptic->o_lambda1.isInitialized()) ? 0 : 1;
 
   platform->options.getArgs("ELEMENT TYPE", elliptic->elementType);
   elliptic->options.setArgs("DISCRETIZATION", "CONTINUOUS");
@@ -173,7 +174,7 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
 
   elliptic->stressForm = 0;
   if (elliptic->options.compareArgs("STRESSFORMULATION", "TRUE")) {
-     elliptic->stressForm = 1;
+    elliptic->stressForm = 1;
   }
 
   elliptic->Nfields = 1;
@@ -204,22 +205,25 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
     initializeGmresData(elliptic);
     const std::string sectionIdentifier = std::to_string(elliptic->Nfields) + "-";
     elliptic->gramSchmidtOrthogonalizationKernel =
-        platform->kernels.get(sectionIdentifier + "gramSchmidtOrthogonalization");
-    elliptic->updatePGMRESSolutionKernel = platform->kernels.get(sectionIdentifier + "updatePGMRESSolution");
-    elliptic->fusedResidualAndNormKernel = platform->kernels.get(sectionIdentifier + "fusedResidualAndNorm");
+        platform->kernelRequests.load(sectionIdentifier + "gramSchmidtOrthogonalization");
+    elliptic->updatePGMRESSolutionKernel =
+        platform->kernelRequests.load(sectionIdentifier + "updatePGMRESSolution");
+    elliptic->fusedResidualAndNormKernel =
+        platform->kernelRequests.load(sectionIdentifier + "fusedResidualAndNorm");
   }
 
   if (options.compareArgs("SOLVER", "PCG+COMBINED")) {
     const std::string sectionIdentifier = std::to_string(elliptic->Nfields) + "-";
-    elliptic->combinedPCGPreMatVecKernel = platform->kernels.get(sectionIdentifier + "combinedPCGPreMatVec");
+    elliptic->combinedPCGPreMatVecKernel =
+        platform->kernelRequests.load(sectionIdentifier + "combinedPCGPreMatVec");
     elliptic->combinedPCGPostMatVecKernel =
-        platform->kernels.get(sectionIdentifier + "combinedPCGPostMatVec");
+        platform->kernelRequests.load(sectionIdentifier + "combinedPCGPostMatVec");
     elliptic->combinedPCGUpdateConvergedSolutionKernel =
-        platform->kernels.get(sectionIdentifier + "combinedPCGUpdateConvergedSolution");
+        platform->kernelRequests.load(sectionIdentifier + "combinedPCGUpdateConvergedSolution");
   }
 
-  mesh->maskKernel = platform->kernels.get("mask");
-  mesh->maskPfloatKernel = platform->kernels.get("maskPfloat");
+  mesh->maskKernel = platform->kernelRequests.load("mask");
+  mesh->maskPfloatKernel = platform->kernelRequests.load("maskPfloat");
 
   ellipticAllocateWorkspace(elliptic);
 
@@ -259,13 +263,13 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
 
   { // setup masked gs handle
     ogs_t *ogs = (elliptic->blockSolver) ? mesh->ogs : nullptr;
-    const auto [Nmasked, o_maskIds, NmaskedLocal, o_maskIdsLocal, NmaskedGlobal, o_maskIdsGlobal] = 
-      maskedFaceIds(mesh,
-                    elliptic->fieldOffset,
-                    elliptic->Nfields,
-                    elliptic->fieldOffset,
-                    elliptic->EToB,
-                    ellipticBcType::DIRICHLET);
+    const auto [Nmasked, o_maskIds, NmaskedLocal, o_maskIdsLocal, NmaskedGlobal, o_maskIdsGlobal] =
+        maskedFaceIds(mesh,
+                      elliptic->fieldOffset,
+                      elliptic->Nfields,
+                      elliptic->fieldOffset,
+                      elliptic->EToB,
+                      ellipticBcType::DIRICHLET);
 
     elliptic->Nmasked = Nmasked;
     elliptic->o_maskIds = o_maskIds;
@@ -280,7 +284,7 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
                  EXIT_FAILURE,
                  "%s\n",
                  "Creating a masked gs handle for nFields > 1 is currently not supported!");
- 
+
       std::vector<hlong> maskedGlobalIds(mesh->Nlocal);
       memcpy(maskedGlobalIds.data(), mesh->globalIds, mesh->Nlocal * sizeof(hlong));
       std::vector<dlong> maskIds(Nmasked);
@@ -288,7 +292,11 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
       for (dlong n = 0; n < Nmasked; n++) {
         maskedGlobalIds[maskIds[n]] = 0;
       }
-      ogs = ogsSetup(mesh->Nlocal, maskedGlobalIds.data(), platform->comm.mpiComm, 1, platform->device.occaDevice());
+      ogs = ogsSetup(mesh->Nlocal,
+                     maskedGlobalIds.data(),
+                     platform->comm.mpiComm,
+                     1,
+                     platform->device.occaDevice());
     }
     elliptic->ogs = ogs;
     elliptic->o_invDegree = elliptic->ogs->o_invDegree;
@@ -302,11 +310,11 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
 
     if (options.compareArgs("PRECONDITIONER", "JACOBI")) {
       kernelName = "ellipticBlockBuildDiagonal" + suffix;
-      elliptic->ellipticBlockBuildDiagonalKernel = platform->kernels.get(poissonPrefix + kernelName);
+      elliptic->ellipticBlockBuildDiagonalKernel = platform->kernelRequests.load(poissonPrefix + kernelName);
     }
 
     kernelName = "fusedCopyDfloatToPfloat";
-    elliptic->fusedCopyDfloatToPfloatKernel = platform->kernels.get(kernelName);
+    elliptic->fusedCopyDfloatToPfloatKernel = platform->kernelRequests.load(kernelName);
 
     std::string kernelNamePrefix = poissonPrefix;
     kernelNamePrefix += "elliptic";
@@ -320,9 +328,9 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
     }
     kernelName += suffix;
 
-    elliptic->AxKernel = platform->kernels.get(kernelNamePrefix + "Partial" + kernelName);
+    elliptic->AxKernel = platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
 
-    elliptic->updatePCGKernel = platform->kernels.get(sectionIdentifier + "ellipticBlockUpdatePCG");
+    elliptic->updatePCGKernel = platform->kernelRequests.load(sectionIdentifier + "ellipticBlockUpdatePCG");
   }
 
   auto timeEllipticOperator = [&]() {

@@ -46,11 +46,11 @@ void lowMach::buildKernel(occa::properties kernelInfo)
   {
     kernelName = "qtlHex3D";
     fileName = path + kernelName + extension;
-    qtlKernel = platform->device.buildKernel(fileName, kernelInfo, true);
+    qtlKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
 
     kernelName = "p0thHelper";
     fileName = path + kernelName + extension;
-    p0thHelperKernel = platform->device.buildKernel(fileName, kernelInfo, true);
+    p0thHelperKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
   }
 
   platform->options.setArgs("LOWMACH", "TRUE");

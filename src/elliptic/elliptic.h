@@ -43,18 +43,20 @@ struct GmresData {
   GmresData(elliptic_t *);
   int nRestartVectors;
   int flexible;
+
   occa::memory o_V;
   occa::memory o_Z;
-  occa::memory o_y;
+
+  std::vector<dfloat> H;
+  std::vector<dfloat> sn;
+  std::vector<dfloat> cs;
+  std::vector<dfloat> s;
+
   occa::memory o_scratch;
-  occa::memory h_scratch;
-  occa::memory h_y;
-  dfloat *y;
-  dfloat *H;
-  dfloat *sn;
-  dfloat *cs;
-  dfloat *s;
-  dfloat *scratch;
+  occa::memory _scratch;
+
+  occa::memory o_y;
+  occa::memory _y;
 };
 
 struct elliptic_t {
@@ -156,7 +158,7 @@ struct elliptic_t {
   int *levels = nullptr;
 
   SolutionProjection *solutionProjection;
-  GmresData *gmresData;
+  GmresData *gmresData = nullptr;
 
   std::function<void(dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x)>
       applyZeroNormalMask;
@@ -166,8 +168,13 @@ struct elliptic_t {
 };
 
 #include "ellipticSolutionProjection.h"
+#include "ellipticMultiGrid.h"
+
+void ellipticMultiGridUpdateLambda(elliptic_t *elliptic);
+void ellipticMultiGridSetup(elliptic_t *elliptic);
 
 elliptic_t *ellipticBuildMultigridLevelFine(elliptic_t *elliptic);
+elliptic_t *ellipticBuildMultigridLevel(elliptic_t *baseElliptic, int Nc, int Nf);
 
 void ellipticPreconditioner(elliptic_t *elliptic, const occa::memory &o_r, occa::memory &o_z);
 void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs);
@@ -217,12 +224,9 @@ void ellipticAx(elliptic_t *elliptic,
                 occa::memory &o_Aq,
                 const char *precision);
 
-void ellipticMultiGridUpdateLambda(elliptic_t *elliptic);
 void ellipticUpdateJacobi(elliptic_t *ellipticBase, occa::memory &o_invDiagA);
 void ellipticUpdateJacobi(elliptic_t *elliptic);
 
-void ellipticMultiGridSetup(elliptic_t *elliptic, precon_t *precon);
-elliptic_t *ellipticBuildMultigridLevel(elliptic_t *baseElliptic, int Nc, int Nf);
 
 dfloat ellipticUpdatePCG(elliptic_t *elliptic,
                          occa::memory &o_p,
