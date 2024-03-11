@@ -157,7 +157,7 @@ static int standardPCG(elliptic_t *elliptic,
     } else {
       printf("PCG ");
     }
-    printf("%s: initial res norm %.15e WE NEED TO GET TO %e \n", elliptic->name.c_str(), rdotr, tol);
+    printf("%s: initial res norm %.15e target %e \n", elliptic->name.c_str(), rdotr, tol);
   }
 
   int iter = 0;
@@ -281,7 +281,7 @@ static int combinedPCG(elliptic_t *elliptic,
 
   if (platform->comm.mpiRank == 0 && verbose) {
     printf("PCGC ");
-    printf("%s: initial res norm %.15e WE NEED TO GET TO %e \n", elliptic->name.c_str(), rdotr, tol);
+    printf("%s: initial res norm %.15e target %e \n", elliptic->name.c_str(), rdotr, tol);
   }
 
   constexpr int nRed = CombinedPCGId::nReduction;

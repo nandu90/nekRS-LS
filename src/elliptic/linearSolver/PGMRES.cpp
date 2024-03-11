@@ -88,7 +88,7 @@ int pgmres(elliptic_t *elliptic,
     } else {
       printf("PGMRES ");
     }
-    printf("%s: initial res norm %.15e WE NEED TO GET TO %e \n", elliptic->name.c_str(), rdotr, tol);
+    printf("%s: initial res norm %.15e target %e \n", elliptic->name.c_str(), rdotr, tol);
   }
 
   auto update = [&](int gmresUpdateSize)
