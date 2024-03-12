@@ -146,8 +146,8 @@ occa::kernel benchmarkAdvsub(int Nfields,
   }
 
   const std::string ext = (platform->device.mode() == "Serial" && dealias) ? ".c" : ".okl";
-  const std::string kernelName = std::string("subCycleStrong") + ((dealias) ? "Cubature" : "") + std::string("VolumeHex3D");
-  const std::string fileName = oklpath + ((isScalar) ? "/nrs/cds/" : "/nrs/") +  kernelName + ext;
+  const std::string kernelName = std::string("subCycleStrong") + (dealias ? "Cubature" : "") + std::string("VolumeHex3D");
+  const std::string fileName = oklpath + (isScalar ? "/nrs/cds/" : "/nrs/") +  kernelName + ext;
 
   std::vector<int> kernelVariants = {0};
   if (!platform->serial && dealias) {
@@ -177,18 +177,19 @@ occa::kernel benchmarkAdvsub(int Nfields,
     }
   }
 
-  auto buildKernel = [&props, &fileName, &kernelName](int ver)
+  auto buildKernel = [&props, &fileName, &kernelName, &isScalar](int ver)
   {
     auto newProps = props;
     newProps["defines/p_knl"] = ver;
     const auto verSuffix = "_v" + std::to_string(ver);
 
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
-      const auto reqName = "fdm::" + std::string(newProps.hash().getString());
+      const auto reqName = std::string(fileName) + "::" + std::string(newProps.hash().getString());
       platform->kernelRequests.add(reqName, fileName, newProps);
       return occa::kernel();
     } else {
-      return platform->device.loadKernel(fileName, kernelName + verSuffix, newProps);
+      auto knl = platform->device.loadKernel(fileName, kernelName + verSuffix, newProps);
+      return knl;
     }
   };
 
@@ -226,10 +227,9 @@ occa::kernel benchmarkAdvsub(int Nfields,
   auto buildKernel2 = [&props, &oklpath](const std::string& _fileName)
   {
     const auto fileName = oklpath + _fileName;
-    auto newProps = props;
 
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
-      const auto reqName = std::string(fs::path(fileName).filename()) + "::" + std::string(newProps.hash().getString());
+      const auto reqName = std::string(fs::path(fileName).filename()) + "::" + std::string(props.hash().getString());
       platform->kernelRequests.add(reqName, fileName, props);
       return occa::kernel();
     } else {

@@ -1216,7 +1216,7 @@ void nrs_t::finalize()
   if (this->pSolver) {
     delete this->pSolver;
   }
-  for (int is; is < this->Nscalar; is++) {
+  for (int is = 0; is < this->Nscalar; is++) {
     if (this->cds->solver[is]) {
       delete this->cds->solver[is];
     }

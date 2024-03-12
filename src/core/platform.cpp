@@ -56,6 +56,11 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
     std::cout << "ENABLE GS COMM OVERLAP disabled\n\n";
   }
 
+  buildOnly = false;
+  if (options.compareArgs("BUILD ONLY", "TRUE")) {
+   buildOnly = true; 
+  }
+
   exitValue = 0;
 
   // only relevant for SERIAL backend

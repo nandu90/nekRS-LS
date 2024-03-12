@@ -150,6 +150,12 @@ occa::kernel device_t::wrapperLoadKernel(const std::string &fileName,
   props["build/compile_only"] = false;
   auto knl = _device.buildKernel(fileName, kernelName, this->adjustKernelProps(fileName, props));
 
+  nekrsCheck(!knl.isInitialized(),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "Cannot load kernel <%s>\n",
+             kernelName.c_str());
+
 #if  0
   // restore
   if (platform->cacheBcast) {
@@ -231,15 +237,8 @@ occa::kernel device_t::buildKernel(const std::string &fileName,
   }
 
   this->compileKernel(fileName, props, suffix, comm);
-  auto knl = this->loadKernel(fileName, kernelName, props, suffix);
+  return this->loadKernel(fileName, kernelName, props, suffix);
 
-  nekrsCheck(!knl.isInitialized(),
-             comm,
-             EXIT_FAILURE,
-             "Cannot load kernel %s\n",
-             knl.name().c_str());
-
-  return knl;
 }
 
 occa::kernel device_t::buildKernel(const std::string &fileName,

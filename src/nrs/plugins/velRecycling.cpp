@@ -65,27 +65,21 @@ static void _setup(occa::memory &o_wrk_, const int bID_, const dfloat wbar_)
 
 void velRecycling::buildKernel(occa::properties kernelInfo)
 {
-  static bool isInitialized = false;
-  if (isInitialized) {
-    return;
-  }
-  isInitialized = true;
-
-  const std::string path = getenv("NEKRS_KERNEL_DIR") + std::string("/nrs/plugins/");
-
-  std::string fileName, kernelName;
-  const std::string extension = ".okl";
+  auto buildKernel = [&kernelInfo](const std::string& kernelName)
   {
-    kernelName = "setBCVectorValue";
-    fileName = path + kernelName + extension;
-    setBCVectorValueKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
+    const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/nrs/plugins/");
+    const auto fileName = path + "velRecycling.okl";
+    if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
+      const auto reqName = "velRecycling::";
+      platform->kernelRequests.add(reqName, fileName, kernelInfo);
+      return occa::kernel();
+    } else {
+      return platform->device.loadKernel(fileName, kernelName, kernelInfo);
+    }
+  };
 
-    kernelName = "velRecyclingMaskCopy";
-    fileName = path + kernelName + extension;
-    maskCopyKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
-  }
-
-  buildKernelCalled = true;
+  setBCVectorValueKernel = buildKernel("setBCVectorValue");
+  maskCopyKernel = buildKernel("velRecyclingMaskCopy");
 }
 
 void velRecycling::copy()

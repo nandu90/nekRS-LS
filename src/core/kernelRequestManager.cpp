@@ -140,7 +140,7 @@ void kernelRequestManager_t::compile()
                                platform->cacheLocal ? platformRef.comm.mpiCommLocalSize : platformRef.comm.mpiCommSize
                              );
 
-  if (platformRef.comm.mpiRank == 0 && platform->verbose) {
+  if (platformRef.comm.mpiRank == 0 && (platform->verbose || platform->buildOnly)) {
     std::cout << "requests.size(): " << kernels.size() << std::endl;
   }
 
@@ -150,8 +150,8 @@ void kernelRequestManager_t::compile()
       const int reqId = distance(kernels.begin(), kernels.find(req));
       if (reqId % ranksCompiling == rank) {
         if (!requestToKernelMap[req.requestName].isInitialized()) {
-          if (platform->verbose) {
-            std::cerr << "Compiling request <" << req.requestName << "> on rank " << rank << std::endl;
+          if (platform->verbose || platform->buildOnly) {
+            std::cout << "Compiling request <" << req.requestName << "> on rank " << rank << std::endl;
           }
           device.compileKernel(req.fileName, req.props, req.suffix, MPI_COMM_SELF);
         }

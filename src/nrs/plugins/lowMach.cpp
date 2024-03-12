@@ -33,28 +33,23 @@ static bool setupCalled = false;
 
 void lowMach::buildKernel(occa::properties kernelInfo)
 {
-  static bool isInitialized = false;
-  if (isInitialized) {
-    return;
-  }
-  isInitialized = true;
+  auto buildKernel = [&kernelInfo](const std::string& kernelName)
+  { 
+    const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/nrs/plugins/");
+    const auto fileName = path + "lowMach.okl";
+    if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
+      const auto reqName = "lowMach::";
+      platform->kernelRequests.add(reqName, fileName, kernelInfo);
+      return occa::kernel();
+    } else { 
+      return platform->device.loadKernel(fileName, kernelName, kernelInfo);
+    }
+  };
 
-  int rank = platform->comm.mpiRank;
-  const std::string path = getenv("NEKRS_KERNEL_DIR") + std::string("/nrs/plugins/");
-  std::string kernelName, fileName;
-  const std::string extension = ".okl";
-  {
-    kernelName = "qtlHex3D";
-    fileName = path + kernelName + extension;
-    qtlKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
-
-    kernelName = "p0thHelper";
-    fileName = path + kernelName + extension;
-    p0thHelperKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
-  }
+  buildKernel("qtlHex3D");
+  buildKernel("p0thHelper");
 
   platform->options.setArgs("LOWMACH", "TRUE");
-  buildKernelCalled = true;
 }
 
 void lowMach::setup(dfloat alpha_, const occa::memory& o_beta_, const occa::memory& o_kappa_)

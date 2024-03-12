@@ -114,36 +114,30 @@ void RANSktau::buildKernel(occa::properties _kernelInfo)
 
   kernelInfo += _kernelInfo;
 
-  int rank = platform->comm.mpiRank;
-  const std::string oklpath = getenv("NEKRS_KERNEL_DIR");
-  const std::string path = oklpath + "/nrs/plugins/";
-  std::string fileName, kernelName;
-  const std::string extension = ".okl";
-  {
-    kernelName = "RANSktauComputeHex3D";
-    fileName = path + kernelName + extension;
-    computeKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
+  auto buildKernel = [&kernelInfo](const std::string& kernelName)
+  { 
+    const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/nrs/plugins/");
+    const auto fileName = path + "RANSktau.okl";
+    if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
+      const auto reqName = "RANSktau::";
+      platform->kernelRequests.add(reqName, fileName, kernelInfo);
+      return occa::kernel();
+    } else { 
+      buildKernelCalled = 1;
+      return platform->device.loadKernel(fileName, kernelName, kernelInfo);
+    }
+  };
 
-    kernelName = "mue";
-    fileName = path + kernelName + extension;
-    mueKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
-
-    kernelName = "limit";
-    fileName = path + kernelName + extension;
-    limitKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
-
-    kernelName = "SijMag2OiOjSk";
-    fileName = path + kernelName + extension;
-    SijMag2OiOjSkKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
-  }
+  buildKernel("RANSktauComputeHex3D");
+  buildKernel("mue");
+  buildKernel("limit");
+  buildKernel("SijMag2OiOjSk");
 
   int Nscalar;
   platform->options.getArgs("NUMBER OF SCALARS", Nscalar);
 
   nekrsCheck(Nscalar < 2, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Nscalar needs to be >= 2!");
   platform->options.setArgs("VELOCITY STRESSFORMULATION", "TRUE");
-
-  buildKernelCalled = true;
 }
 
 void RANSktau::updateProperties()

@@ -69,7 +69,6 @@ private:
   occa::memory& o_rtmp;
   occa::memory& o_Ap;
 
-  occa::kernel scalarMultiplyKernel;
   occa::kernel multiScaledAddwOffsetKernel;
   occa::kernel accumulateKernel;
 

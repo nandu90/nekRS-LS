@@ -78,33 +78,24 @@ static void E4(dlong N,
 
 void tavg::buildKernel(occa::properties kernelInfo)
 {
-  static bool isInitialized = false;
-  if (isInitialized) {
-    return;
-  }
-  isInitialized = true;
-
-  const std::string path = getenv("NEKRS_KERNEL_DIR") + std::string("/plugins/");
-  std::string kernelName, fileName;
-  const std::string extension = ".okl";
+  auto buildKernel = [&kernelInfo](const std::string& kernelName)
   {
-    kernelName = "EX";
-    fileName = path + kernelName + extension;
-    EXKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
+    const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/plugins/");
+    const auto fileName = path + "E.okl";
+    if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
+      const auto reqName = "tavg::";
+      platform->kernelRequests.add(reqName, fileName, kernelInfo);
+      return occa::kernel();
+    } else {
+      buildKernelCalled = 1;
+      return platform->device.loadKernel(fileName, kernelName, kernelInfo);
+    }
+  };
 
-    kernelName = "EXY";
-    fileName = path + kernelName + extension;
-    EXYKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
-
-    kernelName = "EXYZ";
-    fileName = path + kernelName + extension;
-    EXYZKernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
-
-    kernelName = "E4";
-    fileName = path + kernelName + extension;
-    E4Kernel = platform->device.buildKernel(fileName, kernelInfo, platform->comm.mpiComm);
-  }
-  buildKernelCalled = true;
+  EXKernel = buildKernel("EX");
+  EXYKernel = buildKernel("EXY");
+  EXYZKernel = buildKernel("EXYZ");
+  E4Kernel = buildKernel("E4");
 }
 
 void tavg::reset()

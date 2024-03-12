@@ -102,7 +102,7 @@ occa::kernel benchmarkFDM(int Nelements,
       const auto verSuffix = "_v" + std::to_string(ver);
 
       if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
-        const auto reqName = "fdm::" + std::string(newProps.hash().getString());
+        const auto reqName = std::string(fileName) + "::" + std::string(newProps.hash().getString());
         platform->kernelRequests.add(reqName, fileName + ext, newProps, suffix);
         return occa::kernel();
       } else {

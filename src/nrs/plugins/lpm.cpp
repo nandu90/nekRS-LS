@@ -1935,7 +1935,7 @@ void lpm_t::registerKernels(occa::properties &kernelInfo)
   const std::string oklpath(getenv("NEKRS_KERNEL_DIR"));
 
   kernelName = "remapParticles";
-  fileName = oklpath + "/nrs/plugins/" + kernelName + ".okl";
+  fileName = oklpath + "/nrs/plugins/" + "lpm.okl";
   platform->kernelRequests.add(kernelName, fileName, kernelInfo);
 }
 

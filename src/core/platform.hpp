@@ -56,6 +56,7 @@ public:
   int verbose;
   bool cacheLocal;
   bool cacheBcast;
+  bool buildOnly;
 
   occa::kernel copyDfloatToPfloatKernel;
   occa::kernel copyPfloatToDfloatKernel;

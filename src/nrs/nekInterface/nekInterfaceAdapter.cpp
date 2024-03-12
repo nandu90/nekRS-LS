@@ -666,7 +666,7 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
         const std::string case_dir(fs::current_path());
         const std::string include_dirs = "./ " + case_dir + " " + installDir + "/include/nrs/bdry";
         const std::string nekInterface_dir = installDir + "/nekInterface";
-        std::string make_args = "-j8 ";
+        std::string make_args = "-j4 ";
         std::string out_args = std::string(">" + makeOutput + " 2>&1");
         if (!verbose) {
           make_args += "-s ";

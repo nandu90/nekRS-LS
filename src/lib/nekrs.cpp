@@ -204,7 +204,7 @@ void setup(MPI_Comm commg_in,
     nekrsCheck(size > nelgv, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "MPI tasks > number of elements!");
   }
 
-  if (platform->verbose) {
+  if (debug) {
     setenv("PARRSB_VERBOSE_LEVEL","3",1);
   }
 
@@ -242,7 +242,7 @@ void setup(MPI_Comm commg_in,
   auto loadComponents = [](bool registerOnly) 
   {
     platform->options.setArgs("REGISTER ONLY", (registerOnly) ? "TRUE" : "FALSE");
-    auto props = registerUDFKernels();  // compile + load plugin kernels
+    auto props = registerUDFKernels();
     static occa::properties kernelInfoUDF;
     if (registerOnly) kernelInfoUDF = props;
 
