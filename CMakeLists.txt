@@ -298,10 +298,10 @@ include(cmake/nek5000.cmake)
 include(cmake/nekrs.cmake)
 
 # Link dependencies
-target_link_libraries(nekrs-lib PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs ${GSLIB} blas lapack std::filesystem ${CMAKE_DL_LIBS})
+target_link_libraries(nekrs-lib PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs blas lapack std::filesystem ${CMAKE_DL_LIBS})
 target_include_directories(nekrs-lib PRIVATE ${CMAKE_BINARY_DIR})
 if (NEKRS_BUILD_FLOAT)
-  target_link_libraries(nekrs-lib-fp32 PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs ${GSLIB} blas lapack std::filesystem ${CMAKE_DL_LIBS})
+  target_link_libraries(nekrs-lib-fp32 PUBLIC libocca PRIVATE nekrs-hypre nekrs-hypre-device gs blas lapack std::filesystem ${CMAKE_DL_LIBS})
   target_include_directories(nekrs-lib-fp32 PRIVATE ${CMAKE_BINARY_DIR})
 endif()
 

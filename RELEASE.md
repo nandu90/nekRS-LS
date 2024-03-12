@@ -38,6 +38,7 @@
 * use `nekrs_registerPtr` instead of common blocks NRSSCPTR / SCNRS in usr file and access them using `nek::ptr` in udf
 * use `deviceKernel`, `deviceKernelProperties`, `deviceMemory`, `poolDeviceMemory` instead of `occa::` (consult examples for more details) 
 * remove `nrs_t` argument from `<plugin>::setup`
+* use pay key `avm highestModalDecay` instead of `avm+hpfResidual`
 
 We understand that this release includes several breaking changes. These were necessary steps to improve the stability of the user interface going forward. We apologize for any inconvenience caused.
 
