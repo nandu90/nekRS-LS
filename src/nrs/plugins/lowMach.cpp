@@ -41,7 +41,8 @@ void lowMach::buildKernel(occa::properties kernelInfo)
       const auto reqName = "lowMach::";
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
-    } else { 
+    } else {
+      buildKernelCalled = 1; 
       return platform->device.loadKernel(fileName, kernelName, kernelInfo);
     }
   };

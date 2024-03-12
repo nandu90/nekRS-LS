@@ -74,6 +74,7 @@ void velRecycling::buildKernel(occa::properties kernelInfo)
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
     } else {
+      buildKernelCalled = 1;
       return platform->device.loadKernel(fileName, kernelName, kernelInfo);
     }
   };
