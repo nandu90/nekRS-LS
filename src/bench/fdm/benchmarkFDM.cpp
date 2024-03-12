@@ -106,7 +106,7 @@ occa::kernel benchmarkFDM(int Nelements,
         platform->kernelRequests.add(reqName, fileName + ext, newProps, suffix);
         return occa::kernel();
       } else {
-        return platform->device.buildKernel(fileName + ext, kernelName + verSuffix, newProps, suffix, MPI_COMM_SELF);
+        return platform->device.loadKernel(fileName + ext, kernelName + verSuffix, newProps, suffix);
       }
     };
 

@@ -46,7 +46,8 @@ namespace occa {
 
       modeKernel_t* buildLauncherKernel(const std::string &filename,
                                         const std::string &kernelName,
-                                        const hash_t kernelHash);
+                                        const hash_t kernelHash,
+                                        const occa::json& kernelProps = occa::json());
 
       modeKernel_t* buildKernel(const std::string &filename,
                                 const std::string &kernelName,

@@ -123,6 +123,9 @@ namespace occa
                     binaryFilename,
                     kernelProps);
 
+      const bool compile_only = kernelProps.get("build/compile_only",false);
+      if (compile_only) return nullptr;
+      
       if (usingOkl)
       {
         return buildOKLKernelFromBinary(kernelHash,
@@ -250,7 +253,8 @@ namespace occa
       k.launcherKernel = buildLauncherKernel(kernelHash,
                                              hashDir,
                                              kernelName,
-                                             launcherMetadata);
+                                             launcherMetadata,
+                                             kernelProps);
       // Find device kernels
       orderedKernelMetadata launchedKernelsMetadata = getLaunchedKernelsMetadata(
           kernelName,

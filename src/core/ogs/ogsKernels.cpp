@@ -177,7 +177,7 @@ void ogs::initKernels()
       platform->kernelRequests.add(reqName, fileName, props); 
       return occa::kernel();
     } else {
-      return platform->device.buildKernel(fileName, kernelName, props, MPI_COMM_SELF);
+      return platform->device.loadKernel(fileName, kernelName, props);
     }
   };
 

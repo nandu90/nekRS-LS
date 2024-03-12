@@ -188,7 +188,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
       platform->kernelRequests.add(reqName, fileName, newProps);
       return occa::kernel();
     } else {
-      return platform->device.buildKernel(fileName, kernelName + verSuffix, newProps, MPI_COMM_SELF);
+      return platform->device.loadKernel(fileName, kernelName + verSuffix, newProps);
     }
   };
 
@@ -233,7 +233,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
       platform->kernelRequests.add(reqName, fileName, props);
       return occa::kernel();
     } else {
-      return platform->device.buildKernel(fileName, props, MPI_COMM_SELF);
+      return platform->device.loadKernel(fileName, props);
     }
   };
 

@@ -111,21 +111,54 @@ occa::properties device_t::adjustKernelProps(const std::string& fileName, const 
 }
 
 
-std::string device_t::wrapperCompileKernel(const std::string &fileName,
-                                           const occa::properties &props,
-                                           const std::string &suffix) const
+void device_t::wrapperCompileKernel(const std::string &fileName,
+                                    const occa::properties &props_,
+                                    const std::string &suffix) const
 {
-  return _device.compileSource(fileName, this->adjustKernelProps(fileName, props));
+  if(!_compilationEnabled) {
+    nekrsAbort(MPI_COMM_SELF,
+               EXIT_FAILURE,
+               "%s",
+               "illegal call detected after 'finish' declaration\n");
+  }
+
+  auto props = props_;
+  props["build/compile_only"] = true;
+  props["build/load_only"] = false;
+
+  _device.buildKernel(fileName, "" /* dummy */, this->adjustKernelProps(fileName, props));
 }
 
 occa::kernel device_t::wrapperLoadKernel(const std::string &fileName,
-                                         const std::string &kernelName) const
+                                         const std::string &kernelName,
+                                         const occa::properties &props_,
+                                         const std::string &suffix) const
 {
-  nekrsAbort(MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "%s",
-             "not implemented yet\n");
-  return occa::kernel();
+#if 0
+  const std::string cacheDir0 = occa::env::OCCA_CACHE_DIR;
+
+  // redirect
+  if (platform->cacheBcast) {
+    const std::string cacheDir = platform->tmpDir / fs::path("occa/");
+    occa::env::OCCA_CACHE_DIR = cacheDir;
+    setenv("OCCA_CACHE_DIR", cacheDir.c_str(), 1);
+  }
+#endif
+
+  auto props = props_;
+  props["build/load_only"] = true;
+  props["build/compile_only"] = false;
+  auto knl = _device.buildKernel(fileName, kernelName, this->adjustKernelProps(fileName, props));
+
+#if  0
+  // restore
+  if (platform->cacheBcast) {
+    occa::env::OCCA_CACHE_DIR = cacheDir0;
+    setenv("OCCA_CACHE_DIR", cacheDir0.c_str(), 1);
+  }
+#endif
+
+  return knl;
 }
 
 occa::kernel device_t::wrapperBuildKernel(const std::string &fileName,
@@ -133,20 +166,22 @@ occa::kernel device_t::wrapperBuildKernel(const std::string &fileName,
                                           const occa::properties &props,
                                           const std::string &suffix) const
 {
-  return _device.buildKernel(fileName, kernelName, this->adjustKernelProps(fileName, props));
+  wrapperCompileKernel(fileName, props, suffix);
+  return wrapperLoadKernel(fileName, kernelName, props, suffix);
 }
 
-occa::kernel device_t::wrapperBuildKernel(const std::string &fullPath,
+occa::kernel device_t::wrapperBuildKernel(const std::string &fileName,
                                           const occa::properties &props,
                                           const std::string &suffix) const
 {
-  return this->wrapperBuildKernel(fullPath, extractKernelName(fullPath), props, suffix);
+  wrapperCompileKernel(fileName, props, suffix);
+  return wrapperLoadKernel(fileName, extractKernelName(fileName), props, suffix);
 }
 
-std::string device_t::compileKernel(const std::string &fileName,
-                                    const occa::properties &props,
-                                    const std::string &suffix,
-                                    const MPI_Comm &commIn) const
+void device_t::compileKernel(const std::string &fileName,
+                             const occa::properties &props,
+                             const std::string &suffix,
+                             const MPI_Comm &commIn) const
 {
   const auto collective = [&commIn]() 
   {
@@ -161,28 +196,25 @@ std::string device_t::compileKernel(const std::string &fileName,
     if (platform->cacheBcast) comm = _comm.mpiComm; 
   }
 
-  int rank;
-  MPI_Comm_rank(comm, &rank); 
- 
-  auto binaryFileName = (rank == 0) ? this->wrapperCompileKernel(fileName, props, suffix) : std::string(); 
+  const auto buildRank = [&comm]()
+  { 
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+    return (rank == 0) ? true : false; 
+  }();
 
-  if (collective) {
-    MPI_Barrier(comm); // finish compilation
-    auto dstPath = fs::path(occa::env::OCCA_CACHE_DIR) / fs::path("cache/");
-
-    if (platform->cacheBcast) {
-      dstPath = fs::path(platform->tmpDir) / fs::path("occa/");
-      fileBcast(fs::path(binaryFileName).parent_path(), dstPath, comm, platform->verbose);
-    }
-
-    const std::string path = dstPath / fs::path(binaryFileName).parent_path();
-    char tmp[PATH_MAX] = {0};
-    path.copy(tmp, path.size());
-    MPI_Bcast(tmp, path.size(), MPI_CHAR, 0, comm);
-    binaryFileName = std::string(tmp);
+  if (buildRank) { 
+    this->wrapperCompileKernel(fileName, props, suffix); 
   }
+  MPI_Barrier(comm); // finish compilation
 
-  return binaryFileName;
+#if 0
+  const std::string binaryFileName = ...;
+  if (collective && platform->cacheBcast) {
+    auto dstPath = fs::path(platform->tmpDir) / fs::path("occa/");
+    fileBcast(fs::path(binaryFileName).parent_path(), dstPath, comm, platform->verbose);
+  }
+#endif
 }
 
 occa::kernel device_t::buildKernel(const std::string &fileName,
@@ -198,8 +230,8 @@ occa::kernel device_t::buildKernel(const std::string &fileName,
                "illegal call during REGISTER ONLY mode\n");
   }
 
-  compileKernel(fileName, props, suffix, comm);
-  auto knl = this->wrapperBuildKernel(fileName, kernelName, props, suffix);
+  this->compileKernel(fileName, props, suffix, comm);
+  auto knl = this->loadKernel(fileName, kernelName, props, suffix);
 
   nekrsCheck(!knl.isInitialized(),
              comm,
@@ -234,11 +266,21 @@ occa::kernel device_t::buildKernel(const std::string &fullPath,
 }
 
 
-occa::kernel device_t::loadKernel(const std::string &fullPath,
-                                  const std::string &kernelName) const
+occa::kernel device_t::loadKernel(const std::string &fileName,
+                                  const std::string &kernelName, 
+                                  const occa::properties &props,
+                                  const std::string &suffix) const
 {
-  return this->wrapperLoadKernel(fullPath, kernelName);
+  return this->wrapperLoadKernel(fileName, kernelName, props, suffix);
 }
+
+occa::kernel device_t::loadKernel(const std::string &fileName,
+                                  const occa::properties &props,
+                                  const std::string &suffix) const
+{
+  return this->wrapperLoadKernel(fileName, extractKernelName(fileName), props, suffix);
+}
+
 
 occa::memory device_t::mallocHost(size_t Nbytes)
 {
@@ -368,6 +410,7 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
     setenv("OCCA_CXXFLAGS", buf.c_str(), 1);
   }
 
+  _compilationEnabled = true;
   _device_id = device_id;
 
   deviceAtomic = atomicsAvailable(*this, _comm.mpiComm);

@@ -197,6 +197,9 @@ namespace occa {
       opencl::saveProgramBinary(clInfo,
                                 binaryFilename);
 
+      const bool compile_only = kernelProps.get("build/compile_only",false);
+      if (compile_only) return nullptr;
+
       if (usingOkl) {
         return buildOKLKernelFromBinary(clInfo,
                                         kernelHash,
@@ -272,7 +275,8 @@ namespace occa {
       k.launcherKernel = buildLauncherKernel(kernelHash,
                                              hashDir,
                                              kernelName,
-                                             launcherMetadata);
+                                             launcherMetadata,
+                                             kernelProps);
       if (!k.launcherKernel) {
         delete &k;
         return NULL;

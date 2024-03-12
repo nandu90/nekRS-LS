@@ -24,7 +24,9 @@
 namespace {
 
 int worldRank;
-volatile sig_atomic_t processUpdFile = 0;
+volatile sig_atomic_t sig_processUpdFile = 0;
+
+volatile sig_atomic_t sig_writeStackTrace = 0;
 
 struct cmdOptions
 {
@@ -347,23 +349,27 @@ MPI_Comm setupSession(cmdOptions *cmdOpt, const MPI_Comm &comm)
   return newComm;
 }
 
+void writeStackTraceToFile()
+{
+  std::cerr << "generating stacktrace ...\n";
+  const std::string fileName = "stacktrace." + std::to_string(worldRank);
+  FILE *fp;
+  fp = fopen (fileName.c_str(), "w");
+  print_stacktrace(fp);
+  fclose(fp);
+  sig_writeStackTrace = 0;
+}
+
 void signalHandlerBacktrace(int signum) 
 {
-   { // needs to be refactored as this is not async-signal-safe
-     std::cerr << "generating stacktrace ...\n";
-
-     const std::string fileName = "stacktrace." + std::to_string(worldRank);
-
-     FILE *fp;
-     fp = fopen (fileName.c_str(), "w");
-     print_stacktrace(fp);
-     fclose(fp);
-   }
+   // not async-safe but may be we're lucky
+   sig_writeStackTrace = 1;
+   writeStackTraceToFile();
 }
 
 void signalHandlerUpdateFile(int signum) 
 {
-  processUpdFile = 1;
+  sig_processUpdFile = 1;
 }
 
 } // namespace

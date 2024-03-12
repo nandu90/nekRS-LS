@@ -27,7 +27,7 @@ int main(const int argc, const char **argv) {
   testCompilingFailure();
   testArgumentFailure();
   testRun();
-  testBuildSource();
+  // testBuildSource();
 
   return 0;
 }

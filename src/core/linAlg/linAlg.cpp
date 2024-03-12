@@ -125,7 +125,7 @@ linAlg_t::linAlg_t()
   comm = platform->comm.mpiComm;
   timer = 0;
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank == 0 && platform->verbose) {
     std::cout << "initializing linAlg ...\n";
   }
 

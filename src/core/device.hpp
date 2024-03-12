@@ -76,18 +76,26 @@ public:
                            const occa::properties &props,
                            const MPI_Comm& comm) const;
 
-  std::string compileKernel(const std::string &fullPath,
-                            const occa::properties &props,
-                            const std::string &suffix, 
-                            const MPI_Comm& comm) const;
+  void compileKernel(const std::string &fullPath,
+                     const occa::properties &props,
+                     const std::string &suffix, 
+                     const MPI_Comm& comm) const;
 
-  occa::kernel loadKernel(const std::string &fullPath,
-                          const std::string &kernelName) const;
+  occa::kernel loadKernel(const std::string &fileName,
+                          const occa::properties &props,
+                          const std::string &suffix = "") const;
+
+  occa::kernel loadKernel(const std::string &fileName,
+                          const std::string &kernelName,
+                          const occa::properties &props,
+                          const std::string &suffix = "") const;
 
   occa::properties adjustKernelProps(const std::string& fileName, 
                                      const occa::properties& props) const;
 
   bool deviceAtomic;
+
+  void compilationFinished(){ _compilationEnabled = true; };
 
   size_t memoryUsage();
 
@@ -102,15 +110,18 @@ private:
                                   const occa::properties &props,
                                   const std::string &suffix) const;
 
-  std::string wrapperCompileKernel(const std::string &fileName,
-                                   const occa::properties &props_,
-                                   const std::string &suffix) const;
+  void wrapperCompileKernel(const std::string &fileName,
+                            const occa::properties &props_,
+                            const std::string &suffix) const;
 
   occa::kernel wrapperLoadKernel(const std::string &fileName,
-                                 const std::string &kernelName) const;
+                                 const std::string &kernelName,
+                                 const occa::properties &props_,
+                                 const std::string &suffix) const;
 
   comm_t &_comm;
   occa::device _device;
   int _device_id;
+  bool _compilationEnabled;
 };
 #endif

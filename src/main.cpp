@@ -137,6 +137,15 @@ int main(int argc, char** argv)
     }
   }
 
+  auto abort = [&]()
+  {
+    if (cmdOpt->debug) {
+      throw;
+    } else {
+      MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
+  };
+
   try {
     { // change working dir
       const size_t last_slash = cmdOpt->setupFile.rfind('/') + 1;
@@ -230,11 +239,11 @@ int main(int argc, char** argv)
       time = nekrs::finishStep();
  
       {
-        int read = processUpdFile;
+        int read = sig_processUpdFile;
         MPI_Bcast(&read, 1, MPI_INT, 0, comm);
         if(read) {
           nekrs::processUpdFile();
-          processUpdFile = 0;
+          sig_processUpdFile = 0;
         }
       }
  
@@ -285,13 +294,30 @@ int main(int argc, char** argv)
       return EXIT_SUCCESS;
 
   }
-  catch(const std::exception& ex)
+  catch (const std::overflow_error& e)
   {
-    std::cerr << ex.what() << std::endl;
-    if (cmdOpt->debug) {
-      throw;
-    } else {
-      MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-    }
+    std::cerr << e.what() << std::endl;
+    abort();
   }
+  catch (const std::underflow_error& e)
+  {
+    std::cerr << e.what() << std::endl;
+    abort();
+  }
+  catch (const std::runtime_error& e)
+  {
+    std::cerr << e.what() << std::endl;
+    abort();
+  }
+  catch (const std::exception& e)
+  {
+    std::cerr << e.what() << std::endl;
+    abort();
+  }
+  catch (...)
+  {
+    std::cerr << "unknown exception thrown!" << std::endl;
+    abort();
+  }
+
 }

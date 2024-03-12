@@ -396,24 +396,11 @@ namespace occa {
     if (cachedKernel.isInitialized()) {
       cachedKernel.modeKernel->hash = kernelHash;
     } else {
-      sys::rmrf(hashDir);
+      const bool compile_only = allProps.get("build/compile_only", false);
+      if (!compile_only) sys::rmrf(hashDir);
     }
 
     return cachedKernel;
-  }
-
-  std::string device::compileSource(const std::string& fileName, 
-                                    const occa::json& properties) const {
-    const std::string realFileName = io::findInPaths(fileName, env::OCCA_KERNEL_PATH);
-    
-    occa::json allProps;
-    hash_t kernelHash;
-    setupKernelInfo(properties, hashFile(realFileName),allProps, kernelHash);
-
-    allProps["hash"] = kernelHash.getFullString();
-
-    modeDevice->buildSource(realFileName, kernelHash, allProps);
-    return io::hashDir(kernelHash);
   }
 
   kernel device::buildKernelFromString(const std::string &content,

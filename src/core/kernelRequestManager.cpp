@@ -86,7 +86,7 @@ occa::kernel kernelRequestManager_t::load(const std::string& requestName, const 
     } else {
       const auto& req = requestNameToRequestMap.find(requestName)->second;
  
-      knl = platformRef.device.buildKernel(req.fileName, kernelName, req.props, MPI_COMM_SELF);
+      knl = platformRef.device.loadKernel(req.fileName, kernelName, req.props);
       requestToKernelMap.at(requestName) = knl;
     }
     nekrsCheck(!knl.isInitialized(),
@@ -161,9 +161,16 @@ void kernelRequestManager_t::compile()
 
   MPI_Barrier(platform->comm.mpiComm); // finish compilation
 
+  // after this point it is illegal to compile kernels
+  platform->device.compilationFinished();
+
   if (platform->cacheBcast) {
     const auto srcPath = fs::path(getenv("OCCA_CACHE_DIR"));
-    const auto dstPath = platform->tmpDir / fs::path("occa/") / "..";
-    fileBcast(srcPath, dstPath, platform->comm.mpiComm, platform->verbose);
+    const std::string cacheDir = platform->tmpDir / fs::path("occa/"); 
+    fileBcast(srcPath, fs::path(cacheDir) / "..", platform->comm.mpiComm, platform->verbose);
+  
+    // redirect
+    occa::env::OCCA_CACHE_DIR = cacheDir; 
+    setenv("OCCA_CACHE_DIR", cacheDir.c_str(), 1);
   }
 }

@@ -40,7 +40,8 @@ namespace occa {
     modeKernel_t* buildLauncherKernel(const hash_t kernelHash,
                                       const std::string &hashDir,
                                       const std::string &kernelName,
-                                      lang::sourceMetadata_t sourceMetadata);
+                                      lang::sourceMetadata_t sourceMetadata,
+                                      const occa::json& kernelProps);
 
     orderedKernelMetadata getLaunchedKernelsMetadata(
       const std::string &kernelName,

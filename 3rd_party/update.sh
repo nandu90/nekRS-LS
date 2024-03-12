@@ -5,16 +5,25 @@ git stash
 
 if [ "$1" == "nek" ]; then
 
-git rm -rf 3rd_party/nek5000 3rd_party/nek5000_parRSB 3rd_party/nek5000_gslib
-rm -rf 3rd_party/nek5000 3rd_party/nek5000_parRSB 3rd_party/nek5000_gslib
+git rm -rf 3rd_party/nek5000 3rd_party/nek5000_parRSB
+rm -rf 3rd_party/nek5000 3rd_party/nek5000_parRSB
 git commit -m 'remove nek'
 git subtree add --prefix 3rd_party/nek5000 https://github.com/Nek5000/nek5000.git master --squash
 git subtree add --prefix 3rd_party/nek5000_parRSB https://github.com/Nek5000/parRSB.git master --squash
-git subtree add --prefix 3rd_party/nek5000_gslib https://github.com/Nek5000/gslib.git master --squash
 rm -rf 3rd_party/nek5000/tools 3rd_party/nek5000/run 3rd_party/nek5000/examples 3rd_party/nek5000/short_tests
-git reset HEAD~4 --soft
+git reset HEAD~3 --soft
 git add -u
 git commit -m 'import latest nek'
+
+elif [ "$1" == "gslib" ]; then
+
+git rm 3rd_party/gslib
+rm -rf 3rd_party/gslib
+git commit -m 'remove gslib'
+git subtree add --prefix 3rd_party/gslib https://github.com/Nek5000/gslib.git master --squash
+git reset HEAD~2 --soft
+git add -u
+git commit -m 'import latest gslib'
 
 elif [ "$1" == "hypre" ]; then
 

@@ -5,7 +5,6 @@
 occa::properties registerUDFKernels()
 {
   const auto registerOnly = platform->options.compareArgs("REGISTER ONLY", "TRUE") ? true : false;
-  const bool buildNodeLocal = platform->cacheLocal;
 
   std::string installDir;
   installDir.assign(getenv("NEKRS_HOME"));
@@ -65,6 +64,6 @@ occa::kernel oudfBuildKernel(occa::properties kernelInfo, const std::string& ker
     platform->kernelRequests.add(reqName, fileName, kernelInfo);
     return occa::kernel();
   } else {
-    return platform->device.buildKernel(fileName, kernelName, kernelInfo, MPI_COMM_SELF);
+    return platform->device.loadKernel(fileName, kernelName, kernelInfo);
   }
 }

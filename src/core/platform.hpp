@@ -19,7 +19,7 @@ class flopCounter_t;
 struct platform_t {
 public:
   platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm);
-  void bcastJITSourceFiles();
+  void bcastJITKernelSourceFiles();
 
   static platform_t *getInstance(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   {

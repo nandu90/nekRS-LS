@@ -101,7 +101,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   flopCounter = std::make_unique<flopCounter_t>();
 
   tmpDir = "/";
-  if (cacheBcast || cacheLocal) {
+  if (cacheBcast) {
     if (getenv("NEKRS_LOCAL_TMP_DIR")) {
       tmpDir = getenv("NEKRS_LOCAL_TMP_DIR");
     } else {
@@ -195,8 +195,8 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   o_memPool.setAlignment(ALIGN_SIZE);
 }
 
-// kernel source is required to compute hash during JIT compilation
-void platform_t::bcastJITSourceFiles()
+// input files required for JIT kernel compilation or load 
+void platform_t::bcastJITKernelSourceFiles()
 {
   if (platform->verbose && comm.mpiRank == 0) {
     std::cout << "broadcast kernel sources to " << getenv("NEKRS_LOCAL_TMP_DIR") << std::endl; 
