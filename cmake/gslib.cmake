@@ -19,11 +19,8 @@ ExternalProject_Add(
         SOURCE_DIR ${GS_SOURCE_DIR}
         BUILD_IN_SOURCE on
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND 
-          ${CMAKE_CURRENT_LIST_DIR}/run_gs_install.sh
-          "CC=${CMAKE_C_COMPILER}"
-          "CFLAGS=-fPIC ${EXTERNAL_C_FLAGS}"
-        INSTALL_COMMAND ""
+        BUILD_COMMAND "" 
+        INSTALL_COMMAND cd ${GS_SOURCE_DIR} && $(MAKE) CC=${CMAKE_C_COMPILER} "CFLAGS=-fPIC ${EXTERNAL_C_FLAGS}" install
         USES_TERMINAL_BUILD on
 )
 
