@@ -147,10 +147,10 @@ MGSolver_t::~MGSolver_t() {
   if(coarseLevel) delete coarseLevel; 
 }
 
-void MGSolver_t::Run(occa::memory o_rhs, occa::memory o_x) 
+void MGSolver_t::Run(occa::memory o_rhsFine, occa::memory o_xFine) 
 {
-  levels[0]->o_x   = o_x;
-  levels[0]->o_rhs = o_rhs;
+  levels[0]->o_x   = o_xFine;
+  levels[0]->o_rhs = o_rhsFine;
 
   if(ctype == VCYCLE) {
     if(additive)
@@ -158,6 +158,9 @@ void MGSolver_t::Run(occa::memory o_rhs, occa::memory o_x)
     else
       runVcycle(0);
   }
+
+  levels[0]->o_x = nullptr;
+  levels[0]->o_rhs = nullptr;
 }
 
 void MGSolver_t::Report() {
@@ -167,25 +170,27 @@ void MGSolver_t::Report() {
 void MGSolver_t::runVcycle(int k)
 {
   MGSolver_t::multigridLevel *level = levels[k];
-  occa::memory o_rhs = level->o_rhs;
-  occa::memory o_x   = level->o_x;
-  occa::memory o_res = level->o_res;
+  auto& o_rhs = level->o_rhs;
+  auto& o_x   = level->o_x;
+  auto& o_res = level->o_res;
 
   if(k == baseLevel) {
+    // zero initialize o_x as we don't solve for masked points
+    platform->linAlg->pfill(o_x.size(), 0.0, o_x);
     coarseLevel->solvePtr(coarseLevel, o_rhs, o_x);
     return;
   }
 
   MGSolver_t::multigridLevel *levelC = levels[k+1];
-  occa::memory o_rhsC = levelC->o_rhs;
-  occa::memory o_xC   = levelC->o_x;
+  auto& o_rhsC = levelC->o_rhs;
+  auto& o_xC   = levelC->o_x;
 
   level->smooth(o_rhs, o_x, true);
   level->residual(o_rhs, o_x, o_res);
 
   levelC->coarsen(o_res, o_rhsC);
 
-  this->runVcycle(k+1);
+  this->runVcycle(k+1); // recursive call
 
   levelC->prolongate(o_xC, o_x);
 
