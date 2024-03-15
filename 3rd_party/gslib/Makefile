@@ -25,7 +25,7 @@ endif
 
 $(shell >config.h)
 ifneq (0,$(MPI))
-  SN=MPI
+  SN=GSLIB_USE_MPI
   G:=$(G) -D$(SN)
   ifeq ($(origin CC),default)
     CC = mpicc

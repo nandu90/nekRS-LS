@@ -114,7 +114,7 @@ static uint hash_count(struct hash_data *p,
   return count;
 }
 
-uint hash_opt_size(struct hash_data *p,
+static uint hash_opt_size(struct hash_data *p,
                           const struct obbox *const obb, const uint nel,
                           const uint max_size)
 {
