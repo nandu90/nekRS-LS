@@ -17,7 +17,7 @@ git commit -m 'import latest nek'
 
 elif [ "$1" == "gslib" ]; then
 
-git rm 3rd_party/gslib
+git rm -rf 3rd_party/gslib
 rm -rf 3rd_party/gslib
 git commit -m 'remove gslib'
 git subtree add --prefix 3rd_party/gslib https://github.com/Nek5000/gslib.git master --squash
