@@ -68,16 +68,19 @@ namespace occa {
 
     /*Remove this mem from the reservation list*/
     auto pos = reservations.find(mem);
+
     reservations.erase(pos);
 
     /*Find how much of this mem is removed from reserved space*/
     dim_t lo = (mem->offset / alignment) * alignment; //Round down to alignment
     dim_t hi = ((mem->offset + mem->size + alignment - 1)
                 / alignment) * alignment; //Round up
+
     for (modeMemory_t* m : reservations) {
       const dim_t mlo = (m->offset / alignment) * alignment;
       const dim_t mhi = ((m->offset + m->size + alignment - 1)
                         / alignment) * alignment;
+
       if (mlo >= hi) break;
       if (mhi <= lo) continue;
 
@@ -129,8 +132,8 @@ namespace occa {
     if (offset + bytes <= size) {
       return slice(offset, bytes);
     } else {
-      resize(reserved + alignedBytes);
-      return slice(reserved, bytes);
+      resize(offset + alignedBytes);
+      return slice(offset, bytes);
     }
   }
 
