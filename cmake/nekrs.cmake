@@ -152,8 +152,11 @@ if (NEKRS_BUILD_FLOAT)
 endif()
 
 set_target_properties(nekrs-lib PROPERTIES LINKER_LANGUAGE CXX OUTPUT_NAME nekrs)
+target_compile_definitions(nekrs-lib PRIVATE OMPI_SKIP_MPICXX=1 MPICH_SKIP_MPICXX=1)
+
 if (NEKRS_BUILD_FLOAT)
   set_target_properties(nekrs-lib-fp32 PROPERTIES LINKER_LANGUAGE CXX OUTPUT_NAME nekrs-fp32)
+  target_compile_definitions(nekrs-lib-fp32 PRIVATE OMPI_SKIP_MPICXX=1 MPICH_SKIP_MPICXX=1)
 endif()
 
 target_include_directories(nekrs-lib PUBLIC ${CMAKE_CURRENT_BINARY_DIR} ${NRS_INCLUDE}) 
@@ -162,8 +165,7 @@ if (NEKRS_BUILD_FLOAT)
 endif()
 
 if (NEKRS_BUILD_FLOAT)
-  target_compile_definitions(nekrs-lib-fp32 PUBLIC -DNEKRS_USE_DFLOAT_FLOAT)
-  target_compile_definitions(nekrs-lib-fp32 PUBLIC -DOGS_USE_DFLOAT_FLOAT)
+  target_compile_definitions(nekrs-lib-fp32 PUBLIC NEKRS_USE_DFLOAT_FLOAT)
 endif()
 
 add_executable(nekrs-bin src/main.cpp)

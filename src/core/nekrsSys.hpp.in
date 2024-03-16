@@ -55,9 +55,6 @@ using dlong = long long int;
 #define dlongString "long long int"
 #endif
 
-#define OMPI_SKIP_MPICXX 1
-#define MPICH_SKIP_MPICXX 1
-
 #include <mpi.h>
 #include <math.h>
 #ifdef _OPENMP
