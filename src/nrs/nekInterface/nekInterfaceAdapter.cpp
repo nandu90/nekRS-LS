@@ -204,7 +204,6 @@ void outfld(const char *filename,
   {
     int nxo = Nout + 1;
     int ifreg = uniform;
-#if 0
     auto nek_out_mask = ptr<int>("out_mask");
     for(int i = 0; i < nekData.lelt; i++) nek_out_mask[i] = 1; 
 
@@ -215,7 +214,7 @@ void outfld(const char *filename,
         nek_out_mask[entry] = 1;
       }
     }
-#endif
+
     (*nek_outfld_ptr)((char *)filename, 
                       &nxo,
                       &ifreg,           
@@ -227,12 +226,11 @@ void outfld(const char *filename,
                       ps.data(), 
                       &nps, 
                       strlen(filename));
-#if 0
-    // fitler reset
+
+    // filter reset
     for(int i = 0; i < nekData.lelt; i++) {
       nek_out_mask[i] = 1;
     } 
-#endif
   }
 
   (*nek_resetio_ptr)();

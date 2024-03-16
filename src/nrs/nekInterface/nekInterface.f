@@ -99,9 +99,7 @@ c-----------------------------------------------------------------------
       call nekrs_registerPtr('ifgett', ifgett)
       call nekrs_registerPtr('ifgets', ifgets)
 
-#if 0
       call nekrs_registerPtr('out_mask', out_mask)
-#endif
 
       call nekrs_registerPtr('cbc', cbc)
 
@@ -134,7 +132,6 @@ c-----------------------------------------------------------------------
       integer*8 vertex
 
       etimes = dnekclock_sync()
-
 
       call read_re2_hdr(ifbswap, .true.)
 
@@ -426,14 +423,10 @@ c-----------------------------------------------------------------------
       ifxyo = ifxyo_
       call mfo_write_hdr ! hdr + element mapping
 
-#if 0
       cnt = 0
       do iel = 1,nelt
         if(out_mask(iel).ne.0) cnt = cnt + 1
       enddo
-#else
-      cnt = nelt
-#endif
       cntg = iglsum(cnt, 1)
 
       nxyzo8  = nxo*nyo*nzo
