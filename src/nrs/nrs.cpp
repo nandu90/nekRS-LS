@@ -693,14 +693,34 @@ void nrs_t::init()
   }
   this->_mesh->update();
 
-  // in case the user sets IC in udf.setup
+  auto projC0 = [&](oogs_t *gsh, mesh_t *mesh, int nFields, dlong fieldOffset, occa::memory& o_in)
+  {
+    platform->linAlg->axmyMany(mesh->Nlocal, nFields, fieldOffset, 0, 1.0, mesh->o_LMM, o_in);
+    oogs::startFinish(o_in, nFields, fieldOffset, ogsDfloat, ogsAdd, gsh);
+    platform->linAlg->axmyMany(mesh->Nlocal, nFields, fieldOffset, 0, 1.0, mesh->o_invLMM, o_in);
+  };
+
   this->o_U.copyFrom(this->U);
+  projC0(this->gsh, this->meshV, this->NVfields, this->fieldOffset, this->o_U); 
+ 
   this->o_P.copyFrom(this->P);
+  projC0(this->gsh, this->meshV, 1, this->fieldOffset, this->o_P); 
+
   if (this->Nscalar) {
     this->cds->o_S.copyFrom(this->cds->S);
+    for (int s = 0; s < this->Nscalar; ++s) {
+      const std::string sid = scalarDigitStr(s);
+      if (platform->options.compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
+        continue;
+      }
+      auto gsh = (s == 0) ? this->cds->gshT : this->cds->gsh;
+      auto o_Si = this->cds->o_S + this->cds->fieldOffsetScan[s];
+      projC0(gsh, this->cds->mesh[s], 1, this->cds->fieldOffset[s], o_Si); 
+    }
   }
+
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
-    mesh->o_U.copyFrom(mesh->U);
+    _mesh->o_U.copyFrom(_mesh->U);
   }
 
   double startTime;
