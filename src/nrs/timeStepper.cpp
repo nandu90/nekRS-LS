@@ -531,6 +531,7 @@ bool nrs_t::runStep(std::function<bool(int)> convergenceCheck, int iter)
     }
   }
 
+
   if (this->Nscalar) {
     cds->solve(timeNew, iter);
   }
@@ -549,17 +550,23 @@ bool nrs_t::runStep(std::function<bool(int)> convergenceCheck, int iter)
 
   if (this->flow) {
     auto mesh = this->meshV;
- 
+
     platform->timer.tic("pressureSolve", 1);
-    auto o_Pnew = tombo::pressureSolve(this, timeNew, iter);
-    this->o_P.copyFrom(o_Pnew);
+    {
+      const auto& o_Pnew = tombo::pressureSolve(this, timeNew, iter); 
+      this->o_P.copyFrom(o_Pnew, mesh->Nlocal);
+    }
     platform->timer.toc("pressureSolve");
  
     platform->timer.tic("velocitySolve", 1);
-    auto o_Unew = tombo::velocitySolve(this, timeNew, iter);
-    this->o_U.copyFrom(o_Unew, this->NVfields * this->fieldOffset);
+    {
+      auto o_Unew = tombo::velocitySolve(this, timeNew, iter);
+      this->o_U.copyFrom(o_Unew, this->NVfields * this->fieldOffset);
+      o_Unew.free();
+    }
     platform->timer.toc("velocitySolve");
  
+
     if (platform->options.compareArgs("CONSTANT FLOW RATE", "TRUE")) {
       this->adjustFlowRate(tstep, timeNew);
     }

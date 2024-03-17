@@ -67,15 +67,14 @@ public:
   
   void compile();
 
-  occa::kernel load(const std::string& request, bool checkValid = true);
-  occa::kernel load(const std::string& request, const std::string& kernelName, bool checkValid = true);
+  occa::kernel load(const std::string& request, const std::string& kernelName = std::string(), bool checkValid = true);
 
   bool processed() const { return kernelsProcessed; }
 
 private:
   const platform_t& platformRef;
   bool kernelsProcessed;
-  std::set<kernelRequest_t> kernels;
+  std::set<kernelRequest_t> requests;
   std::map<std::string, kernelRequest_t> requestNameToRequestMap;
   std::map<std::string, occa::kernel> requestToKernelMap;
 

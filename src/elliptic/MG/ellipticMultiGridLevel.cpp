@@ -59,7 +59,7 @@ void pMGLevel::coarsen(occa::memory o_x, occa::memory o_Rx)
 
   if (options.compareArgs("DISCRETIZATION","CONTINUOUS")) {
     oogs::startFinish(o_Rx, elliptic->Nfields, elliptic->fieldOffset, ogsPfloat, ogsAdd, elliptic->oogs);
-    ellipticApplyMask(elliptic, o_Rx, pfloatString); // apply mask again because coarsenKernel do not preserve it
+    ellipticApplyMask(elliptic, o_Rx, pfloatString); // apply mask again because coarsenKernel does not preserve it
   }
 
   const double factor = (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value) 
@@ -117,7 +117,6 @@ void pMGLevel::smoother(occa::memory o_x, occa::memory o_Sx, bool x_is_zero)
 void pMGLevel::smoothJacobi (occa::memory &o_r, occa::memory &o_x, bool xIsZero)
 {
   auto o_res = platform->o_memPool.reserve<pfloat>(Ncols); 
-  auto o_Ad = platform->o_memPool.reserve<pfloat>(Ncols); 
   auto o_d = platform->o_memPool.reserve<pfloat>(Ncols); 
 
   const pfloat one = 1.0;

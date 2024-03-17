@@ -830,13 +830,14 @@ void nrs_t::init()
     auto o_lambda1 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
     platform->linAlg->axpby(mesh->Nlocal, this->g0 / this->dt[0], this->o_rho, 0.0, o_lambda1);
 
+    auto EToBx = createEToB("x-velocity", mesh);
+    auto EToBy = createEToB("y-velocity", mesh);
+    auto EToBz = createEToB("z-velocity", mesh);
+
     if (platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE")) {
       std::vector<int> EToB;
-      auto EToBx = createEToB("x-velocity", mesh);
       EToB.insert(std::end(EToB), std::begin(EToBx), std::end(EToBx));
-      auto EToBy = createEToB("y-velocity", mesh);
       EToB.insert(std::end(EToB), std::begin(EToBy), std::end(EToBy));
-      auto EToBz = createEToB("z-velocity", mesh);
       EToB.insert(std::end(EToB), std::begin(EToBz), std::end(EToBz));
 
       this->uvwSolver = new elliptic("velocity", mesh, this->fieldOffset, EToB, o_lambda0, o_lambda1);
@@ -864,22 +865,9 @@ void nrs_t::init()
         this->uvwSolver->applyZeroNormalMask(applyZeroNormalMaskLambda);
       }
     } else {
-      platform->linAlg->axpby(mesh->Nlocal, this->g0 / this->dt[0], this->o_rho, 0.0, o_lambda1);
-
-      {
-        auto EToB = createEToB("x-velocity", mesh);
-        this->uSolver = new elliptic("velocity", mesh, this->fieldOffset, EToB, o_lambda0, o_lambda1);
-      }
-
-      {
-        auto EToB = createEToB("y-velocity", mesh);
-        this->vSolver = new elliptic("velocity", mesh, this->fieldOffset, EToB, o_lambda0, o_lambda1);
-      }
-
-      {
-        auto EToB = createEToB("z-velocity", mesh);
-        this->wSolver = new elliptic("velocity", mesh, this->fieldOffset, EToB, o_lambda0, o_lambda1);
-      }
+        this->uSolver = new elliptic("velocity", mesh, this->fieldOffset, EToBx, o_lambda0, o_lambda1);
+        this->vSolver = new elliptic("velocity", mesh, this->fieldOffset, EToBy, o_lambda0, o_lambda1);
+        this->wSolver = new elliptic("velocity", mesh, this->fieldOffset, EToBz, o_lambda0, o_lambda1);
     }
   } // flow
 

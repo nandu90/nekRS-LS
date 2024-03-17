@@ -95,9 +95,7 @@ std::string extractKernelName(const std::string& fullPath)
   return (foundKernelName && kernelNameMatch.size() == 3) ? kernelNameMatch[2].str() : "";
 } 
 
-} // namespace
-
-occa::properties device_t::adjustKernelProps(const std::string& fileName, const occa::properties& props_) const
+occa::properties adjustKernelProps(const std::string& fileName, const occa::properties& props_)
 {
   occa::properties props = props_;
   if (fileName.find(".okl") != std::string::npos) {
@@ -110,6 +108,7 @@ occa::properties device_t::adjustKernelProps(const std::string& fileName, const 
   return props;
 }
 
+} // namespace
 
 void device_t::wrapperCompileKernel(const std::string &fileName,
                                     const occa::properties &props_,
@@ -122,11 +121,18 @@ void device_t::wrapperCompileKernel(const std::string &fileName,
                "illegal call detected after 'finish' declaration\n");
   }
 
+  if(fileName.empty()) {
+    nekrsAbort(MPI_COMM_SELF,
+               EXIT_FAILURE,
+               "%s",
+               "Empty fileName\n");
+  }
+
   auto props = props_;
   props["build/compile_only"] = true;
   props["build/load_only"] = false;
 
-  _device.buildKernel(fileName, "" /* dummy */, this->adjustKernelProps(fileName, props));
+  _device.buildKernel(fileName, "" /* dummy */, adjustKernelProps(fileName, props));
 }
 
 occa::kernel device_t::wrapperLoadKernel(const std::string &fileName,
@@ -148,7 +154,7 @@ occa::kernel device_t::wrapperLoadKernel(const std::string &fileName,
   auto props = props_;
   props["build/load_only"] = true;
   props["build/compile_only"] = false;
-  auto knl = _device.buildKernel(fileName, kernelName, this->adjustKernelProps(fileName, props));
+  auto knl = _device.buildKernel(fileName, kernelName, adjustKernelProps(fileName, props));
 
   nekrsCheck(!knl.isInitialized(),
              MPI_COMM_SELF,
@@ -277,7 +283,7 @@ occa::kernel device_t::loadKernel(const std::string &fileName,
                                   const occa::properties &props,
                                   const std::string &suffix) const
 {
-  return this->wrapperLoadKernel(fileName, extractKernelName(fileName), props, suffix);
+  return this->loadKernel(fileName, extractKernelName(fileName), props, suffix);
 }
 
 

@@ -101,12 +101,8 @@ struct elliptic_t {
 
   occa::memory o_EToB;
 
-  occa::memory o_x;
-  occa::memory o_x0;
-  occa::memory o_r;
   occa::memory o_p; // search direction
   occa::memory o_z; // preconditioner solution
-  occa::memory o_res;
   occa::memory o_Ap; // A*search direction
   occa::memory o_v;  // work array for combined PCG iteration
   occa::memory o_invDegree;

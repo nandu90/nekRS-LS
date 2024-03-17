@@ -82,16 +82,13 @@ public:
                      const MPI_Comm& comm) const;
 
   occa::kernel loadKernel(const std::string &fileName,
-                          const occa::properties &props,
-                          const std::string &suffix = "") const;
-
-  occa::kernel loadKernel(const std::string &fileName,
                           const std::string &kernelName,
                           const occa::properties &props,
-                          const std::string &suffix = "") const;
+                          const std::string &suffix = std::string()) const;
 
-  occa::properties adjustKernelProps(const std::string& fileName, 
-                                     const occa::properties& props) const;
+  occa::kernel loadKernel(const std::string &fileName,
+                          const occa::properties &props,
+                          const std::string &suffix = std::string()) const;
 
   bool deviceAtomic;
 

@@ -12,7 +12,7 @@ public:
 
   ~elliptic() { };  
 
-  void solve(const occa::memory& o_lambda0, const occa::memory& o_lambda1, const occa::memory& RHS, const occa::memory x);
+  void solve(const occa::memory& o_lambda0, const occa::memory& o_lambda1, const occa::memory& RHS, occa::memory x);
 
   std::string& name() const;
   setupAide& options();

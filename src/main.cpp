@@ -65,7 +65,6 @@
 
 int main(int argc, char** argv)
 {
-
   const auto timeStart = std::chrono::high_resolution_clock::now();
   {
     int request = MPI_THREAD_SINGLE;
@@ -82,7 +81,6 @@ int main(int argc, char** argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
   }
 
-  std::signal(SIGUSR2, signalHandlerUpdateFile);  
   {
     const char* env_val = std::getenv("NEKRS_SIGNUM_BACKTRACE");
     if (env_val)
@@ -94,6 +92,8 @@ int main(int argc, char** argv)
 
   MPI_Comm commGlobal;
   MPI_Comm_dup(MPI_COMM_WORLD, &commGlobal);
+
+MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
   {
     if(!getenv("NEKRS_HOME")) {
@@ -129,21 +129,32 @@ int main(int argc, char** argv)
   MPI_Barrier(comm);
 
   if (cmdOpt->attach) {
-    fprintf(stderr, "rank %d: pid<%d>\n", rank, getpid());
-    MPI_Barrier(comm);
+    char hostname[256];
+    gethostname(hostname, sizeof(hostname));
+    fprintf(stderr, "rank %d on %s: pid<%d>\n", rank, hostname, getpid());
     if (rank == 0) {
-      fprintf(stderr, "Attach debugger, then press enter to continue\n");
-      std::cin.get();
+      fprintf(stderr, "Attach debugger, then send <SIGCONT> to continue\n");
     }
+    sigset_t signalSet;
+    sigemptyset(&signalSet);
+    sigaddset(&signalSet, SIGCONT);
+
+    int signal;
+    sigwait(&signalSet, &signal); 
+    MPI_Barrier(comm); // block until signal is received 
   }
 
-  auto abort = [&]()
+  auto abort = [&](const std::string& txt)
   {
-    if (cmdOpt->debug) {
-      throw;
+    if (cmdOpt->debug) throw; 
+
+    if (!txt.empty()) {
+      std::cerr << txt << std::endl;
+      MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE); // terminates all processes
+     
     } else {
-      MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-    }
+      MPI_Barrier(MPI_COMM_WORLD); // waiting to be terminated
+    } 
   };
 
   try {
@@ -280,44 +291,44 @@ int main(int argc, char** argv)
       if (tStep % 100 == 0) fflush(stdout);
     }
     MPI_Pcontrol(0);
- 
-    delete cmdOpt;
- 
-    const int exitValue = nekrs::finalize();
- 
-    MPI_Barrier(commGlobal);
-    MPI_Finalize();
- 
-    if(exitValue)
-      return EXIT_FAILURE;
-    else
-      return EXIT_SUCCESS;
-
   }
   catch (const std::overflow_error& e)
   {
-    std::cerr << e.what() << std::endl;
-    abort();
+    abort(std::string(e.what()));
   }
   catch (const std::underflow_error& e)
   {
-    std::cerr << e.what() << std::endl;
-    abort();
+    abort(std::string(e.what()));
+  }
+  catch (const cpptrace::exception& e)
+  {
+    const auto msg = "Error in " 
+                     + e.trace().frames.begin()->filename 
+                     + ":" + std::string(e.trace().frames.begin()->symbol) + "\n"
+                     + e.message();
+    abort(!std::string(e.message()).empty() ? msg : std::string(""));
   }
   catch (const std::runtime_error& e)
   {
-    std::cerr << e.what() << std::endl;
-    abort();
+    abort(std::string(e.what()));
   }
   catch (const std::exception& e)
   {
-    std::cerr << e.what() << std::endl;
-    abort();
+    abort(std::string(e.what()));
   }
   catch (...)
   {
-    std::cerr << "unknown exception thrown!" << std::endl;
-    abort();
+    std::cerr << "unknown exception occured" << std::endl;
+    throw;
   }
 
+  const int exitValue = nekrs::finalize();
+
+  MPI_Barrier(commGlobal);
+  MPI_Finalize();
+
+  if(exitValue)
+    return EXIT_FAILURE;
+  else
+    return EXIT_SUCCESS;
 }

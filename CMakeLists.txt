@@ -229,6 +229,8 @@ if(ENABLE_AMGX)
   endif()
 endif()
 
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/cpptrace")
+
 # hypre
 include(cmake/hypre.cmake)
 
@@ -335,9 +337,9 @@ if (ENABLE_CVODE)
   endif()
 endif()
 
-target_link_libraries(nekrs-bin PRIVATE nekrs-lib)
+target_link_libraries(nekrs-bin PRIVATE nekrs-lib cpptrace::cpptrace)
 if (NEKRS_BUILD_FLOAT)
-  target_link_libraries(nekrs-bin-fp32 PRIVATE nekrs-lib-fp32)
+  target_link_libraries(nekrs-bin-fp32 PRIVATE nekrs-lib-fp32 cpptrace::cpptrace)
 endif()
 
 ###############################################################################

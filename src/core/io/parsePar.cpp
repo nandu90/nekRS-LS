@@ -1628,7 +1628,7 @@ void parseBoomerAmgSection(const int rank, setupAide &options, inipp::Ini *par)
     }
     int coarseSmootherType;
     if (par->extract("boomeramg", "coarsesmoothertype", coarseSmootherType)) {
-      options.setArgs("BOOMERAMG COARSE SMOOTHER TYPE", std::to_string(smootherType));
+      options.setArgs("BOOMERAMG COARSE SMOOTHER TYPE", std::to_string(coarseSmootherType));
     }
     int numCycles;
     if (par->extract("boomeramg", "iterations", numCycles)) {
@@ -2593,7 +2593,7 @@ void parsePar(inipp::Ini *par, MPI_Comm comm, setupAide &options)
       return txt.str();
     };
 
-    nekrsCheck(length > 0, comm, EXIT_FAILURE, errTxt().c_str(), "");
+    nekrsCheck(length > 0, comm, EXIT_FAILURE, "%s\n", errTxt().c_str());
   }
 
 #if 0

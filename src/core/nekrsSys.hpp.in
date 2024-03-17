@@ -76,6 +76,7 @@ using dlong = long long int;
 #include <unistd.h>
 #include <getopt.h>
 #include <sys/stat.h>
+#include <cpptrace/cpptrace.hpp>
 
 #include <@CXX_FILESYSTEM_HEADER@>
 namespace fs = @CXX_FILESYSTEM_NAMESPACE@; 
@@ -83,7 +84,6 @@ namespace fs = @CXX_FILESYSTEM_NAMESPACE@;
 #include "occa.hpp"
 #include "ogs.hpp"
 #include "setupAide.hpp"
-#include "stacktrace.hpp"
 
 constexpr std::string_view GITCOMMITHASH="@GIT_COMMIT_HASH@";
 constexpr std::string_view NEKRS_VERSION="@PROJECT_VERSION_MAJOR@";
@@ -101,14 +101,12 @@ if (_nekrsCheckErr) {                                                           
 int rank = 0;                                                                                                \
 MPI_Comm_rank(_nekrsCheckComm, &rank);                                                                       \
 if (rank == 0) {                                                                                             \
-fprintf(stderr, "Error in %s: ", __PRETTY_FUNCTION__);                                                       \
-fprintf(stderr, _nekrsCheckMessage, __VA_ARGS__);                                                            \
-print_stacktrace();                                                                                          \
+  char _errTxt[4096] = {0};                                                                                  \
+  sprintf(_errTxt,_nekrsCheckMessage, __VA_ARGS__);                                                          \
+  throw cpptrace::runtime_error(_errTxt);                                                                    \
+} else {                                                                                                     \
+  throw cpptrace::runtime_error("");                                                                         \
 }                                                                                                            \
-fflush(stderr);                                                                                              \
-fflush(stdout);                                                                                              \
-MPI_Barrier(_nekrsCheckComm);                                                                                \
-MPI_Abort(MPI_COMM_WORLD, _nekrsCheckExitCode);                                                              \
 }                                                                                                            \
 } while (0)
 

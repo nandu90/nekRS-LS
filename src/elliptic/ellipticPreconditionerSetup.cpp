@@ -67,8 +67,6 @@ void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs)
     nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Unknown preconditioner!");
   }
 
-  elliptic->precon->preconBytes = platform->device.occaDevice().memoryAllocated() - pre;
-
   MPI_Barrier(platform->comm.mpiComm);
   if (platform->comm.mpiRank == 0) {
     printf("done (%gs)\n", MPI_Wtime() - tStart);

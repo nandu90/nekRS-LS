@@ -19,7 +19,7 @@
 #include <csignal>
 
 #include "inipp.hpp"
-#include "stacktrace.hpp"
+#include <cpptrace/cpptrace.hpp>
 
 namespace {
 
@@ -353,16 +353,16 @@ void writeStackTraceToFile()
 {
   std::cerr << "generating stacktrace ...\n";
   const std::string fileName = "stacktrace." + std::to_string(worldRank);
-  FILE *fp;
-  fp = fopen (fileName.c_str(), "w");
-  print_stacktrace(fp);
-  fclose(fp);
+  std::ofstream outfile;
+  outfile.open(fileName, std::ios::out | std::ios::trunc );
+  outfile << cpptrace::generate_trace();
+  outfile.close(); 
   sig_writeStackTrace = 0;
 }
 
 void signalHandlerBacktrace(int signum) 
 {
-   // not async-safe but may be we're lucky
+   // stricly speaking not async-safe but often it works ok
    sig_writeStackTrace = 1;
    writeStackTraceToFile();
 }

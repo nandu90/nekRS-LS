@@ -371,7 +371,7 @@ void oogs::registerKernels()
     const auto oklpath = std::string(getenv("NEKRS_KERNEL_DIR")) + "/core/ogs/";
     const auto fileName = oklpath + "oogs.okl";
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
-      const auto reqName = "oogs::" + std::string(props.hash().getString());;
+      const auto reqName = fileName + std::string(props.hash().getString());;
       platform->kernelRequests.add(reqName, fileName, props); 
       return occa::kernel();
     } else {

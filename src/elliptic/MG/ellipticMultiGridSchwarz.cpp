@@ -204,7 +204,7 @@ void compute_element_lengths(ElementLengths *lengths, elliptic_t *elliptic)
       txt << "}\n";
       return txt.str();
     };
-    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, errTxt().c_str(), "");
+    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s\n", errTxt().c_str());
   }
 
   // In Nq == 2 case, there are no interior points to use for obtaining
@@ -579,7 +579,7 @@ void compute_1d_matrices(dfloat *S,
 
       return txt.str();
     };
-    nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, errTxt().c_str(), "");
+    nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "%s\n", errTxt().c_str());
   }
   if (lbc > 0) {
     row_zero(S, nl, 0);

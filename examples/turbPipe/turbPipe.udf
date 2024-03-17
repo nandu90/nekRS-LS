@@ -60,6 +60,8 @@ void UDF_Setup()
       nrs->U[n + 0 * nrs->fieldOffset] = 0.05 * pow(rand[n], 2);
       nrs->U[n + 1 * nrs->fieldOffset] = 0.1  * pow(rand[n], 3);
       nrs->U[n + 2 * nrs->fieldOffset] = uz + 0.01 * rand[n];
+
+      nrs->cds->S[n] = 0;
     }
   }
 

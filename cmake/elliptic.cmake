@@ -1,7 +1,7 @@
 set(ELLIPTIC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/elliptic)
 
 set(ELLIPTIC_SOURCES
-        ${ELLIPTIC_SOURCE_DIR}/ellipticWrapper.cpp
+        ${ELLIPTIC_SOURCE_DIR}/elliptic.cpp
         ${ELLIPTIC_SOURCE_DIR}/ellipticWorkspace.cpp
         ${ELLIPTIC_SOURCE_DIR}/linearSolver/PCG.cpp
         ${ELLIPTIC_SOURCE_DIR}/linearSolver/PGMRES.cpp

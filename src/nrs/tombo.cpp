@@ -154,6 +154,18 @@ occa::memory pressureSolve(nrs_t* nrs, double time, int stage)
 
   nrs->pSolver->solve(o_lambda0, o_NULL, static_cast<const occa::memory>(o_pRhs), o_p);
 
+  if (platform->verbose) {
+    const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
+                                                                 1,
+                                                                 nrs->fieldOffset,
+                                                                 mesh->ogs->o_invDegree,
+                                                                 o_p,
+                                                                 platform->comm.mpiComm);
+    if (platform->comm.mpiRank == 0) {
+      printf("p norm: %.15e\n", debugNorm);
+    }
+  }
+
   return o_p;
 }
 
@@ -250,6 +262,18 @@ occa::memory velocitySolve(nrs_t* nrs, double time, int stage)
     nrs->vSolver->solve(o_lambda0, o_lambda1, o_rhsY, o_U.slice(1 * nrs->fieldOffset));
     nrs->wSolver->solve(o_lambda0, o_lambda1, o_rhsZ, o_U.slice(2 * nrs->fieldOffset));
   }
+
+  if (platform->verbose) {
+    const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
+                                                                 mesh->dim,
+                                                                 nrs->fieldOffset,
+                                                                 mesh->ogs->o_invDegree,
+                                                                 o_U,
+                                                                 platform->comm.mpiComm);
+    if (platform->comm.mpiRank == 0) {
+      printf("U norm: %.15e\n", debugNorm);
+    }
+  } 
 
   return o_U;
 }

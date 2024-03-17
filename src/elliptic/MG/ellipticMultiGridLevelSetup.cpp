@@ -353,6 +353,7 @@ dfloat pMGLevel::maxEigSmoothAx()
   platform->linAlg
       ->axpbyMany(Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1. / norm_vo, o_Vx, 0.0, o_V[0]);
 
+  // Arnoldi
   for (int j = 0; j < k; j++) {
     // v[j+1] = invD*(A*v[j])
     platform->copyDfloatToPfloatKernel(M, o_V[j], o_VxPfloat);

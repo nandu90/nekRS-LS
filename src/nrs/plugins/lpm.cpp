@@ -49,7 +49,7 @@ lpm_t::lpm_t(dfloat bb_tol_, dfloat newton_tol_)
   registerDOF("z");
 
   nStagesSumManyKernel = platform->kernelRequests.load("nStagesSumMany");
-  remapParticlesKernel = platform->kernelRequests.load("remapParticles");
+  remapParticlesKernel = platform->kernelRequests.load("lpm", "remapParticles");
 
   setTimerLevel(timerLevel);
   setTimerName(timerName);
@@ -1934,9 +1934,8 @@ void lpm_t::registerKernels(occa::properties &kernelInfo)
   const std::string suffix = "Hex3D";
   const std::string oklpath(getenv("NEKRS_KERNEL_DIR"));
 
-  kernelName = "remapParticles";
   fileName = oklpath + "/nrs/plugins/" + "lpm.okl";
-  platform->kernelRequests.add(kernelName, fileName, kernelInfo);
+  platform->kernelRequests.add("lpm", fileName, kernelInfo);
 }
 
 void lpm_t::setTimerLevel(TimerLevel level)

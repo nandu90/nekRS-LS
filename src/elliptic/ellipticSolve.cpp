@@ -34,49 +34,45 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
   elliptic->o_lambda0 = o_lambda0;
   elliptic->o_lambda1 = o_lambda1;
 
-  ellipticAllocateWorkspace(elliptic);
-
-  setupAide &options = elliptic->options;
-  precon_t *precon = elliptic->precon;
-
-  mesh_t *mesh = elliptic->mesh;
-
-  std::string name = elliptic->name;
-  if (name.find("scalar") != std::string::npos) {
-    name = "scalar";
-  }
+  auto &options = elliptic->options;
+  auto &precon = elliptic->precon;
+  auto &mesh = elliptic->mesh;
 
   int maxIter = 999;
   options.getArgs("MAXIMUM ITERATIONS", maxIter);
   const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+
   elliptic->resNormFactor = 1 / mesh->volume;
 
-  if (verbose) {
-    const dfloat rhsNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
-                                                               elliptic->Nfields,
-                                                               elliptic->fieldOffset,
-                                                               elliptic->o_invDegree,
-                                                               o_rhs,
-                                                               platform->comm.mpiComm) *
-                           sqrt(elliptic->resNormFactor);
-    if (platform->comm.mpiRank == 0) {
-      printf("%s RHS norm: %.15e\n", elliptic->name.c_str(), rhsNorm);
-    }
-    nekrsCheck(std::isnan(rhsNorm), MPI_COMM_SELF, EXIT_FAILURE, "%s unreasonable rhsNorm!\n", name.c_str());
+  std::string timerName = elliptic->name;
+  if (timerName.find("scalar") != std::string::npos) {
+    timerName = "scalar";
   }
 
-  if (verbose) {
-    const dfloat rhsNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
-                                                               elliptic->Nfields,
-                                                               elliptic->fieldOffset,
-                                                               elliptic->o_invDegree,
-                                                               o_x,
-                                                               platform->comm.mpiComm) *
-                           sqrt(elliptic->resNormFactor);
+  auto printNorm = [&] (const occa::memory& o_u, const std::string& txt)
+  {
+    const dfloat norm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
+                                                            elliptic->Nfields,
+                                                            elliptic->fieldOffset,
+                                                            elliptic->o_invDegree,
+                                                            o_u,
+                                                            platform->comm.mpiComm);
     if (platform->comm.mpiRank == 0) {
-      printf("%s x0 norm: %.15e\n", elliptic->name.c_str(), rhsNorm);
+      printf("%s %s norm: %.15e\n", elliptic->name.c_str(), txt.c_str(), norm);
     }
-  }
+    nekrsCheck(std::isnan(norm), MPI_COMM_SELF, EXIT_FAILURE, "%s unreasonable %s!\n", elliptic->name.c_str(), txt.c_str());
+  };
+
+  if (platform->verbose) 
+    printNorm(o_rhs, "o_rhs");
+
+  auto o_x0 = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
+  o_x0.copyFrom(o_x, elliptic->Nfields * elliptic->fieldOffset);
+
+  if (platform->verbose) 
+    printNorm(o_x0, "o_x0");
+
+  ellipticAllocateWorkspace(elliptic);
 
   if (options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
     if (options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
@@ -90,79 +86,81 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
   }
 
   // compute initial residual r = rhs - Ax0
-  auto o_r = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
+  auto o_r = [&]()
+  {
+    auto o_r = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
+    auto o_Ap = o_x;
+    ellipticAx(elliptic, mesh->Nelements, mesh->o_elementList, o_x0, o_Ap, dfloatString);
+    platform->linAlg->axpbyzMany(mesh->Nlocal,
+                                 elliptic->Nfields,
+                                 elliptic->fieldOffset,
+                                 -1.0,
+                                 o_Ap,
+                                 1.0,
+                                 o_rhs,
+                                 o_r);
+ 
+    if (elliptic->allNeumann) {
+      ellipticZeroMean(elliptic, o_r);
+    }
+    ellipticApplyMask(elliptic, o_r, dfloatString);
+    oogs::startFinish(o_r, elliptic->Nfields, elliptic->fieldOffset, ogsDfloat, ogsAdd, elliptic->oogs);
+    return o_r;
+  }();
 
-  ellipticAx(elliptic, mesh->Nelements, mesh->o_elementList, o_x, elliptic->o_Ap, dfloatString);
-  platform->linAlg->axpbyzMany(mesh->Nlocal,
-                               elliptic->Nfields,
-                               elliptic->fieldOffset,
-                               -1.0,
-                               elliptic->o_Ap,
-                               1.0,
-                               o_rhs,
-                               o_r);
-  if (elliptic->allNeumann) {
-    ellipticZeroMean(elliptic, o_r);
-  }
-  ellipticApplyMask(elliptic, o_r, dfloatString);
-  oogs::startFinish(o_r, elliptic->Nfields, elliptic->fieldOffset, ogsDfloat, ogsAdd, elliptic->oogs);
+  const auto rdotr = [&]()
+  {
+    return platform->linAlg->weightedNorm2Many(mesh->Nlocal,
+                                               elliptic->Nfields,
+                                               elliptic->fieldOffset,
+                                               elliptic->o_invDegree,
+                                               o_r,
+                                               platform->comm.mpiComm) * sqrt(elliptic->resNormFactor);
+  };
 
-  elliptic->o_x0.copyFrom(o_x);
-  platform->linAlg->fill(elliptic->fieldOffset * elliptic->Nfields, 0.0, o_x);
   if (options.compareArgs("INITIAL GUESS", "PROJECTION") ||
       options.compareArgs("INITIAL GUESS", "PROJECTION-ACONJ")) {
 
-    platform->timer.tic(name + " proj pre", 1);
-    elliptic->res00Norm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
-                                                              elliptic->Nfields,
-                                                              elliptic->fieldOffset,
-                                                              elliptic->o_invDegree,
-                                                              o_r,
-                                                              platform->comm.mpiComm) *
-                          sqrt(elliptic->resNormFactor);
-
+    platform->timer.tic(timerName + " proj pre", 1);
+    elliptic->res00Norm = rdotr(); 
     nekrsCheck(std::isnan(elliptic->res00Norm),
                MPI_COMM_SELF,
                EXIT_FAILURE,
                "%s unreasonable res00Norm!\n",
-               name.c_str());
+               elliptic->name.c_str());
 
     elliptic->solutionProjection->pre(o_r);
 
-    platform->timer.toc(name + " proj pre");
+    platform->timer.toc(timerName + " proj pre");
   }
 
-  elliptic->res0Norm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
-                                                           elliptic->Nfields,
-                                                           elliptic->fieldOffset /* offset */,
-                                                           elliptic->o_invDegree,
-                                                           o_r,
-                                                           platform->comm.mpiComm) *
-                       sqrt(elliptic->resNormFactor);
-
+  elliptic->res0Norm = rdotr(); 
   nekrsCheck(std::isnan(elliptic->res0Norm),
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "%s unreasonable res00Norm!\n",
-             name.c_str());
+             elliptic->name.c_str());
 
-  // absolute tol
-  dfloat tol = 1e-6;
-  options.getArgs("SOLVER TOLERANCE", tol);
 
-  // absolute tol + relative
-  if (!options.getArgs("SOLVER RELATIVE TOLERANCE").empty()) {
-    dfloat relTol;
-    options.getArgs("SOLVER RELATIVE TOLERANCE", relTol);
-    tol = std::max(relTol * elliptic->res0Norm, tol);
-  } else { // relative and absolute tolerance are the same
-    if (options.compareArgs("LINEAR SOLVER STOPPING CRITERION", "RELATIVE")) {
-      tol *= elliptic->res0Norm;
+  // linear solve
+  {
+    // absolute tol
+    dfloat tol = 1e-6;
+    options.getArgs("SOLVER TOLERANCE", tol);
+
+    // absolute tol + relative
+    if (!options.getArgs("SOLVER RELATIVE TOLERANCE").empty()) {
+      dfloat relTol;
+      options.getArgs("SOLVER RELATIVE TOLERANCE", relTol);
+      tol = std::max(relTol * elliptic->res0Norm, tol);
+    } else { // relative and absolute tolerance are the same
+      if (options.compareArgs("LINEAR SOLVER STOPPING CRITERION", "RELATIVE")) {
+        tol *= elliptic->res0Norm;
+      }
     }
-  }
 
-  if (!options.compareArgs("SOLVER", "NONBLOCKING")) {
     elliptic->resNorm = elliptic->res0Norm;
+    platform->linAlg->fill(elliptic->fieldOffset * elliptic->Nfields, 0.0, o_x);
 
     if (options.compareArgs("SOLVER", "PCG")) {
       elliptic->Niter = pcg(elliptic, tol, maxIter, elliptic->resNorm, o_r, o_x);
@@ -171,32 +169,26 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
     } else {
       nekrsAbort(platform->comm.mpiComm,
                  EXIT_FAILURE,
-                 "Linear solver %s is not supported!\n",
+                 "Unknown linear solver %s!\n",
                  options.getArgs("SOLVER").c_str());
     }
 
     if (elliptic->Niter == maxIter && platform->comm.mpiRank == 0) {
-      printf("iteration limit of %s linear solver reached!\n", name.c_str());
+      printf("iteration limit of %s linear solver reached!\n", elliptic->name.c_str());
     }
-
-  } else {
-    nekrsAbort(platform->comm.mpiComm,
-               EXIT_FAILURE,
-               "%s\n",
-               "NONBLOCKING Krylov solvers currently not supported!");
   }
 
   if (options.compareArgs("INITIAL GUESS", "PROJECTION") ||
       options.compareArgs("INITIAL GUESS", "PROJECTION-ACONJ")) {
-    platform->timer.tic(name + " proj post", 1);
+    platform->timer.tic(timerName + " proj post", 1);
     elliptic->solutionProjection->post(o_x);
-    platform->timer.toc(name + " proj post");
+    platform->timer.toc(timerName + " proj post");
   } else {
     elliptic->res00Norm = elliptic->res0Norm;
   }
 
   platform->linAlg
-      ->axpbyMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, elliptic->o_x0, 1.0, o_x);
+      ->axpbyMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_x0, 1.0, o_x);
 
   if (elliptic->allNeumann) {
     ellipticZeroMean(elliptic, o_x);

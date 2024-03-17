@@ -70,7 +70,7 @@ void ellipticAx(elliptic_t *elliptic,
 
     return txt.str();
   };
-  nekrsCheck(!valid, MPI_COMM_SELF, EXIT_FAILURE, errTxt().c_str(), "");
+  nekrsCheck(!valid, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", errTxt().c_str());
 
   occa::memory &o_geom_factors = elliptic->stressForm ? mesh->o_vgeo : mesh->o_ggeo;
   occa::memory &o_D = mesh->o_D;
@@ -91,6 +91,7 @@ void ellipticAx(elliptic_t *elliptic,
            o_lambda1,
            o_q,
            o_Aq);
+
 
   double flopCount = mesh->Np * 12 * mesh->Nq + 15 * mesh->Np;
   if (coeffField) {
@@ -114,6 +115,7 @@ void ellipticAx(elliptic_t *elliptic,
   platform->flopCounter->add(elliptic->name + " Ax, N=" + std::to_string(mesh->N) + ", " +
                                  std::string(precision),
                              factor * flopCount);
+
 }
 
 void ellipticOperator(elliptic_t *elliptic,

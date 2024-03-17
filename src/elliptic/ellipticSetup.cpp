@@ -225,7 +225,6 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
   mesh->maskKernel = platform->kernelRequests.load("mask");
   mesh->maskPfloatKernel = platform->kernelRequests.load("maskPfloat");
 
-  ellipticAllocateWorkspace(elliptic);
 
   int Nreductions = 1;
   if (options.compareArgs("SOLVER", "PCG+COMBINED")) {
@@ -333,24 +332,6 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
     elliptic->updatePCGKernel = platform->kernelRequests.load(sectionIdentifier + "ellipticBlockUpdatePCG");
   }
 
-  auto timeEllipticOperator = [&]() {
-    const int Nsamples = 10;
-    ellipticOperator(elliptic, elliptic->o_p, elliptic->o_Ap, dfloatString);
-
-    platform->device.finish();
-    MPI_Barrier(platform->comm.mpiComm);
-    const double start = MPI_Wtime();
-
-    for (int test = 0; test < Nsamples; ++test) {
-      ellipticOperator(elliptic, elliptic->o_p, elliptic->o_Ap, dfloatString);
-    }
-
-    platform->device.finish();
-    double elapsed = (MPI_Wtime() - start) / Nsamples;
-    MPI_Allreduce(MPI_IN_PLACE, &elapsed, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
-
-    return elapsed;
-  };
 
   oogs_mode oogsMode = OOGS_AUTO;
   elliptic->oogs =
@@ -358,13 +339,36 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
   elliptic->oogsAx = elliptic->oogs;
 
   if (platform->options.compareArgs("ENABLE GS COMM OVERLAP", "TRUE")) {
+    const auto Nlocal = elliptic->Nfields * static_cast<size_t>(elliptic->fieldOffset);
+    auto o_p = platform->o_memPool.reserve<dfloat>(Nlocal);
+    auto o_Ap = platform->o_memPool.reserve<dfloat>(Nlocal); 
+
+    auto timeEllipticOperator = [&]() {
+      const int Nsamples = 10;
+      ellipticOperator(elliptic, o_p, o_Ap, dfloatString);
+ 
+      platform->device.finish();
+      MPI_Barrier(platform->comm.mpiComm);
+      const double start = MPI_Wtime();
+ 
+      for (int test = 0; test < Nsamples; ++test) {
+        ellipticOperator(elliptic, o_p, o_Ap, dfloatString);
+      }
+ 
+      platform->device.finish();
+      double elapsed = (MPI_Wtime() - start) / Nsamples;
+      MPI_Allreduce(MPI_IN_PLACE, &elapsed, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
+ 
+      return elapsed;
+    };
+
     auto nonOverlappedTime = timeEllipticOperator();
     auto callback = [&]() {
       ellipticAx(elliptic,
                  mesh->NlocalGatherElements,
                  mesh->o_localGatherElementList,
-                 elliptic->o_p,
-                 elliptic->o_Ap,
+                 o_p,
+                 o_Ap,
                  dfloatString);
     };
     elliptic->oogsAx =
@@ -404,8 +408,6 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
 
     elliptic->solutionProjection = new SolutionProjection(*elliptic, type, nVecsProject, nStepsStart);
   }
-
-  ellipticFreeWorkspace(elliptic);
 
   elliptic->o_lambda0 = nullptr;
   elliptic->o_lambda1 = nullptr;

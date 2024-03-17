@@ -198,7 +198,7 @@ void tavg::outfld(int _outXYZ, int FP64)
   }
 
   if (userFieldList.size()) {
-    fld::write("tavg", atime, outfldCounter, outXYZ, FP64, o_NULL, o_NULL, o_AVG, userFieldList.size());
+    fld::write("tavg", atime, outfldCounter, outXYZ, FP64, o_AVG, userFieldList.size());
   }
 
   atime = 0; // reset

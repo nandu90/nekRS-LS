@@ -31,7 +31,10 @@
 #include "timer.hpp"
 #include "linAlg.hpp"
 
-// #define DEBUG
+#if 0
+#define DEBUG
+#endif
+
 #define TIMERS
 
 static dfloat update(elliptic_t *elliptic,
@@ -176,6 +179,14 @@ static int standardPCG(elliptic_t *elliptic,
                                                        platform->comm.mpiComm);
     } else {
       rdotz1 = rdotr;
+    }
+
+    if (platform->comm.mpiRank == 0) {
+      nekrsCheck(std::isnan(rdotz1),
+                 MPI_COMM_SELF,
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "Detected invalid rdotz norm while running linear solver!");
     }
 
 #ifdef DEBUG
@@ -328,6 +339,14 @@ static int combinedPCG(elliptic_t *elliptic,
     const auto fk = reductions[CombinedPCGId::f];
 
     alphak = dk / (ak + tiny);
+
+    if (platform->comm.mpiRank == 0) {
+      nekrsCheck(std::isnan(dk),
+                 MPI_COMM_SELF,
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "Detected invalid rdotz norm while running linear solver!");
+    }
 
 #ifdef DEBUG
     printf("alpha: %.15e\n", alphak);
