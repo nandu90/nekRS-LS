@@ -114,15 +114,14 @@ void RANSktau::buildKernel(occa::properties _kernelInfo)
 
   kernelInfo += _kernelInfo;
 
-  auto buildKernel = [&kernelInfo](const std::string& kernelName)
-  { 
+  auto buildKernel = [&kernelInfo](const std::string &kernelName) {
     const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/nrs/plugins/");
     const auto fileName = path + "RANSktau.okl";
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
       const auto reqName = "RANSktau::";
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
-    } else { 
+    } else {
       buildKernelCalled = 1;
       return platform->device.loadKernel(fileName, kernelName, kernelInfo);
     }
@@ -179,7 +178,7 @@ void RANSktau::updateSourceTerms()
   occa::memory o_SijMag2 = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
 
   occa::memory o_FS = cds->o_NLT + cds->fieldOffsetScan[kFieldIndex];
-  occa::memory o_LHSDiag = cds->o_LHSDiag + cds->fieldOffsetScan[kFieldIndex];
+  occa::memory o_implicitLT = cds->o_implicitLT + cds->fieldOffsetScan[kFieldIndex];
 
   auto o_SijOij = nrs->strainRotationRate();
 
@@ -195,7 +194,7 @@ void RANSktau::updateSourceTerms()
                 o_tau,
                 o_SijMag2,
                 o_OiOjSk,
-                o_LHSDiag,
+                o_implicitLT,
                 o_FS);
 }
 
@@ -207,7 +206,8 @@ void RANSktau::setup(dfloat mueIn, dfloat rhoIn, int ifld)
   }
   isInitialized = true;
 
-  nrs = dynamic_cast<nrs_t*>(platform->solver);;
+  nrs = dynamic_cast<nrs_t *>(platform->solver);
+  ;
   mueLam = mueIn;
   rho = rhoIn;
   kFieldIndex = ifld;
@@ -220,9 +220,8 @@ void RANSktau::setup(dfloat mueIn, dfloat rhoIn, int ifld)
 
   o_mut = platform->device.malloc<dfloat>(cds->fieldOffset[kFieldIndex]);
 
-  if (!cds->o_LHSDiag.ptr()) {
-    cds->o_LHSDiag = platform->device.malloc<dfloat>(cds->fieldOffsetSum);
-    platform->linAlg->fill(cds->fieldOffsetSum, 0.0, cds->o_LHSDiag);
+  if (!cds->o_implicitLT.ptr()) {
+    cds->o_implicitLT = platform->device.malloc<dfloat>(cds->fieldOffsetSum);
   }
 
   setupCalled = true;

@@ -27,24 +27,25 @@ struct cdsConfig_t {
   occa::memory o_U;
   occa::memory o_Ue;
   occa::memory o_Urst;
-  occa::memory o_relUrst; 
+  occa::memory o_relUrst;
 
   bool dpdt = false;
   dfloat *dp0thdt = nullptr;
   dfloat *alpha0Ref = nullptr;
 };
 
-class cds_t : public solver_t {
+class cds_t : public solver_t
+{
 
-using userSource_t = std::function<void(double)>;
-using userProperties_t = std::function<void(double)>;
+  using userSource_t = std::function<void(double)>;
+  using userProperties_t = std::function<void(double)>;
 
 public:
   static constexpr double targetTimeBenchmark{0.2};
 
   cds_t(cdsConfig_t &cfg);
   void solve(double time, int stage);
-  void makeNLT(double time, int tstep, occa::memory& o_Subcycling);
+  void makeNLT(double time, int tstep, occa::memory &o_Subcycling);
   occa::memory advectionSubcyling(int nEXT, double time, int scalarIdx);
 
   userSource_t userSource = nullptr;
@@ -110,7 +111,7 @@ public:
   occa::memory o_S, o_Se;
   occa::memory o_prop;
   occa::memory o_rho, o_diff;
-  occa::memory o_NLT, o_BF, o_LHSDiag;
+  occa::memory o_NLT, o_BF, o_implicitLT;
 
   dfloat *coeffEXT, *coeffBDF;
   occa::memory o_coeffEXT, o_coeffBDF;

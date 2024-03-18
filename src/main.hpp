@@ -168,15 +168,22 @@ cmdOptions* processCmdLineOptions(int argc, char** argv, const MPI_Comm &comm)
   MPI_Bcast(&err, sizeof(err), MPI_BYTE, 0, comm);
   if (err | printHelp) {
     if (rank == 0) {
-      if (helpCat == "par") {
+      auto print = [&](const std::string& txtFile)
+      {
         std::string installDir;
         installDir.assign(getenv("NEKRS_HOME"));
-        std::ifstream f(installDir + "/doc/parHelp.txt");
+        std::ifstream f(installDir + "/doc/" + txtFile);
         if (f.is_open()) std::cout << f.rdbuf();
         f.close();
+      };
+
+      if (helpCat == "par") {
+        print("parHelp.txt");
+      } else if (helpCat == "env") {
+        print("envHelp.txt");
       } else {
         std::cout << "usage: ./nekrs "
-                  << "[ --help <par> ] "
+                  << "[ --help <par|env> ] "
                   << "--setup <par|sess file> "
                   << "[ --build-only <#procs> ] [ --cimode <id> ] [ --debug ] [ --attach ] "
                   << "[ --backend <CPU|CUDA|HIP|DPCPP|OPENCL> ] [ --device-id <id|LOCAL-RANK> ]"

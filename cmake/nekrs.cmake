@@ -131,13 +131,13 @@ set(NRS_INCLUDE
     src/plugins
     src/pointInterpolation/findpts
     src/pointInterpolation
+    src/nrs/nekInterface
     ${BENCH_SOURCE_DIR}
     ${BENCH_SOURCE_DIR}/core
     ${BENCH_SOURCE_DIR}/fdm
     ${BENCH_SOURCE_DIR}/axHelm
     ${BENCH_SOURCE_DIR}/advsub
     ${MESH_SOURCE_DIR}
-    ${NEKINTERFACEDIR}
     ${FINDPTS_SOURCE_DIR}
     ${ELLIPTIC_SOURCE_DIR}
     PRIVATE

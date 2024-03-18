@@ -14,61 +14,62 @@ void cds_t::solve(double time, int stage)
     auto mesh = (is) ? this->meshV : this->mesh[0];
 
     platform->timer.tic("scalar rhs", 1);
- 
+
     auto o_rhs = platform->o_memPool.reserve<dfloat>(this->fieldOffset[is]);
     o_rhs.copyFrom(this->o_BF, this->fieldOffset[is], 0, this->fieldOffsetScan[is]);
- 
+
     this->neumannBCKernel(mesh->Nelements,
-                         1,
-                         mesh->o_sgeo,
-                         mesh->o_vmapM,
-                         mesh->o_EToB,
-                         is,
-                         time,
-                         this->fieldOffset[is],
-                         0,
-                         this->EToBOffset,
-                         mesh->o_x,
-                         mesh->o_y,
-                         mesh->o_z,
-                         this->o_Ue,
-                         this->o_S,
-                         this->o_EToB,
-                         this->o_diff,
-                         this->o_rho,
-                         *(this->o_usrwrk),
-                         o_rhs);
- 
+                          1,
+                          mesh->o_sgeo,
+                          mesh->o_vmapM,
+                          mesh->o_EToB,
+                          is,
+                          time,
+                          this->fieldOffset[is],
+                          0,
+                          this->EToBOffset,
+                          mesh->o_x,
+                          mesh->o_y,
+                          mesh->o_z,
+                          this->o_Ue,
+                          this->o_S,
+                          this->o_EToB,
+                          this->o_diff,
+                          this->o_rho,
+                          *(this->o_usrwrk),
+                          o_rhs);
+
     platform->timer.toc("scalar rhs");
 
     auto o_diff_i = this->o_diff.slice(this->fieldOffsetScan[is], mesh->Nlocal);
     auto o_rho_i = this->o_rho.slice(this->fieldOffsetScan[is], mesh->Nlocal);
-    auto o_LHSDiag_i = (this->o_LHSDiag.isInitialized()) ? this->o_LHSDiag.slice(this->fieldOffsetScan[is], mesh->Nlocal) : o_NULL;
+    auto o_implicitLT_i = (this->o_implicitLT.isInitialized())
+                              ? this->o_implicitLT.slice(this->fieldOffsetScan[is], mesh->Nlocal)
+                              : o_NULL;
 
     auto o_lambda0 = o_diff_i;
     auto o_lambda1 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
-    if (o_LHSDiag_i.isInitialized())
-      platform->linAlg->axpbyz(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 1.0, o_LHSDiag_i, o_lambda1);
-    else
+    if (o_implicitLT_i.isInitialized()) {
+      platform->linAlg
+          ->axpbyz(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 1.0, o_implicitLT_i, o_lambda1);
+    } else {
       platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 0.0, o_lambda1);
+    }
 
- 
-    auto o_S = [&]()
-    {
-       auto o_S0 = platform->o_memPool.reserve<dfloat>(this->fieldOffset[is]);
-       if (platform->options.compareArgs("SCALAR" + sid + " INITIAL GUESS", "EXTRAPOLATION") && stage == 1)
-         o_S0.copyFrom(this->o_Se, this->fieldOffset[is], 0, this->fieldOffsetScan[is]);
-       else
-         o_S0.copyFrom(this->o_S, this->fieldOffset[is], 0, this->fieldOffsetScan[is]);
-       
-       return o_S0;
+    auto o_S = [&]() {
+      auto o_S0 = platform->o_memPool.reserve<dfloat>(this->fieldOffset[is]);
+      if (platform->options.compareArgs("SCALAR" + sid + " INITIAL GUESS", "EXTRAPOLATION") && stage == 1) {
+        o_S0.copyFrom(this->o_Se, this->fieldOffset[is], 0, this->fieldOffsetScan[is]);
+      } else {
+        o_S0.copyFrom(this->o_S, this->fieldOffset[is], 0, this->fieldOffsetScan[is]);
+      }
+
+      return o_S0;
     }();
- 
+
     this->solver[is]->solve(o_lambda0, o_lambda1, o_rhs, o_S);
     o_S.copyTo(this->o_S, this->fieldOffset[is], this->fieldOffsetScan[is]);
   }
 
   platform->timer.toc("scalarSolve");
 }
-
-

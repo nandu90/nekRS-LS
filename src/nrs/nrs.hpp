@@ -9,15 +9,16 @@
 #include "randomVector.hpp"
 #include "aeroForce.hpp"
 
-class nrs_t : public solver_t {
+class nrs_t : public solver_t
+{
 
-using userVelocitySource_t = std::function<void(double)>;
-using userScalarSource_t = std::function<void(double)>;
-using userProperties_t = std::function<void(double)>;
-using userDivergence_t = std::function<void(double)>;
-using preFluid_t = std::function<void(double, int)>;
-using postScalar_t = std::function<void(double, int)>;
-using userConvergenceCheck_t = std::function<bool(int)>;
+  using userVelocitySource_t = std::function<void(double)>;
+  using userScalarSource_t = std::function<void(double)>;
+  using userProperties_t = std::function<void(double)>;
+  using userDivergence_t = std::function<void(double)>;
+  using preFluid_t = std::function<void(double, int)>;
+  using postScalar_t = std::function<void(double, int)>;
+  using userConvergenceCheck_t = std::function<bool(int)>;
 
 public:
   userVelocitySource_t userVelocitySource = nullptr;
@@ -98,7 +99,7 @@ public:
   occa::memory o_idH;
 
   occa::memory o_BF;
-  occa::memory o_LHSDiag;
+  occa::memory o_implicitLT;
   occa::memory o_NLT;
 
   dfloat *coeffEXT, *coeffBDF;
@@ -184,7 +185,10 @@ public:
 
   void init();
 
-  std::string id() const { return "nrs"; };
+  std::string id() const
+  {
+    return "nrs";
+  };
 
   void initStep(double time, dfloat dt, int tstep);
   dfloat adjustDt(int tstep);
@@ -195,7 +199,7 @@ public:
   void printRunStat(int step);
   void printInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo);
 
-  void makeNLT(double time, int tstep, occa::memory& o_Usubcycling);
+  void makeNLT(double time, int tstep, occa::memory &o_Usubcycling);
   dfloat computeCFL();
   dfloat computeCFL(dfloat dt);
 
@@ -204,13 +208,13 @@ public:
   dfloat flowRatescaleFactor();
 
   void evaluateProperties(const double time);
-  void evaluateDivergence(const double time); 
+  void evaluateDivergence(const double time);
 
   occa::memory advectionSubcycling(int nEXT, double time);
 
   int numberActiveFields();
 
-  AeroForce *aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_ = o_NULL); 
+  AeroForce *aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_ = o_NULL);
 
   //       ( SO0          )         (     SO8  SO7)
   // Sij = ( SO3  SO1     )  Oij =  (          SO6)
@@ -225,13 +229,13 @@ public:
   void writeFld(double t, int step, int Nout = 0, bool uniform = false);
   void writeFld(double t, int step, std::string suffix, int Nout = 0, bool uniform = false);
   void writeFld(double t, int step, int outXYZ, int FP64, int Nout = 0, bool uniform = false);
-  void writeFld(double t, int step, int outXYZ, int FP64, std::string suffix, int Nout = 0, bool uniform = false);
+  void
+  writeFld(double t, int step, int outXYZ, int FP64, std::string suffix, int Nout = 0, bool uniform = false);
 
   void finalize();
-
 };
 
-void nrsSetDefaultSettings(setupAide* options);
+void nrsSetDefaultSettings(setupAide *options);
 
 static std::vector<std::string> nrsFieldsToSolve(setupAide &options)
 {

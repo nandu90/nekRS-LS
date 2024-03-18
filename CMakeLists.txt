@@ -79,11 +79,6 @@ endif()
 ###############################################################################
 # Configure Options
 ###############################################################################
-set(NEK5000_PPLIST "PARRSB DPROCMAP" CACHE STRING
-  "Preprocessor macros for Nek5000")
-set(NEKINTERFACEDIR "${CMAKE_CURRENT_SOURCE_DIR}/src/nrs/nekInterface/" CACHE PATH
-"Directory for Nek5000 inteface source files")
-
 string(COMPARE EQUAL "${CMAKE_CXX_COMPILER_ID}" "GNU" USING_GNU)
 string(COMPARE EQUAL "${CMAKE_CXX_COMPILER_ID}" "IntelLLVM" USING_INTEL_LLVM)
 string(COMPARE EQUAL "${CMAKE_CXX_COMPILER_ID}" "Clang" USING_LLVM)
@@ -222,6 +217,7 @@ set(CMAKE_CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER})
 
 # amgx
 if(ENABLE_AMGX)
+  message(FATAL_ERROR "AMGX support was removed, use HYPRE (enabled by default)!")
   if(OCCA_CUDA_ENABLED)
     add_subdirectory(3rd_party/AMGX)
   else()

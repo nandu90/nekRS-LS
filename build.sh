@@ -18,7 +18,8 @@ if [ $? -eq 0 ] && [ ${NRSCONFIG_NOBUILD} -eq 0 ]; then
   cmd="cmake --build ./build --target install -j8"
   echo ""
   echo $cmd
-  read -p "Please check the summary above carefully and press ENTER to continue or ctrl-c to cancel"
+  echo -e "\033[32mPlease check the summary above carefully and press ENTER to continue or ctrl-c to cancel\033[m"
+  read -rsn1 key  
 
   eval $cmd
   if [ $? -eq 0 ]; then

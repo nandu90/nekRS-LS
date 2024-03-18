@@ -1,0 +1,21 @@
+----------------------------------------------------------------------------------------------------------------------
+Variable			Value(s)   	Description / Comment
+----------------------------------------------------------------------------------------------------------------------
+NEKRS_HOME			string	     	Installation directory
+NEKRS_CACHE_DIR			string		Cache directory	
+NEKRS_GPU_MPI			0/1		Enable device aware MPI
+NEKRS_LOCAL_TMP_DIR		string		Node local temp directory
+NEKRS_CACHE_BCAST		0/1		Broadcast cache to NEKRS_LOCAL_TMP_DIR
+NEKRS_CACHE_LOCAL		0/1		Use node local cache (NEKRS_CACHE_DIR)
+
+NEKRS_MPI_THREAD_MULTIPLE	0/1		Use fully thread-safe MPI mode
+NEKRS_SIGNUM_BACKTRACE		int		Signal number to trigger stack trace
+
+NEKRS_UDF_INCLUDES		string		Optional include flags
+NEKRS_UDF_LDFLAGS		string		Operational linking flags
+
+OOGS_SYNC_RECV			0/1		Wait until all ranks have preposed recv (avoid unexpected msgs)
+OOGS_ENABLE_NBC_DEVICE		0/1		Enable device support for neighbor hood collectives
+
+OCCA_DIR			string		OCCA installation directory
+OCCA_VERBOSE			0/1		Enable verbose mode

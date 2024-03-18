@@ -1,3 +1,5 @@
+set(NEK5000_PPLIST "PARRSB DPROCMAP" CACHE STRING "Preprocessor macros for Nek5000")
+
 message(CHECK_START "Checking for a supported Nek5000 Fortran compiler")
 
 if(USING_GNU OR USING_INTEL_LLVM OR USING_NVHPC OR USING_FLANG)
