@@ -60,6 +60,7 @@
 
 \*---------------------------------------------------------------------------*/
 
+
 #include "main.hpp"
 #include "nekrs.hpp"
 
@@ -300,14 +301,16 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
   {
     abort(std::string(e.what()));
   }
+#ifdef CPPTRACE_ENABLED
   catch (const cpptrace::exception& e)
   {
-    const auto msg = "Error in " 
+    const auto msg = "Aborting in " 
                      + e.trace().frames.begin()->filename 
                      + ":" + std::string(e.trace().frames.begin()->symbol) + "\n"
                      + e.message();
     abort(!std::string(e.message()).empty() ? msg : std::string(""));
   }
+#endif
   catch (const std::runtime_error& e)
   {
     abort(std::string(e.what()));

@@ -19,7 +19,10 @@
 #include <csignal>
 
 #include "inipp.hpp"
+
+#ifdef CPPTRACE_ENABLED
 #include <cpptrace/cpptrace.hpp>
+#endif
 
 namespace {
 
@@ -358,6 +361,7 @@ MPI_Comm setupSession(cmdOptions *cmdOpt, const MPI_Comm &comm)
 
 void writeStackTraceToFile()
 {
+#ifdef CPPTRACE_ENABLED
   std::cerr << "generating stacktrace ...\n";
   const std::string fileName = "stacktrace." + std::to_string(worldRank);
   std::ofstream outfile;
@@ -365,6 +369,7 @@ void writeStackTraceToFile()
   outfile << cpptrace::generate_trace();
   outfile.close(); 
   sig_writeStackTrace = 0;
+#endif
 }
 
 void signalHandlerBacktrace(int signum) 

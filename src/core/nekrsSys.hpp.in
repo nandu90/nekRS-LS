@@ -76,7 +76,10 @@ using dlong = long long int;
 #include <unistd.h>
 #include <getopt.h>
 #include <sys/stat.h>
+
+#ifdef CPPTRACE_ENABLED
 #include <cpptrace/cpptrace.hpp>
+#endif
 
 #include <@CXX_FILESYSTEM_HEADER@>
 namespace fs = @CXX_FILESYSTEM_NAMESPACE@; 
@@ -90,7 +93,9 @@ constexpr std::string_view NEKRS_VERSION="@PROJECT_VERSION_MAJOR@";
 constexpr std::string_view NEKRS_SUBVERSION="@PROJECT_VERSION_MINOR@";
 constexpr std::string_view NEKRS_PATCHVERSION="@PROJECT_VERSION_PATCH@";
 
-#define nekrsCheck(_nekrsCheckCond, _nekrsCheckComm, _nekrsCheckExitCode, _nekrsCheckMessage, ...)           \
+#ifdef CPPTRACE_ENABLED
+
+#define nekrsCheck(_nekrsCheckCond, _nekrsCheckComm, _nekrsCheckExitCode, _nekrsCheckFormat, ...)            \
 do {                                                                                                         \
 int _nekrsCheckErr = 0;                                                                                      \
 if (_nekrsCheckCond)                                                                                         \
@@ -102,13 +107,37 @@ int rank = 0;                                                                   
 MPI_Comm_rank(_nekrsCheckComm, &rank);                                                                       \
 if (rank == 0) {                                                                                             \
   char _errTxt[4096] = {0};                                                                                  \
-  sprintf(_errTxt,_nekrsCheckMessage, __VA_ARGS__);                                                          \
+  sprintf(_errTxt,_nekrsCheckFormat, __VA_ARGS__);                                                           \
   throw cpptrace::runtime_error(_errTxt);                                                                    \
 } else {                                                                                                     \
   throw cpptrace::runtime_error("");                                                                         \
 }                                                                                                            \
 }                                                                                                            \
 } while (0)
+
+#else
+
+#define nekrsCheck(_nekrsCheckCond, _nekrsCheckComm, _nekrsCheckExitCode, _nekrsCheckFormat, ...)            \
+do {                                                                                                         \
+int _nekrsCheckErr = 0;                                                                                      \
+if (_nekrsCheckCond)                                                                                         \
+_nekrsCheckErr = 1;                                                                                          \
+if (_nekrsCheckComm != MPI_COMM_SELF)                                                                        \
+MPI_Allreduce(MPI_IN_PLACE, &_nekrsCheckErr, 1, MPI_INT, MPI_SUM, _nekrsCheckComm);                          \
+if (_nekrsCheckErr) {                                                                                        \
+int rank = 0;                                                                                                \
+MPI_Comm_rank(_nekrsCheckComm, &rank);                                                                       \
+if (rank == 0) {                                                                                             \
+  char _errTxt[4096] = {0};                                                                                  \
+  sprintf(_errTxt,"Aborting in %s:%s " _nekrsCheckFormat, __FILE__, __func__, __VA_ARGS__);                  \
+  throw std::runtime_error(_errTxt);                                                                         \
+} else {                                                                                                     \
+  throw std::runtime_error("");                                                                              \
+}                                                                                                            \
+}                                                                                                            \
+} while (0)
+
+#endif
 
 #define nekrsAbort(...)                                                                                      \
 do {                                                                                                         \

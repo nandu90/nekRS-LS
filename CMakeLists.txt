@@ -150,6 +150,8 @@ set(ENABLE_CVODE OFF CACHE BOOL "Enable CVODE support")
 
 set(NEKRS_BUILD_FLOAT ON CACHE BOOL "Build dfloat = float version")
 
+set(ENABLE_CPPTRACE OFF CACHE BOOL "Enable cpptrace for stack tracing")
+
 ###############################################################################
 # Set compiler flags                                                          #
 ###############################################################################
@@ -225,7 +227,9 @@ if(ENABLE_AMGX)
   endif()
 endif()
 
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/cpptrace")
+if(ENABLE_CPPTRACE)
+  add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/cpptrace")
+endif()
 
 # hypre
 include(cmake/hypre.cmake)
@@ -333,9 +337,9 @@ if (ENABLE_CVODE)
   endif()
 endif()
 
-target_link_libraries(nekrs-bin PRIVATE nekrs-lib cpptrace::cpptrace)
+target_link_libraries(nekrs-bin PRIVATE nekrs-lib)
 if (NEKRS_BUILD_FLOAT)
-  target_link_libraries(nekrs-bin-fp32 PRIVATE nekrs-lib-fp32 cpptrace::cpptrace)
+  target_link_libraries(nekrs-bin-fp32 PRIVATE nekrs-lib-fp32)
 endif()
 
 ###############################################################################

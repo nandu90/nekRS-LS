@@ -53,11 +53,13 @@ target_compile_definitions(OKL PRIVATE -D__okl__)
 add_library(udf SHARED udf.cpp)
 target_include_directories(udf PRIVATE $ENV{NEKRS_UDF_INCLUDES} ${INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
 
-find_package(cpptrace REQUIRED PATHS ${NEKRS_INSTALL_DIR})
-target_link_libraries(udf cpptrace::cpptrace)
+find_package(cpptrace QUIET PATHS ${NEKRS_INSTALL_DIR})
+if(cpptrace_FOUND)
+  target_link_libraries(udf cpptrace::cpptrace)
+endif()
 
 if(NEKRS_USE_DFLOAT_FLOAT)
-  target_compile_definitions(udf PUBLIC -DNEKRS_USE_DFLOAT_FLOAT)
+  target_compile_definitions(udf PUBLIC NEKRS_USE_DFLOAT_FLOAT)
 endif()
 
 if(APPLE)
