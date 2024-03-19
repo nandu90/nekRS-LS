@@ -7,4 +7,4 @@ if [ $# -eq 0 ] || [ $# -lt 2 ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; the
   echo "usage: ${0##*/} casename #tasks [args]"
   exit 1
 fi
-mpirun -np $2 $NEKRS_HOME/bin/nekrs --setup $1 ${@:3} 
+mpirun -np $2 $bin --setup $1 ${@:3} 

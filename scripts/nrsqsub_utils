@@ -2,14 +2,19 @@
 : ${CPUONLY:=0}
 : ${NEKRS_CACHE_BCAST:=1}
 : ${NEKRS_SKIP_BUILD_ONLY:=0}
+: ${NEKRS_FP32:=0}
 
-bin=$NEKRS_HOME/bin/nekrs
 
 case=$1
 nodes=$2
 time=$3
 
 setup() {
+
+bin=$NEKRS_HOME/bin/nekrs
+if [ $NEKRS_FP32 -gt 0 ]; then
+  bin=$NEKRS_HOME/bin/nekrs-fp32
+fi
 
 if [ $2 -gt 0 ]; then
 

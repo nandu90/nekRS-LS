@@ -20,20 +20,13 @@ setup $case $#
 RANKS_PER_NODE=$GPUS_PER_NODE
 TOTAL_RANKS=$(( nodes * RANKS_PER_NODE ))
 
-time_fmt=`echo $time|tr ":" " "|awk '{print NF}'`
-if [ "$time_fmt" -ne "3" ]; then
-  echo "Warning: time is not in the format <hh:mm:ss>"
-  echo $time
-  exit 1
-fi
-
 #--------------------------------------
 # Generate the submission script
 SFILE=s.bin
 echo "#!/bin/bash" > $SFILE
 echo "#PBS -A $PROJ_ID" >>$SFILE
 echo "#PBS -N nekRS_$case" >>$SFILE
-echo "#PBS -l walltime=$time" >>$SFILE
+echo "#PBS -l walltime=${time}:00" >>$SFILE
 echo "#PBS -l select=$nodes" >>$SFILE
 echo "#PBS -l place=scatter" >>$SFILE
 echo "#PBS -k doe" >>$SFILE
