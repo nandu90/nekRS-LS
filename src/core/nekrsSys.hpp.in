@@ -156,7 +156,7 @@ constexpr double targetTimeBenchmark{0.2};
 constexpr int BLOCKSIZE = 256;
 constexpr int ALIGN_SIZE = 1024;
 constexpr int NSCALAR_MAX = 100;
-occa::memory o_NULL;
+const occa::memory o_NULL;
 
 template <typename T> unsigned int alignStride(unsigned int stride)
 {
