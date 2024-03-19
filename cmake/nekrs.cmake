@@ -159,7 +159,7 @@ target_compile_definitions(nekrs-lib PUBLIC CPPTRACE_ENABLED)
 endif()
 
 if (NEKRS_BUILD_FLOAT)
-  target_link_libraries(nekrs-lib PUBLIC MPI::MPI_CXX)
+  target_link_libraries(nekrs-lib-fp32 PUBLIC MPI::MPI_CXX)
   set_target_properties(nekrs-lib-fp32 PROPERTIES LINKER_LANGUAGE CXX OUTPUT_NAME nekrs-fp32)
   if(ENABLE_CPPTRACE)
     target_link_libraries(nekrs-lib-fp32 PUBLIC cpptrace::cpptrace)

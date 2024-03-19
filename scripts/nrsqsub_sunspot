@@ -3,7 +3,7 @@
 source $NEKRS_HOME/bin/nrsqsub_utils
 
 #--------------------------------------
-: ${QUEUE:="EarlyAppAccess"}
+: ${QUEUE:="workq"}
 : ${NEKRS_GPU_MPI:=1}
 : ${NEKRS_BACKEND:="dpcpp"}
 : ${OCCA_DPCPP_COMPILER_FLAGS:="-w -O3 -fsycl -gline-tables-only -fsycl-targets=intel_gpu_pvc -Xsycl-target-backend '-options -ze-intel-enable-auto-large-GRF-mode'"}
@@ -11,7 +11,7 @@ source $NEKRS_HOME/bin/nrsqsub_utils
 : ${RANKS_FOR_BUILD:=12}
 : ${ONEAPI_MODULE:="oneapi/eng-compiler/2023.05.15.006"}
 : ${MPICH_MODULE:="mpich/51.2/icc-all-pmix-gpu"}
-: ${CMAKE_MODULE:="spack-pe-gcc cmake"}
+: ${CMAKE_MODULE:="spack cmake"}
 : ${CPU_BIND_LIST:="0-7,104-111:8-15,112-119:16-23,120-127:24-31,128-135:32-39,136-143:40-47,144-151:52-59,156-163:60-67,164-171:68-75,172-179:76-83,180-187:84-91,188-195:92-99,196-203"}
 #--------------------------------------
 
