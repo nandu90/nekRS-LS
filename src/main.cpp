@@ -62,11 +62,23 @@
 
 
 #include "main.hpp"
-#include "nekrs.hpp"
 
 int main(int argc, char** argv)
 {
   const auto timeStart = std::chrono::high_resolution_clock::now();
+
+  if (const char* env_val = std::getenv("NEKRS_SIGNUM_BACKTRACE")) {
+    std::signal(std::atoi(env_val), signalHandlerBacktrace);  
+  }
+
+  if (const char* env_val = std::getenv("NEKRS_SIGNUM_TERM")) {
+    std::signal(std::atoi(env_val), signalHandlerLastStep);  
+  }
+
+  if (const char* env_val = std::getenv("NEKRS_SIGNUM_UPD")) {
+    std::signal(std::atoi(env_val), signalHandlerUpdateFile);  
+  }
+
   {
     int request = MPI_THREAD_SINGLE;
     const char* env_val = std::getenv ("NEKRS_MPI_THREAD_MULTIPLE");
@@ -80,12 +92,6 @@ int main(int argc, char** argv)
       exit(EXIT_FAILURE);
     }
     MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
-  }
-
-  {
-    const char* env_val = std::getenv("NEKRS_SIGNUM_BACKTRACE");
-    if (env_val)
-      std::signal(std::atoi(env_val), signalHandlerBacktrace);  
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
@@ -223,6 +229,8 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
       if (rank == 0) std::cout << "endTime or numSteps reached already -> skip timestepping\n"; 
     }
 
+    // time stepping loop 
+
     fflush(stdout);
     MPI_Pcontrol(1);
     while (!isLastStep) {
@@ -232,6 +240,8 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
       ++tStep;
       double dt = nekrs::dt(tStep);
       isLastStep = nekrs::lastStep(time + dt, tStep, elapsedTime);
+      if (sig_terminate) isLastStep = 1;
+
       if (isLastStep && nekrs::endTime() > 0) dt = nekrs::endTime() - time;
 
       int outputStep = nekrs::outputStep(time + dt, tStep);
@@ -250,13 +260,9 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
   
       time = nekrs::finishStep();
  
-      {
-        int read = sig_processUpdFile;
-        MPI_Bcast(&read, 1, MPI_INT, 0, comm);
-        if(read) {
-          nekrs::processUpdFile();
-          sig_processUpdFile = 0;
-        }
+      if(sig_processUpdFile) {
+        nekrs::processUpdFile();
+        sig_processUpdFile = 0;
       }
  
       if (nekrs::printInfoFreq()) {

@@ -7,9 +7,12 @@ set (CMAKE_CXX_STANDARD 17)
 
 set(NEKRS_USE_DFLOAT_FLOAT OFF CACHE BOOL "use dfloat = float")
 
+set(MPI_CXX_SKIP_MPICXX TRUE)
+find_package(MPI REQUIRED)
+
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
 
-#set(CMAKE_VERBOSE_MAKEFILE on)
+set(CMAKE_VERBOSE_MAKEFILE on)
 
 set(GSDIR ${NEKRS_INSTALL_DIR}/gslib)
 set(FINDPTSDIR ${NEKRS_INSTALL_DIR}/pointInterpolation/findpts)
@@ -51,11 +54,12 @@ target_include_directories(OKL PRIVATE $ENV{NEKRS_UDF_INCLUDES} ${INCLUDE_DIRS} 
 target_compile_definitions(OKL PRIVATE -D__okl__)
 
 add_library(udf SHARED udf.cpp)
+target_link_libraries(udf PRIVATE MPI::MPI_CXX)
 target_include_directories(udf PRIVATE $ENV{NEKRS_UDF_INCLUDES} ${INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
 
-find_package(cpptrace QUIET PATHS ${NEKRS_INSTALL_DIR})
 if(cpptrace_FOUND)
-  target_link_libraries(udf cpptrace::cpptrace)
+  find_package(cpptrace QUIET PATHS ${NEKRS_INSTALL_DIR})
+  target_link_libraries(udf PRIVATE cpptrace::cpptrace)
 endif()
 
 if(NEKRS_USE_DFLOAT_FLOAT)
@@ -63,9 +67,9 @@ if(NEKRS_USE_DFLOAT_FLOAT)
 endif()
 
 if(APPLE)
-    target_link_libraries(udf "-Wl,-undefined -Wl,dynamic_lookup")
+target_link_options(udf PRIVATE "LINKER:-undefined,dynamic_lookup")
 endif()
-target_link_libraries(udf "$ENV{NEKRS_UDF_LDFLAGS}")
+target_link_options(udf PRIVATE "$ENV{NEKRS_UDF_LDFLAGS}")
 
 if(EXISTS "udf.cmake") 
     include(udf.cmake)

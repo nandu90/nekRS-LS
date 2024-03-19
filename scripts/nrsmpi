@@ -1,7 +1,7 @@
 #!/bin/bash
+source $NEKRS_HOME/bin/nrsqsub_utils
 
-ulimit -s unlimited 2>/dev/null
-export NEKRS_HOME=${NEKRS_HOME:="`dirname "$0"`/../"}
+setup $1 -1
 
 if [ $# -eq 0 ] || [ $# -lt 2 ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
   echo "usage: ${0##*/} casename #tasks [args]"

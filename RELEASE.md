@@ -15,7 +15,7 @@
 ## Good to know
 * `nek::userchk` is no longer called automatically during setup 
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
-* send SIGUSR2 to process trigger file `nekrs.upd` (no automatic check every N steps)
+* send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd` (no automatic check every N steps)
 
 ## Breaking Changes
 * call `build.sh` instead of `nrsconfig` to build nekRS

@@ -1,0 +1,55 @@
+: ${PROJ_ID:=""}
+: ${CPUONLY:=0}
+: ${NEKRS_CACHE_BCAST:=1}
+: ${NEKRS_SKIP_BUILD_ONLY:=0}
+
+bin=$NEKRS_HOME/bin/nekrs
+
+case=$1
+nodes=$2
+time=$3
+
+setup() {
+
+if [ $2 -gt 0 ]; then
+
+  if [ $2 -ne 3 ]; then
+    echo "usage: [PROJ_ID] [QUEUE] $0 <casename> <number of compute nodes> <hh:mm>"
+    exit 1
+  fi
+
+  if [ -z "$PROJ_ID" ]; then
+    echo "ERROR: PROJ_ID is empty"
+    exit 1
+  fi
+
+  if [ -z "$QUEUE" ]; then
+    echo "ERROR: QUEUE is empty"
+    exit 1
+  fi
+fi
+
+
+if [ ! -f $NEKRS_HOME/bin/nekrs ]; then
+  echo "Cannot find" $NEKRS_HOME/bin/nekrs  
+  exit 1
+fi
+
+if [ ! -f $1.par ]; then
+  echo "Cannot find" $1.par
+  exit 1
+fi
+
+if [ ! -f $1.udf ]; then
+  echo "Cannot find" $1.udf
+  exit 1
+fi
+
+if [ ! -f $1.re2 ]; then
+  echo "Cannot find" $1.re2
+  exit 1
+fi
+
+ulimit -s unlimited 2>/dev/null
+
+}

@@ -24,12 +24,16 @@
 #include <cpptrace/cpptrace.hpp>
 #endif
 
+#include "nekrs.hpp"
+
 namespace {
 
 int worldRank;
 volatile sig_atomic_t sig_processUpdFile = 0;
 
 volatile sig_atomic_t sig_writeStackTrace = 0;
+
+volatile sig_atomic_t sig_terminate = 0;
 
 struct cmdOptions
 {
@@ -383,5 +387,11 @@ void signalHandlerUpdateFile(int signum)
 {
   sig_processUpdFile = 1;
 }
+
+void signalHandlerLastStep(int signum)
+{
+  sig_terminate = 1;
+}
+
 
 } // namespace

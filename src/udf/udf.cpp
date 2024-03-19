@@ -436,19 +436,19 @@ void udfBuild(const std::string &_udfFile, setupAide &options)
 
         const std::string useFloat = (sizeof(dfloat) == sizeof(float)) ? "ON" : "OFF";
 
+
         sprintf(cmd,
                 "rm -f %s/*.so && cmake %s -S %s -B %s "
                 "-DNEKRS_USE_DFLOAT_FLOAT=%s "
                 "-DNEKRS_INSTALL_DIR=\"%s\" -DCASE_DIR=\"%s\" -DCMAKE_CXX_COMPILER=\"$NEKRS_CXX\" "
-                "-DCMAKE_CXX_FLAGS=\"$NEKRS_CXXFLAGS\" %s >cmake.log 2>&1",
+                "-DCMAKE_CXX_FLAGS=\"$NEKRS_CXXFLAGS\" >cmake.log 2>&1",
                 cmakeBuildDir.c_str(),
                 cmakeFlags.c_str(),
                 cmakeBuildDir.c_str(),
                 cmakeBuildDir.c_str(),
                 useFloat.c_str(),
                 installDir.c_str(),
-                case_dir.c_str(),
-                pipeToNull.c_str());
+                case_dir.c_str());
         const int retVal = system(cmd);
         if (verbose && platform->comm.mpiRank == 0) {
           printf("%s (cmake retVal: %d)\n", cmd, retVal);
@@ -457,8 +457,10 @@ void udfBuild(const std::string &_udfFile, setupAide &options)
           return EXIT_FAILURE;
         }
 
+        auto stdoutFlag = (verbose) ? std::string("") : ">>cmake.log 2>&1"; 
+
         { // generate pre-processed okl
-          sprintf(cmd, "cd %s && make -j1 okl.i %s", cmakeBuildDir.c_str(), pipeToNull.c_str());
+          sprintf(cmd, "cd %s && make -j1 okl.i %s", cmakeBuildDir.c_str(), stdoutFlag.c_str());
           const int retVal = system(cmd);
           if (verbose && platform->comm.mpiRank == 0) {
             printf("%s (preprocessing retVal: %d)\n", cmd, retVal);
@@ -473,7 +475,7 @@ void udfBuild(const std::string &_udfFile, setupAide &options)
         }
 
         { // build
-          sprintf(cmd, "cd %s/udf && make -j1 %s", cache_dir.c_str(), pipeToNull.c_str());
+          sprintf(cmd, "cd %s/udf && make VERBOSE=1 -j1 %s", cache_dir.c_str(), stdoutFlag.c_str());
           const int retVal = system(cmd);
           if (verbose && platform->comm.mpiRank == 0) {
             printf("%s (make retVal: %d)\n", cmd, retVal);

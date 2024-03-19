@@ -9,7 +9,10 @@ NEKRS_CACHE_BCAST		0/1		Broadcast cache to NEKRS_LOCAL_TMP_DIR
 NEKRS_CACHE_LOCAL		0/1		Use node local cache (NEKRS_CACHE_DIR)
 
 NEKRS_MPI_THREAD_MULTIPLE	0/1		Use fully thread-safe MPI mode
+
 NEKRS_SIGNUM_BACKTRACE		int		Signal number to trigger stack trace
+NEKRS_SIGNUM_TERM               int             Signal number to exit gracefully 
+NEKRS_SIGNUM_UPD                int             Signal number to process update (trigger) file
 
 NEKRS_UDF_INCLUDES		string		Optional include flags
 NEKRS_UDF_LDFLAGS		string		Operational linking flags

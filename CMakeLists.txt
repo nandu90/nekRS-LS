@@ -57,6 +57,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 #set(MPI_C_COMPILER ${CMAKE_C_COMPILER})
 #set(MPI_CXX_COMPILER ${CMAKE_CXX_COMPILER})
 #set(MPI_Fortran_COMPILER ${CMAKE_Fortran_COMPILER})
+set(MPI_CXX_SKIP_MPICXX TRUE)
 find_package(MPI REQUIRED)
 
 FortranCInterface_VERIFY(CXX QUIET)
@@ -424,7 +425,7 @@ install(FILES ${CMAKE_BINARY_DIR}/nekrsSys.hpp DESTINATION include/core)
 install(DIRECTORY src/ DESTINATION include FILES_MATCHING REGEX "\.hpp$|\.h$|\.tpp$")
 install(FILES src/udf/CMakeLists.txt DESTINATION udf)
 install(DIRECTORY src/nrs/nekInterface/ DESTINATION nekInterface REGEX "\.hpp$|\.cpp$" EXCLUDE)
-install(FILES doc/parHelp.txt DESTINATION doc)
+install(DIRECTORY doc/ DESTINATION doc)
 
 # Examples will follow a different policy -- only copy if source tree is newer than install tree
 file(GLOB_RECURSE EXAMPLE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/examples/*)

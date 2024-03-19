@@ -145,6 +145,10 @@ void setup(MPI_Comm commg_in,
   configRead(comm);
 
   auto options = setDefaultSettings(casename);
+  if (debug) {
+    options->setArgs("VERBOSE", "TRUE");
+  }
+
   static auto par = new inipp::Ini();
   par->sections = parKeyValuePairs;
   parsePar(par, comm, *options);
@@ -173,10 +177,6 @@ void setup(MPI_Comm commg_in,
   }
   if (!_deviceID.empty()) {
     options->setArgs("DEVICE NUMBER", _deviceID);
-  }
-
-  if (debug) {
-    options->setArgs("VERBOSE", "TRUE");
   }
 
   // setup platform (requires THREAD MODEL)
