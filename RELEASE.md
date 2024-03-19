@@ -47,10 +47,11 @@ We understand that this release includes several breaking changes. These were ne
 * Code is not fully optimized on CPUs and Intel GPUs
 * [507](https://github.com/Nek5000/nekRS/issues/485)
 * [485](https://github.com/Nek5000/nekRS/issues/485)
-* [729](https://github.com/Nek5000/Nek5000/issues/759)
 * [258](https://github.com/Nek5000/nekRS/issues/258)
 
 ## Thanks to our Contributors
+
+@kris-rowe, @MalachiTimothyPhillips, @yslan
 
 We are grateful to all who added new features, filed issues or helped resolve them, 
 asked and answered questions, and were part of inspiring discussions.
