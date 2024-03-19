@@ -53,9 +53,8 @@ provides an early preview of the next upcoming release (do not use in a producti
 To build and install the code run:
 
 ```sh
-CC=mpicc CXX=mpic++ FC=mpif77 ./build.sh [-DCMAKE_INSTALL_PREFIX=$HOME/.local/nekrs]
+CC=mpicc CXX=mpic++ FC=mpif77 ./build.sh [-DCMAKE_INSTALL_PREFIX=$HOME/.local/nekrs] [<options>]
 ```
-Build settings can be customized through CMake options passed to `configure`. 
 Please remove the previous build and installation directory in case of an update. 
 
 ## Setting the Enviroment
