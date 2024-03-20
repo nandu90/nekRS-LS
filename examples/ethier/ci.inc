@@ -11,6 +11,8 @@
 #include "randomVector.hpp"
 #include "LVector.hpp"
 
+std::fexcept_t flag;
+
 std::vector<dfloat> xp0;
 std::vector<dfloat> yp0;
 std::vector<dfloat> zp0;
@@ -105,6 +107,10 @@ static int ciMode = 0;
 
 void ciSetup(MPI_Comm comm, setupAide &options)
 {
+  std::feclearexcept(FE_ALL_EXCEPT);
+  std::fegetexceptflag(&flag, FE_ALL_EXCEPT);
+  std::fesetexceptflag(&flag, FE_ALL_EXCEPT);  
+
   options.setArgs("POLYNOMIAL DEGREE", std::string("9"));
   options.setArgs("SOLUTION OUTPUT INTERVAL", "0");
   options.setArgs("VISCOSITY", std::string("0.01"));
@@ -919,6 +925,10 @@ void ciTestErrors(nrs_t *nrs,
                   occa::kernel exactUVWPKernel,
                   occa::kernel RKKernel)
 {
+  if (std::fetestexcept(FE_INVALID)) {
+    throw std::runtime_error("floating-point exception occured!");
+  }  
+
   const int rank = platform->comm.mpiRank;
 
   if (ciMode == 15) {

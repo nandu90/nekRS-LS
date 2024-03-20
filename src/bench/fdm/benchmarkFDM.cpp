@@ -116,9 +116,9 @@ occa::kernel benchmarkFDM(int Nelements,
       return std::make_pair(referenceKernel, -1.0);
     }
 
-    auto Sx = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0, 1, true);
-    auto Sy = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0, 1, true);
-    auto Sz = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0, 1, true);
+    auto Sx = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0, 1e-4, true);
+    auto Sy = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0, 1e-4, true);
+    auto Sz = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0, 1e-4, true);
     auto invL = randomVector<FPType>(Nelements * Np_e, 0, 1, true);
     auto Su = randomVector<FPType>(Nelements * Np_e, 0, 1, true);
     auto u = randomVector<FPType>(Nelements * Np_e, 0, 1, true);
