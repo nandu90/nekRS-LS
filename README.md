@@ -70,10 +70,11 @@ then type `source $HOME/.bash_profile` in the current terminal window.
 
 ## Run the Code
 
-We try hard not to break userland but the code is evolving quickly so things might change from one version to another without being backward compatible. Please consult `RELEASE.md` *before* using the code. 
+We try hard not to break userland but the code is evolving quickly so things might change from one version to another without being backward compatible. Please consult `RELEASE.md` *before* using the code.  
 
 ```sh
-cd $NEKRS_HOME/examples/turbPipePeriodic
+cd <directory outside of your installation or source folder>
+cp -a $NEKRS_HOME/examples/turbPipePeriodic .
 mpirun -np 2 nekrs --setup turbPipe.par
 ```
 For convenience we provide various launch scripts in the `bin` directory.
