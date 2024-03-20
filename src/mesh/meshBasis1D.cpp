@@ -318,16 +318,14 @@ void JacobiGQ(dfloat alpha, dfloat beta, int _N, dfloat *_x, dfloat *_w)
       eps = eps / 2.;
     }
  
-    int nStart = 0;
-    if (alpha + beta < 10 * eps) {
-      J[0] = 0;
-      nStart = 1;
-    }
- 
     // J = J + J';
-    for (int n = nStart; n <= _N; ++n) {
+    for (int n = 0; n <= _N; ++n) {
       // J = diag(-1/2*(alpha^2-beta^2)./(h1+2)./h1) + ...
-      J[n * (_N + 1) + n] += -0.5 * (alpha * alpha - beta * beta) / ((h1[n] + 2) * h1[n]) * 2; // *2 for symm
+      if (n == 0 && alpha + beta < 10 * eps) {
+        J[n] = 0;
+      } else {
+        J[n * (_N + 1) + n] += -0.5 * (alpha * alpha - beta * beta) / ((h1[n] + 2) * h1[n]) * 2; // *2 for symm
+      }
  
       //    diag(2./(h1(1:_N)+2).*sqrt((1:_N).*((1:_N)+alpha+beta).*((1:_N)+alpha).*((1:_N)+beta)./(h1(1:_N)+1)./(h1(1:_N)+3)),1);
       if (n < _N) {
