@@ -119,6 +119,11 @@ public:
     return o_partition_;
   }
 
+  const std::vector<std::string> fieldList() const
+  {
+    return fields;
+  }
+
 private:
   void reserveAllocation();
   void updateInterpPoints();

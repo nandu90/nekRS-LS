@@ -170,7 +170,7 @@ void UDF_LoadKernels(deviceKernelProperties& kernelInfo)
   kernelInfo.define("p_U0") = P_U0;
   kernelInfo.define("p_V0") = P_V0;
 
-  dfloat viscosity;
+  dfloat viscosity = 1;
   platform->options.getArgs("VISCOSITY", viscosity);
   kernelInfo.define("p_visc") = viscosity;
 }
@@ -181,7 +181,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
   if (ciMode) {
     ciSetup(comm, options);
   }
-  dfloat viscosity;
+  dfloat viscosity = 1;
   options.getArgs("VISCOSITY", viscosity);
 
   platform->par->extract("casedata", "p_u0", P_U0);

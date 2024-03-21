@@ -121,46 +121,6 @@ void neknek_t::findIntPoints()
   this->interpolator->setTimerLevel(TimerLevel::Basic);
   this->interpolator->setTimerName("neknek_t::");
 
-  // remove fields with no INT boundaries
-  for (auto &&field : this->fields) {
-    int intFound = 0;
-    for (dlong e = 0; e < mesh->Nelements; ++e) {
-      for (dlong f = 0; f < mesh->Nfaces; ++f) {
-        auto bID = mesh->EToB[f + mesh->Nfaces * e];
-        auto bcType = bcMap::id(bID, field);
-        if (isIntBc(bcType, field)) {
-          intFound = 1;
-        }
-      }
-    }
-    MPI_Allreduce(MPI_IN_PLACE, &intFound, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-    if (!intFound) {
-      this->fields.erase(std::remove(this->fields.begin(), this->fields.end(), field), this->fields.end());
-    }
-  }
-
-  // check if all remaining fields have all the same INT boundaries
-  std::ostringstream errorLogger;
-  std::set<int> intBIDs;
-  for (auto &&field : this->fields) {
-    for (int bID = 1; bID <= bcMap::size(field); ++bID) {
-      auto bcType = bcMap::id(bID, field);
-      bool isInt = isIntBc(bcType, field);
-
-      if (isInt) {
-        intBIDs.insert(bID);
-      }
-
-      if ((intBIDs.find(bID) != intBIDs.end()) && !isInt) {
-        errorLogger << "ERROR: expected INT boundary condition on boundary id " << bID << " for field "
-                    << field << "\n";
-      }
-    }
-  }
-  int errorLength = errorLogger.str().length();
-  MPI_Allreduce(MPI_IN_PLACE, &errorLength, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
-  nekrsCheck(errorLength > 0, platform->comm.mpiCommParent, EXIT_FAILURE, "%s\n", errorLogger.str().c_str());
-
   // int points are the same for all neknek fields
   dlong numInterpFaces = 0;
   for (dlong e = 0; e < mesh->Nelements; ++e) {
@@ -230,6 +190,8 @@ void neknek_t::setup()
   dlong globalRank;
   MPI_Comm_rank(platform->comm.mpiCommParent, &globalRank);
 
+  auto mesh = nrs->_mesh;
+
   const int nsessions = this->nsessions_;
   if (platform->comm.mpiRank == 0) {
     printf("initializing neknek with %d sessions\n", nsessions);
@@ -273,6 +235,8 @@ void neknek_t::setup()
   this->globalMovingMesh = movingMesh;
 
   this->fields = nrsFieldsToSolve(platform->options);
+
+  // remove scalar > minScalar and fields with no INT boundaries
   for (auto &&field : this->fields) {
     if (field.find("scalar") != std::string::npos) {
       const auto id = std::stoi(field.substr(std::string("scalar").length()));
@@ -281,6 +245,47 @@ void neknek_t::setup()
       }
     }
   }
+  for (auto &&field : this->fields) {
+    int intFound = 0;
+    if(bcMap::size(field)) {
+      for (dlong e = 0; e < mesh->Nelements; ++e) {
+        for (dlong f = 0; f < mesh->Nfaces; ++f) {
+          auto bID = mesh->EToB[f + mesh->Nfaces * e];
+          auto bcType = bcMap::id(bID, field);
+          if (isIntBc(bcType, field)) {
+            intFound = 1;
+          }
+        }
+      }
+    }
+    MPI_Allreduce(MPI_IN_PLACE, &intFound, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+
+    if (!intFound) {
+      this->fields.erase(std::remove(this->fields.begin(), this->fields.end(), field), this->fields.end());
+    }
+  }
+
+  // check if all remaining fields have all the same INT boundaries
+  std::ostringstream errorLogger;
+  std::set<int> intBIDs;
+  for (auto &&field : this->fields) {
+    for (int bID = 1; bID <= bcMap::size(field); ++bID) {
+      auto bcType = bcMap::id(bID, field);
+      bool isInt = isIntBc(bcType, field);
+
+      if (isInt) {
+        intBIDs.insert(bID);
+      }
+
+      if ((intBIDs.find(bID) != intBIDs.end()) && !isInt) {
+        errorLogger << "ERROR: expected INT boundary condition on boundary id " << bID << " for field "
+                    << field << "\n";
+      }
+    }
+  }
+  int errorLength = errorLogger.str().length();
+  MPI_Allreduce(MPI_IN_PLACE, &errorLength, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
+  nekrsCheck(errorLength > 0, platform->comm.mpiCommParent, EXIT_FAILURE, "%s\n", errorLogger.str().c_str());
 
   this->findIntPoints();
 

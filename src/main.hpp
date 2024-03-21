@@ -354,7 +354,7 @@ MPI_Comm setupSession(cmdOptions *cmdOpt, const MPI_Comm &comm)
 
     if(rank == 0) {
       const std::string outputFile = cmdOpt->setupFile + ".log";
-      std::cout << "redirecting output to " << outputFile << " ...\n";
+      std::cout << "redirecting rank0 output to " << outputFile << " ...\n";
       const int fd = open(outputFile.c_str(), O_WRONLY|O_CREAT|O_TRUNC, S_IWUSR|S_IRUSR);
       dup2(fd, fileno(stderr));
       dup2(fd, fileno(stdout));
