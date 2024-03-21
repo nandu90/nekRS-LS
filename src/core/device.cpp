@@ -140,6 +140,12 @@ occa::kernel device_t::wrapperLoadKernel(const std::string &fileName,
                                          const occa::properties &props_,
                                          const std::string &suffix) const
 {
+  nekrsCheck(platform->options.compareArgs("BUILD ONLY", "TRUE"),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "illegal call during BUILD ONLY mode\n");
+
 #if 0
   const std::string cacheDir0 = occa::env::OCCA_CACHE_DIR;
 
@@ -235,12 +241,11 @@ occa::kernel device_t::buildKernel(const std::string &fileName,
                                    const std::string suffix,
                                    const MPI_Comm& comm) const
 {
-  if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
-    nekrsAbort(MPI_COMM_SELF,
-               EXIT_FAILURE,
-               "%s",
-               "illegal call during REGISTER ONLY mode\n");
-  }
+  nekrsCheck(platform->options.compareArgs("REGISTER ONLY", "TRUE"),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "illegal call during REGISTER ONLY mode\n");
 
   this->compileKernel(fileName, props, suffix, comm);
   return this->loadKernel(fileName, kernelName, props, suffix);
