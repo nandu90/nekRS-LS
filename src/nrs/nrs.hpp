@@ -19,6 +19,8 @@ class nrs_t : public solver_t
   using preFluid_t = std::function<void(double, int)>;
   using postScalar_t = std::function<void(double, int)>;
   using userConvergenceCheck_t = std::function<bool(int)>;
+  using userVelocityImplicitLinearTerm_t = std::function<occa::memory(double)>;
+  using userScalarImplicitLinearTerm_t = std::function<occa::memory(double, int)>;
 
 public:
   userVelocitySource_t userVelocitySource = nullptr;
@@ -28,6 +30,8 @@ public:
   preFluid_t preFluid = nullptr;
   postScalar_t postScalar = nullptr;
   userConvergenceCheck_t userConvergenceCheck = nullptr;
+  userVelocityImplicitLinearTerm_t userVelocityImplicitLinearTerm = nullptr;
+  userScalarImplicitLinearTerm_t userScalarImplicitLinearTerm = nullptr;
 
   bool multiSession = false;
 
@@ -99,7 +103,6 @@ public:
   occa::memory o_idH;
 
   occa::memory o_BF;
-  occa::memory o_implicitLT;
   occa::memory o_NLT;
 
   dfloat *coeffEXT, *coeffBDF;

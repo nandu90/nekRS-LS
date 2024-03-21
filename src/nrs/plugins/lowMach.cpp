@@ -47,8 +47,8 @@ void lowMach::buildKernel(occa::properties kernelInfo)
     }
   };
 
-  buildKernel("qtlHex3D");
-  buildKernel("p0thHelper");
+  qtlKernel= buildKernel("qtlHex3D");
+  p0thHelperKernel = buildKernel("p0thHelper");
 
   platform->options.setArgs("LOWMACH", "TRUE");
 }

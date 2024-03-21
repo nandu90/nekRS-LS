@@ -193,15 +193,20 @@ occa::memory velocitySolve(nrs_t *nrs, double time, int stage)
                    ? nrs->o_Ue
                    : nrs->o_U);
 
-  auto o_lambda0 = nrs->o_mue;
-  auto o_lambda1 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+  const auto o_lambda0 = nrs->o_mue;
 
-  if (nrs->o_implicitLT.isInitialized()) {
-    platform->linAlg
-        ->axpbyz(mesh->Nlocal, nrs->g0 / nrs->dt[0], nrs->o_rho, 1.0, nrs->o_implicitLT, o_lambda1);
-  } else {
-    platform->linAlg->axpby(mesh->Nlocal, nrs->g0 / nrs->dt[0], nrs->o_rho, 0.0, o_lambda1);
-  }
+  const auto o_lambda1 = [&]()
+  {
+    auto o_l = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+    if (nrs->userVelocityImplicitLinearTerm) {
+      auto o_implicitLT = nrs->userVelocityImplicitLinearTerm(time);
+      platform->linAlg
+          ->axpbyz(mesh->Nlocal, nrs->g0 / nrs->dt[0], nrs->o_rho, 1.0, o_implicitLT, o_l);
+    } else {
+      platform->linAlg->axpby(mesh->Nlocal, nrs->g0 / nrs->dt[0], nrs->o_rho, 0.0, o_l);
+    }
+    return o_l;
+  }();
 
   if (nrs->uvwSolver) {
     nrs->uvwSolver->solve(o_lambda0, o_lambda1, static_cast<const occa::memory>(o_rhs), o_U);

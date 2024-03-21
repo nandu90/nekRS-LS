@@ -41,20 +41,26 @@ void cds_t::solve(double time, int stage)
 
     platform->timer.toc("scalar rhs");
 
-    auto o_diff_i = this->o_diff.slice(this->fieldOffsetScan[is], mesh->Nlocal);
-    auto o_rho_i = this->o_rho.slice(this->fieldOffsetScan[is], mesh->Nlocal);
-    auto o_implicitLT_i = (this->o_implicitLT.isInitialized())
-                              ? this->o_implicitLT.slice(this->fieldOffsetScan[is], mesh->Nlocal)
-                              : o_NULL;
+    const auto o_diff_i = this->o_diff.slice(this->fieldOffsetScan[is], mesh->Nlocal);
 
-    auto o_lambda0 = o_diff_i;
-    auto o_lambda1 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
-    if (o_implicitLT_i.isInitialized()) {
-      platform->linAlg
-          ->axpbyz(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 1.0, o_implicitLT_i, o_lambda1);
-    } else {
-      platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 0.0, o_lambda1);
-    }
+    const auto o_lambda0 = o_diff_i;
+    const auto o_lambda1 = [&]()
+    { 
+      const auto o_rho_i = this->o_rho.slice(this->fieldOffsetScan[is], mesh->Nlocal);
+      auto o_l = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+      if (this->userImplicitLinearTerm) {
+        auto o_implicitLT = this->userImplicitLinearTerm(time, is);
+        if(o_implicitLT.isInitialized()) {
+          platform->linAlg
+            ->axpbyz(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 1.0, o_implicitLT, o_l);
+        } else {
+          platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 0.0, o_l);
+        }
+      } else {
+        platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 0.0, o_l);
+      }
+      return o_l;
+    }();
 
     auto o_S = [&]() {
       auto o_S0 = platform->o_memPool.reserve<dfloat>(this->fieldOffset[is]);

@@ -643,6 +643,7 @@ void nrs_t::init()
     cfg.alpha0Ref = &this->alpha0Ref;
 
     this->cds = new cds_t(cfg);
+
     if (this->cds->cvode) {
       this->cds->cvode->setEvaluateProperties(
           std::bind(&nrs_t::evaluateProperties, this, std::placeholders::_1));
@@ -681,6 +682,9 @@ void nrs_t::init()
     }
     if (this->userProperties) {
       cds->userProperties = this->userProperties;
+    }
+    if(this->userScalarImplicitLinearTerm) {
+      this->cds->userImplicitLinearTerm = this->userScalarImplicitLinearTerm;
     }
   }
 

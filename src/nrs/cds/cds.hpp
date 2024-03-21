@@ -32,6 +32,7 @@ struct cdsConfig_t {
   bool dpdt = false;
   dfloat *dp0thdt = nullptr;
   dfloat *alpha0Ref = nullptr;
+
 };
 
 class cds_t : public solver_t
@@ -39,6 +40,7 @@ class cds_t : public solver_t
 
   using userSource_t = std::function<void(double)>;
   using userProperties_t = std::function<void(double)>;
+  using userImplicitLinearTerm_t = std::function<occa::memory(double, int)>;
 
 public:
   static constexpr double targetTimeBenchmark{0.2};
@@ -50,6 +52,7 @@ public:
 
   userSource_t userSource = nullptr;
   userProperties_t userProperties = nullptr;
+  userImplicitLinearTerm_t userImplicitLinearTerm = nullptr;
 
   std::vector<mesh_t *> mesh;
   std::vector<dlong> fieldOffset;
@@ -111,7 +114,7 @@ public:
   occa::memory o_S, o_Se;
   occa::memory o_prop;
   occa::memory o_rho, o_diff;
-  occa::memory o_NLT, o_BF, o_implicitLT;
+  occa::memory o_NLT, o_BF;
 
   dfloat *coeffEXT, *coeffBDF;
   occa::memory o_coeffEXT, o_coeffBDF;

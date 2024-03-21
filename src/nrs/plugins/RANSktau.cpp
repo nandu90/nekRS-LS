@@ -19,6 +19,8 @@ static occa::memory o_mut;
 static occa::memory o_k;
 static occa::memory o_tau;
 
+static occa::memory o_implicitKtau;
+
 static occa::kernel computeKernel;
 static occa::kernel mueKernel;
 static occa::kernel limitKernel;
@@ -45,16 +47,18 @@ static dfloat coeff[] = {
     1e-8,      // TINY
     0          // Pope correction
 };
+
+occa::memory implicitK(double time, int scalarIdx)
+{
+  if (scalarIdx == kFieldIndex) return o_implicitKtau.slice(0 * nrs->fieldOffset, nrs->fieldOffset);
+  if (scalarIdx == kFieldIndex + 1) return o_implicitKtau.slice(1 * nrs->fieldOffset, nrs->fieldOffset);
+  return o_NULL;
+}
+
 } // namespace
 
 void RANSktau::buildKernel(occa::properties _kernelInfo)
 {
-  static bool isInitialized = false;
-  if (isInitialized) {
-    return;
-  }
-  isInitialized = true;
-
   occa::properties kernelInfo;
   if (!kernelInfo.get<std::string>("defines/p_sigma_k").size()) {
     kernelInfo["defines/p_sigma_k"] = coeff[0];
@@ -127,10 +131,10 @@ void RANSktau::buildKernel(occa::properties _kernelInfo)
     }
   };
 
-  buildKernel("RANSktauComputeHex3D");
-  buildKernel("mue");
-  buildKernel("limit");
-  buildKernel("SijMag2OiOjSk");
+  computeKernel = buildKernel("RANSktauComputeHex3D");
+  mueKernel = buildKernel("mue");
+  limitKernel = buildKernel("limit");
+  SijMag2OiOjSkKernel = buildKernel("SijMag2OiOjSk");
 
   int Nscalar;
   platform->options.getArgs("NUMBER OF SCALARS", Nscalar);
@@ -178,14 +182,13 @@ void RANSktau::updateSourceTerms()
   occa::memory o_SijMag2 = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
 
   occa::memory o_FS = cds->o_NLT + cds->fieldOffsetScan[kFieldIndex];
-  occa::memory o_implicitLT = cds->o_implicitLT + cds->fieldOffsetScan[kFieldIndex];
 
   auto o_SijOij = nrs->strainRotationRate();
 
   SijMag2OiOjSkKernel(mesh->Nelements * mesh->Np, nrs->fieldOffset, 1, o_SijOij, o_OiOjSk, o_SijMag2);
 
   computeKernel(mesh->Nelements,
-                nrs->cds->fieldOffset[kFieldIndex],
+                nrs->fieldOffset, // assumes offset is always the same
                 rho,
                 mueLam,
                 mesh->o_vgeo,
@@ -194,7 +197,7 @@ void RANSktau::updateSourceTerms()
                 o_tau,
                 o_SijMag2,
                 o_OiOjSk,
-                o_implicitLT,
+                o_implicitKtau,
                 o_FS);
 }
 
@@ -207,22 +210,23 @@ void RANSktau::setup(dfloat mueIn, dfloat rhoIn, int ifld)
   isInitialized = true;
 
   nrs = dynamic_cast<nrs_t *>(platform->solver);
-  ;
   mueLam = mueIn;
   rho = rhoIn;
-  kFieldIndex = ifld;
+  kFieldIndex = ifld; // tauFieldIndex is assumed to be kFieldIndex+1
 
   cds_t *cds = nrs->cds;
   mesh_t *mesh = nrs->meshV;
+
+  nekrsCheck(cds->NSfields < kFieldIndex+1, platform->comm.mpiComm, EXIT_FAILURE, 
+    "%s\n", "number of scalar fields too low!");
 
   o_k = cds->o_S + cds->fieldOffsetScan[kFieldIndex];
   o_tau = cds->o_S + cds->fieldOffsetScan[kFieldIndex + 1];
 
   o_mut = platform->device.malloc<dfloat>(cds->fieldOffset[kFieldIndex]);
 
-  if (!cds->o_implicitLT.ptr()) {
-    cds->o_implicitLT = platform->device.malloc<dfloat>(cds->fieldOffsetSum);
-  }
+  o_implicitKtau = platform->device.malloc<dfloat>(2 * nrs->fieldOffset);
+  cds->userImplicitLinearTerm = implicitK;
 
   setupCalled = true;
 }

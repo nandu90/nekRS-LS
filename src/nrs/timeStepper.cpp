@@ -384,7 +384,7 @@ void nrs_t::initStep(double time, dfloat _dt, int tstep)
                                                                        1,
                                                                        isOffset,
                                                                        mesh->ogs->o_invDegree,
-                                                                       cds->o_BF,
+                                                                       cds->o_BF + cds->fieldOffsetScan[is],
                                                                        platform->comm.mpiComm);
           if (platform->comm.mpiRank == 0) {
             printf("BF scalar=%d norm: %.15e\n", is, debugNorm);
@@ -435,7 +435,7 @@ void nrs_t::initStep(double time, dfloat _dt, int tstep)
                                                                    this->o_BF,
                                                                    platform->comm.mpiComm);
       if (platform->comm.mpiRank == 0) {
-        printf("BF norm: %.15e\n", debugNorm);
+        printf("BF velocity norm: %.15e\n", debugNorm);
       }
     }
 
