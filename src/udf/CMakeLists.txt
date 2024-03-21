@@ -12,7 +12,7 @@ find_package(MPI REQUIRED)
 
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
 
-set(CMAKE_VERBOSE_MAKEFILE on)
+#set(CMAKE_VERBOSE_MAKEFILE on)
 
 set(GSDIR ${NEKRS_INSTALL_DIR}/gslib)
 set(FINDPTSDIR ${NEKRS_INSTALL_DIR}/pointInterpolation/findpts)
