@@ -32,7 +32,7 @@ occa::memory cds_t::advectionSubcyling(int nEXT, double time, int scalarIdx)
   const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
 
   const auto mesh = (scalarIdx == 0) ? this->mesh[0] : this->meshV;
-  const auto gsh = this->gsh;
+  const auto gshV = this->gsh;
 
   const auto nFields = 1;
   const auto fieldOffset = this->fieldOffset[scalarIdx];
@@ -43,7 +43,7 @@ occa::memory cds_t::advectionSubcyling(int nEXT, double time, int scalarIdx)
   auto o_U = this->o_S.slice(this->fieldOffsetScan[scalarIdx], fieldOffset);
 
   auto o_Urst = (movingMesh) ? this->o_relUrst : this->o_Urst;
-  auto opKernel = (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE"))
+  auto kernel = (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE"))
                       ? this->subCycleStrongCubatureVolumeKernel
                       : this->subCycleStrongVolumeKernel;
 
@@ -55,8 +55,8 @@ occa::memory cds_t::advectionSubcyling(int nEXT, double time, int scalarIdx)
                                this->coeffBDF,
                                nEXT,
                                nFields,
-                               opKernel,
-                               gsh,
+                               kernel,
+                               gshV,
                                meshOffset,
                                fieldOffset,
                                this->vCubatureOffset,
@@ -106,8 +106,8 @@ cds_t::cds_t(cdsConfig_t &cfg)
   this->dp0thdt = cfg.dp0thdt;
   this->alpha0Ref = cfg.alpha0Ref;
 
-  auto mesh = this->mesh[0];
-  this->cht = (mesh != this->meshV) ? true : false;
+  //auto mesh = this->mesh[0];
+  this->cht = (this->mesh[0] != this->meshV) ? true : false;
 
   this->fieldOffsetScan[0] = 0;
   dlong sum = this->fieldOffset[0];
@@ -121,9 +121,9 @@ cds_t::cds_t(cdsConfig_t &cfg)
 
   this->o_fieldOffsetScan = platform->device.malloc<dlong>(this->NSfields, this->fieldOffsetScan.data());
 
-  this->gsh = oogs::setup(mesh->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO);
-  this->gshT = (mesh != this->meshV)
-                   ? oogs::setup(mesh->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO)
+  this->gsh = oogs::setup(this->meshV->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO);
+  this->gshT = (this->cht)
+                   ? oogs::setup(this->mesh[0]->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO)
                    : this->gsh;
 
   this->S = (dfloat *)calloc(std::max(this->nBDF, this->nEXT) * this->fieldOffsetSum, sizeof(dfloat));
@@ -138,6 +138,8 @@ cds_t::cds_t(cdsConfig_t &cfg)
     if (options.compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
       continue;
     }
+
+    auto mesh = (is) ? this->meshV : this->mesh[0]; // only first scalar can be a CHT mesh
 
     dfloat diff = 1;
     dfloat rho = 1;
@@ -171,8 +173,7 @@ cds_t::cds_t(cdsConfig_t &cfg)
     this->anyCvodeSolver |= this->cvodeSolve[is];
     this->anyEllipticSolver |= (!this->cvodeSolve[is] && this->compute[is]);
 
-    mesh_t *mesh;
-    (is) ? mesh = this->meshV : mesh = this->mesh[0]; // only first scalar can be a CHT mesh
+    auto mesh = (is) ? this->meshV : this->mesh[0]; // only first scalar can be a CHT mesh
 
     int cnt = 0;
     for (int e = 0; e < mesh->Nelements; e++) {

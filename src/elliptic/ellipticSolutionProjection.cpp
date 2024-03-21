@@ -178,7 +178,7 @@ void SolutionProjection::computePreProjection(occa::memory &o_r)
 
   flopCount += Nfields * (1 + 2 * (numVecsProjection - 1)) * static_cast<double>(Nlocal);
   if (type == ProjectionType::CLASSIC) {
-    auto o_rtmp = platform->o_memPool.reserve<pfloat>(Nfields * fieldOffset);
+    auto o_rtmp = platform->o_memPool.reserve<dfloat>(Nfields * fieldOffset);
     accumulateKernel(Nlocal, numVecsProjection, fieldOffset, o_alpha, o_bb, o_rtmp);
     platform->linAlg->axpbyMany(Nlocal, Nfields, fieldOffset, mone, o_rtmp, one, o_r);
 

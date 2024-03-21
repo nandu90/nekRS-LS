@@ -18,12 +18,12 @@ static occa::kernel subCycleRKKernel;
 
 static void flops(mesh_t *mesh, int Nfields)
 {
-  const auto cubNq = mesh->cubNq;
-  const auto cubNp = mesh->cubNp;
-  const auto Nq = mesh->Nq;
-  const auto Np = mesh->Np;
+  const auto cubNq = meshV->cubNq;
+  const auto cubNp = meshV->cubNp;
+  const auto Nq = meshV->Nq;
+  const auto Np = meshV->Np;
   const auto nEXT = 3;
-  const auto Nelements = mesh->Nelements;
+  const auto Nelements = meshV->Nelements;
   double flopCount = 0.0; // per elem basis
   if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
     flopCount += 6. * cubNp * nEXT;            // extrapolate U(r,s,t) to current time
@@ -73,13 +73,13 @@ applyOperator(int nFields, dfloat *extC, occa::memory &o_Urst, occa::memory &o_u
     if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
       opKernel(meshV->NglobalGatherElements,
                meshV->o_globalGatherElementList,
-               mesh->o_cubDiffInterpT,
-               mesh->o_cubInterpT,
+               meshV->o_cubDiffInterpT,
+               meshV->o_cubInterpT,
                fieldOffset,
                cubatureOffset,
                meshOffset,
                mesh->o_invLMM,
-               mesh->o_divU,
+               meshV->o_divU,
                extC[0],
                extC[1],
                extC[2],
@@ -89,11 +89,11 @@ applyOperator(int nFields, dfloat *extC, occa::memory &o_Urst, occa::memory &o_u
     } else {
       opKernel(meshV->NglobalGatherElements,
                meshV->o_globalGatherElementList,
-               mesh->o_D,
+               meshV->o_D,
                fieldOffset,
                meshOffset,
                mesh->o_invLMM,
-               mesh->o_divU,
+               meshV->o_divU,
                extC[0],
                extC[1],
                extC[2],
@@ -109,13 +109,13 @@ applyOperator(int nFields, dfloat *extC, occa::memory &o_Urst, occa::memory &o_u
     if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
       opKernel(meshV->NlocalGatherElements,
                meshV->o_localGatherElementList,
-               mesh->o_cubDiffInterpT,
-               mesh->o_cubInterpT,
+               meshV->o_cubDiffInterpT,
+               meshV->o_cubInterpT,
                fieldOffset,
                cubatureOffset,
                meshOffset,
                mesh->o_invLMM,
-               mesh->o_divU,
+               meshV->o_divU,
                extC[0],
                extC[1],
                extC[2],
@@ -125,11 +125,11 @@ applyOperator(int nFields, dfloat *extC, occa::memory &o_Urst, occa::memory &o_u
     } else {
       opKernel(meshV->NlocalGatherElements,
                meshV->o_localGatherElementList,
-               mesh->o_D,
+               meshV->o_D,
                fieldOffset,
                meshOffset,
                mesh->o_invLMM,
-               mesh->o_divU,
+               meshV->o_divU,
                extC[0],
                extC[1],
                extC[2],
@@ -181,7 +181,7 @@ static void rk44(int nFields,
     auto extC = extCoeffs(nEXT, time, tstage, sdt, dt, nodes, rk);
 
     if (movingMesh) {
-      nStagesSum3Kernel(meshV->Nlocal, meshOffset, nEXT, extC[0], extC[1], extC[2], mesh->o_LMM, o_LMMe);
+      nStagesSum3Kernel(meshV->Nlocal, meshOffset, nEXT, extC[0], extC[1], extC[2], meshV->o_LMM, o_LMMe);
       linAlg->aydxMany(meshV->Nlocal, nFields, fieldOffset, 0, 1.0, o_LMMe, o_u1);
     }
 
