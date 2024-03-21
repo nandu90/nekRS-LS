@@ -11,6 +11,8 @@ time=$3
 
 setup() {
 
+ulimit -s unlimited 2>/dev/null
+
 bin=$NEKRS_HOME/bin/nekrs
 if [ $NEKRS_FP32 -gt 0 ]; then
   bin=$NEKRS_HOME/bin/nekrs-fp32
@@ -32,29 +34,26 @@ if [ $2 -gt 0 ]; then
     echo "ERROR: QUEUE is empty"
     exit 1
   fi
+
+  if [ ! -f $NEKRS_HOME/bin/nekrs ]; then
+    echo "Cannot find" $NEKRS_HOME/bin/nekrs  
+    exit 1
+  fi
+
+  if [ ! -f $1.par ]; then
+    echo "Cannot find" $1.par
+    exit 1
+  fi
+
+  if [ ! -f $1.udf ]; then
+    echo "Cannot find" $1.udf
+    exit 1
+  fi
+
+  if [ ! -f $1.re2 ]; then
+    echo "Cannot find" $1.re2
+    exit 1
+  fi
 fi
-
-
-if [ ! -f $NEKRS_HOME/bin/nekrs ]; then
-  echo "Cannot find" $NEKRS_HOME/bin/nekrs  
-  exit 1
-fi
-
-if [ ! -f $1.par ]; then
-  echo "Cannot find" $1.par
-  exit 1
-fi
-
-if [ ! -f $1.udf ]; then
-  echo "Cannot find" $1.udf
-  exit 1
-fi
-
-if [ ! -f $1.re2 ]; then
-  echo "Cannot find" $1.re2
-  exit 1
-fi
-
-ulimit -s unlimited 2>/dev/null
 
 }
