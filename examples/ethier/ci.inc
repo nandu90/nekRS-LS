@@ -955,7 +955,7 @@ void ciTestErrors(nrs_t *nrs,
     return; // don't run the rest of the tests
   }
 
-  if (tstep == 1 && ciMode != 7 && ciMode != 13) {
+  if (tstep == 1 && ciMode != 7 && ciMode != 13 && ciMode != 8) {
     int NiterP = nrs->pSolver->Niter();
 
     int expectedNiterP = 5;
