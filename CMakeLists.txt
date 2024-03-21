@@ -403,29 +403,16 @@ if (NEKRS_BUILD_FLOAT)
   )
 endif()
 
-# Trailing slash prevents parent directory from being copied
-install(DIRECTORY scripts/ DESTINATION bin
-  FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-
-file(GLOB_RECURSE KERNEL_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/*.okl)
-set (KERNEL_DIRS "")
-foreach(F IN LISTS KERNEL_FILES)
-  get_filename_component(KERNEL_DIR ${F} DIRECTORY)
-  list(APPEND KERNEL_DIRS ${KERNEL_DIR})
-endforeach()
-foreach(DIR IN LISTS KERNEL_DIRS)
-  file(GLOB KERNEL_DIR_FILES  RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/${DIR}/*)
-  foreach(F IN LISTS KERNEL_DIR_FILES)
-    STRING(REGEX REPLACE "/kernels/" "/" FNEW ${F})
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/${F} ${CMAKE_INSTALL_PREFIX}/kernels/${FNEW} COPYONLY)
-  endforeach()
-endforeach()
+include(cmake/install_kernels.cmake)
 
 install(FILES ${CMAKE_BINARY_DIR}/nekrsSys.hpp DESTINATION include/core)
 install(DIRECTORY src/ DESTINATION include FILES_MATCHING REGEX "\.hpp$|\.h$|\.tpp$")
 install(FILES src/udf/CMakeLists.txt DESTINATION udf)
 install(DIRECTORY src/nrs/nekInterface/ DESTINATION nekInterface REGEX "\.hpp$|\.cpp$" EXCLUDE)
 install(DIRECTORY doc/ DESTINATION doc)
+
+install(DIRECTORY scripts/ DESTINATION bin
+  FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
 # Examples will follow a different policy -- only copy if source tree is newer than install tree
 file(GLOB_RECURSE EXAMPLE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/examples/*)
