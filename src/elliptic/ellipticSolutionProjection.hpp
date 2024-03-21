@@ -66,8 +66,6 @@ private:
   occa::memory o_alpha;
   // references to memory on elliptic
   occa::memory& o_invDegree;
-  occa::memory& o_rtmp;
-  occa::memory& o_Ap;
 
   occa::kernel multiScaledAddwOffsetKernel;
   occa::kernel accumulateKernel;

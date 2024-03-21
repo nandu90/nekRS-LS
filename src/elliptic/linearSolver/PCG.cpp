@@ -37,12 +37,20 @@
 
 #define TIMERS
 
-static dfloat update(elliptic_t *elliptic,
-                     const occa::memory &o_p,
-                     const occa::memory &o_Ap,
-                     const dfloat alpha,
-                     occa::memory &o_x,
-                     occa::memory &o_r)
+namespace
+{
+
+occa::memory o_p;
+occa::memory o_z;
+occa::memory o_Ap;
+occa::memory o_v;
+
+dfloat update(elliptic_t *elliptic,
+              const occa::memory &o_p,
+              const occa::memory &o_Ap,
+              const dfloat alpha,
+              occa::memory &o_x,
+              occa::memory &o_r)
 {
   mesh_t *mesh = elliptic->mesh;
 
@@ -86,13 +94,13 @@ static dfloat update(elliptic_t *elliptic,
   return rdotr1;
 }
 
-static void combinedPCGReductions(elliptic_t *elliptic,
-                                  const dlong preco,
-                                  const occa::memory &o_Minv,
-                                  const occa::memory &o_v,
-                                  const occa::memory &o_p,
-                                  const occa::memory &o_r,
-                                  std::array<dfloat, CombinedPCGId::nReduction> &reductions)
+void combinedPCGReductions(elliptic_t *elliptic,
+                           const dlong preco,
+                           const occa::memory &o_Minv,
+                           const occa::memory &o_v,
+                           const occa::memory &o_p,
+                           const occa::memory &o_r,
+                           std::array<dfloat, CombinedPCGId::nReduction> &reductions)
 {
   constexpr auto nRed = CombinedPCGId::nReduction;
   auto mesh = elliptic->mesh;
@@ -130,12 +138,12 @@ static void combinedPCGReductions(elliptic_t *elliptic,
   MPI_Allreduce(MPI_IN_PLACE, reductions.data(), nRed, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
 }
 
-static int standardPCG(elliptic_t *elliptic,
-                       const dfloat tol,
-                       const int MAXIT,
-                       dfloat &rdotr,
-                       occa::memory &o_r,
-                       occa::memory &o_x)
+int standardPCG(elliptic_t *elliptic,
+                const dfloat tol,
+                const int MAXIT,
+                dfloat &rdotr,
+                occa::memory &o_r,
+                occa::memory &o_x)
 {
 
   mesh_t *mesh = elliptic->mesh;
@@ -148,9 +156,6 @@ static int standardPCG(elliptic_t *elliptic,
   dfloat alpha;
 
   /*aux variables */
-  auto &o_p = elliptic->o_p;
-  auto &o_z = (!options.compareArgs("PRECONDITIONER", "NONE")) ? elliptic->o_z : o_r;
-  auto &o_Ap = elliptic->o_Ap;
   auto &o_weight = elliptic->o_invDegree;
   platform->linAlg->fill(elliptic->Nfields * elliptic->fieldOffset, 0.0, o_p);
 
@@ -256,12 +261,12 @@ static int standardPCG(elliptic_t *elliptic,
 }
 
 // Algo 5 from https://arxiv.org/pdf/2205.08909.pdf
-static int combinedPCG(elliptic_t *elliptic,
-                       const dfloat tol,
-                       const int MAXIT,
-                       dfloat &rdotr,
-                       occa::memory &o_r,
-                       occa::memory &o_x)
+int combinedPCG(elliptic_t *elliptic,
+                const dfloat tol,
+                const int MAXIT,
+                dfloat &rdotr,
+                occa::memory &o_r,
+                occa::memory &o_x)
 {
   mesh_t *mesh = elliptic->mesh;
   setupAide &options = elliptic->options;
@@ -281,11 +286,7 @@ static int combinedPCG(elliptic_t *elliptic,
   occa::memory o_null;
 
   /*aux variables */
-  auto &o_v = elliptic->o_v;
-  auto &o_p = elliptic->o_p;
-  auto &o_z = elliptic->o_z;
   auto &o_Minv = (preco) ? precon->o_invDiagA : o_null;
-  auto &o_Ap = elliptic->o_Ap;
   auto &o_weight = elliptic->o_invDegree;
   platform->linAlg->fill(elliptic->Nfields * elliptic->fieldOffset, 0.0, o_p);
   platform->linAlg->fill(elliptic->Nfields * elliptic->fieldOffset, 0.0, o_v);
@@ -381,7 +382,8 @@ static int combinedPCG(elliptic_t *elliptic,
                                                          alphak,
                                                          alphakm1,
                                                          betakm1,
-                                                         (!singleVectorUpdate) ? alphakm1 / betakm1 : static_cast<dfloat>(0),
+                                                         (!singleVectorUpdate) ? alphakm1 / betakm1
+                                                                               : static_cast<dfloat>(0),
                                                          o_Minv,
                                                          o_p,
                                                          o_r,
@@ -402,6 +404,8 @@ static int combinedPCG(elliptic_t *elliptic,
   return iter;
 }
 
+} // namespace
+
 int pcg(elliptic_t *elliptic,
         const dfloat tol,
         const int MAXIT,
@@ -410,9 +414,27 @@ int pcg(elliptic_t *elliptic,
         occa::memory &o_x)
 {
   setupAide &options = elliptic->options;
-  if (options.compareArgs("SOLVER", "PCG+COMBINED")) {
-    return combinedPCG(elliptic, tol, MAXIT, rdotr, o_r, o_x);
+
+  const auto Nlocal = elliptic->Nfields * static_cast<size_t>(elliptic->fieldOffset);
+
+  o_p = platform->o_memPool.reserve<dfloat>(Nlocal);
+  o_z = (elliptic->options.compareArgs("PRECONDITIONER", "NONE")) ? o_r : platform->o_memPool.reserve<dfloat>(Nlocal);
+  o_Ap = platform->o_memPool.reserve<dfloat>(Nlocal);
+
+  int Niter = 0;
+  if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
+    o_v = platform->o_memPool.reserve<dfloat>(Nlocal);
+    Niter = combinedPCG(elliptic, tol, MAXIT, rdotr, o_r, o_x);
+    o_v.free();
   } else {
-    return standardPCG(elliptic, tol, MAXIT, rdotr, o_r, o_x);
+    Niter = standardPCG(elliptic, tol, MAXIT, rdotr, o_r, o_x);
   }
+
+  o_p.free();
+  if (o_z != o_r) {
+    o_z.free();
+  }
+  o_Ap.free();
+
+  return Niter;
 }

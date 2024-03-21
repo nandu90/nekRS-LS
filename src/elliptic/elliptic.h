@@ -57,6 +57,10 @@ struct GmresData {
 
   occa::memory o_y;
   occa::memory _y;
+
+  occa::memory o_p;
+  occa::memory o_z;
+  occa::memory o_Ap;
 };
 
 struct elliptic_t {
@@ -101,10 +105,6 @@ struct elliptic_t {
 
   occa::memory o_EToB;
 
-  occa::memory o_p; // search direction
-  occa::memory o_z; // preconditioner solution
-  occa::memory o_Ap; // A*search direction
-  occa::memory o_v;  // work array for combined PCG iteration
   occa::memory o_invDegree;
   occa::memory o_interp;
 
@@ -163,7 +163,7 @@ struct elliptic_t {
   ~elliptic_t();
 };
 
-#include "ellipticSolutionProjection.h"
+#include "ellipticSolutionProjection.hpp"
 #include "ellipticMultiGrid.h"
 
 void ellipticMultiGridUpdateLambda(elliptic_t *elliptic);

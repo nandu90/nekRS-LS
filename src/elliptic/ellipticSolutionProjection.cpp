@@ -23,13 +23,9 @@
    SOFTWARE.
 
  */
-#include "mesh.h"
-#include "elliptic.h"
-#include "ellipticSolutionProjection.h"
-#include <iostream>
-#include "timer.hpp"
 #include "platform.hpp"
-#include "linAlg.hpp"
+#include "elliptic.h"
+#include "ellipticSolutionProjection.hpp"
 
 void SolutionProjection::matvec(occa::memory &o_Ax,
                                 const dlong Ax_offset,
@@ -182,6 +178,7 @@ void SolutionProjection::computePreProjection(occa::memory &o_r)
 
   flopCount += Nfields * (1 + 2 * (numVecsProjection - 1)) * static_cast<double>(Nlocal);
   if (type == ProjectionType::CLASSIC) {
+    auto o_rtmp = platform->o_memPool.reserve<pfloat>(Nfields * fieldOffset);
     accumulateKernel(Nlocal, numVecsProjection, fieldOffset, o_alpha, o_bb, o_rtmp);
     platform->linAlg->axpbyMany(Nlocal, Nfields, fieldOffset, mone, o_rtmp, one, o_r);
 
@@ -236,8 +233,7 @@ SolutionProjection::SolutionProjection(elliptic_t &elliptic,
       alpha((dfloat *)calloc(maxNumVecsProjection, sizeof(dfloat))), numVecsProjection(0),
       prevNumVecsProjection(0), Nlocal(elliptic.mesh->Np * elliptic.mesh->Nelements),
       fieldOffset(elliptic.fieldOffset), Nfields(elliptic.Nfields), timestep(0),
-      verbose(platform->options.compareArgs("VERBOSE", "TRUE")), o_invDegree(elliptic.mesh->ogs->o_invDegree),
-      o_rtmp(elliptic.o_z), o_Ap(elliptic.o_Ap)
+      verbose(platform->options.compareArgs("VERBOSE", "TRUE")), o_invDegree(elliptic.mesh->ogs->o_invDegree)
 {
   solverName = elliptic.name;
 
