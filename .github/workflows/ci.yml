@@ -13,11 +13,7 @@ env:
   NEKRS_HOME: "${{ github.workspace }}/.local/nekrs"
   MPICH_FC: "gfortran"
   NEKRS_EXAMPLES: "${{ github.workspace }}/.local/nekrs/examples"
-  ENABLE_CUDA: "0"
-  ENABLE_HIP: "0"
   NEKRS_COMPILER_FLAGS: "-O2"
-  OCCA_CXXFLAGS: "-O2"
-  NEKRS_OCCA_MODE_DEFAULT: "SERIAL"
   NRSCONFIG_NOBUILD: "1"
   RUNNER_ARCH: "X64"
 
@@ -42,7 +38,7 @@ jobs:
 
     - name: config and build
       run: |
-        CC=mpicc CXX=mpic++ FC=mpif77 ./build.sh -DENABLE_CVODE=OFF -DCMAKE_INSTALL_PREFIX=${{ env.NEKRS_HOME }}
+        CC=mpicc CXX=mpic++ FC=mpif77 ./build.sh -DENABLE_CVODE=OFF -DNEKRS_CXX_FLAGS=${{ env.NEKRS_COMPILER_FLAGS }} -DNEKRS_C_FLAGS=${{ env.NEKRS_COMPILER_FLAGS }} -DNEKRS_Fortran_FLAGS=${{ env.NEKRS_COMPILER_FLAGS }} -DCMAKE_INSTALL_PREFIX=${{ env.NEKRS_HOME }} -DOCCA_CXXFLAGS=${{ env.NEKRS_COMPILER_FLAGS }}
         cmake --build build --target install -j 4
 
     - name: Upload install dir
@@ -53,10 +49,10 @@ jobs:
         path: ${{ env.NEKRS_HOME }}
         if-no-files-found: error
 
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
-      timeout-minutes: 3 
-      if: ${{ github.event_name == 'workflow_dispatch' }}
+#    - name: Setup tmate session
+#      uses: mxschmitt/action-tmate@v3
+#      timeout-minutes: 3 
+#      if: ${{ github.event_name == 'workflow_dispatch' }}
 
   ethier:
     needs: install
