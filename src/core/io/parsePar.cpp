@@ -1048,7 +1048,7 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
       {"none"},
       {"jac"},
       {"semfem"},
-      {"non-smoothed"},
+      {"nonsmoothed"},
       {"femsem"},
       {"pmg"},
       {"multigrid"},
@@ -1093,7 +1093,7 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
     options.setArgs(parSection + "MGSOLVER CYCLE", key);
   } else if (p_preconditioner.find("semfem") != std::string::npos ||
              p_preconditioner.find("femsem") != std::string::npos) {
-    auto smoothed = (p_preconditioner.find("non-smoothed") != std::string::npos) ? false : true;
+    auto smoothed = (p_preconditioner.find("nonsmoothed") != std::string::npos) ? false : true;
 
     std::string p_coarseGridDiscretization;
     if (par->extract(parScope, "coarsegriddiscretization", p_coarseGridDiscretization)) {

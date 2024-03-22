@@ -81,6 +81,7 @@ solver                      none                                       linear so
                             user
                             cvode
                             PCG [D]
+                              +combined [D]
                               +block [D for VELOCITY]
                               +flexible
                             PFGMRES [D for PRESSURE] 
@@ -102,7 +103,7 @@ preconditioner              Jacobi [D]
                             multigrid [D for PRESSURE]                 polynomial multigrid + coarse grid correction
                               +additive
                             SEMFEM
-                              +non-smoothed                            
+                              +nonSmoothed                            
 
 coarseGridDiscretization    FEM [D]                                    linear finite elment discretization
                               +Galerkin                                coarse grid matrix by Galerkin projection 
