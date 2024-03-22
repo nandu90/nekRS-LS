@@ -3,6 +3,7 @@
 #include <set>
 #include <memory>
 #include "nekrsSys.hpp"
+#include "QQt.hpp"
 #include "flopCounter.hpp"
 #include "timer.hpp"
 #include "comm.hpp"

@@ -109,7 +109,7 @@ void setupRowBlocks(ogs_t *ogs, occa::device &device)
   free(blockRowStarts);
 }
 
-ogs_t *ogsSetup(dlong N, hlong *ids, MPI_Comm &comm,
+ogs_t *ogsSetup(dlong N, hlong *ids, const MPI_Comm &comm,
                 int verbose, occa::device device){
 
   //  ogs_t *ogs = (ogs_t*) calloc(1, sizeof(ogs_t));

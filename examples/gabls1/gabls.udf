@@ -151,7 +151,7 @@ void planarAverage(nrs_t *nrs)
   // d<u,w,temp>/dy(y)
   auto o_ddyAvg = o_work.slice(3 * nrs->fieldOffset, 3 * nrs->fieldOffset);
   gradY(mesh->Nelements, mesh->o_vgeo, mesh->o_D, nrs->fieldOffset, mesh->o_invLMM, o_work, o_ddyAvg);
-  qqt::startFinish(o_ddyAvg, 3, nrs->fieldOffset, ogsDfloat, ogsAdd, nrs->qqt);
+  nrs->qqt->startFinish("+", o_ddyAvg, nrs->fieldOffset);
 
   planarAvg(mesh, "xz", NUMBER_ELEMENTS_X, NUMBER_ELEMENTS_Y, NUMBER_ELEMENTS_Z, 6, nrs->fieldOffset, o_work);
 }
@@ -480,7 +480,7 @@ void UDF_ExecuteStep(double time, int tstep)
             o_ddyAvg,
             o_divTau);
 
-  oogs::startFinish(o_divTau, 3, nrs->fieldOffset, ogsDfloat, ogsAdd, nrs->gsh);
+  oogs::startFinish(nrs->qqtH, "+", o_divTau, nrs->fieldOffset, 3);
 
   if (nrs->isOutputStep) {
     if (platform->comm.mpiRank == 0) {

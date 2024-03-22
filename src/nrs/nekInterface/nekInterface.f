@@ -313,11 +313,10 @@ c-----------------------------------------------------------------------
 
       real ts
       integer npscals, p63s
-      logical ifxyos, ifvos, ifpos, iftos
-
+      logical ifxyos, ifvos, ifpos, iftos, ifpscos(ldimt1)
       common /ros/  ts
       common /ios/  npscals, p63s
-      common /ifos/ ifxyos, ifvos, ifpos
+      common /ifos/ ifxyos, ifvos, ifpos, iftos, ifpscos
 
       ts = time
       time = ttime
@@ -336,12 +335,18 @@ c-----------------------------------------------------------------------
       ifvo   = .false.
       ifpo   = .false.
       ifto   = .false.
- 
+      do i = 1,ldimt1
+        ifpsco(i) = .false.
+      enddo 
+
       if(xo.ne.0) ifxyo = .true.
       if(vo.ne.0) ifvo  = .true.
       if(po.ne.0) ifpo  = .true.
       if(so.ne.0) then
         ifto = .true.
+        do i = 1,npscal
+          ifpsco(i) = .true.
+        enddo
       endif
 
       return

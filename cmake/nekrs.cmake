@@ -26,6 +26,7 @@ set(OGS_SOURCES
         src/core/ogs/ogsScatterMany.cpp
         src/core/ogs/ogsScatterVec.cpp
         src/core/ogs/ogsSetup.cpp
+        src/core/ogs/QQt.cpp
         src/core/ogs/oogs.cpp)
 
 set(NRS_SRC 

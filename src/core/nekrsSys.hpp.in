@@ -87,7 +87,6 @@ using dlong = long long int;
 namespace fs = @CXX_FILESYSTEM_NAMESPACE@; 
 
 #include "occa.hpp"
-#include "ogs.hpp"
 #include "setupAide.hpp"
 
 constexpr std::string_view GITCOMMITHASH="@GIT_COMMIT_HASH@";

@@ -175,7 +175,7 @@ typedef struct {
 }ogs_t;
 
 
-ogs_t *ogsSetup(int N, long long int *ids, MPI_Comm &comm, 
+ogs_t *ogsSetup(int N, long long int *ids, const MPI_Comm &comm, 
                 int verbose, occa::device device);
 
 void ogsFree(ogs_t* ogs);
@@ -274,13 +274,13 @@ typedef struct {
 
 namespace oogs{
 
-void start(const occa::memory &o_v, const int k, const int stride, const char *type, const char *op, oogs_t *h);
-void finish(const occa::memory &o_v, const int k, const int stride, const char *type, const char *op, oogs_t *h);
+void start(occa::memory &o_v, const int k, const int stride, const char *type, const char *op, oogs_t *h);
+void finish( occa::memory &o_v, const int k, const int stride, const char *type, const char *op, oogs_t *h);
 void startFinish(void *v, const int k, const int stride, const char *type, const char *op, oogs_t *h);
-void startFinish(const occa::memory &o_v, const int k, const int stride, const char *type, const char *op, oogs_t *h);
+void startFinish(occa::memory &o_v, const int k, const int stride, const char *type, const char *op, oogs_t *h);
 void registerKernels();
 oogs_t *setup(ogs_t *ogs, int nVec, int stride, const char *type, std::function<void()> callback, oogs_mode gsMode);
-oogs_t *setup(int N, long long int *ids, const int k, const int stride, const char *type, MPI_Comm &comm,
+oogs_t *setup(int N, long long int *ids, const int k, const int stride, const char *type, const MPI_Comm &comm,
               int verbose, occa::device device, std::function<void()> callback, oogs_mode mode);
 void gpu_mpi(int val);
 void overlap(int val);
@@ -289,8 +289,5 @@ void sync_recv(int val);
 void destroy(oogs_t *h);
 
 }
-
-namespace qqt = oogs;
-using qqt_t = oogs_t;
 
 #endif

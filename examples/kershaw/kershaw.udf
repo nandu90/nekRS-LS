@@ -206,22 +206,5 @@ void UDF_ExecuteStep(double time, int tstep)
 {
   mesh_t *mesh = nrs->meshV;
 
-#if 1
-  {
-    auto qqth_host = qqt::setup(mesh->ogs, 1, mesh->Nelements * mesh->Np, ogsDfloat, NULL, OOGS_HOSTMPI);
-    if (qqt::gpu_mpi()) {
-      qqt_t *qqth_device =
-          qqt::setup(mesh->ogs, 1, mesh->Nelements * mesh->Np, ogsDfloat, NULL, OOGS_DEVICEMPI);
-    }
-  }
-  {
-    auto qqth_host = qqt::setup(mesh->ogs, 1, mesh->Nelements * mesh->Np, ogsPfloat, NULL, OOGS_HOSTMPI);
-    if (qqt::gpu_mpi()) {
-      qqt_t *qqth_device =
-          qqt::setup(mesh->ogs, 1, mesh->Nelements * mesh->Np, ogsPfloat, NULL, OOGS_DEVICEMPI);
-    }
-  }
-#endif
-
   runBenchmarks(nrs);
 }

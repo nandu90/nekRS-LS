@@ -27,9 +27,7 @@ SOFTWARE.
 #ifndef MGSOLVER_HPP
 #define MGSOLVER_HPP
 
-#include <functional>
-
-#include "nekrsSys.hpp"
+#include "platform.hpp"
 #include "defines.hpp"
 
 #include "ellipticParseMultigridSchedule.hpp"

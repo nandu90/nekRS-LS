@@ -787,7 +787,7 @@ oogs_t *oogs::setup(dlong N,
                     int nVec,
                     dlong stride,
                     const char *type,
-                    MPI_Comm &comm,
+                    const MPI_Comm &comm,
                     int verbose,
                     occa::device device,
                     std::function<void()> callback,
@@ -875,7 +875,7 @@ static void unpackBuf(oogs_t *gs,
   kernel(Ngather, k, stride, o_gstarts, o_gids, o_sstarts, o_sids, o_v, o_gv);
 }
 
-void oogs::start(const occa::memory &o_v,
+void oogs::start(occa::memory &o_v,
                  const int k,
                  const dlong stride,
                  const char *type,
@@ -935,7 +935,7 @@ void oogs::start(const occa::memory &o_v,
   }
 }
 
-void oogs::finish(const occa::memory &o_v,
+void oogs::finish(occa::memory &o_v,
                   const int k,
                   const dlong stride,
                   const char *type,
@@ -1028,13 +1028,15 @@ void oogs::startFinish(void *v, const int k, const dlong stride, const char *typ
   ogsGatherScatterMany(v, k, stride, type, op, h->ogs);
 }
 
-void oogs::startFinish(const occa::memory &o_v,
+
+void oogs::startFinish(occa::memory &o_v,
                        const int k,
                        const dlong stride,
                        const char *type,
                        const char *op,
                        oogs_t *h)
 {
+
   start(o_v, k, stride, type, op, h);
   finish(o_v, k, stride, type, op, h);
 }

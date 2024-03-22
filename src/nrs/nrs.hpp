@@ -52,7 +52,7 @@ public:
   neknek_t *neknek = nullptr;
 
   oogs_t *gsh = nullptr;
-  oogs_t *qqt = nullptr;
+  QQt *qqt = nullptr;
 
   oogs_t *gshMesh = nullptr;
 

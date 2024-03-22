@@ -568,8 +568,8 @@ void nrs_t::init()
   this->o_coeffEXT = platform->device.malloc<dfloat>(this->nEXT, this->coeffEXT);
   this->o_coeffBDF = platform->device.malloc<dfloat>(this->nBDF, this->coeffBDF);
 
-  this->qqt = oogs::setup(mesh->ogs, this->NVfields, this->fieldOffset, ogsDfloat, NULL, OOGS_AUTO);
-  this->gsh = this->qqt;
+  this->gsh = oogs::setup(mesh->ogs, this->NVfields, this->fieldOffset, ogsDfloat, NULL, OOGS_AUTO);
+  this->qqt = new QQt(this->gsh);
 
   if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
     mesh_t *meshT = this->_mesh;
