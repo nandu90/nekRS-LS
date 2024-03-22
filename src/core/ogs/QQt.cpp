@@ -1,5 +1,5 @@
 #include "platform.hpp"
-#include "qqt.hpp"
+#include "QQt.hpp"
 
 QQt::QQt(std::vector<hlong> ids, const timingConfig& config, oogs_mode gsMode, const MPI_Comm& comm)
 {
