@@ -2,7 +2,7 @@
 
 source $NEKRS_HOME/bin/nrsqsub_utils
 
-setup $case $#
+setup $# 1
 
 gpu_per_node=4
 cores_per_socket=16

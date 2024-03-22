@@ -4,7 +4,7 @@ source $NEKRS_HOME/bin/nrsqsub_utils
 
 : ${QUEUE:="batch"}
 
-setup $case $#
+setup $# 1
 
 export NVME_HOME="/mnt/bb/$USER/"
 

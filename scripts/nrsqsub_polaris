@@ -3,7 +3,7 @@ source $NEKRS_HOME/bin/nrsqsub_utils
 
 : ${QUEUE:="prod"} # debug, debug-scaling, prod https://docs.alcf.anl.gov/running-jobs/job-and-queue-scheduling/
 
-setup $case $#
+setup $# 1
 
 gpu_per_node=4
 cores_per_numa=8
