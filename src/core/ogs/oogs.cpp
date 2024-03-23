@@ -349,16 +349,16 @@ void oogs::registerKernels()
  
     props["defines/init_"
           "long_long"
-          "_add"] = static_cast<int64_t>(0);
+          "_add"] = static_cast<long long>(0);
     props["defines/init_"
           "long_long"
-          "_mul"] = static_cast<int64_t>(1);
+          "_mul"] = static_cast<long long>(1);
     props["defines/init_"
           "long_long"
-          "_min"] = std::numeric_limits<int64_t>::max();
+          "_min"] = std::numeric_limits<long long>::max();
     props["defines/init_"
            "long_long"
-           "_max"] = std::numeric_limits<int64_t>::lowest();
+           "_max"] = std::numeric_limits<long long>::lowest();
  
     props["defines/p_gatherNodesPerBlock"] = ogs::gatherNodesPerBlock;
     firstTime = false;

@@ -1,5 +1,5 @@
-#define GENERATE(T,OP)                                                          \
-@kernel void gatherScatter_##T##_##OP(const dlong Nblocks,                      \
+#define GENERATE(TN,T,OP)                                                       \
+@kernel void gatherScatter_##TN##_##OP(const dlong Nblocks,                     \
                                       const int   Nentries,                     \
                                       const int   Nvectors,                     \
                                       const dlong stride,                       \
@@ -32,7 +32,7 @@
             const dlong gRowEnd   = gatherStarts[row+1]-gStart;                 \
             const dlong sRowStart = gRowStart;                                  \
             const dlong sRowEnd   = gRowEnd;                                    \
-            T gq = init_##T##_##OP;                                             \
+            T gq = init_##TN##_##OP;                                            \
             for (dlong i=gRowStart;i<gRowEnd;i++) {                             \
               OGS_DO_##OP(gq,gtemp[i]);                                         \
             }                                                                   \
@@ -54,7 +54,7 @@
   }                                                                             \
 }
 
-GENERATE(float,add)
-GENERATE(double,add)
-GENERATE(double,min)
-GENERATE(double,max)
+GENERATE(float,float,add)
+GENERATE(double,double,add)
+GENERATE(double,double,min)
+GENERATE(double,double,max)

@@ -1,5 +1,5 @@
-#define GENERATE(T)                                                                                      \
-@kernel void scatter_##T(const dlong Nscatter,                                                           \
+#define GENERATE(TN,T)                                                                                   \
+@kernel void scatter_##TN(const dlong Nscatter,                                                          \
                          @ restrict const dlong *scatterStarts,                                          \
                          @ restrict const dlong *scatterIds,                                             \
                          @ restrict const T *q, @ restrict T *scatterq)                                  \
@@ -15,7 +15,7 @@
   }                                                                                                      \
 }
 
-GENERATE(float)
-GENERATE(double)
-GENERATE(int)
-GENERATE(long_long)
+GENERATE(float,float,)
+GENERATE(double,double)
+GENERATE(int,int)
+GENERATE(long_long,hlong)

@@ -120,7 +120,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
       nekrsCheck(!fs::exists(tmpDir),
                  MPI_COMM_SELF,
                  EXIT_FAILURE,
-                 "Cannot find NEKRS_LOCAL_TMP_DIR %s\n",
+                 "Cannot find NEKRS_LOCAL_TMP_DIR: %s\n",
                  tmpDir.c_str());
     }
   }
@@ -159,7 +159,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   kernelInfo["defines/"
              "dlong"] = dlongString;
   kernelInfo["defines/"
-             "hlong"] = hlongString;
+             "hlong"] = "long long"; // occa's parser doesn't know long long int
 
   if (device.mode() == "CUDA") {
     kernelInfo["defines/smXX"] = 1;

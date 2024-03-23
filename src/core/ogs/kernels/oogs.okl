@@ -1,5 +1,5 @@
-#define GENERATE(T, OP)                                                                                      \
-@kernel void packBuf_##T##_##OP(const dlong N,                                                               \
+#define GENERATE(TN, T, OP)                                                                                  \
+@kernel void packBuf_##TN##_##OP(const dlong N,                                                              \
                                 const int Nentries,                                                          \
                                 const dlong stride,                                                          \
                                 @restrict const  dlong *gatherStarts,                                        \
@@ -17,7 +17,7 @@
     const dlong startScatter = scatterStarts[gid];                                                           \
     const dlong endScatter = scatterStarts[gid+1];                                                           \
                                                                                                              \
-    T gq = init_##T##_##OP;                                                                                  \
+    T gq = init_##TN##_##OP;                                                                                 \
     for(dlong n=startGather;n<endGather;++n){                                                                \
       const dlong id = gatherIds[n];                                                                         \
       OGS_DO_##OP(gq,q[id+k*stride]);                                                                        \
@@ -34,18 +34,18 @@
   }                                                                                                          \
 }
 
-GENERATE(float,add)
-GENERATE(float,min)
-GENERATE(float,max)
+GENERATE(float,float,add)
+GENERATE(float,float,min)
+GENERATE(float,float,max)
 
-GENERATE(double,add)
-GENERATE(double,min)
-GENERATE(double,max)
+GENERATE(double,double,add)
+GENERATE(double,double,min)
+GENERATE(double,double,max)
 
 #undef GENERATE
 
-#define GENERATE(T, OP)                                                                                      \
-@kernel void unpackBuf_##T##_##OP(const dlong N,                                                             \
+#define GENERATE(TN, T, OP)                                                                                  \
+@kernel void unpackBuf_##TN##_##OP(const dlong N,                                                            \
                                   const int Nentries,                                                        \
                                   const dlong stride,                                                        \
                                   @restrict const  dlong *gatherStarts,                                      \
@@ -75,12 +75,12 @@ GENERATE(double,max)
   }                                                                                                          \
 }
 
-GENERATE(float,add)
-GENERATE(float,mul)
-GENERATE(float,min)
-GENERATE(float,max)
+GENERATE(float,float,add)
+GENERATE(float,float,mul)
+GENERATE(float,float,min)
+GENERATE(float,float,max)
 
-GENERATE(double,add)
-GENERATE(double,mul)
-GENERATE(double,min)
-GENERATE(double,max)
+GENERATE(double,double,add)
+GENERATE(double,double,mul)
+GENERATE(double,double,min)
+GENERATE(double,double,max)

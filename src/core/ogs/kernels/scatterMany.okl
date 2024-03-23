@@ -24,8 +24,8 @@ SOFTWARE.
 
 */
 
-#define GENERATE(T)                                                                                      \
-@kernel void scatterMany_##T(const dlong Nscatter,                                                       \
+#define GENERATE(TN,T)                                                                                   \
+@kernel void scatterMany_##TN(const dlong Nscatter,                                                      \
                              const   int Nentries,                                                       \
                              const  dlong  stride,                                                       \
                              const  dlong sstride,                                                       \
@@ -46,7 +46,7 @@ SOFTWARE.
   }                                                                                                      \
 }
 
-GENERATE(float)
-GENERATE(double)
-GENERATE(int)
-GENERATE(long_long)
+GENERATE(float,float)
+GENERATE(double,double)
+GENERATE(int,int)
+GENERATE(long_long,hlong)
