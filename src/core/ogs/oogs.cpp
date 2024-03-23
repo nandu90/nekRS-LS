@@ -316,10 +316,10 @@ void oogs::registerKernels()
           "_mul"] = (float)1;
     props["defines/init_"
           "float"
-          "_min"] = 0.01 * (float)std::numeric_limits<float>::max();
+          "_min"] = (float)std::numeric_limits<float>::max() / 100;
     props["defines/init_"
           "float"
-          "_max"] = 100 * (float)std::numeric_limits<float>::lowest();
+          "_max"] = (float)std::numeric_limits<float>::lowest() / 100;
  
     props["defines/init_"
           "double"
@@ -329,10 +329,10 @@ void oogs::registerKernels()
           "_mul"] = (double)1;
     props["defines/init_"
           "double"
-          "_min"] = 0.01 * (double)std::numeric_limits<double>::max();
+          "_min"] = (double)std::numeric_limits<double>::max() / 100;
     props["defines/init_"
            "double"
-           "_max"] = 100 * (double)std::numeric_limits<double>::lowest();
+           "_max"] = (double)std::numeric_limits<double>::lowest() / 100;
  
     props["defines/init_"
           "int"
@@ -345,7 +345,7 @@ void oogs::registerKernels()
           "_min"] = (int)std::numeric_limits<int>::max() / 100;
     props["defines/init_"
            "int"
-           "_max"] = 100 * (int)std::numeric_limits<int>::lowest();
+           "_max"] = (int)std::numeric_limits<int>::lowest() / 100;
  
     props["defines/init_"
           "long_long"
@@ -358,7 +358,7 @@ void oogs::registerKernels()
           "_min"] = std::numeric_limits<int64_t>::max() / 100;
     props["defines/init_"
            "long_long"
-           "_max"] = 100 * std::numeric_limits<int64_t>::lowest();
+           "_max"] = std::numeric_limits<int64_t>::lowest() / 100;
  
     props["defines/p_gatherNodesPerBlock"] = ogs::gatherNodesPerBlock;
     firstTime = false;
