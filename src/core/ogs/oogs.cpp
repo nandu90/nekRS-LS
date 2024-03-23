@@ -307,7 +307,7 @@ void oogs::registerKernels()
             "hlong"] = "long";
 
     props["includes"] += std::string(getenv("NEKRS_KERNEL_DIR")) + "/core/ogs/ogsDefs.h";
- 
+
     props["defines/init_"
           "float"
           "_add"] = (float)0;
@@ -316,10 +316,10 @@ void oogs::registerKernels()
           "_mul"] = (float)1;
     props["defines/init_"
           "float"
-          "_min"] = (float)std::numeric_limits<float>::max();
+          "_min"] = 0.01 * (float)std::numeric_limits<float>::max();
     props["defines/init_"
           "float"
-          "_max"] = (float)std::numeric_limits<float>::lowest();
+          "_max"] = 100 * (float)std::numeric_limits<float>::lowest();
  
     props["defines/init_"
           "double"
@@ -329,10 +329,10 @@ void oogs::registerKernels()
           "_mul"] = (double)1;
     props["defines/init_"
           "double"
-          "_min"] = (double)std::numeric_limits<double>::max();
+          "_min"] = 0.01 * (double)std::numeric_limits<double>::max();
     props["defines/init_"
            "double"
-           "_max"] = (double)std::numeric_limits<double>::lowest();
+           "_max"] = 100 * (double)std::numeric_limits<double>::lowest();
  
     props["defines/init_"
           "int"
@@ -342,23 +342,23 @@ void oogs::registerKernels()
           "_mul"] = (int)1;
     props["defines/init_"
           "int"
-          "_min"] = (int)std::numeric_limits<int>::max();
+          "_min"] = (int)std::numeric_limits<int>::max() / 100;
     props["defines/init_"
            "int"
-           "_max"] = (int)std::numeric_limits<int>::lowest();
+           "_max"] = 100 * (int)std::numeric_limits<int>::lowest();
  
     props["defines/init_"
           "long_long"
-          "_add"] = static_cast<long long>(0);
+          "_add"] = static_cast<int64_t>(0);
     props["defines/init_"
           "long_long"
-          "_mul"] = static_cast<long long>(1);
+          "_mul"] = static_cast<int64_t>(1);
     props["defines/init_"
           "long_long"
-          "_min"] = std::numeric_limits<long long>::max();
+          "_min"] = std::numeric_limits<int64_t>::max() / 100;
     props["defines/init_"
            "long_long"
-           "_max"] = std::numeric_limits<long long>::lowest();
+           "_max"] = 100 * std::numeric_limits<int64_t>::lowest();
  
     props["defines/p_gatherNodesPerBlock"] = ogs::gatherNodesPerBlock;
     firstTime = false;
