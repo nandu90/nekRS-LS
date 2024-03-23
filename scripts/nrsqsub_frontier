@@ -8,6 +8,8 @@ setup $# 1
 
 export NVME_HOME="/mnt/bb/$USER/"
 
+NEKRS_CACHE_BCAST=1
+
 gpu_per_node=8
 cores_per_numa=7
 let nn=$nodes*$gpu_per_node

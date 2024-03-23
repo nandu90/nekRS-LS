@@ -1,6 +1,6 @@
 : ${PROJ_ID:=""}
 : ${CPUONLY:=0}
-: ${NEKRS_CACHE_BCAST:=1}
+: ${NEKRS_CACHE_BCAST:=0}
 : ${NEKRS_SKIP_BUILD_ONLY:=0}
 : ${NEKRS_FP32:=0}
 
