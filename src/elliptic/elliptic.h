@@ -130,10 +130,6 @@ struct elliptic_t {
 
   dfloat resNormFactor;
 
-  // combined PCG update step
-  dfloat *tmpHostScalars = nullptr;
-  occa::memory h_tmpHostScalars;
-  occa::memory o_tmpHostScalars;
   occa::kernel updatePCGKernel;
 
   hlong NelementsGlobal;

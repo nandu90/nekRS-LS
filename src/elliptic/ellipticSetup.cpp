@@ -231,12 +231,6 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
     Nreductions = CombinedPCGId::nReduction;
   }
 
-  elliptic->h_tmpHostScalars = platform->device.mallocHost<dfloat>(Nreductions * Nblocks);
-  elliptic->tmpHostScalars = elliptic->h_tmpHostScalars.ptr<dfloat>();
-  std::fill(elliptic->tmpHostScalars, elliptic->tmpHostScalars + Nreductions * Nblocks, 0.0);
-  elliptic->o_tmpHostScalars =
-      platform->device.malloc<dfloat>(Nreductions * Nblocks, elliptic->tmpHostScalars);
-
   elliptic->allNeumann = 0;
   if (elliptic->poisson) {
     int allNeumann = 1;
@@ -424,11 +418,5 @@ elliptic_t::~elliptic_t()
   if (precon) {
     delete this->precon;
   }
-  if (this->o_tmpHostScalars.byte_size()) {
-    this->o_tmpHostScalars.free();
-    this->h_tmpHostScalars.free();
-  }
-  this->h_tmpHostScalars.free();
-  this->o_tmpHostScalars.free();
   this->o_EToB.free();
 }

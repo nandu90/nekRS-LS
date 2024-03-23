@@ -44,6 +44,8 @@ occa::memory o_p;
 occa::memory o_z;
 occa::memory o_Ap;
 occa::memory o_v;
+occa::memory o_tmpReductions;
+occa::memory h_tmpReductions;
 
 dfloat update(elliptic_t *elliptic,
               const occa::memory &o_p,
@@ -53,6 +55,7 @@ dfloat update(elliptic_t *elliptic,
               occa::memory &o_r)
 {
   mesh_t *mesh = elliptic->mesh;
+
 
   const bool serial = platform->serial;
 
@@ -64,19 +67,19 @@ dfloat update(elliptic_t *elliptic,
                             o_Ap,
                             alpha,
                             o_r,
-                            elliptic->o_tmpHostScalars);
+                            o_tmpReductions);
 
   dfloat rdotr1 = 0;
 #ifdef ELLIPTIC_ENABLE_TIMER
   // platform->timer.tic("dotp",1);
 #endif
   if (serial) {
-    rdotr1 = *((dfloat *)elliptic->o_tmpHostScalars.ptr());
+    rdotr1 = *((dfloat *)o_tmpReductions.ptr());
   } else {
-    const dlong Nblock = (mesh->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
-    elliptic->o_tmpHostScalars.copyTo(elliptic->tmpHostScalars, Nblock);
-    for (int n = 0; n < Nblock; ++n) {
-      rdotr1 += elliptic->tmpHostScalars[n];
+    auto tmp = h_tmpReductions.ptr<dfloat>();
+    o_tmpReductions.copyTo(tmp);
+    for (int n = 0; n < o_tmpReductions.size(); ++n) {
+      rdotr1 += tmp[n];
     }
   }
 
@@ -116,20 +119,25 @@ void combinedPCGReductions(elliptic_t *elliptic,
                                         o_v,
                                         o_p,
                                         o_r,
-                                        elliptic->o_tmpHostScalars);
+                                        o_tmpReductions);
 #ifdef TIMERS
   platform->timer.toc("combinedPCGPostMatVec");
 #endif
   if (serial) {
-    auto ptr = elliptic->o_tmpHostScalars.ptr<dfloat>();
+    auto ptr = o_tmpReductions.ptr<dfloat>();
     std::copy(ptr, ptr + nRed, reductions.begin());
   } else {
-    const dlong Nblock = (mesh->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
-    elliptic->o_tmpHostScalars.copyTo(elliptic->tmpHostScalars, nRed * Nblock);
+    auto tmp = h_tmpReductions.ptr<dfloat>();
+    o_tmpReductions.copyTo(tmp);
     std::fill(reductions.begin(), reductions.end(), 0.0);
+
+    auto mesh = elliptic->mesh;
+    const dlong Nlocal = mesh->Np * mesh->Nelements;
+    const dlong Nblock = (Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
+
     for (int red = 0; red < nRed; ++red) {
       for (int n = 0; n < Nblock; ++n) {
-        reductions[red] += elliptic->tmpHostScalars[n + Nblock * red];
+        reductions[red] += tmp[n + Nblock * red];
       }
     }
   }
@@ -421,6 +429,24 @@ int pcg(elliptic_t *elliptic,
   o_z = (elliptic->options.compareArgs("PRECONDITIONER", "NONE")) ? o_r : platform->o_memPool.reserve<dfloat>(Nlocal);
   o_Ap = platform->o_memPool.reserve<dfloat>(Nlocal);
 
+  o_tmpReductions = [&]() 
+  {
+    int Nreductions = 1;
+    if (options.compareArgs("SOLVER", "PCG+COMBINED")) {
+      Nreductions = CombinedPCGId::nReduction;
+    }
+    auto mesh = elliptic->mesh; 
+    const dlong Nlocal = mesh->Np * mesh->Nelements;
+    const dlong Nblock = (Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
+
+    if (h_tmpReductions.size() < Nreductions * Nblock) {
+      h_tmpReductions.free();
+      h_tmpReductions = platform->device.mallocHost<dfloat>(Nreductions * Nblock);
+    }
+
+    return platform->o_memPool.reserve<dfloat>(Nreductions * Nblock);
+  }();
+
   int Niter = 0;
   if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
     o_v = platform->o_memPool.reserve<dfloat>(Nlocal);
@@ -435,6 +461,7 @@ int pcg(elliptic_t *elliptic,
     o_z.free();
   }
   o_Ap.free();
+  o_tmpReductions.free();
 
   return Niter;
 }
