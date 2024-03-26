@@ -35,8 +35,6 @@
 #define DEBUG
 #endif
 
-#define TIMERS
-
 namespace
 {
 
@@ -71,7 +69,7 @@ dfloat update(elliptic_t *elliptic,
 
   dfloat rdotr1 = 0;
 #ifdef ELLIPTIC_ENABLE_TIMER
-  // platform->timer.tic("dotp",1);
+  platform->timer.tic("dotp",0);
 #endif
   if (serial) {
     rdotr1 = *((dfloat *)o_tmpReductions.ptr());
@@ -88,7 +86,7 @@ dfloat update(elliptic_t *elliptic,
 
   MPI_Allreduce(MPI_IN_PLACE, &rdotr1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
 #ifdef ELLIPTIC_ENABLE_TIMER
-  // platform->timer.toc("dotp");
+  platform->timer.toc("dotp");
 #endif
 
   platform->flopCounter->add(elliptic->name + " ellipticUpdatePC",
@@ -108,9 +106,6 @@ void combinedPCGReductions(elliptic_t *elliptic,
   constexpr auto nRed = CombinedPCGId::nReduction;
   auto mesh = elliptic->mesh;
   const bool serial = platform->serial;
-#ifdef TIMERS
-  platform->timer.tic("combinedPCGPostMatVec", 1);
-#endif
   elliptic->combinedPCGPostMatVecKernel(mesh->Nlocal,
                                         elliptic->fieldOffset,
                                         preco,
@@ -120,9 +115,6 @@ void combinedPCGReductions(elliptic_t *elliptic,
                                         o_p,
                                         o_r,
                                         o_tmpReductions);
-#ifdef TIMERS
-  platform->timer.toc("combinedPCGPostMatVec");
-#endif
   if (serial) {
     auto ptr = o_tmpReductions.ptr<dfloat>();
     std::copy(ptr, ptr + nRed, reductions.begin());
@@ -314,9 +306,6 @@ int combinedPCG(elliptic_t *elliptic,
     iter++;
     const dlong updateX = iter > 1 && iter % 2 == 1;
 
-#ifdef TIMERS
-    platform->timer.tic("combinedPCGPreMatVec", 1);
-#endif
     elliptic->combinedPCGPreMatVecKernel(mesh->Nlocal,
                                          updateX,
                                          preco,
@@ -331,9 +320,6 @@ int combinedPCG(elliptic_t *elliptic,
                                          o_p,
                                          o_x,
                                          o_r);
-#ifdef TIMERS
-    platform->timer.toc("combinedPCGPreMatVec");
-#endif
 
     ellipticOperator(elliptic, o_p, o_v, dfloatString);
 
@@ -428,6 +414,9 @@ int pcg(elliptic_t *elliptic,
   o_p = platform->o_memPool.reserve<dfloat>(Nlocal);
   o_z = (elliptic->options.compareArgs("PRECONDITIONER", "NONE")) ? o_r : platform->o_memPool.reserve<dfloat>(Nlocal);
   o_Ap = platform->o_memPool.reserve<dfloat>(Nlocal);
+  if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
+    o_v = platform->o_memPool.reserve<dfloat>(Nlocal);
+  }
 
   o_tmpReductions = [&]() 
   {
@@ -447,20 +436,23 @@ int pcg(elliptic_t *elliptic,
     return platform->o_memPool.reserve<dfloat>(Nreductions * Nblock);
   }();
 
-  int Niter = 0;
-  if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
-    o_v = platform->o_memPool.reserve<dfloat>(Nlocal);
-    Niter = combinedPCG(elliptic, tol, MAXIT, rdotr, o_r, o_x);
-    o_v.free();
-  } else {
-    Niter = standardPCG(elliptic, tol, MAXIT, rdotr, o_r, o_x);
-  }
+  const auto Niter = [&]() 
+  {
+    if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
+      return combinedPCG(elliptic, tol, MAXIT, rdotr, o_r, o_x);
+    } else {
+      return standardPCG(elliptic, tol, MAXIT, rdotr, o_r, o_x);
+    }
+  }();
 
   o_p.free();
   if (o_z != o_r) {
     o_z.free();
   }
   o_Ap.free();
+  if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
+    o_v.free();
+  }
   o_tmpReductions.free();
 
   return Niter;

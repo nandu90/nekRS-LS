@@ -40,7 +40,6 @@ void ellipticZeroMean(elliptic_t *elliptic, occa::memory &o_q)
                "NULL space handling for Block solver current not supported!");
   } else {
     auto qmeanGlobal = platform->linAlg->sum(mesh->Nlocal, o_q, platform->comm.mpiComm);
-    qmeanGlobal /= (dfloat)Nglobal;
-    platform->linAlg->add(mesh->Nlocal, -qmeanGlobal, o_q);
+    platform->linAlg->add(mesh->Nlocal, -qmeanGlobal / Nglobal, o_q);
   }
 }

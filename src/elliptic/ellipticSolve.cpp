@@ -89,7 +89,7 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
   auto o_r = [&]()
   {
     auto o_r = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
-    auto o_Ap = o_x;
+    auto& o_Ap = o_x;
     ellipticAx(elliptic, mesh->Nelements, mesh->o_elementList, o_x0, o_Ap, dfloatString);
     platform->linAlg->axpbyzMany(mesh->Nlocal,
                                  elliptic->Nfields,

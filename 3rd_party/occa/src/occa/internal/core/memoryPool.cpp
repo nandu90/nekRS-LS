@@ -76,6 +76,8 @@ namespace occa {
     dim_t hi = ((mem->offset + mem->size + alignment - 1)
                 / alignment) * alignment; //Round up
 
+    const auto mem_size = hi-lo;
+
     for (modeMemory_t* m : reservations) {
       const dim_t mlo = (m->offset / alignment) * alignment;
       const dim_t mhi = ((m->offset + m->size + alignment - 1)
@@ -93,6 +95,9 @@ namespace occa {
       if (lo == hi) break;
     }
     reserved -= hi-lo;
+    if (hi-lo) {
+      OCCA_ERROR("Invalid partial release of reserved memory", (mem_size == hi-lo)); 
+    }
   }
 
   bool modeMemoryPool_t::needsFree() const {
@@ -132,8 +137,8 @@ namespace occa {
     if (offset + bytes <= size) {
       return slice(offset, bytes);
     } else {
-      resize(offset + alignedBytes);
-      return slice(offset, bytes);
+      resize(reserved + alignedBytes);
+      return slice(reserved, bytes);
     }
   }
 
@@ -142,8 +147,6 @@ namespace occa {
     OCCA_ERROR("Cannot resize memoryPool below current usage"
                "(reserved: " << reserved << ", bytes: " << bytes << ")",
                reserved <= bytes);
-
-    if (size == bytes) return; /*Nothing to do*/
 
     const udim_t alignedBytes = ((bytes + alignment - 1) / alignment) * alignment;
 

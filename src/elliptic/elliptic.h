@@ -33,7 +33,7 @@
 #include "ellipticApplyMask.hpp"
 #include "ellipticBcTypes.h"
 
-#define ELLIPTIC_ENABLE_TIMER
+//#define ELLIPTIC_ENABLE_TIMER
 
 class SolutionProjection;
 class elliptic_t;
@@ -73,7 +73,7 @@ struct elliptic_t {
 
   bool mgLevel = false;
 
-  std::string name;
+  std::string name = "unknown";
 
   int Niter;
   dfloat res00Norm, res0Norm, resNorm;
@@ -111,8 +111,6 @@ struct elliptic_t {
   occa::memory o_rPfloat;
   occa::memory o_zPfloat;
 
-  occa::memory o_EXYZ; // element vertices for reconstructing geofacs (trilinear hexes only)
-
   occa::kernel AxKernel;
 
   occa::kernel fusedCopyDfloatToPfloatKernel;
@@ -149,7 +147,7 @@ struct elliptic_t {
   int nLevels = 0;
   int *levels = nullptr;
 
-  SolutionProjection *solutionProjection;
+  SolutionProjection *solutionProjection = nullptr;
   GmresData *gmresData = nullptr;
 
   std::function<void(dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x)>

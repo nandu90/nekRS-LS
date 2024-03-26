@@ -178,6 +178,195 @@ static void assignKernels(nrs_t *nrs)
   }
 }
 
+static void setupEllipticSolvers(nrs_t *nrs)
+{
+  auto createEToB = [](std::string field, mesh_t *mesh) {
+    std::vector<int> EToB(mesh->Nelements * mesh->Nfaces);
+    for (dlong e = 0; e < mesh->Nelements; e++) {
+      for (int f = 0; f < mesh->Nfaces; f++) {
+        const int bID = mesh->EToB[f + e * mesh->Nfaces];
+        EToB[f + e * mesh->Nfaces] = bcMap::ellipticType(bID, field);
+      }
+    }
+    return EToB;
+  };
+
+  if (nrs->Nscalar) {
+    cds_t *cds = nrs->cds;
+
+    for (int is = 0; is < cds->NSfields; is++) {
+      std::string sid = scalarDigitStr(is);
+
+      if (!cds->compute[is]) {
+        continue;
+      }
+
+      auto mesh = (is) ? cds->meshV : cds->mesh[0]; // only first scalar can be a CHT mesh
+
+      const auto solverName = cds->cvodeSolve[is] ? "CVODE" : "ELLIPTIC";
+      if (platform->comm.mpiRank == 0) {
+        std::cout << "================= " << solverName << " SETUP SCALAR" << sid << " ===============\n";
+      }
+
+      const int nbrBIDs = bcMap::size("scalar" + sid);
+      for (int bID = 1; bID <= nbrBIDs; bID++) {
+        std::string bcTypeText(bcMap::text(bID, "scalar" + sid));
+        if (platform->comm.mpiRank == 0 && bcTypeText.size()) {
+          printf("bID %d -> bcType %s\n", bID, bcTypeText.c_str());
+        }
+      }
+
+      if (cds->cvodeSolve[is]) {
+        continue;
+      }
+
+      auto EToB = createEToB("scalar" + sid, mesh);
+
+      auto o_rho_i = cds->o_rho.slice(cds->fieldOffsetScan[is], mesh->Nlocal);
+      auto o_lambda0 = cds->o_diff.slice(cds->fieldOffsetScan[is], mesh->Nlocal);
+      auto o_lambda1 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+      platform->linAlg->axpby(mesh->Nlocal, *cds->g0 / cds->dt[0], o_rho_i, 0.0, o_lambda1);
+
+      cds->solver[is] = new elliptic("scalar" + sid, mesh, nrs->fieldOffset, EToB, o_lambda0, o_lambda1);
+    }
+  }
+
+  if (nrs->flow) {
+    auto mesh = nrs->meshV;
+
+    if (platform->comm.mpiRank == 0) {
+      printf("================ ELLIPTIC SETUP VELOCITY ================\n");
+    }
+
+    if (platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE")) {
+      platform->options.setArgs("VELOCITY NFIELDS", std::to_string(mesh->dim));
+    }
+
+    bool unalignedBoundary = bcMap::unalignedMixedBoundary("velocity");
+    nekrsCheck(unalignedBoundary && !platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE"),
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "%s\n",
+               "SHL or unaligned SYM boundaries require solver = pcg+block");
+
+    for (int bID = 1; bID <= bcMap::size("velocity"); bID++) {
+      std::string bcTypeText(bcMap::text(bID, "velocity"));
+      if (platform->comm.mpiRank == 0 && bcTypeText.size()) {
+        printf("bID %d -> bcType %s\n", bID, bcTypeText.c_str());
+      }
+    }
+
+    auto o_lambda0 = nrs->o_mue;
+    auto o_lambda1 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+    platform->linAlg->axpby(mesh->Nlocal, nrs->g0 / nrs->dt[0], nrs->o_rho, 0.0, o_lambda1);
+
+    auto EToBx = createEToB("x-velocity", mesh);
+    auto EToBy = createEToB("y-velocity", mesh);
+    auto EToBz = createEToB("z-velocity", mesh);
+
+    if (platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE")) {
+      std::vector<int> EToB;
+      EToB.insert(std::end(EToB), std::begin(EToBx), std::end(EToBx));
+      EToB.insert(std::end(EToB), std::begin(EToBy), std::end(EToBy));
+      EToB.insert(std::end(EToB), std::begin(EToBz), std::end(EToBz));
+
+      nrs->uvwSolver = new elliptic("velocity", mesh, nrs->fieldOffset, EToB, o_lambda0, o_lambda1);
+
+      if (unalignedBoundary) {
+        nrs->o_zeroNormalMaskVelocity =
+            platform->device.malloc<dfloat>(nrs->uvwSolver->Nfields() * nrs->uvwSolver->fieldOffset());
+        nrs->o_EToBVVelocity = platform->device.malloc<int>(nrs->meshV->Nlocal);
+        createEToBV(nrs->meshV, nrs->uvwSolver->EToB(), nrs->o_EToBVVelocity);
+        auto o_EToB =
+            platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * nrs->uvwSolver->Nfields(),
+                                         nrs->uvwSolver->EToB().data());
+        createZeroNormalMask(nrs, mesh, o_EToB, nrs->o_EToBVVelocity, nrs->o_zeroNormalMaskVelocity);
+
+        auto applyZeroNormalMaskLambda =
+            [nrs, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) {
+              applyZeroNormalMask(nrs,
+                                  mesh,
+                                  Nelements,
+                                  o_elementList,
+                                  nrs->uvwSolver->o_EToB(),
+                                  nrs->o_zeroNormalMaskVelocity,
+                                  o_x);
+            };
+        nrs->uvwSolver->applyZeroNormalMask(applyZeroNormalMaskLambda);
+      }
+    } else {
+        nrs->uSolver = new elliptic("velocity", mesh, nrs->fieldOffset, EToBx, o_lambda0, o_lambda1);
+        nrs->vSolver = new elliptic("velocity", mesh, nrs->fieldOffset, EToBy, o_lambda0, o_lambda1);
+        nrs->wSolver = new elliptic("velocity", mesh, nrs->fieldOffset, EToBz, o_lambda0, o_lambda1);
+    }
+  } // flow
+
+  if (nrs->flow) {
+    auto mesh = nrs->meshV;
+
+    if (platform->comm.mpiRank == 0) {
+      printf("================ ELLIPTIC SETUP PRESSURE ================\n");
+    }
+
+    auto o_lambda0 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+    platform->linAlg->adyz(mesh->Nlocal, 1.0, nrs->o_rho, o_lambda0);
+
+    auto EToB = createEToB("pressure", mesh);
+
+    nrs->pSolver = new elliptic("pressure", mesh, nrs->fieldOffset, EToB, o_lambda0, o_NULL);
+    if (nrs->cds) {
+      nrs->cds->dpdt = nrs->pSolver->nullSpace();
+    }
+
+  } // flow
+
+  if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
+    auto mesh = nrs->_mesh;
+
+    if (platform->comm.mpiRank == 0) {
+      printf("================ ELLIPTIC SETUP MESH ================\n");
+    }
+
+    if (platform->options.compareArgs("MESH BLOCK SOLVER", "TRUE")) {
+      platform->options.setArgs("MESH NFIELDS", std::to_string(mesh->dim));
+    }
+
+    std::vector<int> EToB;
+    auto EToBx = createEToB("x-mesh", mesh);
+    EToB.insert(std::end(EToB), std::begin(EToBx), std::end(EToBx));
+    auto EToBy = createEToB("y-mesh", mesh);
+    EToB.insert(std::end(EToB), std::begin(EToBy), std::end(EToBy));
+    auto EToBz = createEToB("z-mesh", mesh);
+    EToB.insert(std::end(EToB), std::begin(EToBz), std::end(EToBz));
+
+    auto o_lambda0 = nrs->o_meshMue;
+
+    nrs->meshSolver = new elliptic("mesh", mesh, nrs->fieldOffset, EToB, o_lambda0, o_NULL);
+
+    bool unalignedBoundary = bcMap::unalignedMixedBoundary("mesh");
+    if (unalignedBoundary) {
+      nrs->o_zeroNormalMaskMeshVelocity =
+          platform->device.malloc<dfloat>(nrs->meshSolver->Nfields() * nrs->meshSolver->fieldOffset());
+      nrs->o_EToBVMeshVelocity = platform->device.malloc<int>(mesh->Nlocal);
+      auto o_EToB = platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * nrs->meshSolver->Nfields(),
+                                                 nrs->meshSolver->EToB().data());
+      createEToBV(mesh, nrs->meshSolver->EToB(), nrs->o_EToBVMeshVelocity);
+      createZeroNormalMask(nrs, mesh, o_EToB, nrs->o_EToBVMeshVelocity, nrs->o_zeroNormalMaskMeshVelocity);
+      auto applyZeroNormalMaskLambda =
+          [nrs, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) {
+            applyZeroNormalMask(nrs,
+                                mesh,
+                                Nelements,
+                                o_elementList,
+                                nrs->meshSolver->o_EToB(),
+                                nrs->o_zeroNormalMaskMeshVelocity,
+                                o_x);
+          };
+      nrs->meshSolver->applyZeroNormalMask(applyZeroNormalMaskLambda);
+    }
+  }
+}
+
 int nrs_t::numberActiveFields()
 {
   int Nscalar = 0;
@@ -442,9 +631,27 @@ void nrs_t::init()
 
   this->_mesh = createMesh(platform->comm.mpiComm, N, cubN, this->cht, platform->kernelInfo);
   this->meshV = (mesh_t *)this->_mesh->fluid;
-  mesh_t *mesh = this->meshV;
+  auto mesh = this->meshV;
 
-  // verify boundary conditions
+  const auto [fieldOffset, cubatureOffset] = [&]()
+  {
+    auto offset = mesh->Np * (mesh->Nelements + mesh->totalHaloPairs);
+    auto meshT = this->_mesh;
+    offset = std::max(offset, meshT->Np * (meshT->Nelements + meshT->totalHaloPairs));
+
+    auto cubOffset = offset;
+    if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+      cubOffset = std::max(offset, mesh->Nelements * mesh->cubNp);
+    }
+    
+    return std::tuple(alignStride<dfloat>(offset), alignStride<dfloat>(cubOffset));
+  }();
+
+  this->fieldOffset = fieldOffset;
+  this->cubatureOffset = cubatureOffset;
+  this->_mesh->fieldOffset = this->fieldOffset;
+
+  auto verifyBC = [&]() 
   {
     auto fields = nrsFieldsToSolve(platform->options);
 
@@ -460,7 +667,9 @@ void nrs_t::init()
     }
 
     bcMap::checkBoundaryAlignment(this->meshV);
-  }
+  };
+
+  verifyBC();
 
   this->coeffEXT = (dfloat *)calloc(this->nEXT, sizeof(dfloat));
   this->coeffBDF = (dfloat *)calloc(this->nBDF, sizeof(dfloat));
@@ -469,23 +678,6 @@ void nrs_t::init()
   dfloat rho = 1;
   platform->options.getArgs("VISCOSITY", mue);
   platform->options.getArgs("DENSITY", rho);
-
-  { // setup fieldOffset
-    this->fieldOffset = mesh->Np * (mesh->Nelements + mesh->totalHaloPairs);
-    mesh_t *meshT = this->_mesh;
-    this->fieldOffset = std::max(this->fieldOffset, meshT->Np * (meshT->Nelements + meshT->totalHaloPairs));
-    this->fieldOffset = alignStride<dfloat>(this->fieldOffset);
-  }
-  this->_mesh->fieldOffset = this->fieldOffset;
-
-  { // setup cubatureOffset
-    if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
-      this->cubatureOffset = std::max(this->fieldOffset, mesh->Nelements * mesh->cubNp);
-    } else {
-      this->cubatureOffset = this->fieldOffset;
-    }
-    this->cubatureOffset = alignStride<dfloat>(this->cubatureOffset);
-  }
 
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     const int nBDF = std::max(this->nBDF, this->nEXT);
@@ -572,46 +764,41 @@ void nrs_t::init()
   this->qqt = new QQt(this->gsh);
 
   if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
-    mesh_t *meshT = this->_mesh;
+    auto meshT = this->_mesh;
     this->gshMesh = oogs::setup(meshT->ogs, this->NVfields, this->fieldOffset, ogsDfloat, NULL, OOGS_AUTO);
   }
 
-  if (this->flow) {
-    this->EToB = (int *)calloc(mesh->Nelements * mesh->Nfaces, sizeof(int));
+  auto EToB = [&](const std::string& field)
+  {
+    std::vector<int> EToB(mesh->Nelements * mesh->Nfaces);
     int cnt = 0;
     for (int e = 0; e < mesh->Nelements; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
-        this->EToB[cnt] = bcMap::id(mesh->EToB[f + e * mesh->Nfaces], "velocity");
+        EToB[cnt] = bcMap::id(mesh->EToB[f + e * mesh->Nfaces], field);
         cnt++;
       }
     }
-    this->o_EToB = platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces, this->EToB);
+    auto o_EToB = platform->device.malloc<int>(EToB.size());
+    o_EToB.copyFrom(EToB.data());
+    return o_EToB;
+  };
+
+
+  if (this->flow) {
+    this->o_EToB = EToB("velocity"); 
   }
 
   if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
-    this->EToBMeshVelocity = (int *)calloc(mesh->Nelements * mesh->Nfaces, sizeof(int));
-    int cnt = 0;
-    for (int e = 0; e < mesh->Nelements; e++) {
-      for (int f = 0; f < mesh->Nfaces; f++) {
-        int bc = bcMap::id(mesh->EToB[f + e * mesh->Nfaces], "mesh");
-        this->EToBMeshVelocity[cnt] = bcMap::id(mesh->EToB[f + e * mesh->Nfaces], "mesh");
-        cnt++;
-      }
-    }
-    this->o_EToBMeshVelocity =
-        platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces, this->EToBMeshVelocity);
+    this->o_EToBMeshVelocity = EToB("mesh"); 
   }
 
   if (platform->options.compareArgs("VELOCITY REGULARIZATION METHOD", "HPFRT")) {
-
-    int filterNc = -1;
-    dfloat filterS = 1.0;
-    platform->options.getArgs("VELOCITY HPFRT STRENGTH", filterS);
-    platform->options.getArgs("VELOCITY HPFRT MODES", filterNc);
-    filterS = -fabs(filterS);
-    this->filterS = filterS;
-
-    this->o_filterRT = lowPassFilterSetup(this->meshV, filterNc);
+    int nModes = -1;
+    dfloat strength = 1.0;
+    platform->options.getArgs("VELOCITY HPFRT STRENGTH", strength);
+    platform->options.getArgs("VELOCITY HPFRT MODES", nModes);
+    this->filterS = -std::abs(strength);
+    this->o_filterRT = lowPassFilterSetup(this->meshV, nModes); 
   }
 
   assignKernels(this);
@@ -652,6 +839,52 @@ void nrs_t::init()
     }
   }
 
+#if 1
+  // set required memPool size to avoid resize
+  // scalar: 7, advSub: 6*dim + 1, velocity solve: 7*dim+1, pressure solve: 2*nVector + 7 + MG 
+  const auto requiredPoolSize = [&]()
+  {
+    int requiredPoolSize = 7;
+
+    if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
+      requiredPoolSize = std::max(requiredPoolSize, 22);
+    } 
+
+    if (this->flow) {
+      requiredPoolSize = std::max(requiredPoolSize, 22);
+
+      int nRestartVectors = 0;
+      platform->options.getArgs("PRESSURE PGMRES RESTART", nRestartVectors);
+      if (platform->options.compareArgs("PRESSURE SOLVER", "PGMRES+FLEXIBLE")) nRestartVectors *= 2;
+      requiredPoolSize = std::max(requiredPoolSize, 7 + nRestartVectors );
+    }
+
+    requiredPoolSize += 3; // safety factor
+    return requiredPoolSize;
+  }();
+  std::cout << "requiredPoolSize: " << requiredPoolSize << std::endl;
+  platform->o_memPool.reserve<dfloat>(requiredPoolSize * static_cast<size_t>(this->meshV->Nlocal)); 
+#endif
+
+  this->setIC();
+
+  // CVODE can only be initialized once the initial condition is known
+  if (cds) {
+    if (cds->cvode) {
+      cds->cvode->initialize();
+    }
+  }
+
+  if (platform->comm.mpiRank == 0) {
+    std::cout << std::endl;
+  }
+  printMeshMetrics(this->_mesh);
+
+  setupEllipticSolvers(this);
+}
+
+void nrs_t::setIC()
+{
   if (!platform->options.getArgs("RESTART FILE NAME").empty()) {
     std::string fileName;
     platform->options.getArgs("RESTART FILE NAME", fileName);
@@ -688,7 +921,6 @@ void nrs_t::init()
     }
   }
 
-  // in case the user modifies mesh in udf.setup
   this->_mesh->o_x.copyFrom(this->_mesh->x);
   this->_mesh->o_y.copyFrom(this->_mesh->y);
   this->_mesh->o_z.copyFrom(this->_mesh->z);
@@ -730,213 +962,9 @@ void nrs_t::init()
   double startTime;
   platform->options.getArgs("START TIME", startTime);
 
-  // ensure both codes see the same mesh + IC
-  nek::ocopyToNek(startTime, 0);
+  nek::ocopyToNek(startTime, 0); // ensure both codes see the same mesh + IC
 
-  // update props based on IC
   this->evaluateProperties(startTime);
-
-  // CVODE can only be initialized once the initial condition
-  // is known, however, a user may need to set function ptrs
-  // on to cvode_t object.
-  // Hence, the actual CVODE initialization part of cvode_t
-  // is done below.
-  if (cds) {
-    if (cds->cvode) {
-      cds->cvode->initialize();
-    }
-  }
-
-  if (platform->comm.mpiRank == 0) {
-    std::cout << std::endl;
-  }
-  printMeshMetrics(this->_mesh);
-
-  this->printMinMax();
-
-  // setup elliptic solvers
-  auto createEToB = [](std::string field, mesh_t *mesh) {
-    std::vector<int> EToB(mesh->Nelements * mesh->Nfaces);
-    for (dlong e = 0; e < mesh->Nelements; e++) {
-      for (int f = 0; f < mesh->Nfaces; f++) {
-        const int bID = mesh->EToB[f + e * mesh->Nfaces];
-        EToB[f + e * mesh->Nfaces] = bcMap::ellipticType(bID, field);
-      }
-    }
-    return EToB;
-  };
-
-  if (this->Nscalar) {
-    cds_t *cds = this->cds;
-
-    for (int is = 0; is < cds->NSfields; is++) {
-      std::string sid = scalarDigitStr(is);
-
-      if (!cds->compute[is]) {
-        continue;
-      }
-
-      mesh_t *mesh;
-      (is) ? mesh = cds->meshV : mesh = cds->mesh[0]; // only first scalar can be a CHT mesh
-
-      const auto solverName = cds->cvodeSolve[is] ? "CVODE" : "ELLIPTIC";
-      if (platform->comm.mpiRank == 0) {
-        std::cout << "================= " << solverName << " SETUP SCALAR" << sid << " ===============\n";
-      }
-
-      const int nbrBIDs = bcMap::size("scalar" + sid);
-      for (int bID = 1; bID <= nbrBIDs; bID++) {
-        std::string bcTypeText(bcMap::text(bID, "scalar" + sid));
-        if (platform->comm.mpiRank == 0 && bcTypeText.size()) {
-          printf("bID %d -> bcType %s\n", bID, bcTypeText.c_str());
-        }
-      }
-
-      if (cds->cvodeSolve[is]) {
-        continue;
-      }
-
-      auto EToB = createEToB("scalar" + sid, mesh);
-
-      auto o_rho_i = cds->o_rho.slice(cds->fieldOffsetScan[is], mesh->Nlocal);
-      auto o_lambda0 = cds->o_diff.slice(cds->fieldOffsetScan[is], mesh->Nlocal);
-      auto o_lambda1 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
-      platform->linAlg->axpby(mesh->Nlocal, *cds->g0 / cds->dt[0], o_rho_i, 0.0, o_lambda1);
-
-      cds->solver[is] = new elliptic("scalar" + sid, mesh, this->fieldOffset, EToB, o_lambda0, o_lambda1);
-    }
-  }
-
-  if (this->flow) {
-    if (platform->comm.mpiRank == 0) {
-      printf("================ ELLIPTIC SETUP VELOCITY ================\n");
-    }
-
-    if (platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE")) {
-      platform->options.setArgs("VELOCITY NFIELDS", std::to_string(mesh->dim));
-    }
-
-    bool unalignedBoundary = bcMap::unalignedMixedBoundary("velocity");
-    nekrsCheck(unalignedBoundary && !platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE"),
-               platform->comm.mpiComm,
-               EXIT_FAILURE,
-               "%s\n",
-               "SHL or unaligned SYM boundaries require solver = pcg+block");
-
-    for (int bID = 1; bID <= bcMap::size("velocity"); bID++) {
-      std::string bcTypeText(bcMap::text(bID, "velocity"));
-      if (platform->comm.mpiRank == 0 && bcTypeText.size()) {
-        printf("bID %d -> bcType %s\n", bID, bcTypeText.c_str());
-      }
-    }
-
-    auto o_lambda0 = this->o_mue;
-    auto o_lambda1 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->axpby(mesh->Nlocal, this->g0 / this->dt[0], this->o_rho, 0.0, o_lambda1);
-
-    auto EToBx = createEToB("x-velocity", mesh);
-    auto EToBy = createEToB("y-velocity", mesh);
-    auto EToBz = createEToB("z-velocity", mesh);
-
-    if (platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE")) {
-      std::vector<int> EToB;
-      EToB.insert(std::end(EToB), std::begin(EToBx), std::end(EToBx));
-      EToB.insert(std::end(EToB), std::begin(EToBy), std::end(EToBy));
-      EToB.insert(std::end(EToB), std::begin(EToBz), std::end(EToBz));
-
-      this->uvwSolver = new elliptic("velocity", mesh, this->fieldOffset, EToB, o_lambda0, o_lambda1);
-
-      if (unalignedBoundary) {
-        this->o_zeroNormalMaskVelocity =
-            platform->device.malloc<dfloat>(this->uvwSolver->Nfields() * this->uvwSolver->fieldOffset());
-        this->o_EToBVVelocity = platform->device.malloc<int>(this->meshV->Nlocal);
-        createEToBV(this->meshV, this->uvwSolver->EToB(), this->o_EToBVVelocity);
-        auto o_EToB =
-            platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * this->uvwSolver->Nfields(),
-                                         this->uvwSolver->EToB().data());
-        createZeroNormalMask(this, mesh, o_EToB, this->o_EToBVVelocity, this->o_zeroNormalMaskVelocity);
-
-        auto applyZeroNormalMaskLambda =
-            [this, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) {
-              applyZeroNormalMask(this,
-                                  mesh,
-                                  Nelements,
-                                  o_elementList,
-                                  this->uvwSolver->o_EToB(),
-                                  this->o_zeroNormalMaskVelocity,
-                                  o_x);
-            };
-        this->uvwSolver->applyZeroNormalMask(applyZeroNormalMaskLambda);
-      }
-    } else {
-        this->uSolver = new elliptic("velocity", mesh, this->fieldOffset, EToBx, o_lambda0, o_lambda1);
-        this->vSolver = new elliptic("velocity", mesh, this->fieldOffset, EToBy, o_lambda0, o_lambda1);
-        this->wSolver = new elliptic("velocity", mesh, this->fieldOffset, EToBz, o_lambda0, o_lambda1);
-    }
-  } // flow
-
-  if (this->flow) {
-    if (platform->comm.mpiRank == 0) {
-      printf("================ ELLIPTIC SETUP PRESSURE ================\n");
-    }
-
-    auto o_lambda0 = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->adyz(mesh->Nlocal, 1.0, this->o_rho, o_lambda0);
-
-    auto EToB = createEToB("pressure", mesh);
-
-    this->pSolver = new elliptic("pressure", mesh, this->fieldOffset, EToB, o_lambda0, o_NULL);
-    if (cds) {
-      cds->dpdt = this->pSolver->nullSpace();
-    }
-
-  } // flow
-
-  if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
-    mesh_t *mesh = this->_mesh;
-
-    if (platform->comm.mpiRank == 0) {
-      printf("================ ELLIPTIC SETUP MESH ================\n");
-    }
-
-    if (platform->options.compareArgs("MESH BLOCK SOLVER", "TRUE")) {
-      platform->options.setArgs("MESH NFIELDS", std::to_string(mesh->dim));
-    }
-
-    std::vector<int> EToB;
-    auto EToBx = createEToB("x-mesh", mesh);
-    EToB.insert(std::end(EToB), std::begin(EToBx), std::end(EToBx));
-    auto EToBy = createEToB("y-mesh", mesh);
-    EToB.insert(std::end(EToB), std::begin(EToBy), std::end(EToBy));
-    auto EToBz = createEToB("z-mesh", mesh);
-    EToB.insert(std::end(EToB), std::begin(EToBz), std::end(EToBz));
-
-    auto o_lambda0 = this->o_meshMue;
-
-    this->meshSolver = new elliptic("mesh", mesh, this->fieldOffset, EToB, o_lambda0, o_NULL);
-
-    bool unalignedBoundary = bcMap::unalignedMixedBoundary("mesh");
-    if (unalignedBoundary) {
-      this->o_zeroNormalMaskMeshVelocity =
-          platform->device.malloc<dfloat>(this->meshSolver->Nfields() * this->meshSolver->fieldOffset());
-      this->o_EToBVMeshVelocity = platform->device.malloc<int>(mesh->Nlocal);
-      auto o_EToB = platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * this->meshSolver->Nfields(),
-                                                 this->meshSolver->EToB().data());
-      createEToBV(mesh, this->meshSolver->EToB(), this->o_EToBVMeshVelocity);
-      createZeroNormalMask(this, mesh, o_EToB, this->o_EToBVMeshVelocity, this->o_zeroNormalMaskMeshVelocity);
-      auto applyZeroNormalMaskLambda =
-          [this, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) {
-            applyZeroNormalMask(this,
-                                mesh,
-                                Nelements,
-                                o_elementList,
-                                this->meshSolver->o_EToB(),
-                                this->o_zeroNormalMaskMeshVelocity,
-                                o_x);
-          };
-      this->meshSolver->applyZeroNormalMask(applyZeroNormalMaskLambda);
-    }
-  }
 }
 
 void nrs_t::printRunStat(int step)

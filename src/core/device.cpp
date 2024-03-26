@@ -428,5 +428,5 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
 
 size_t device_t::memoryUsage()
 {
-  return platform->o_memPool.size() + platform->device.occaDevice().memoryAllocated();
+  return platform->device.occaDevice().memoryAllocated();
 } 

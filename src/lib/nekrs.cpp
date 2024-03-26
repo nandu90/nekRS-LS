@@ -323,11 +323,15 @@ void setup(MPI_Comm commg_in,
               << "occa memory usage: " << platform->device.memoryUsage() / 1e9 << " GB"
               << std::endl;
   }
-  fflush(stdout);
 
   platform->flopCounter->clear();
 
+  if (rank == 0) std::cout << std::endl;
+  if (nrs) nrs->printMinMax();
+  if (rank == 0) std::cout << std::endl;
+
   initialized = true;
+  fflush(stdout);
 }
 
 void copyFromNek(double time, int tstep)

@@ -25,8 +25,7 @@ SOFTWARE.
 */
 
 // for platform
-#include "nekInterfaceAdapter.hpp"
-#include "nekrsSys.hpp"
+#include "platform.hpp"
 #include "tuple_for_each.hpp"
 
 #include <cstdlib>

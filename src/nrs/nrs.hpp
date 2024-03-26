@@ -108,8 +108,6 @@ public:
   dfloat *coeffEXT, *coeffBDF;
   occa::memory o_coeffEXT, o_coeffBDF;
 
-  int *EToB = nullptr;
-  int *EToBMeshVelocity = nullptr;
   occa::memory o_EToB;
   occa::memory o_EToBMeshVelocity;
 
@@ -236,6 +234,10 @@ public:
   writeFld(double t, int step, int outXYZ, int FP64, std::string suffix, int Nout = 0, bool uniform = false);
 
   void finalize();
+
+private:
+  void setIC();
+
 };
 
 void nrsSetDefaultSettings(setupAide *options);

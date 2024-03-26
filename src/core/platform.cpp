@@ -195,9 +195,11 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   if (rank == 0)
     compileDummyKernel(*this);
 
-  occa::json properties;
-  o_memPool = device.occaDevice().createMemoryPool(properties);
-  o_memPool.setAlignment(ALIGN_SIZE);
+  {
+    occa::json properties;
+    o_memPool = device.occaDevice().createMemoryPool(properties);
+    o_memPool.setAlignment(ALIGN_SIZE);
+  }
 }
 
 // input files required for JIT kernel compilation or load 
