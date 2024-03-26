@@ -50,12 +50,12 @@ The `master` branch always points to the latest stable release while `next`
 provides an early preview of the next upcoming release (do not use in a production environment).
 
 #
-To build and install the code run:
+If you're on an HPC system, ensure you log in to a compute node. Then, check if there's an `nrsqsub` script in the `bin` directory for your machine. If found, load the same modules. Then, just run:
 
 ```sh
 CC=mpicc CXX=mpic++ FC=mpif77 ./build.sh [-DCMAKE_INSTALL_PREFIX=$HOME/.local/nekrs] [<options>]
 ```
-Please remove the previous build and installation directory in case of an update. 
+Adjust the compilers as necessary. Make sure to remove the previous build and installation directory if updating.
 
 ## Setting the Enviroment
 
