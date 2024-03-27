@@ -114,20 +114,14 @@ void outfld(const char *filename,
     o_s = o_ss.cast(occa::dtype::byte);
   }
 
-  int xo = 0;
-  int vo = 0;
-  int po = 0;
-  int so = 0;
-
   const int stepSave = *(nekData.istep);
   *(nekData.istep) = step;
 
   // nek5000 writes all fields using nelt
   // note, nrs->fieldOffset >= nelt*nxyz
   auto mesh = nrs->_mesh;
-  dlong Nlocal = mesh->Nelements * mesh->Np;
+  const auto Nlocal = mesh->Nelements * mesh->Np;
 
-  // nek5000 uses lelv = lelt
   const dlong nekFieldOffset = nekData.lelt * mesh->Np;
 
   const auto p0thSave = *(nekData.p0th);
@@ -135,18 +129,10 @@ void outfld(const char *filename,
 
   platform->timer.tic("checkpointing", 1);
 
-  std::vector<double> vx(Nlocal);
-  std::vector<double> vy(Nlocal);
-  std::vector<double> vz(Nlocal);
-  std::vector<double> pr(Nlocal);
-  std::vector<double> temp(Nlocal);
-
-  std::vector<double> ps;
-  if(NSfields) ps.resize((NSfields-1) * nekFieldOffset);
-
-  auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
-
+  int xo = 0;
   if (coords) {
+    auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
+
     platform->copyDfloatToDoubleKernel(Nlocal, mesh->o_x, o_tmpDouble);
     o_tmpDouble.copyTo(nekData.xm1, o_tmpDouble.size());
 
@@ -159,49 +145,64 @@ void outfld(const char *filename,
     xo = 1;
   }
 
+  std::vector<double> vx;
+  std::vector<double> vy;
+  std::vector<double> vz;
   if (o_u.isInitialized()) {
+    auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
+
     auto o_vx = o_u + (0 * sizeof(dfloat)) * nrs->fieldOffset;
     platform->copyDfloatToDoubleKernel(Nlocal, o_vx, o_tmpDouble);
+    vx.resize(Nlocal);
     o_tmpDouble.copyTo(vx.data(), o_tmpDouble.size());
 
     auto o_vy = o_u + (1 * sizeof(dfloat)) * nrs->fieldOffset;
     platform->copyDfloatToDoubleKernel(Nlocal, o_vy, o_tmpDouble);
+    vy.resize(Nlocal);
     o_tmpDouble.copyTo(vy.data(), o_tmpDouble.size());
 
     auto o_vz = o_u + (2 * sizeof(dfloat)) * nrs->fieldOffset;
     platform->copyDfloatToDoubleKernel(Nlocal, o_vz, o_tmpDouble);
+    vz.resize(Nlocal);
     o_tmpDouble.copyTo(vz.data(), o_tmpDouble.size());
-
-    vo = 1;
   }
 
+  std::vector<double> pr;
   if (o_p.isInitialized()) {
-    platform->copyDfloatToDoubleKernel(Nlocal, o_p, o_tmpDouble);
-    o_tmpDouble.copyTo(pr.data(), o_tmpDouble.size());
+    auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
 
-    po = 1;
+    platform->copyDfloatToDoubleKernel(Nlocal, o_p, o_tmpDouble);
+    pr.resize(Nlocal);
+    o_tmpDouble.copyTo(pr.data(), o_tmpDouble.size());
   }
 
   int nps = 0;
+  std::vector<double> temp;
+  std::vector<double> ps;
   if (o_s.isInitialized()) {
+    ps.resize(NSfields * nekFieldOffset);
+    auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
+
     for (int is = 0; is < NSfields; is++) {
       occa::memory o_Si = o_s + (is * sizeof(dfloat)) * nrs->fieldOffset;
       platform->copyDfloatToDoubleKernel(Nlocal, o_Si, o_tmpDouble);
 
-      if (is == 0) {
+      if (is == 0 && platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE")) {
+        temp.resize(Nlocal);
         o_tmpDouble.copyTo(temp.data(), o_tmpDouble.size());
       } else {
-        o_tmpDouble.copyTo(ps.data() + (is-1)*nekFieldOffset, o_tmpDouble.size());
+        o_tmpDouble.copyTo(ps.data() + is*nekFieldOffset, o_tmpDouble.size());
         nps++;
       }
     }
-    so = 1;
   }
 
-
-  (*nek_setio_ptr)(&t, &xo, &vo, &po, &so, &NSfields, &FP64);
-
   {
+    int vo = (vx.size()) ? 1 : 0;
+    int po = (pr.size()) ? 1 : 0;
+    int to = (temp.size()) ? 1 : 0;
+    (*nek_setio_ptr)(&t, &xo, &vo, &po, &to, &nps, &FP64);
+
     int nxo = Nout + 1;
     int ifreg = uniform;
     auto nek_out_mask = ptr<int>("out_mask");
@@ -231,14 +232,14 @@ void outfld(const char *filename,
     for(int i = 0; i < nekData.lelt; i++) {
       nek_out_mask[i] = 1;
     } 
+
+   (*nek_resetio_ptr)();
   }
-
-  (*nek_resetio_ptr)();
-
-  platform->timer.toc("checkpointing");
 
   *(nekData.p0th) = p0thSave;
   *(nekData.istep) = stepSave;
+
+  platform->timer.toc("checkpointing");
 }
 
 void uic(int ifield)

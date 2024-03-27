@@ -302,14 +302,14 @@ c-----------------------------------------------------------------------
       return
       end
 c-----------------------------------------------------------------------
-      subroutine nekf_setio(ttime, xo, vo, po, so, ns, fp64)
+      subroutine nekf_setio(ttime, xo, vo, po, to, ns, fp64)
 
       include 'SIZE'
       include 'TOTAL'
       include 'NEKINTF'
 
       real ttime
-      integer xo, vo, po, so, fp64
+      integer xo, vo, po, to, fp64
 
       real ts
       integer npscals, p63s
@@ -330,7 +330,7 @@ c-----------------------------------------------------------------------
       ifpos   = ifpo
       iftos   = ifto
 
-      npscal = ns-1 
+      npscal = ns
       ifxyo  = .false.
       ifvo   = .false.
       ifpo   = .false.
@@ -342,12 +342,10 @@ c-----------------------------------------------------------------------
       if(xo.ne.0) ifxyo = .true.
       if(vo.ne.0) ifvo  = .true.
       if(po.ne.0) ifpo  = .true.
-      if(so.ne.0) then
-        ifto = .true.
-        do i = 1,npscal
-          ifpsco(i) = .true.
-        enddo
-      endif
+      if(to.ne.0) ifto  = .true.
+      do i = 1,npscal
+        ifpsco(i) = .true.
+      enddo
 
       return
       end
