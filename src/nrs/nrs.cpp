@@ -839,7 +839,7 @@ void nrs_t::init()
     }
   }
 
-#if 1
+#if 0
   // set required memPool size to avoid resize
   // scalar: 7, advSub: 6*dim + 1, velocity solve: 7*dim+1, pressure solve: 2*nVector + 7 + MG 
   const auto requiredPoolSize = [&]()
