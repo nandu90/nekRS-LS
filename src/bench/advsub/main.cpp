@@ -160,6 +160,8 @@ int main(int argc, char **argv)
 
   platform = platform_t::getInstance(options, MPI_COMM_WORLD, MPI_COMM_WORLD);
   platform->options.setArgs("BUILD ONLY", "FALSE");
+  platform->device.compileWhenLoad();
+
 #ifdef _OPENMP
   const int Nthreads = omp_get_max_threads();
 #else

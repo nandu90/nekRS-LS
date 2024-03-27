@@ -137,6 +137,8 @@ int main(int argc, char **argv)
 
   platform = platform_t::getInstance(options, MPI_COMM_WORLD, MPI_COMM_WORLD);
   platform->options.setArgs("BUILD ONLY", "FALSE");
+  platform->device.compileWhenLoad();
+
   const int verbosity = 2;
   if (Ntests != -1) {
     benchmarkAx(Nelements,
@@ -150,8 +152,7 @@ int main(int argc, char **argv)
                 stressForm,
                 verbosity,
                 Ntests,
-                true,
-                "");
+                true);
   } else {
     const double targetTime = 10.0;
     benchmarkAx(Nelements,
@@ -165,8 +166,7 @@ int main(int argc, char **argv)
                 stressForm,
                 verbosity,
                 targetTime,
-                true,
-                "");
+                true);
   }
   MPI_Finalize();
   exit(0);

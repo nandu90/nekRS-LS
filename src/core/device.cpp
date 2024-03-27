@@ -179,23 +179,6 @@ occa::kernel device_t::wrapperLoadKernel(const std::string &fileName,
   return knl;
 }
 
-occa::kernel device_t::wrapperBuildKernel(const std::string &fileName,
-                                          const std::string &kernelName,
-                                          const occa::properties &props,
-                                          const std::string &suffix) const
-{
-  wrapperCompileKernel(fileName, props, suffix);
-  return wrapperLoadKernel(fileName, kernelName, props, suffix);
-}
-
-occa::kernel device_t::wrapperBuildKernel(const std::string &fileName,
-                                          const occa::properties &props,
-                                          const std::string &suffix) const
-{
-  wrapperCompileKernel(fileName, props, suffix);
-  return wrapperLoadKernel(fileName, extractKernelName(fileName), props, suffix);
-}
-
 void device_t::compileKernel(const std::string &fileName,
                              const occa::properties &props,
                              const std::string &suffix,
@@ -235,52 +218,15 @@ void device_t::compileKernel(const std::string &fileName,
 #endif
 }
 
-occa::kernel device_t::buildKernel(const std::string &fileName,
-                                   const std::string &kernelName,
-                                   const occa::properties &props,
-                                   const std::string suffix,
-                                   const MPI_Comm& comm) const
-{
-  nekrsCheck(platform->options.compareArgs("REGISTER ONLY", "TRUE"),
-             MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "%s",
-             "illegal call during REGISTER ONLY mode\n");
-
-  this->compileKernel(fileName, props, suffix, comm);
-  return this->loadKernel(fileName, kernelName, props, suffix);
-
-}
-
-occa::kernel device_t::buildKernel(const std::string &fileName,
-                                   const std::string &kernelName,
-                                   const occa::properties &props,
-                                   const MPI_Comm& comm) const
-{
-  return this->buildKernel(fileName, kernelName, props, "", comm);
-}
-
-occa::kernel device_t::buildKernel(const std::string &fullPath,
-                                   const occa::properties &props,
-                                   const std::string suffix,
-                                   const MPI_Comm& comm) const
-{
-  return this->buildKernel(fullPath, extractKernelName(fullPath), props, suffix, comm);
-}
-
-occa::kernel device_t::buildKernel(const std::string &fullPath,
-                                   const occa::properties &props,
-                                   const MPI_Comm& comm) const
-{
-  return this->buildKernel(fullPath, extractKernelName(fullPath), props, "", comm);
-}
-
-
 occa::kernel device_t::loadKernel(const std::string &fileName,
                                   const std::string &kernelName, 
                                   const occa::properties &props,
                                   const std::string &suffix) const
 {
+  if (_compileWhenLoad) {
+    this->compileKernel(fileName, props, suffix, platform->comm.mpiComm);
+  }
+
   return this->wrapperLoadKernel(fileName, kernelName, props, suffix);
 }
 
@@ -421,6 +367,7 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
   }
 
   _compilationEnabled = true;
+  _compileWhenLoad = false;
   _device_id = device_id;
 
   deviceAtomic = atomicsAvailable(*this, _comm.mpiComm);

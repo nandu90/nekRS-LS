@@ -56,26 +56,6 @@ public:
     _device.finish();
   }
 
-  occa::kernel buildKernel(const std::string &fullPath,
-                           const std::string &kernelName,
-                           const occa::properties &props,
-                           const std::string suffix,
-                           const MPI_Comm& comm) const;
-
-  occa::kernel buildKernel(const std::string &fullPath,
-                           const std::string &kernelName,
-                           const occa::properties &props,
-                           const MPI_Comm& comm) const;
-
-  occa::kernel buildKernel(const std::string &fullPath,
-                           const occa::properties &props,
-                           const std::string suffix,
-                           const MPI_Comm& comm) const;
-
-  occa::kernel buildKernel(const std::string &fullPath,
-                           const occa::properties &props,
-                           const MPI_Comm& comm) const;
-
   void compileKernel(const std::string &fullPath,
                      const occa::properties &props,
                      const std::string &suffix, 
@@ -94,19 +74,12 @@ public:
 
   void compilationFinished(){ _compilationEnabled = true; };
 
+  void compileWhenLoad(){ _compileWhenLoad = true; };
+
+
   size_t memoryUsage();
 
 private:
-  // non-collective wrappers around occa's buildKernel
-  occa::kernel wrapperBuildKernel(const std::string &fullPath, 
-                                  const occa::properties &props, 
-                                  const std::string &suffix) const;
-
-  occa::kernel wrapperBuildKernel(const std::string &fileName,
-                                  const std::string &kernelName,
-                                  const occa::properties &props,
-                                  const std::string &suffix) const;
-
   void wrapperCompileKernel(const std::string &fileName,
                             const occa::properties &props_,
                             const std::string &suffix) const;
@@ -120,5 +93,6 @@ private:
   occa::device _device;
   int _device_id;
   bool _compilationEnabled;
+  bool _compileWhenLoad;
 };
 #endif

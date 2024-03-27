@@ -104,6 +104,7 @@ int main(int argc, char **argv)
 
   platform = platform_t::getInstance(options, MPI_COMM_WORLD, MPI_COMM_WORLD);
   platform->options.setArgs("BUILD ONLY", "FALSE");
+  platform->device.compileWhenLoad();
 
   const int verbosity = 2;
   if (Ntests != -1) {
