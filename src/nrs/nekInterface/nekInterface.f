@@ -169,9 +169,6 @@ c-----------------------------------------------------------------------
         param(23) = npscal
         ifto = .true.    
         call icopy(idpss, idpss_in, npscal+1)
-        do i = 1,npscal
-          ifpsco(i) = .true.
-        enddo 
       endif
 
       call usrdat0 ! call again just in case user want to change some params 
@@ -273,84 +270,8 @@ c-----------------------------------------------------------------------
       return
       end
 c-----------------------------------------------------------------------
-      subroutine nekf_resetio()
-
-      include 'SIZE'
-      include 'TOTAL'
-      include 'NEKINTF'
-
-      real ts
-      integer npscals, p63s
-      logical ifxyos, ifvos, ifpos, iftos, ifpscos(ldimt1)
-      common /ros/  ts
-      common /ios/  npscals, p63s
-      common /ifos/ ifxyos, ifvos, ifpos, iftos, ifpscos
-
-      time = ts
-
-      param(63) = p63s
-
-      npscal = npscals
-      ifxyo  = ifxyos 
-      ifvo   = ifvos 
-      ifpo   = ifpos 
-      ifto   = iftos 
-      do i = 1,ldimt1
-        ifpsco(i) = ifpscos(i) 
-      enddo
-
-      return
-      end
-c-----------------------------------------------------------------------
-      subroutine nekf_setio(ttime, xo, vo, po, to, ns, fp64)
-
-      include 'SIZE'
-      include 'TOTAL'
-      include 'NEKINTF'
-
-      real ttime
-      integer xo, vo, po, to, fp64
-
-      real ts
-      integer npscals, p63s
-      logical ifxyos, ifvos, ifpos, iftos, ifpscos(ldimt1)
-      common /ros/  ts
-      common /ios/  npscals, p63s
-      common /ifos/ ifxyos, ifvos, ifpos, iftos, ifpscos
-
-      ts = time
-      time = ttime
-
-      p63s = param(63)
-      param(63) = fp64 
- 
-      npscals = npscal
-      ifxyos  = ifxyo
-      ifvos   = ifvo
-      ifpos   = ifpo
-      iftos   = ifto
-
-      npscal = ns
-      ifxyo  = .false.
-      ifvo   = .false.
-      ifpo   = .false.
-      ifto   = .false.
-      do i = 1,ldimt1
-        ifpsco(i) = .false.
-      enddo 
-
-      if(xo.ne.0) ifxyo = .true.
-      if(vo.ne.0) ifvo  = .true.
-      if(po.ne.0) ifpo  = .true.
-      if(to.ne.0) ifto  = .true.
-      do i = 1,npscal
-        ifpsco(i) = .true.
-      enddo
-
-      return
-      end
-c-----------------------------------------------------------------------
-      subroutine nekf_outfld(prefix, nxo_in, rego_in,
+      subroutine nekf_outfld(prefix, time_in, out_fld, 
+     &                       nxo_in, rego_in,
      $                       vx_in, vy_in, vz_in,
      $                       pm1_in, t_in, ps_in, nps_in)
 
@@ -360,8 +281,11 @@ c-----------------------------------------------------------------------
       include 'NEKINTF'
 
       character prefix*(*)
-      integer nxo_int
+      real time_in
+      integer out_fld(*)
+
       integer rego_in
+      integer nxo_int
 
       real vx_in(*), vy_in(*), vz_in(*)
       real pm1_in(*)
@@ -370,15 +294,19 @@ c-----------------------------------------------------------------------
       integer nps_in
 
       integer*8 offs0,offs,nbyte,stride,strideB,nxyzo8
-      logical ifxyo_s
       logical rego
 
       integer cnt
       integer*8 cntg
 
+      real time_s
+
       common /vrthov/ ur1(lxo*lxo*lxo*lelt)
      &              , ur2(lxo*lxo*lxo*lelt)
      &              , ur3(lxo*lxo*lxo*lelt)
+
+      time_s = time
+      time = time_in
 
       rego = .false.
       if(rego_in.ne.0) rego = .true.
@@ -410,9 +338,6 @@ c-----------------------------------------------------------------------
 
       call io_init
 
-      ifxyo_s = ifxyo 
-      ifxyo_  = ifxyo
-
       nout = nelt ! dump all fields based on the t-mesh to avoid different topologies in the post-processor
       nyo  = nxo 
       nzo  = nxo 
@@ -422,9 +347,37 @@ c-----------------------------------------------------------------------
          call mfo_open_files(prefix,ierr)
       endif
       call err_chk(ierr,'Error opening file in mfo_open_files. $')
-      call bcast(ifxyo_,lsize)
-      ifxyo = ifxyo_
-      call mfo_write_hdr ! hdr + element mapping
+
+      call blank(rdcode1,10)
+      i = 1
+      if (out_fld(1).ne.0) then
+         rdcode1(i)='X'
+         i = i + 1
+      endif
+      if (out_fld(2).ne.0) then
+         rdcode1(i)='U'
+         i = i + 1
+      endif
+      if (out_fld(3).ne.0) then
+         rdcode1(i)='P'
+         i = i + 1
+      endif
+      if (out_fld(4).ne.0) then
+         rdcode1(i)='T'
+         i = i + 1
+      endif
+      if (nps_in.gt.0) then
+         npscalo = 0
+         do k = 1,nps_in
+           if(out_fld(4+k).ne.0) npscalo = npscalo + 1
+         enddo
+
+         rdcode1(i) = 'S'
+         write(rdcode1(i+1),'(I1)') npscalo/10
+         write(rdcode1(i+2),'(I1)') npscalo-(npscalo/10)*10
+      endif
+
+      call mfo_write_hdr(rdcode1) ! hdr + element mapping
 
       cnt = 0
       do iel = 1,nelt
@@ -440,7 +393,7 @@ c-----------------------------------------------------------------------
       stride  = cntg * nxyzo8*wdsizo
 
       ioflds = 0
-      if (ifxyo) then
+      if (out_fld(1).ne.0) then
          offs = offs0 + ldim*strideB
          call byte_set_view(offs,ifh_mbyte)
          call interp_fld_n(ur1,nxo,xm1,rego)
@@ -450,7 +403,7 @@ c-----------------------------------------------------------------------
          ioflds = ioflds + ldim
       endif
 
-      if (ifvo ) then
+      if (out_fld(2).ne.0) then
          offs = offs0 + ioflds*stride + ldim*strideB
          call byte_set_view(offs,ifh_mbyte)
          call interp_fld_n(ur1,nxo,vx_in,rego)
@@ -460,7 +413,7 @@ c-----------------------------------------------------------------------
          ioflds = ioflds + ldim
       endif
 
-      if (ifpo ) then
+      if (out_fld(3).ne.0) then
          offs = offs0 + ioflds*stride + strideB
          call byte_set_view(offs,ifh_mbyte)
          call interp_fld_n(ur1,nxo,pm1_in,rego)
@@ -468,7 +421,7 @@ c-----------------------------------------------------------------------
          ioflds = ioflds + 1
       endif
 
-      if (ifto ) then
+      if (out_fld(4).ne.0) then
          offs = offs0 + ioflds*stride + strideB
          call byte_set_view(offs,ifh_mbyte)
          call interp_fld_n(ur1,nxo,t_in,rego)
@@ -477,11 +430,13 @@ c-----------------------------------------------------------------------
       endif
 
       do k=1,nps_in
-         offs = offs0 + ioflds*stride + strideB
-         call byte_set_view(offs,ifh_mbyte)
-         call interp_fld_n(ur1,nxo,ps_in(1,1,1,1,k),rego)
-         call mfo_outs(ur1,nout,nxo,nyo,nzo)
-         ioflds = ioflds + 1
+         if (out_fld(4+k).ne.0) then
+           offs = offs0 + ioflds*stride + strideB
+           call byte_set_view(offs,ifh_mbyte)
+           call interp_fld_n(ur1,nxo,ps_in(1,1,1,1,k),rego)
+           call mfo_outs(ur1,nout,nxo,nyo,nzo)
+           ioflds = ioflds + 1
+         endif
       enddo
       dnbyte = 1.*ioflds*cnt*wdsizo*nxo*nyo*nzo
 
@@ -491,32 +446,32 @@ c-----------------------------------------------------------------------
          strideB = nelB *2*4
          stride  = cntg *2*4
          ioflds  = 0
-         if (ifxyo) then
+         if (out_fld(1).ne.0) then
             offs = offs0 + ldim*strideB
             call byte_set_view(offs,ifh_mbyte)
             call mfo_mdatav(xm1,ym1,zm1,nout)
             ioflds = ioflds + ldim
          endif
-         if (ifvo ) then
+         if (out_fld(2).ne.0) then
             offs = offs0 + ioflds*stride + ldim*strideB
             call byte_set_view(offs,ifh_mbyte)
             call mfo_mdatav(vx_in,vy_in,vz_in,nout)
             ioflds = ioflds + ldim
          endif
-         if (ifpo ) then
+         if (out_fld(3).ne.0) then
             offs = offs0 + ioflds*stride + strideB
             call byte_set_view(offs,ifh_mbyte)
             call mfo_mdatas(pm1_in,nout)
             ioflds = ioflds + 1
          endif
-         if (ifto ) then
+         if (out_fld(4).ne.0) then
             offs = offs0 + ioflds*stride + strideB
             call byte_set_view(offs,ifh_mbyte)
             call mfo_mdatas(t_in,nout)
             ioflds = ioflds + 1
          endif
          do k=1,nps_in
-           if(.true.) then
+           if(out_fld(4+k).ne.0) then
              offs = offs0 + ioflds*stride + strideB
              call byte_set_view(offs,ifh_mbyte)
              call mfo_mdatas(ps_in(1,1,1,1,k), nout)
@@ -549,53 +504,7 @@ c-----------------------------------------------------------------------
      &       30X,'avg data-throughput = ',0pf7.1,'GB/s',/,
      &       30X,'io-nodes = ',i5,/)
 
-      ifxyo = ifxyo_s ! restore old value
-
-      return
-      end
-c-----------------------------------------------------------------------
-      subroutine nekf_storesol()
-
-      include 'SIZE'
-      include 'TOTAL'
-      include 'NEKINTF'
-
-      parameter(ltot=lx1*ly1*lz1*lelt)
-      common /outtmp/  w1(ltot),w2(ltot),w3(ltot),wp(ltot)
-     &                ,wt(ltot,1)
-
-      ntot1  = lx1*ly1*lz1*nelt
-
-      call copy(w1,vx,ntot1)
-      call copy(w2,vy,ntot1)
-      call copy(w3,vz,ntot1)
-      call copy(wp,pr,ntot1)
-      do i = 1,1
-         call copy(wt(1,i),t(1,1,1,1,i),ntot1)
-      enddo
-
-      return
-      end
-c-----------------------------------------------------------------------
-      subroutine nekf_restoresol()
-
-      include 'SIZE'
-      include 'TOTAL'
-      include 'NEKINTF'
-
-      parameter(ltot=lx1*ly1*lz1*lelt)
-      common /outtmp/  w1(ltot),w2(ltot),w3(ltot),wp(ltot)
-     &                ,wt(ltot,1)
-
-      ntot1  = lx1*ly1*lz1*nelt
-
-      call copy(vx,w1,ntot1)
-      call copy(vy,w2,ntot1)
-      call copy(vz,w3,ntot1)
-      call copy(pr,wp,ntot1)
-      do i = 1,1
-         call copy(t(1,1,1,1,i),wt(1,i),ntot1)
-      enddo
+      time = time_s
 
       return
       end

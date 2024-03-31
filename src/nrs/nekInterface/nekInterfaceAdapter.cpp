@@ -27,9 +27,7 @@ static void (*useric_ptr)(void);
 static void (*userqtl_ptr)(void);
 static void (*usrsetvert_ptr)(void);
 
-static void (*nek_outfld_ptr)(char *, int *, int *, double*, double*, double*, double*, double*, double*, int*, int);
-static void (*nek_resetio_ptr)(void);
-static void (*nek_setio_ptr)(double *, int *, int *, int *, int *, int *, int *);
+static void (*nek_outfld_ptr)(char *, double*, int*, int *, int *, double*, double*, double*, double*, double*, double*, int*, int);
 static void (*nek_uic_ptr)(int *);
 static void (*nek_end_ptr)(void);
 static void (*nek_restart_ptr)(char *, int *);
@@ -61,8 +59,6 @@ static long long (*nek_set_vert_ptr)(int *, int *);
 static void (*nek_setbd_ptr)(double *, double *, int *);
 static void (*nek_setabbd_ptr)(double *, double *, int *, int *);
 
-static void (*nek_storesol_ptr)(void);
-static void (*nek_restoresol_ptr)(void);
 static void (*nek_updggeom_ptr)(void);
 static void (*nek_meshmetrics_ptr)(void);
 
@@ -92,44 +88,22 @@ namespace nek
 {
 
 void outfld(const char *filename,
-            double t,
+            double time,
             int step,
             int coords,
             int FP64,
-            const occa::memory &o_uu,
-            const occa::memory &o_pp,
-            const occa::memory &o_ss,
+            const occa::memory &o_u,
+            const occa::memory &o_p,
+            const occa::memory &o_s,
             int NSfields,
             int Nout, 
             bool uniform)
 {
-  occa::memory o_u, o_p, o_s;
-  if (o_uu.isInitialized()) {
-    o_u = o_uu.cast(occa::dtype::byte);
-  }
-  if (o_pp.isInitialized()) {
-    o_p = o_pp.cast(occa::dtype::byte);
-  }
-  if (o_ss.isInitialized() && NSfields) {
-    o_s = o_ss.cast(occa::dtype::byte);
-  }
-
-  const int stepSave = *(nekData.istep);
-  *(nekData.istep) = step;
-
-  // nek5000 writes all fields using nelt
-  // note, nrs->fieldOffset >= nelt*nxyz
-  auto mesh = nrs->_mesh;
-  const auto Nlocal = mesh->Nelements * mesh->Np;
-
-  const dlong nekFieldOffset = nekData.lelt * mesh->Np;
-
-  const auto p0thSave = *(nekData.p0th);
-  *(nekData.p0th) = nrs->p0th[0];
-
   platform->timer.tic("checkpointing", 1);
 
-  int xo = 0;
+  const auto mesh = nrs->_mesh; // use always t-mesh for output
+  const auto Nlocal = mesh->Nelements * mesh->Np;
+
   if (coords) {
     auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
 
@@ -141,8 +115,6 @@ void outfld(const char *filename,
 
     platform->copyDfloatToDoubleKernel(Nlocal, mesh->o_z, o_tmpDouble);
     o_tmpDouble.copyTo(nekData.zm1, o_tmpDouble.size());
-
-    xo = 1;
   }
 
   std::vector<double> vx;
@@ -151,17 +123,17 @@ void outfld(const char *filename,
   if (o_u.isInitialized()) {
     auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
 
-    auto o_vx = o_u + (0 * sizeof(dfloat)) * nrs->fieldOffset;
+    auto o_vx = o_u + (0 * nrs->fieldOffset);
     platform->copyDfloatToDoubleKernel(Nlocal, o_vx, o_tmpDouble);
     vx.resize(Nlocal);
     o_tmpDouble.copyTo(vx.data(), o_tmpDouble.size());
 
-    auto o_vy = o_u + (1 * sizeof(dfloat)) * nrs->fieldOffset;
+    auto o_vy = o_u + (1 * nrs->fieldOffset);
     platform->copyDfloatToDoubleKernel(Nlocal, o_vy, o_tmpDouble);
     vy.resize(Nlocal);
     o_tmpDouble.copyTo(vy.data(), o_tmpDouble.size());
 
-    auto o_vz = o_u + (2 * sizeof(dfloat)) * nrs->fieldOffset;
+    auto o_vz = o_u + (2 * nrs->fieldOffset);
     platform->copyDfloatToDoubleKernel(Nlocal, o_vz, o_tmpDouble);
     vz.resize(Nlocal);
     o_tmpDouble.copyTo(vz.data(), o_tmpDouble.size());
@@ -179,12 +151,14 @@ void outfld(const char *filename,
   int nps = 0;
   std::vector<double> temp;
   std::vector<double> ps;
-  if (o_s.isInitialized()) {
+  if (o_s.isInitialized() && NSfields) {
+    const dlong nekFieldOffset = nekData.lelt * mesh->Np;
+
     ps.resize(NSfields * nekFieldOffset);
     auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
 
     for (int is = 0; is < NSfields; is++) {
-      occa::memory o_Si = o_s + (is * sizeof(dfloat)) * nrs->fieldOffset;
+      occa::memory o_Si = o_s + (is * nrs->fieldOffset);
       platform->copyDfloatToDoubleKernel(Nlocal, o_Si, o_tmpDouble);
 
       if (is == 0 && platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE")) {
@@ -198,10 +172,22 @@ void outfld(const char *filename,
   }
 
   {
-    int vo = (vx.size()) ? 1 : 0;
-    int po = (pr.size()) ? 1 : 0;
-    int to = (temp.size()) ? 1 : 0;
-    (*nek_setio_ptr)(&t, &xo, &vo, &po, &to, &nps, &FP64);
+    const int step_s = *(nekData.istep);
+    *(nekData.istep) = step;
+
+    const auto p0th_s = *(nekData.p0th);
+    *(nekData.p0th) = nrs->p0th[0];
+
+    std::vector<int> outFld;
+    outFld.push_back(coords ? 1 : 0);
+    outFld.push_back(vx.size() ? 1 : 0);
+    outFld.push_back(pr.size() ? 1 : 0);
+    outFld.push_back(temp.size() ? 1 : 0);
+    for (int is = 0; is < nps; is++) outFld.push_back(1);
+
+    auto& p63 = nekData.param[62];
+    const auto p63_s = p63;
+    p63 = (FP64) ? 1 : 0;
 
     int nxo = Nout + 1;
     int ifreg = uniform;
@@ -216,7 +202,9 @@ void outfld(const char *filename,
       }
     }
 
-    (*nek_outfld_ptr)((char *)filename, 
+    (*nek_outfld_ptr)((char *)filename,
+                      &time,
+                      outFld.data(), 
                       &nxo,
                       &ifreg,           
                       vx.data(), 
@@ -233,11 +221,10 @@ void outfld(const char *filename,
       nek_out_mask[i] = 1;
     } 
 
-   (*nek_resetio_ptr)();
+    *(nekData.p0th) = p0th_s;
+    *(nekData.istep) = step_s;
+    p63 = p63_s;
   }
-
-  *(nekData.p0th) = p0thSave;
-  *(nekData.istep) = stepSave;
 
   platform->timer.toc("checkpointing");
 }
@@ -385,12 +372,7 @@ void set_usr_handles(const char *session_in, int verbose)
   check_error(dlerror());
   nek_end_ptr = (void (*)(void))dlsym(handle, fname("nekf_end"));
   check_error(dlerror());
-  nek_outfld_ptr = (void (*)(char *, int *, int *, double*, double*, double*, double*, double*, double*, int*, int))dlsym(handle, fname("nekf_outfld"));
-  check_error(dlerror());
-  nek_resetio_ptr = (void (*)(void))dlsym(handle, fname("nekf_resetio"));
-  check_error(dlerror());
-  nek_setio_ptr =
-      (void (*)(double *, int *, int *, int *, int *, int *, int *))dlsym(handle, fname("nekf_setio"));
+  nek_outfld_ptr = (void (*)(char *, double *, int *, int *, int *, double*, double*, double*, double*, double*, double*, int*, int))dlsym(handle, fname("nekf_outfld"));
   check_error(dlerror());
   nek_restart_ptr = (void (*)(char *, int *))dlsym(handle, fname("nekf_restart"));
   check_error(dlerror());
@@ -417,10 +399,6 @@ void set_usr_handles(const char *session_in, int verbose)
   nek_setabbd_ptr = (void (*)(double *, double *, int *, int *))dlsym(handle, fname("setabbd"));
   check_error(dlerror());
 
-  nek_storesol_ptr = (void (*)(void))dlsym(handle, fname("nekf_storesol"));
-  check_error(dlerror());
-  nek_restoresol_ptr = (void (*)(void))dlsym(handle, fname("nekf_restoresol"));
-  check_error(dlerror());
   nek_updggeom_ptr = (void (*)(void))dlsym(handle, fname("nekf_updggeom"));
   check_error(dlerror());
   nek_meshmetrics_ptr = (void (*)(void))dlsym(handle, fname("mesh_metrics"));
@@ -661,6 +639,11 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
       if (buildRequired) {
         const double tStart = MPI_Wtime();
 
+        if (rank == 0) {
+          printf("building nekInterface for lx1=%d, lelt=%d and lelg=%d ... ", N + 1, lelt, nelgt);
+        }
+        fflush(stdout);
+
         const std::string makeOutput = (rank == 0) ? cache_dir + "/make.out" : "/dev/null";
         const std::string case_dir(fs::current_path());
         const std::string include_dirs = "./ " + case_dir + " " + installDir + "/include/nrs/bdry";
@@ -672,12 +655,6 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
         } else {
           out_args = "";
         }
-
-        if (rank == 0) {
-          printf("building nekInterface for lx1=%d, lelt=%d and lelg=%d ... ", N + 1, lelt, nelgt);
-        }
-
-        fflush(stdout);
 
         char buf[4096];
         sprintf(buf,
@@ -1298,5 +1275,3 @@ void nekf_registerptr_(char *id, void* val, int *nameLen)
 }
 
 }
-
-
