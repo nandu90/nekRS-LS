@@ -165,7 +165,7 @@ void outfld(const char *filename,
         temp.resize(Nlocal);
         o_tmpDouble.copyTo(temp.data(), o_tmpDouble.size());
       } else {
-        o_tmpDouble.copyTo(ps.data() + is*nekFieldOffset, o_tmpDouble.size());
+        o_tmpDouble.copyTo(ps.data() + nps*nekFieldOffset, o_tmpDouble.size());
         nps++;
       }
     }
