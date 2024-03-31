@@ -762,8 +762,9 @@ void nrs_t::init()
 
   this->gsh = oogs::setup(mesh->ogs, this->NVfields, this->fieldOffset, ogsDfloat, NULL, OOGS_AUTO);
   this->qqt = new QQt(this->gsh);
+  this->qqtT = this->qqt
 
-  if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
+  if (platform->options.compareArgs("MESH SOLVER", "NONE")) {
     auto meshT = this->_mesh;
     this->gshMesh = oogs::setup(meshT->ogs, this->NVfields, this->fieldOffset, ogsDfloat, NULL, OOGS_AUTO);
   }
@@ -830,6 +831,8 @@ void nrs_t::init()
     cfg.alpha0Ref = &this->alpha0Ref;
 
     this->cds = new cds_t(cfg);
+
+    this->qqtT = this->cds->qqtT;
 
     if (this->cds->cvode) {
       this->cds->cvode->setEvaluateProperties(

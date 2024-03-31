@@ -71,7 +71,10 @@ public:
   int NVfields = 3;
   int NSfields = 0;
 
-  oogs_t *gsh, *gshT;
+  oogs_t *gsh = nullptr;
+  oogs_t *gshT = nullptr;
+  QQt *qqt = nullptr;
+  QQt *qqtT = nullptr;
 
   dlong vFieldOffset;
   dlong vCubatureOffset;

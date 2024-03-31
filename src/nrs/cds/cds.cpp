@@ -122,9 +122,12 @@ cds_t::cds_t(cdsConfig_t &cfg)
   this->o_fieldOffsetScan = platform->device.malloc<dlong>(this->NSfields, this->fieldOffsetScan.data());
 
   this->gsh = oogs::setup(this->meshV->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO);
+  this->qqt = new QQt(this->gsh);
+
   this->gshT = (this->cht)
                    ? oogs::setup(this->mesh[0]->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO)
                    : this->gsh;
+  this->qqtT = new QQt(this->gshT);
 
   this->S = (dfloat *)calloc(std::max(this->nBDF, this->nEXT) * this->fieldOffsetSum, sizeof(dfloat));
 
