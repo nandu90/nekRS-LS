@@ -4,7 +4,7 @@
 #include "printHeader.hpp"
 #include "udf.hpp"
 #include "bcMap.hpp"
-#include "parsePar.hpp"
+#include "par.hpp"
 #include "re2Reader.hpp"
 #include "configReader.hpp"
 #include "re2Reader.hpp"
@@ -84,9 +84,10 @@ setupAide *setDefaultSettings(std::string casename)
   options->setArgs("CHECKPOINT OUTPUT MESH", "FALSE");
 
   const auto dropTol = 5.0 * std::numeric_limits<pfloat>::epsilon();
-  options->setArgs("AMG DROP TOLERANCE", to_string_f(setPrecision(dropTol,2)));
+  options->setArgs("AMG DROP TOLERANCE", to_string_f(setPrecision(dropTol, 2)));
 
-  if (options->compareArgs("EQUATION TYPE", "NAVIERSTOKES") || options->compareArgs("EQUATION TYPE", "STOKES")) {
+  if (options->compareArgs("EQUATION TYPE", "NAVIERSTOKES") ||
+      options->compareArgs("EQUATION TYPE", "STOKES")) {
     nrsSetDefaultSettings(options);
   }
 
@@ -149,9 +150,9 @@ void setup(MPI_Comm commg_in,
     options->setArgs("VERBOSE", "TRUE");
   }
 
-  static auto par = new inipp::Ini();
-  par->sections = parKeyValuePairs;
-  parsePar(par, comm, *options);
+  static auto par = new Par(comm);
+  par->ini->sections = parKeyValuePairs;
+  par->parse(*options);
 
   if (nSessions > 1) {
     options->setArgs("NEKNEK NUMBER OF SESSIONS", std::to_string(nSessions));
@@ -183,7 +184,8 @@ void setup(MPI_Comm commg_in,
   platform = platform_t::getInstance(*options, commg, comm);
   platform->par = par;
 
-  if (options->compareArgs("EQUATION TYPE", "NAVIERSTOKES") || options->compareArgs("EQUATION TYPE", "STOKES")) {
+  if (options->compareArgs("EQUATION TYPE", "NAVIERSTOKES") ||
+      options->compareArgs("EQUATION TYPE", "STOKES")) {
     nrs = new nrs_t();
   }
 
@@ -205,7 +207,7 @@ void setup(MPI_Comm commg_in,
   }
 
   if (debug) {
-    setenv("PARRSB_VERBOSE_LEVEL","3",1);
+    setenv("PARRSB_VERBOSE_LEVEL", "3", 1);
   }
 
   bcMap::setup();
@@ -219,8 +221,9 @@ void setup(MPI_Comm commg_in,
     udfBuild(udfFile, platform->options);
   }
 
-  if (platform->cacheBcast || platform->cacheLocal)
+  if (platform->cacheBcast || platform->cacheLocal) {
     platform->bcastJITKernelSourceFiles();
+  }
 
   if (!udfFile.empty()) {
     udfLoad();
@@ -239,17 +242,20 @@ void setup(MPI_Comm commg_in,
     }
   }
 
-  auto loadComponents = [](bool registerOnly) 
-  {
+  auto loadComponents = [](bool registerOnly) {
     platform->options.setArgs("REGISTER ONLY", (registerOnly) ? "TRUE" : "FALSE");
     auto props = registerUDFKernels();
     static occa::properties kernelInfoUDF;
-    if (registerOnly) kernelInfoUDF = props;
+    if (registerOnly) {
+      kernelInfoUDF = props;
+    }
 
     registerCoreKernels();
     registerPointInterpolationKernels();
     registerMeshKernels(kernelInfoUDF);
-    if (platform->solver->id() == "nrs") registerNrsKernels(kernelInfoUDF);
+    if (platform->solver->id() == "nrs") {
+      registerNrsKernels(kernelInfoUDF);
+    }
 
     platform->options.removeArgs("REGISTER ONLY");
   };
@@ -264,7 +270,7 @@ void setup(MPI_Comm commg_in,
       printf("JIT compiling kernels (this may take awhile if they are not in cache) ...\n");
       fflush(stdout);
     }
- 
+
     platform->kernelRequests.compile();
 
     MPI_Barrier(platform->comm.mpiComm);
@@ -317,18 +323,22 @@ void setup(MPI_Comm commg_in,
 
   const double setupTime = platform->timer.query("setup", "DEVICE:MAX");
   if (rank == 0) {
-    std::cout << "\noptions:\n" 
-              << platform->options 
-              << std::endl
-              << "occa memory usage: " << platform->device.memoryUsage() / 1e9 << " GB"
-              << std::endl;
+    std::cout << "\noptions:\n"
+              << platform->options << std::endl
+              << "occa memory usage: " << platform->device.memoryUsage() / 1e9 << " GB" << std::endl;
   }
 
   platform->flopCounter->clear();
 
-  if (rank == 0) std::cout << std::endl;
-  if (nrs) nrs->printMinMax();
-  if (rank == 0) std::cout << std::endl;
+  if (rank == 0) {
+    std::cout << std::endl;
+  }
+  if (nrs) {
+    nrs->printMinMax();
+  }
+  if (rank == 0) {
+    std::cout << std::endl;
+  }
 
   initialized = true;
   fflush(stdout);
@@ -376,14 +386,14 @@ double dt(int tstep)
       dfloat minAdjustDtRatio = 1;
       platform->options.getArgs("MAX ADJUST DT RATIO", maxAdjustDtRatio);
       platform->options.getArgs("MIN ADJUST DT RATIO", minAdjustDtRatio);
- 
+
       if (tstep > 1) {
         dt_ = std::max(dt_, minAdjustDtRatio * nrs->dt[0]);
       }
       if (tstep > 1) {
         dt_ = std::min(dt_, maxAdjustDtRatio * nrs->dt[0]);
       }
- 
+
       dfloat maxDt = 0;
       platform->options.getArgs("MAX DT", maxDt);
       if (maxDt > 0) {
@@ -542,6 +552,10 @@ int updateFileCheckFreq()
 void printRuntimeStatistics(int step)
 {
   platform->solver->printRunStat(step);
+
+  for (auto& callback : platform->timer.printStatCallbacks()) {
+    callback();
+  }
 }
 
 void processUpdFile()

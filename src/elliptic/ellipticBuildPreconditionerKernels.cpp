@@ -36,13 +36,20 @@ void ellipticBuildPreconditionerKernels(elliptic_t *elliptic)
   std::string prefix = "Hex3D";
   std::string kernelName;
 
+  int M;
+  platform->options.getArgs("POLYNOMIAL DEGREE", M);
+
   const std::string orderSuffix = std::string("_") + std::to_string(mesh->N);
 
   {
     kernelName = "mask";
-    mesh->maskKernel = platform->kernelRequests.load(kernelName + orderSuffix);
-
-    mesh->maskPfloatKernel = platform->kernelRequests.load(kernelName + orderSuffix + "pfloat");
+    if (mesh->N != M) { 
+      mesh->maskKernel = platform->kernelRequests.load(kernelName + orderSuffix);
+      mesh->maskPfloatKernel = platform->kernelRequests.load(kernelName + orderSuffix + "pfloat");
+    } else {
+      mesh->maskKernel = platform->kernelRequests.load(kernelName);
+      mesh->maskPfloatKernel = platform->kernelRequests.load(kernelName + "Pfloat");
+    }
 
     kernelName = "updateChebyshev";
     elliptic->updateChebyshevKernel = platform->kernelRequests.load(kernelName + orderSuffix);

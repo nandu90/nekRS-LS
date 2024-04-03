@@ -239,12 +239,25 @@ void finalize()
   (*nek_end_ptr)();
 }
 
-void restartFromFile(const std::string &fileName)
+void restartFromFile(const std::string &str_in)
 {
-  std::string str(fileName.size(), '\0');
-  std::replace_copy(fileName.begin(), fileName.end(), str.begin(), '+', ' ');
-  int len = str.length();
-  (*nek_restart_ptr)((char *)str.c_str(), &len);
+  std::string str = str_in;
+  str.erase(std::remove_if(str.begin(), str.end(), ::isspace), str.end());
+
+  auto pos = str.find('+');
+  if (pos == std::string::npos) pos = str.length();
+
+  auto fileName = str.substr(0, pos);
+
+  std::string options;
+  if (pos != std::string::npos) options = str.substr(pos);
+  upperCase(options);
+  std::replace_copy(options.begin(), options.end(), options.begin(), '+', ' ');
+
+  auto str_nek = fileName + " " + options;
+  int len = str_nek.length();
+
+  (*nek_restart_ptr)((char *)str_nek.c_str(), &len);
 }
 
 void getIC(void)

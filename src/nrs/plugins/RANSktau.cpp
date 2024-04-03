@@ -121,13 +121,13 @@ void RANSktau::buildKernel(occa::properties _kernelInfo)
   auto buildKernel = [&kernelInfo](const std::string &kernelName) {
     const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/nrs/plugins/");
     const auto fileName = path + "RANSktau.okl";
+    const auto reqName = "RANSktau::";
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
-      const auto reqName = "RANSktau::";
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
     } else {
       buildKernelCalled = 1;
-      return platform->device.loadKernel(fileName, kernelName, kernelInfo);
+      return platform->kernelRequests.load(reqName, kernelName);
     }
   };
 

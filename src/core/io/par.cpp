@@ -1,5 +1,7 @@
-#include "nekrsSys.hpp"
 #include <optional>
+
+#include "nekrsSys.hpp"
+#include "par.hpp"
 
 #include "inipp.hpp"
 #include "tinyexpr.h"
@@ -418,7 +420,7 @@ void checkValidity(const int rank, const std::vector<std::string> &validValues, 
   }
 }
 
-void parseConstFlowRate(const int rank, setupAide &options, inipp::Ini *par)
+void parseConstFlowRate(const int rank, setupAide &options, inipp::Ini *ini)
 {
   const std::vector<std::string> validValues = {
       {"constflowrate"},
@@ -429,7 +431,7 @@ void parseConstFlowRate(const int rank, setupAide &options, inipp::Ini *par)
   };
 
   std::string flowRateDescription;
-  if (par->extract("general", "constflowrate", flowRateDescription)) {
+  if (ini->extract("general", "constflowrate", flowRateDescription)) {
     options.setArgs("CONSTANT FLOW RATE", "TRUE");
     bool flowRateSet = false;
     bool flowDirectionSet = false;
@@ -514,7 +516,7 @@ void parseConstFlowRate(const int rank, setupAide &options, inipp::Ini *par)
   }
 }
 
-void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
+void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *ini)
 {
 #ifndef ENABLE_CVODE
   append_error("ERROR: CVODE not enabled! Recompile with -DENABLE_CVODE=ON\n");
@@ -535,7 +537,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
 
   const std::string parScope = "cvode";
 
-  if (par->extract(parScope, "relativetol", relativeTol)) {
+  if (ini->extract(parScope, "relativetol", relativeTol)) {
     options.setArgs("CVODE RELATIVE TOLERANCE", to_string_f(relativeTol));
   }
 
@@ -546,7 +548,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   [&]() {
     std::string p_solver;
 
-    if (!par->extract("cvode", "solver", p_solver)) {
+    if (!ini->extract("cvode", "solver", p_solver)) {
       return;
     }
 
@@ -589,27 +591,27 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
 
   options.setArgs("CVODE STOP TIME", "TRUE");
 
-  if (par->extract(parScope, "hmaxratio", hmax)) {
+  if (ini->extract(parScope, "hmaxratio", hmax)) {
     options.setArgs("CVODE HMAX RATIO", std::to_string(hmax));
     options.setArgs("CVODE STOP TIME", "FALSE");
   }
 
-  if (par->extract(parScope, "epslin", epsLin)) {
+  if (ini->extract(parScope, "epslin", epsLin)) {
     options.setArgs("CVODE EPS LIN", std::to_string(epsLin));
   }
 
-  if (par->extract(parScope, "maxSteps", maxSteps)) {
+  if (ini->extract(parScope, "maxSteps", maxSteps)) {
     options.setArgs("CVODE MAX STEPS", std::to_string(maxSteps));
   }
 
   int maxOrder;
-  if (par->extract(parScope, "maxOrder", maxOrder)) {
+  if (ini->extract(parScope, "maxOrder", maxOrder)) {
     options.setArgs("CVODE MAX TIMESTEPPER ORDER", std::to_string(maxOrder));
   }
 
   options.setArgs("CVODE GS TYPE", "CLASSICAL");
   std::string gstype;
-  if (par->extract(parScope, "gstype", gstype)) {
+  if (ini->extract(parScope, "gstype", gstype)) {
     if (gstype == "classical") {
       options.setArgs("CVODE GS TYPE", "CLASSICAL");
     } else if (gstype == "modified") {
@@ -622,12 +624,12 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   upperCase(integrator);
   options.setArgs("CVODE INTEGRATOR", integrator);
 
-  if (par->extract(parScope, "dqsigma", sigScale)) {
+  if (ini->extract(parScope, "dqsigma", sigScale)) {
     options.setArgs("CVODE DQ SIGMA", to_string_f(sigScale));
   }
 
   bool dealiasing = options.compareArgs("ADVECTION TYPE", "CUBATURE") ? true : false;
-  par->extract(parScope, "dealiasing", dealiasing);
+  ini->extract(parScope, "dealiasing", dealiasing);
   if (dealiasing) {
     options.setArgs("CVODE ADVECTION TYPE", "CUBATURE+CONVECTIVE");
   } else {
@@ -639,7 +641,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   }
 
   std::string recyclePropsStr;
-  if (par->extract(parScope, "jtvrecycleproperties", recyclePropsStr)) {
+  if (ini->extract(parScope, "jtvrecycleproperties", recyclePropsStr)) {
     recycleProps = checkForTrue(recyclePropsStr);
     if (recycleProps) {
       options.setArgs("CVODE JTV RECYCLE PROPERTIES", "TRUE");
@@ -650,7 +652,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
 
   options.setArgs("CVODE SHARED RHO", "FALSE");
   std::string sharedRhoStr;
-  if (par->extract(parScope, "sharedrho", sharedRhoStr)) {
+  if (ini->extract(parScope, "sharedrho", sharedRhoStr)) {
     bool sharedRho = checkForTrue(sharedRhoStr);
     if (sharedRho) {
       options.setArgs("CVODE SHARED RHO", "TRUE");
@@ -660,7 +662,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   }
 
   std::string mixedPrecisionStr;
-  if (par->extract(parScope, "jtvmixedprecision", mixedPrecisionStr)) {
+  if (ini->extract(parScope, "jtvmixedprecision", mixedPrecisionStr)) {
     mixedPrecisionJtv = checkForTrue(mixedPrecisionStr);
     if (mixedPrecisionJtv) {
       options.setArgs("CVODE MIXED PRECISION JTV", "TRUE");
@@ -674,7 +676,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *par)
   }
 }
 
-void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *par, std::string parScope)
+void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope)
 {
 
   std::string parSectionName = parPrefixFromParSection(parScope);
@@ -685,8 +687,8 @@ void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *par, s
   };
 
   std::string residualTol;
-  if (par->extract(parScope, "residualtol", residualTol) ||
-      par->extract(parScope, "residualtolerance", residualTol)) {
+  if (ini->extract(parScope, "residualtol", residualTol) ||
+      ini->extract(parScope, "residualtolerance", residualTol)) {
     if (residualTol.find("relative") != std::string::npos) {
       options.setArgs(parSectionName + "LINEAR SOLVER STOPPING CRITERION", "RELATIVE");
 
@@ -711,10 +713,10 @@ void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *par, s
   }
 
   std::string absoluteTol;
-  if (par->extract(parScope, "absolutetol", absoluteTol)) {
+  if (ini->extract(parScope, "absolutetol", absoluteTol)) {
     bool issueError = false;
     std::string solver;
-    if (par->extract(parScope, "solver", solver)) {
+    if (ini->extract(parScope, "solver", solver)) {
       issueError |= (solver != "cvode" && solver != "none");
     } else {
       solver = options.getArgs(parSectionName + "SOLVER");
@@ -727,12 +729,12 @@ void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *par, s
   }
 }
 
-void parseCoarseGridDiscretization(const int rank, setupAide &options, inipp::Ini *par, std::string parScope)
+void parseCoarseGridDiscretization(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope)
 {
   std::string parSectionName = parPrefixFromParSection(parScope);
   upperCase(parSectionName);
   std::string p_coarseGridDiscretization;
-  const bool continueParsing = par->extract(parScope, "coarsegriddiscretization", p_coarseGridDiscretization);
+  const bool continueParsing = ini->extract(parScope, "coarsegriddiscretization", p_coarseGridDiscretization);
   if (!continueParsing) {
     return;
   }
@@ -765,14 +767,14 @@ void parseCoarseGridDiscretization(const int rank, setupAide &options, inipp::In
   }
 }
 
-void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *par, std::string parScope)
+void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope)
 {
   std::string parSectionName = parPrefixFromParSection(parScope);
   upperCase(parSectionName);
 
   std::string p_coarseSolver;
-  const bool keyExist = par->extract(parScope, "coarsesolver", p_coarseSolver) ||
-                        par->extract(parScope, "semfemsolver", p_coarseSolver);
+  const bool keyExist = ini->extract(parScope, "coarsesolver", p_coarseSolver) ||
+                        ini->extract(parScope, "semfemsolver", p_coarseSolver);
   if (!keyExist) {
     if (parScope == "pressure") {
       p_coarseSolver = "boomeramg";
@@ -898,7 +900,7 @@ std::vector<int> checkForIntInInputs(const std::vector<std::string> &inputs)
   return values;
 }
 
-void parseSmoother(const int rank, setupAide &options, inipp::Ini *par, std::string parScope)
+void parseSmoother(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope)
 {
   std::string p_smoother;
 
@@ -919,12 +921,12 @@ void parseSmoother(const int rank, setupAide &options, inipp::Ini *par, std::str
     }
   }
 
-  if (!par->extract(parScope, "smoothertype", p_smoother)) {
+  if (!ini->extract(parScope, "smoothertype", p_smoother)) {
     return;
   }
 
   std::string p_preconditioner;
-  par->extract(parScope, "preconditioner", p_preconditioner);
+  ini->extract(parScope, "preconditioner", p_preconditioner);
 
   const std::vector<std::string> validValues = {
       {"asm"},
@@ -1042,7 +1044,7 @@ void parseSmoother(const int rank, setupAide &options, inipp::Ini *par, std::str
   }
 }
 
-void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, std::string parScope)
+void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope)
 {
   const std::vector<std::string> validValues = {
       {"none"},
@@ -1060,7 +1062,7 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
   upperCase(parSection);
 
   std::string p_preconditioner;
-  if (!par->extract(parScope, "preconditioner", p_preconditioner)) {
+  if (!ini->extract(parScope, "preconditioner", p_preconditioner)) {
     p_preconditioner = "jac";
     if (parScope == "pressure") {
       p_preconditioner = "multigrid";
@@ -1096,7 +1098,7 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
     auto smoothed = (p_preconditioner.find("nonsmoothed") != std::string::npos) ? false : true;
 
     std::string p_coarseGridDiscretization;
-    if (par->extract(parScope, "coarsegriddiscretization", p_coarseGridDiscretization)) {
+    if (ini->extract(parScope, "coarsegriddiscretization", p_coarseGridDiscretization)) {
       if (p_coarseGridDiscretization.find("semfem") != std::string::npos) {
         smoothed = false;
       }
@@ -1114,20 +1116,20 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
     }
   }
 
-  parseSmoother(rank, options, par, parScope);
+  parseSmoother(rank, options, ini, parScope);
 
-  parseCoarseGridDiscretization(rank, options, par, parScope);
+  parseCoarseGridDiscretization(rank, options, ini, parScope);
 
   if (options.compareArgs(parSection + "PRECONDITIONER", "MULTIGRID") ||
       options.compareArgs(parSection + "PRECONDITIONER", "SEMFEM")) {
-    parseCoarseSolver(rank, options, par, parScope);
+    parseCoarseSolver(rank, options, ini, parScope);
   }
 
   if (options.compareArgs(parSection + "PRECONDITIONER", "MULTIGRID")) {
     std::string p_mgschedule;
-    if (par->extract(parScope, "pmgschedule", p_mgschedule)) {
-      const auto semfem = options.compareArgs(parSection + "SMOOTHED SEMFEM", "TRUE"); 
-      if (semfem) { 
+    if (ini->extract(parScope, "pmgschedule", p_mgschedule)) {
+      const auto semfem = options.compareArgs(parSection + "SMOOTHED SEMFEM", "TRUE");
+      if (semfem) {
         append_error("pMGSchedule not supported for preconditioner = semfem.\n");
       }
 
@@ -1152,7 +1154,7 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
 
       // bail if degree is set _and_ it conflicts
       std::string p_smoother;
-      if (par->extract(parScope, "smoothertype", p_smoother)) {
+      if (ini->extract(parScope, "smoothertype", p_smoother)) {
         for (auto &&s : serializeString(p_smoother, '+')) {
           if (s.find("degree") != std::string::npos) {
             const auto degreeStr = parseValueForKey(s, "degree");
@@ -1188,18 +1190,17 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *par, st
         }
       }
     }
-
   }
 }
 
-void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std::string parScope)
+void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope)
 {
 
   std::string parSectionName = parPrefixFromParSection(parScope);
   upperCase(parSectionName);
 
   int maxIter = 500;
-  par->extract(parScope, "maxiterations", maxIter);
+  ini->extract(parScope, "maxiterations", maxIter);
 
   options.setArgs(parSectionName + "MAXIMUM ITERATIONS", std::to_string(maxIter));
 
@@ -1214,7 +1215,6 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
 #else
       options.setArgs(parSectionName + "SOLVER", "PCG");
 #endif
-
     }
 
     if (parScope == "pressure") {
@@ -1231,7 +1231,7 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
   }
 
   std::string p_solver;
-  if (!par->extract(parScope, "solver", p_solver)) {
+  if (!ini->extract(parScope, "solver", p_solver)) {
     return;
   }
 
@@ -1307,7 +1307,7 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *par, std:
   options.setArgs(parSectionName + "SOLVER", p_solver);
 }
 
-void parseInitialGuess(const int rank, setupAide &options, inipp::Ini *par, std::string parScope)
+void parseInitialGuess(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope)
 {
 
   std::string parSectionName = parPrefixFromParSection(parScope);
@@ -1331,7 +1331,7 @@ void parseInitialGuess(const int rank, setupAide &options, inipp::Ini *par, std:
     options.setArgs(parSectionName + "INITIAL GUESS", "PROJECTION-ACONJ");
   }
 
-  if (par->extract(parScope, "initialguess", initialGuess)) {
+  if (ini->extract(parScope, "initialguess", initialGuess)) {
     if (initialGuess.find("extrapolation") != std::string::npos) {
       options.setArgs(parSectionName + "INITIAL GUESS", "EXTRAPOLATION");
 
@@ -1382,7 +1382,7 @@ void parseInitialGuess(const int rank, setupAide &options, inipp::Ini *par, std:
   }
 }
 
-void parseRegularization(const int rank, setupAide &options, inipp::Ini *par, std::string parSection)
+void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, std::string parSection)
 {
   int N;
   options.getArgs("POLYNOMIAL DEGREE", N);
@@ -1396,7 +1396,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *par, st
 
   [&]() {
     std::string regularization;
-    if (par->extract(parSection, "regularization", regularization)) {
+    if (ini->extract(parSection, "regularization", regularization)) {
       const std::vector<std::string> validValues = {
           {"hpfrt"},
           {"none"},
@@ -1421,7 +1421,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *par, st
       }
       // new command syntax
       std::string filtering;
-      par->extract(parSection, "filtering", filtering);
+      ini->extract(parSection, "filtering", filtering);
       if (filtering == "hpfrt") {
         append_error("cannot specify both regularization and filtering!\n");
       }
@@ -1528,13 +1528,13 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *par, st
         }
       }
       return;
-    } else if (par->extract(parSection, "filtering", regularization)) {
+    } else if (ini->extract(parSection, "filtering", regularization)) {
       // fall back on old command syntax
       std::string filtering;
-      par->extract(parSection, "filtering", filtering);
+      ini->extract(parSection, "filtering", filtering);
       if (filtering == "hpfrt") {
         options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPFRT");
-        if (par->extract(parSection, "filterweight", sbuf)) {
+        if (ini->extract(parSection, "filterweight", sbuf)) {
           int err = 0;
           double weight = te_interp(sbuf.c_str(), &err);
           if (err) {
@@ -1548,10 +1548,10 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *par, st
         }
         double filterCutoffRatio;
         int NFilterModes;
-        if (par->extract(parSection, "filtercutoffratio", filterCutoffRatio)) {
+        if (ini->extract(parSection, "filtercutoffratio", filterCutoffRatio)) {
           NFilterModes = round((N + 1) * (1 - filterCutoffRatio));
         }
-        if (par->extract(parSection, "filtermodes", NFilterModes)) {
+        if (ini->extract(parSection, "filtermodes", NFilterModes)) {
           if (NFilterModes < 1) {
             NFilterModes = 1;
           }
@@ -1571,12 +1571,12 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *par, st
 
       // use default settings, if applicable
       std::string defaultSettings;
-      if (par->extract("general", "filtering", defaultSettings)) {
+      if (ini->extract("general", "filtering", defaultSettings)) {
         options.setArgs(parPrefix + "REGULARIZATION METHOD", options.getArgs("REGULARIZATION METHOD"));
         options.setArgs(parPrefix + "HPFRT MODES", options.getArgs("HPFRT MODES"));
         options.setArgs(parPrefix + "HPFRT STRENGTH", options.getArgs("HPFRT STRENGTH"));
       }
-      if (par->extract("general", "regularization", defaultSettings)) {
+      if (ini->extract("general", "regularization", defaultSettings)) {
         options.setArgs(parPrefix + "REGULARIZATION METHOD", options.getArgs("REGULARIZATION METHOD"));
         options.setArgs(parPrefix + "HPFRT MODES", options.getArgs("HPFRT MODES"));
 
@@ -1612,56 +1612,56 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *par, st
   }
 }
 
-void parseBoomerAmgSection(const int rank, setupAide &options, inipp::Ini *par)
+void parseBoomerAmgSection(const int rank, setupAide &options, inipp::Ini *ini)
 {
-  if (par->sections.count("boomeramg")) {
+  if (ini->sections.count("boomeramg")) {
     int coarsenType;
-    if (par->extract("boomeramg", "coarsentype", coarsenType)) {
+    if (ini->extract("boomeramg", "coarsentype", coarsenType)) {
       options.setArgs("BOOMERAMG COARSEN TYPE", std::to_string(coarsenType));
     }
     int interpolationType;
-    if (par->extract("boomeramg", "interpolationtype", interpolationType)) {
+    if (ini->extract("boomeramg", "interpolationtype", interpolationType)) {
       options.setArgs("BOOMERAMG INTERPOLATION TYPE", std::to_string(interpolationType));
     }
     int smootherType;
-    if (par->extract("boomeramg", "smoothertype", smootherType)) {
+    if (ini->extract("boomeramg", "smoothertype", smootherType)) {
       options.setArgs("BOOMERAMG SMOOTHER TYPE", std::to_string(smootherType));
     }
     int coarseSmootherType;
-    if (par->extract("boomeramg", "coarsesmoothertype", coarseSmootherType)) {
+    if (ini->extract("boomeramg", "coarsesmoothertype", coarseSmootherType)) {
       options.setArgs("BOOMERAMG COARSE SMOOTHER TYPE", std::to_string(coarseSmootherType));
     }
     int numCycles;
-    if (par->extract("boomeramg", "iterations", numCycles)) {
+    if (ini->extract("boomeramg", "iterations", numCycles)) {
       options.setArgs("BOOMERAMG ITERATIONS", std::to_string(numCycles));
     }
     double strongThres;
-    if (par->extract("boomeramg", "strongthreshold", strongThres)) {
+    if (ini->extract("boomeramg", "strongthreshold", strongThres)) {
       options.setArgs("BOOMERAMG STRONG THRESHOLD", to_string_f(strongThres));
     }
     double nonGalerkinTol;
-    if (par->extract("boomeramg", "nongalerkintol", nonGalerkinTol)) {
+    if (ini->extract("boomeramg", "nongalerkintol", nonGalerkinTol)) {
       options.setArgs("BOOMERAMG NONGALERKIN TOLERANCE", to_string_f(nonGalerkinTol));
     }
     int aggLevels;
-    if (par->extract("boomeramg", "aggressivecoarseninglevels", aggLevels)) {
+    if (ini->extract("boomeramg", "aggressivecoarseninglevels", aggLevels)) {
       options.setArgs("BOOMERAMG AGGRESSIVE COARSENING LEVELS", std::to_string(aggLevels));
     }
     int chebyRelaxOrder;
-    if (par->extract("boomeramg", "chebyshevrelaxorder", chebyRelaxOrder)) {
+    if (ini->extract("boomeramg", "chebyshevrelaxorder", chebyRelaxOrder)) {
       options.setArgs("BOOMERAMG CHEBYSHEV RELAX ORDER", std::to_string(chebyRelaxOrder));
     }
     double chebyFraction;
-    if (par->extract("boomeramg", "chebyshevfraction", chebyFraction)) {
+    if (ini->extract("boomeramg", "chebyshevfraction", chebyFraction)) {
       options.setArgs("BOOMERAMG CHEBYSHEV FRACTION", std::to_string(chebyFraction));
     }
   }
 }
 
-void parseOccaSection(const int rank, setupAide &options, inipp::Ini *par)
+void parseOccaSection(const int rank, setupAide &options, inipp::Ini *ini)
 {
   std::string backendSpecification;
-  if (par->extract("occa", "backend", backendSpecification)) {
+  if (ini->extract("occa", "backend", backendSpecification)) {
     const std::vector<std::string> validBackends = {
         {"serial"},
         {"cpu"},
@@ -1726,35 +1726,35 @@ void parseOccaSection(const int rank, setupAide &options, inipp::Ini *par)
   }
 
   std::string deviceNumber;
-  if (par->extract("occa", "devicenumber", deviceNumber)) {
+  if (ini->extract("occa", "devicenumber", deviceNumber)) {
     upperCase(deviceNumber);
     options.setArgs("DEVICE NUMBER", deviceNumber);
   }
 
   std::string platformNumber;
-  if (par->extract("occa", "platformnumber", platformNumber)) {
+  if (ini->extract("occa", "platformnumber", platformNumber)) {
     upperCase(platformNumber);
     options.setArgs("PLATFORM NUMBER", platformNumber);
   }
 }
 
-void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
+void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *ini)
 {
   // GENERAL
   bool verbose = false;
-  if (par->extract("general", "verbose", verbose)) {
+  if (ini->extract("general", "verbose", verbose)) {
     if (verbose) {
       options.setArgs("VERBOSE", "TRUE");
     }
   }
 
   std::string startFrom;
-  if (par->extract("general", "startfrom", startFrom)) {
+  if (ini->extract("general", "startfrom", startFrom)) {
     options.setArgs("RESTART FILE NAME", startFrom);
   }
 
   int N;
-  if (par->extract("general", "polynomialorder", N)) {
+  if (ini->extract("general", "polynomialorder", N)) {
     options.setArgs("POLYNOMIAL DEGREE", std::to_string(N));
     if (N > 10) {
       append_error("polynomialOrder > 10 is currently not supported");
@@ -1764,9 +1764,9 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
   }
 
   // optional nScalar setting, not including temperature
-  auto optionalNscalar = [par]() -> std::optional<int> {
+  auto optionalNscalar = [ini]() -> std::optional<int> {
     int nScalar = 0;
-    if (par->extract("general", "nscalars", nScalar)) {
+    if (ini->extract("general", "nscalars", nScalar)) {
       if (nScalar < 0) {
         std::ostringstream error;
         error << "nScalar must be non-negative, but is " << nScalar << "\n";
@@ -1781,7 +1781,7 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
   // udf file
   {
     std::string udfFile;
-    if (par->extract("general", "udf", udfFile)) {
+    if (ini->extract("general", "udf", udfFile)) {
       options.setArgs("UDF FILE", udfFile);
     }
   }
@@ -1789,7 +1789,7 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
   // usr file
   {
     std::string usrFile;
-    if (par->extract("general", "usr", usrFile)) {
+    if (ini->extract("general", "usr", usrFile)) {
       options.setArgs("NEK USR FILE", usrFile);
     }
   }
@@ -1797,20 +1797,20 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
   // oudf file
   {
     std::string oudfFile;
-    if (par->extract("general", "oudf", oudfFile)) {
+    if (ini->extract("general", "oudf", oudfFile)) {
       options.setArgs("UDF OKL FILE", oudfFile);
     }
   }
 
   {
     int NSubCycles = 0;
-    if (par->extract("general", "subcyclingsteps", NSubCycles)) {
+    if (ini->extract("general", "subcyclingsteps", NSubCycles)) {
       options.setArgs("SUBCYCLING STEPS", std::to_string(NSubCycles));
     }
   }
 
   std::string dtString;
-  if (par->extract("general", "dt", dtString)) {
+  if (ini->extract("general", "dt", dtString)) {
     const std::vector<std::string> validValues = {
         {"targetcfl"},
         {"max"},
@@ -1853,7 +1853,7 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
           }
 
           int NSubCyclesSpecified = 0;
-          if (par->extract("general", "subcyclingsteps", NSubCyclesSpecified)) {
+          if (ini->extract("general", "subcyclingsteps", NSubCyclesSpecified)) {
             options.setArgs("SUBCYCLING STEPS", std::to_string(NSubCyclesSpecified));
           } else {
             options.setArgs("SUBCYCLING STEPS", std::to_string(NSubCycles));
@@ -1866,7 +1866,7 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
       // if targetCFL is not set, try to infer from subcyclingSteps
       if (!userSuppliesTargetCFL) {
         std::string subCyclingString;
-        if (par->extract("general", "subcyclingsteps", subCyclingString)) {
+        if (ini->extract("general", "subcyclingsteps", subCyclingString)) {
           if (subCyclingString.find("auto") != std::string::npos) {
             append_error("subCyclingSteps = auto requires the targetCFL to be set");
             options.setArgs("SUBCYCLING STEPS", "0"); // dummy
@@ -1903,7 +1903,7 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
   }
 
   std::string timeStepper;
-  if (par->extract("general", "timestepper", timeStepper)) {
+  if (ini->extract("general", "timestepper", timeStepper)) {
     if (timeStepper == "bdf3" || timeStepper == "tombo3") {
       options.setArgs("BDF ORDER", "3");
     } else if (timeStepper == "bdf2" || timeStepper == "tombo2") {
@@ -1927,14 +1927,14 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
     }
   }
 
-  parseConstFlowRate(rank, options, par);
+  parseConstFlowRate(rank, options, ini);
 
   double endTime;
   std::string stopAt = "numsteps";
-  par->extract("general", "stopat", stopAt);
+  ini->extract("general", "stopat", stopAt);
   if (stopAt == "numsteps") {
     int numSteps = 0;
-    if (par->extract("general", "numsteps", numSteps)) {
+    if (ini->extract("general", "numsteps", numSteps)) {
       options.setArgs("NUMBER TIMESTEPS", std::to_string(numSteps));
       endTime = -1;
     } else {
@@ -1942,13 +1942,13 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
     }
     options.setArgs("NUMBER TIMESTEPS", std::to_string(numSteps));
   } else if (stopAt == "endtime") {
-    if (!par->extract("general", "endtime", endTime)) {
+    if (!ini->extract("general", "endtime", endTime)) {
       append_error("cannot find mandatory parameter GENERAL::endTime");
     }
     options.setArgs("END TIME", to_string_f(endTime));
   } else if (stopAt == "elapsedtime") {
     double elapsedTime;
-    if (!par->extract("general", "elapsedtime", elapsedTime)) {
+    if (!ini->extract("general", "elapsedtime", elapsedTime)) {
       append_error("cannot find mandatory parameter GENERAL::elapsedTime");
     }
     options.setArgs("STOP AT ELAPSED TIME", to_string_f(elapsedTime));
@@ -1959,11 +1959,11 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
   }
 
   double writeInterval = 0;
-  par->extract("general", "writeinterval", writeInterval);
+  ini->extract("general", "writeinterval", writeInterval);
   options.setArgs("SOLUTION OUTPUT INTERVAL", std::to_string(writeInterval));
 
   std::string writeControl;
-  if (par->extract("general", "writecontrol", writeControl)) {
+  if (ini->extract("general", "writecontrol", writeControl)) {
 
     checkValidity(rank, {"steps", "simulationtime"}, writeControl);
 
@@ -1979,7 +1979,7 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
   }
 
   bool dealiasing = true;
-  if (par->extract("general", "dealiasing", dealiasing)) {
+  if (ini->extract("general", "dealiasing", dealiasing)) {
     if (dealiasing) {
       options.setArgs("ADVECTION TYPE", "CUBATURE+CONVECTIVE");
     } else {
@@ -1991,23 +1991,23 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *par)
   if (!dealiasing) {
     cubN = 0;
   }
-  par->extract("general", "cubaturepolynomialorder", cubN);
+  ini->extract("general", "cubaturepolynomialorder", cubN);
   options.setArgs("CUBATURE POLYNOMIAL DEGREE", std::to_string(cubN));
 
   {
-    parseRegularization(rank, options, par, "general");
+    parseRegularization(rank, options, ini, "general");
   }
 }
 
-void parseMeshSection(const int rank, setupAide &options, inipp::Ini *par)
+void parseMeshSection(const int rank, setupAide &options, inipp::Ini *ini)
 {
-  if (par->sections.count("mesh")) {
+  if (ini->sections.count("mesh")) {
     std::string meshFile;
-    if (par->extract("mesh", "file", meshFile)) {
+    if (ini->extract("mesh", "file", meshFile)) {
       options.setArgs("MESH FILE", meshFile);
     }
 
-    parseLinearSolver(rank, options, par, "mesh");
+    parseLinearSolver(rank, options, ini, "mesh");
     if (options.compareArgs("MESH SOLVER", "USER")) {
       options.setArgs("MOVING MESH", "TRUE");
       options.setArgs("MESH SOLVER", "NONE");
@@ -2020,23 +2020,23 @@ void parseMeshSection(const int rank, setupAide &options, inipp::Ini *par)
       options.setArgs("MESH ELLIPTIC COEFF FIELD", "TRUE");
       options.setArgs("MESH STRESSFORMULATION", "FALSE");
 
-      parseInitialGuess(rank, options, par, "mesh");
-      parsePreconditioner(rank, options, par, "mesh");
-      parseSolverTolerance(rank, options, par, "mesh");
+      parseInitialGuess(rank, options, ini, "mesh");
+      parsePreconditioner(rank, options, ini, "mesh");
+      parseSolverTolerance(rank, options, ini, "mesh");
 
       std::string m_bcMap;
-      if (par->extract("mesh", "boundarytypemap", m_bcMap)) {
+      if (ini->extract("mesh", "boundarytypemap", m_bcMap)) {
         options.setArgs("MESH BOUNDARY TYPE MAP", m_bcMap);
       } else {
         std::string v_bcMap;
-        if (par->extract("velocity", "boundarytypemap", v_bcMap)) {
+        if (ini->extract("velocity", "boundarytypemap", v_bcMap)) {
           options.setArgs("MESH DERIVED BOUNDARY TYPE MAP", v_bcMap);
         }
       }
     }
 
     std::string meshPartitioner;
-    if (par->extract("mesh", "partitioner", meshPartitioner)) {
+    if (ini->extract("mesh", "partitioner", meshPartitioner)) {
       if (meshPartitioner != "rcb" && meshPartitioner != "rcb+rsb") {
         std::ostringstream error;
         error << "Could not parse mesh::partitioner = " << meshPartitioner;
@@ -2046,16 +2046,16 @@ void parseMeshSection(const int rank, setupAide &options, inipp::Ini *par)
     }
 
     std::string meshConTol;
-    if (par->extract("mesh", "connectivitytol", meshConTol)) {
+    if (ini->extract("mesh", "connectivitytol", meshConTol)) {
       options.setArgs("MESH CONNECTIVITY TOL", meshConTol);
     }
 
     std::string boundaryIDs;
-    if (par->extract("mesh", "boundaryidmap", boundaryIDs)) {
+    if (ini->extract("mesh", "boundaryidmap", boundaryIDs)) {
       options.setArgs("MESH BOUNDARY ID MAP", boundaryIDs);
     }
 
-    if (par->extract("mesh", "boundaryidmapV", boundaryIDs)) {
+    if (ini->extract("mesh", "boundaryidmapV", boundaryIDs)) {
       options.setArgs("MESHV BOUNDARY ID MAP", boundaryIDs);
     }
 
@@ -2069,7 +2069,7 @@ void parseMeshSection(const int rank, setupAide &options, inipp::Ini *par)
           {"0"},
       };
       std::string checkpointOutputMesh;
-      if (par->extract("mesh", "writetofieldfile", checkpointOutputMesh)) {
+      if (ini->extract("mesh", "writetofieldfile", checkpointOutputMesh)) {
 
         checkValidity(rank, validValues, checkpointOutputMesh);
         if (checkForTrue(checkpointOutputMesh)) {
@@ -2082,32 +2082,32 @@ void parseMeshSection(const int rank, setupAide &options, inipp::Ini *par)
   }
 }
 
-void parsePressureSection(const int rank, setupAide &options, inipp::Ini *par)
+void parsePressureSection(const int rank, setupAide &options, inipp::Ini *ini)
 {
   options.setArgs("PRESSURE ELLIPTIC COEFF FIELD", "FALSE");
 
-  parseSolverTolerance(rank, options, par, "pressure");
+  parseSolverTolerance(rank, options, ini, "pressure");
 
-  parseInitialGuess(rank, options, par, "pressure");
+  parseInitialGuess(rank, options, ini, "pressure");
 
-  parsePreconditioner(rank, options, par, "pressure");
+  parsePreconditioner(rank, options, ini, "pressure");
 
-  parseLinearSolver(rank, options, par, "pressure");
+  parseLinearSolver(rank, options, ini, "pressure");
 
-  parseBoomerAmgSection(rank, options, par);
+  parseBoomerAmgSection(rank, options, ini);
 
-  if (par->sections.count("amgx")) {
+  if (ini->sections.count("amgx")) {
     if (!AMGXenabled()) {
       append_error("AMGX was requested but is not compiled!\n");
     }
     std::string configFile;
-    if (par->extract("amgx", "configfile", configFile)) {
+    if (ini->extract("amgx", "configfile", configFile)) {
       options.setArgs("AMGX CONFIG FILE", configFile);
     }
   }
 }
 
-void parseVelocitySection(const int rank, setupAide &options, inipp::Ini *par)
+void parseVelocitySection(const int rank, setupAide &options, inipp::Ini *ini)
 {
   std::string vsolver;
   std::string sbuf;
@@ -2117,25 +2117,25 @@ void parseVelocitySection(const int rank, setupAide &options, inipp::Ini *par)
     options.setArgs("VELOCITY STRESSFORMULATION", "FALSE");
   }
 
-  parseInitialGuess(rank, options, par, "velocity");
+  parseInitialGuess(rank, options, ini, "velocity");
 
-  parsePreconditioner(rank, options, par, "velocity");
+  parsePreconditioner(rank, options, ini, "velocity");
 
-  parseLinearSolver(rank, options, par, "velocity");
+  parseLinearSolver(rank, options, ini, "velocity");
 
-  parseSolverTolerance(rank, options, par, "velocity");
+  parseSolverTolerance(rank, options, ini, "velocity");
 
   std::string v_bcMap;
-  if (par->extract("velocity", "boundarytypemap", v_bcMap)) {
+  if (ini->extract("velocity", "boundarytypemap", v_bcMap)) {
     options.setArgs("VELOCITY BOUNDARY TYPE MAP", v_bcMap);
   }
 
   double rho;
-  if (par->extract("velocity", "density", rho) || par->extract("velocity", "rho", rho)) {
+  if (ini->extract("velocity", "density", rho) || ini->extract("velocity", "rho", rho)) {
     options.setArgs("DENSITY", to_string_f(rho));
   }
 
-  if (par->extract("velocity", "viscosity", sbuf)) {
+  if (ini->extract("velocity", "viscosity", sbuf)) {
     int err = 0;
     double viscosity = te_interp(sbuf.c_str(), &err);
     if (err) {
@@ -2147,21 +2147,21 @@ void parseVelocitySection(const int rank, setupAide &options, inipp::Ini *par)
     options.setArgs("VISCOSITY", to_string_f(viscosity));
   }
 
-  parseRegularization(rank, options, par, "velocity");
+  parseRegularization(rank, options, ini, "velocity");
 }
 
-void parseProblemTypeSection(const int rank, setupAide &options, inipp::Ini *par)
+void parseProblemTypeSection(const int rank, setupAide &options, inipp::Ini *ini)
 {
   {
     bool stressFormulation;
-    if (par->extract("problemtype", "stressformulation", stressFormulation)) {
+    if (ini->extract("problemtype", "stressformulation", stressFormulation)) {
       if (stressFormulation) {
         options.setArgs("VELOCITY STRESSFORMULATION", "TRUE");
       }
     }
 
     std::string eqn;
-    if (par->extract("problemtype", "equation", eqn)) {
+    if (ini->extract("problemtype", "equation", eqn)) {
       const std::vector<std::string> validValues = {
           {"stokes"},
           {"navierstokes"},
@@ -2170,7 +2170,7 @@ void parseProblemTypeSection(const int rank, setupAide &options, inipp::Ini *par
       };
       const std::vector<std::string> list = serializeString(eqn, '+');
 
-      auto eqnType = list[0]; 
+      auto eqnType = list[0];
       upperCase(eqnType);
       options.setArgs("EQUATION TYPE", eqnType);
 
@@ -2190,11 +2190,11 @@ void parseProblemTypeSection(const int rank, setupAide &options, inipp::Ini *par
   }
 }
 
-void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
+void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
 {
-  auto optionalNscalar = [par]() -> std::optional<int> {
+  auto optionalNscalar = [ini]() -> std::optional<int> {
     int nScalar = 0;
-    if (par->extract("general", "nscalars", nScalar)) {
+    if (ini->extract("general", "nscalars", nScalar)) {
       if (nScalar < 0) {
         std::ostringstream error;
         error << "nScalar must be non-negative, but is " << nScalar << "\n";
@@ -2209,19 +2209,19 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
   nscal = optionalNscalar ? optionalNscalar.value() : 0;
   int isStart = 0;
 
-  if (par->sections.count("temperature")) {
+  if (ini->sections.count("temperature")) {
     std::string sid = scalarDigitStr(0);
     nscal++;
     isStart++;
 
     {
-      parseRegularization(rank, options, par, "temperature");
+      parseRegularization(rank, options, ini, "temperature");
     }
 
     options.setArgs("SCALAR" + sid + " IS TEMPERATURE", "TRUE");
 
     std::string solver;
-    par->extract("temperature", "solver", solver);
+    ini->extract("temperature", "solver", solver);
 
     if (solver == "cvode") {
       cvodeRequested = true;
@@ -2230,16 +2230,16 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
 
     options.setArgs("SCALAR" + sid + " ELLIPTIC COEFF FIELD", "TRUE");
 
-    parseInitialGuess(rank, options, par, "temperature");
+    parseInitialGuess(rank, options, ini, "temperature");
 
-    parsePreconditioner(rank, options, par, "temperature");
+    parsePreconditioner(rank, options, ini, "temperature");
 
-    parseLinearSolver(rank, options, par, "temperature");
+    parseLinearSolver(rank, options, ini, "temperature");
 
-    parseSolverTolerance(rank, options, par, "temperature");
+    parseSolverTolerance(rank, options, ini, "temperature");
 
     std::string sbuf;
-    if (par->extract("temperature", "conductivity", sbuf)) {
+    if (ini->extract("temperature", "conductivity", sbuf)) {
       int err = 0;
       double diffusivity = te_interp(sbuf.c_str(), &err);
       if (err) {
@@ -2251,7 +2251,7 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
       options.setArgs("SCALAR" + sid + " DIFFUSIVITY", to_string_f(diffusivity));
     }
 
-    if (par->extract("temperature", "rhocp", sbuf)) {
+    if (ini->extract("temperature", "rhocp", sbuf)) {
       int err = 0;
       double rhoCp = te_interp(sbuf.c_str(), &err);
       if (err) {
@@ -2261,12 +2261,12 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
     }
 
     std::string s_bcMap;
-    if (par->extract("temperature", "boundarytypemap", s_bcMap)) {
+    if (ini->extract("temperature", "boundarytypemap", s_bcMap)) {
       options.setArgs("SCALAR" + sid + " BOUNDARY TYPE MAP", s_bcMap);
     }
   }
 
-  const auto sections = par->sections;
+  const auto sections = ini->sections;
 
   bool foundDefaultScalarSection = false;
   int nNonTemperatureScalars = 0;
@@ -2280,7 +2280,7 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
     }
     foundDefaultScalarSection = true;
   } else {
-    for (auto &sec : par->sections) {
+    for (auto &sec : ini->sections) {
       std::string key = sec.first;
 
       // skip default [SCALAR] section when counting scalars
@@ -2340,11 +2340,11 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
     }
 
     {
-      parseRegularization(rank, options, par, parScope);
+      parseRegularization(rank, options, ini, parScope);
     }
 
     std::string solver;
-    par->extract(parScope, "solver", solver);
+    ini->extract(parScope, "solver", solver);
 
     if (solver == "cvode") {
       cvodeRequested = true;
@@ -2353,16 +2353,16 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
 
     options.setArgs("SCALAR" + sid + " ELLIPTIC COEFF FIELD", "TRUE");
 
-    parseInitialGuess(rank, options, par, parScope);
+    parseInitialGuess(rank, options, ini, parScope);
 
-    parsePreconditioner(rank, options, par, parScope);
+    parsePreconditioner(rank, options, ini, parScope);
 
-    parseLinearSolver(rank, options, par, parScope);
+    parseLinearSolver(rank, options, ini, parScope);
 
-    parseSolverTolerance(rank, options, par, parScope);
+    parseSolverTolerance(rank, options, ini, parScope);
 
     std::string sbuf;
-    if (par->extract(parScope, "diffusivity", sbuf)) {
+    if (ini->extract(parScope, "diffusivity", sbuf)) {
       int err = 0;
       double diffusivity = te_interp(sbuf.c_str(), &err);
       if (err) {
@@ -2374,7 +2374,7 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
       options.setArgs("SCALAR" + sid + " DIFFUSIVITY", to_string_f(diffusivity));
     }
 
-    if (par->extract(parScope, "rho", sbuf)) {
+    if (ini->extract(parScope, "rho", sbuf)) {
       int err = 0;
       double rho = te_interp(sbuf.c_str(), &err);
       if (err) {
@@ -2384,7 +2384,7 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
     }
 
     std::string s_bcMap;
-    if (par->extract(parScope, "boundarytypemap", s_bcMap)) {
+    if (ini->extract(parScope, "boundarytypemap", s_bcMap)) {
       options.setArgs("SCALAR" + sid + " BOUNDARY TYPE MAP", s_bcMap);
     } else if (!is || optionalNscalar) {
       // do not throw if generic [SCALAR] section _or_ [SCALAR0X] with a generic [SCALAR] section specifying
@@ -2421,11 +2421,11 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
   // Add in boundarytypemap handling for scalars using the default [SCALAR] settings.
   if (sections.count("scalar") != 0) {
     std::string s_bcMap;
-    par->extract("scalar", "boundarytypemap", s_bcMap);
+    ini->extract("scalar", "boundarytypemap", s_bcMap);
     for (int is = 1; is < nscal; ++is) {
       std::string sid = scalarDigitStr(is);
       std::string dummy;
-      if (!par->extract("scalar" + sid, "boundarytypemap", dummy)) {
+      if (!ini->extract("scalar" + sid, "boundarytypemap", dummy)) {
         if (s_bcMap.size() > 0) {
           options.setArgs("SCALAR" + sid + " BOUNDARY TYPE MAP", s_bcMap);
         }
@@ -2463,7 +2463,7 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *par)
   }
 }
 
-void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *par)
+void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *ini)
 {
   std::vector<std::string> sections = {"MESH", "PRESSURE", "VELOCITY", "SCALAR DEFAULT"};
   for (int i = 0; i < nscal; i++) {
@@ -2534,48 +2534,59 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *par)
   }
 }
 
-void parsePar(inipp::Ini *par, MPI_Comm comm, setupAide &options)
+Par::Par(MPI_Comm comm_)
+{
+  ini = new inipp::Ini();
+  comm = comm_;
+}
+
+void Par::addValidSection(const std::string &name)
+{
+  validSections.push_back(name);
+}
+
+void Par::parse(setupAide &options)
 {
   int rank;
   MPI_Comm_rank(comm, &rank);
 
   if (rank == 0) {
-    validateKeys(par->sections);
+    validateKeys(ini->sections);
   }
   if (rank == 0) {
-    printDeprecation(par->sections);
+    printDeprecation(ini->sections);
   }
 
-  parseOccaSection(rank, options, par);
+  parseOccaSection(rank, options, ini);
 
-  parseGeneralSection(rank, options, par);
+  parseGeneralSection(rank, options, ini);
 
   {
     dlong boundaryEXTOrder;
-    if (par->extract("neknek", "boundaryextorder", boundaryEXTOrder)) {
+    if (ini->extract("neknek", "boundaryextorder", boundaryEXTOrder)) {
       options.setArgs("NEKNEK BOUNDARY EXT ORDER", std::to_string(boundaryEXTOrder));
     }
   }
 
-  parseProblemTypeSection(rank, options, par);
+  parseProblemTypeSection(rank, options, ini);
 
-  parseMeshSection(rank, options, par);
+  parseMeshSection(rank, options, ini);
 
-  if (par->sections.count("velocity")) {
-    parsePressureSection(rank, options, par);
-    parseVelocitySection(rank, options, par);
+  if (ini->sections.count("velocity")) {
+    parsePressureSection(rank, options, ini);
+    parseVelocitySection(rank, options, ini);
   } else {
     options.setArgs("VELOCITY SOLVER", "NONE");
   }
 
-  parseScalarSections(rank, options, par);
+  parseScalarSections(rank, options, ini);
 
-  if (par->sections.count("cvode") || cvodeRequested) {
+  if (ini->sections.count("cvode") || cvodeRequested) {
     options.setArgs("CVODE", "TRUE");
-    parseCvodeSolver(rank, options, par);
+    parseCvodeSolver(rank, options, ini);
   }
 
-  cleanupStaleKeys(rank, options, par);
+  cleanupStaleKeys(rank, options, ini);
 
   // error checking
   {

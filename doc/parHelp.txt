@@ -21,7 +21,13 @@ dealiasing                  true [D], false
   cubaturePolynomialOrder   <int>
                             3/2*(polynomialOrder+1) -1 [D] 
 
-startFrom                   "<string>"                                 name of restart file
+startFrom                   "<string>"
+                              + time=<float>                           reset to specified time 
+                              + x                                      read mesh coordinates 
+                              + u                                      read velocity 
+                              + t
+                              + s1
+                              + int                                    interpolate restart data onto mesh
 
 timeStepper                 tombo1, tombo2 [D], tombo3
 

@@ -263,6 +263,8 @@ namespace occa {
         modeDevice->finish(); //wait for async copies to finish
         sys::free(host_memory);
       }
+
+      if (old_buffer) delete old_buffer;
     }
   }
 

@@ -2,6 +2,7 @@
 #include "kernelRequestManager.hpp"
 #include "platform.hpp"
 #include "fileUtils.hpp"
+#include <unordered_set>
 #include <regex>
 
 kernelRequestManager_t::kernelRequestManager_t(const platform_t &m_platform)
@@ -9,13 +10,14 @@ kernelRequestManager_t::kernelRequestManager_t(const platform_t &m_platform)
 {
 }
 
-// after benchmarking add fastest kernel
+// add (autotuned) kernel for subsequent load 
 void kernelRequestManager_t::add(const std::string& requestName, occa::kernel kernel)
 {
   if (!kernel.isInitialized()) return;
 
-  add(requestName, kernel.sourceFilename(), kernel.properties(), ""); 
-  requestToKernelMap[requestName] = kernel;
+  kernelRequest_t req(requestName, kernel.sourceFilename(), kernel.properties(), "");
+  req.kernel = kernel;
+  this->add(req, false);
 }
 
 void kernelRequestManager_t::add(const std::string &m_requestName,
@@ -46,15 +48,14 @@ void kernelRequestManager_t::add(kernelRequest_t request, bool checkUnique)
 
   if (!inserted) return;
 
-  requestNameToRequestMap.insert({request.requestName, request});
-  requestToKernelMap.insert({request.requestName, occa::kernel()}); // not loaded yet
+  requestMap.insert({request.requestName, request});
 }
 
-occa::kernel kernelRequestManager_t::load(const std::string& requestName, const std::string& _kernelName, bool checkValid)
+occa::kernel kernelRequestManager_t::load(const std::string& requestName, const std::string& _kernelName)
 {
-
+  auto checkValid = true;
   if (checkValid) {
-    const bool issueError = !processed() || (requestNameToRequestMap.find(requestName) == requestNameToRequestMap.end());
+    const bool issueError = !processed() || (requestMap.find(requestName) == requestMap.end());
     int errorFlag = issueError ? 1 : 0;
     MPI_Allreduce(MPI_IN_PLACE, &errorFlag, 1, MPI_INT, MPI_MAX, platformRef.comm.mpiComm);
 
@@ -63,7 +64,7 @@ occa::kernel kernelRequestManager_t::load(const std::string& requestName, const 
       txt << "\n";
       txt << "Cannot find request " << "<" << requestName << ">" << "\n";
       txt << "Available:\n";
-      for (auto &keyAndValue : requestNameToRequestMap) {
+      for (auto &keyAndValue : requestMap) {
         txt << "\t" << "<" << keyAndValue.second.requestName << ">" << "\n";
       }
 
@@ -76,47 +77,45 @@ occa::kernel kernelRequestManager_t::load(const std::string& requestName, const 
 
   auto kernel = [&]() 
   {
-    bool knlIsInitialized = false;
-    if (requestToKernelMap.find(requestName) != requestToKernelMap.end()) {
-      if (requestToKernelMap.at(requestName).isInitialized()) {
-        knlIsInitialized = true;
+    const auto& req = requestMap.find(requestName)->second;
+
+    auto reqKnl = req.kernel;
+    if (reqKnl.isInitialized()) return reqKnl; // request is mapped to a already loaded kernel
+
+    const auto kernelName = [&]()
+    {
+      if (_kernelName.empty()) {
+        auto fullPath = req.fileName;
+        std::regex kernelNameRegex(R"((.+)\/(.+)\.)");
+        std::smatch kernelNameMatch;
+        const auto foundKernelName = std::regex_search(fullPath, kernelNameMatch, kernelNameRegex);
+  
+        // capture group
+        // 0:   /path/to/install/nekrs/kernels/cds/advectMeshVelocityHex3D.okl
+        // 1:   /path/to/install/nekrs/kernels/cds
+        // 2:   advectMeshVelocityHex3D.okl
+  
+        return (foundKernelName && kernelNameMatch.size() == 3) ? kernelNameMatch[2].str() : "";
+      } else {
+        return _kernelName;
       }
-    }
+    }();
 
-    occa::kernel knl;
-    if (knlIsInitialized) {
-      knl = requestToKernelMap.at(requestName);
+    if (kernelMap.find({req, kernelName}) != kernelMap.end()) {
+      return kernelMap[{req, kernelName}];
     } else {
-      const auto& req = requestNameToRequestMap.find(requestName)->second;
-
-      auto extractKernelName = [](const std::string& fullPath)
-      {
-      std::regex kernelNameRegex(R"((.+)\/(.+)\.)");
-      std::smatch kernelNameMatch;
-      const auto foundKernelName = std::regex_search(fullPath, kernelNameMatch, kernelNameRegex);
-  
-      // capture group
-      // 0:   /path/to/install/nekrs/kernels/cds/advectMeshVelocityHex3D.okl
-      // 1:   /path/to/install/nekrs/kernels/cds
-      // 2:   advectMeshVelocityHex3D.okl
-  
-      return (foundKernelName && kernelNameMatch.size() == 3) ? kernelNameMatch[2].str() : "";
-      };
-      const auto kernelName = (_kernelName.empty()) ? extractKernelName(req.fileName) : _kernelName;
-
-      knl = platformRef.device.loadKernel(req.fileName, kernelName, req.props, req.suffix);
-      requestToKernelMap.at(requestName) = knl;
+      return kernelMap[{req, kernelName}] = platformRef.device.loadKernel(req.fileName, kernelName, req.props, req.suffix);
     }
-    nekrsCheck(!knl.isInitialized(),
-               MPI_COMM_SELF,
-               EXIT_FAILURE,
-               "kernel %s for request %s could not be initialized!\n",
-               _kernelName.c_str(),
-               requestName.c_str());
-    return knl;
-  };
+  }();
 
-  return kernel();
+  nekrsCheck(!kernel.isInitialized(),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "kernel <%s> for request <%s> could not be initialized!\n",
+             _kernelName.c_str(),
+             requestName.c_str());
+
+  return kernel;
 }
 
 void kernelRequestManager_t::compile()
@@ -142,20 +141,34 @@ void kernelRequestManager_t::compile()
 
   // compile requests (assumed to have a unique occa hash) on build ranks
   if (rank < ranksCompiling) { 
-    for (auto&& req: requests) {
-      const int reqId = distance(requests.begin(), requests.find(req));
+    for (auto&& req : requests) {
+      const auto reqId = distance(requests.begin(), requests.find(req));
       if (reqId % ranksCompiling == rank) {
-        if (!requestToKernelMap[req.requestName].isInitialized()) {
-          if (platform->verbose || platform->buildOnly) {
-            std::cout << "Compiling request <" << req.requestName << "> on rank " << rank << std::endl;
-          }
-          device.compileKernel(req.fileName, req.props, req.suffix, MPI_COMM_SELF);
+        auto knl = device.compileKernel(req.fileName, req.props, req.suffix, MPI_COMM_SELF);
+        kernelHashMap[req.requestName] = knl.hash();
+        if (platform->verbose || platform->buildOnly) {
+          std::cout << "Compiling request <" << req.requestName << "> (" << knl.hash() << ") on rank " << rank << std::endl;
         }
       }
     }
   }
-
   MPI_Barrier(platform->comm.mpiComm); // finish compilation
+
+  // a-posteriori check for duplicated hash 
+  // causing a potential race condition
+  const auto duplicateHashFound = [&]()
+  {
+    std::unordered_set<std::string> encounteredHashes;
+    for (const auto& req : requests) {
+      const auto hash = kernelHashMap[req.requestName];
+      if (!encounteredHashes.insert(hash).second) {
+        std::cerr << req.requestName << "(" << hash << ")" << std::endl;
+        return true;
+      }
+    }
+    return false;
+  }();
+  nekrsCheck(duplicateHashFound, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "more than one request is using the same hash!");
 
   // after this point it is illegal to compile kernels
   platform->device.compilationFinished();

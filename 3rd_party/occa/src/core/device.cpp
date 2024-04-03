@@ -388,19 +388,15 @@ namespace occa {
     const std::string hashDir = io::hashDir(realFilename, kernelHash);
     allProps["hash"] = kernelHash.getFullString();
 
-    kernel cachedKernel = modeDevice->buildKernel(realFilename,
-                                                  kernelName,
-                                                  kernelHash,
-                                                  allProps);
+    modeKernel_t* mode_kernel = modeDevice->buildKernel(realFilename,
+                                                        kernelName,
+                                                        kernelHash,
+                                                        allProps);
 
-    if (cachedKernel.isInitialized()) {
-      cachedKernel.modeKernel->hash = kernelHash;
-    } else {
-      const bool compile_only = allProps.get("build/compile_only", false);
-      if (!compile_only) sys::rmrf(hashDir);
-    }
-
-    return cachedKernel;
+    const bool compile_only = allProps.get("build/compile_only", false);
+    if (!compile_only && !mode_kernel) sys::rmrf(hashDir);
+  
+    return kernel(mode_kernel,kernelHash);
   }
 
   kernel device::buildKernelFromString(const std::string &content,

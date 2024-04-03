@@ -82,13 +82,13 @@ void tavg::buildKernel(occa::properties kernelInfo)
   {
     const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/plugins/");
     const auto fileName = path + "E.okl";
+    const auto reqName = "tavg::";
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
-      const auto reqName = "tavg::";
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
     } else {
       buildKernelCalled = 1;
-      return platform->device.loadKernel(fileName, kernelName, kernelInfo);
+      return platform->kernelRequests.load(reqName, kernelName);
     }
   };
 

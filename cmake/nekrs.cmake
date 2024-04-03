@@ -68,7 +68,7 @@ set(NRS_SRC
     src/nrs/constantFlowRate.cpp
     src/nrs/cds/cds.cpp
     src/nrs/cds/solve.cpp
-    src/core/io/parsePar.cpp
+    src/core/io/par.cpp
     src/core/io/re2Reader.cpp
     src/core/io/configReader.cpp
     src/core/timer.cpp

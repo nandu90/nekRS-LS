@@ -118,6 +118,9 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
   const bool serial = platform->serial;
   const std::string extension = serial ? ".c" : ".okl";
 
+  int M;
+  platform->options.getArgs("POLYNOMIAL DEGREE", M);
+
   {
     std::string fileName;
     const std::string oklpath = getenv("NEKRS_KERNEL_DIR");
@@ -129,6 +132,7 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
     meshKernelInfo["defines/p_cubNq"] = cubNq;
     meshKernelInfo["defines/p_cubNp"] = cubNq * cubNq * cubNq;
 
+
     kernelName = "geometricFactorsHex3D";
     fileName = oklpath + "/mesh/" + kernelName + ".okl";
     const std::string meshPrefix = "pMGmesh-";
@@ -139,16 +143,18 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
     std::string fileName;
     std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/");
 
-    fileName = oklpath + "mask.okl";
-    kernelName = "mask";
-    platform->kernelRequests.add(kernelName + orderSuffix, fileName, kernelInfo, orderSuffix);
-
-    fileName = oklpath + "mask.okl";
-    platform->kernelRequests.add(kernelName + orderSuffix + "pfloat",
-                          fileName,
-                          pfloatKernelInfo,
-                          orderSuffix + "pfloat");
-
+    if (N != M) { 
+      fileName = oklpath + "mask.okl";
+      kernelName = "mask";
+      platform->kernelRequests.add(kernelName + orderSuffix, fileName, kernelInfo, orderSuffix);
+ 
+      fileName = oklpath + "mask.okl";
+      platform->kernelRequests.add(kernelName + orderSuffix + "pfloat",
+                            fileName,
+                            pfloatKernelInfo,
+                            orderSuffix + "pfloat");
+    }
+  
 
     oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/elliptic/");
 

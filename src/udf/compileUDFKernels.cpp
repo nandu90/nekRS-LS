@@ -52,18 +52,27 @@ occa::kernel oudfBuildKernel(occa::properties kernelInfo, const std::string& ker
 {
   const auto registerOnly = platform->options.compareArgs("REGISTER ONLY", "TRUE") ? true : false;
 
-  std::string oudfCache;
-  platform->options.getArgs("OKL FILE CACHE", oudfCache);
-  if (platform->verbose && platform->comm.mpiRank == 0 && !registerOnly) { 
-    std::cout << kernelName << std::endl;
-  }
+  const auto fileName = platform->options.getArgs("OKL FILE CACHE");
+  
+  auto knl = [&] ()
+  {
+    static std::vector<std::string> reqNames;
 
-  const auto fileName = oudfCache;
-  if (registerOnly) {
-    const auto reqName = "udf";
-    platform->kernelRequests.add(reqName, fileName, kernelInfo);
-    return occa::kernel();
-  } else {
-    return platform->device.loadKernel(fileName, kernelName, kernelInfo);
-  }
+    if (registerOnly) {
+      // hash reqName as the user might call oudfBuildKernel using different props
+      const auto reqName = "udf::" + std::string(kernelInfo.hash().getString());
+      reqNames.push_back(reqName); 
+      platform->kernelRequests.add(reqName, fileName, kernelInfo);
+      return occa::kernel();
+    } else {
+      if (platform->verbose && platform->comm.mpiRank == 0) { 
+        std::cout << kernelName << std::endl; 
+      }
+      static int idx = 0;  
+      const auto reqName = reqNames[idx++];
+      return platform->kernelRequests.load(reqName, kernelName);
+    }
+  }();
+
+  return knl;
 }

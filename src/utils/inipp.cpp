@@ -154,7 +154,7 @@ void Ini::parse(std::stringstream & is, bool lowerValue)
           end_position = value.find("\"");
           if (end_position != std::string::npos)
           {
-            valueInQuotes = value.substr(start_position, end_position - start_position);
+            valueInQuotes = value.substr(start_position, end_position - start_position - 1);
           }    
         }
        

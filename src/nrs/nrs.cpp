@@ -889,8 +889,7 @@ void nrs_t::init()
 void nrs_t::setIC()
 {
   if (!platform->options.getArgs("RESTART FILE NAME").empty()) {
-    std::string fileName;
-    platform->options.getArgs("RESTART FILE NAME", fileName);
+    auto fileName = platform->options.getArgs("RESTART FILE NAME");
     nek::restartFromFile(fileName);
 
     double startTime;

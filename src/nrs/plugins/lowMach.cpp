@@ -37,13 +37,13 @@ void lowMach::buildKernel(occa::properties kernelInfo)
   { 
     const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/nrs/plugins/");
     const auto fileName = path + "lowMach.okl";
+    const auto reqName = "lowMach::";
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
-      const auto reqName = "lowMach::";
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
     } else {
       buildKernelCalled = 1; 
-      return platform->device.loadKernel(fileName, kernelName, kernelInfo);
+      return platform->kernelRequests.load(reqName, kernelName);
     }
   };
 

@@ -69,13 +69,13 @@ void velRecycling::buildKernel(occa::properties kernelInfo)
   {
     const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/nrs/plugins/");
     const auto fileName = path + "velRecycling.okl";
+    const auto reqName = "velRecycling::";
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
-      const auto reqName = "velRecycling::";
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
     } else {
       buildKernelCalled = 1;
-      return platform->device.loadKernel(fileName, kernelName, kernelInfo);
+      return platform->kernelRequests.load(reqName, kernelName);
     }
   };
 

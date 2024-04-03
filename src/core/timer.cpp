@@ -25,6 +25,8 @@ orderedMap<std::string, tagData> m_;
 const int NEKRS_TIMER_INVALID_KEY = -1;
 const int NEKRS_TIMER_INVALID_METRIC = -2;
 
+std::vector<std::function<void()>> _printStatCallbacks;
+
 int ifSync_;
 
 inline int ifSync()
@@ -415,7 +417,6 @@ void timer_t::printStatEntry(std::string name, double time, double tNorm)
   }
 }
 
-
 void timer_t::printAll()
 {
   if (platform->comm.mpiRank != 0) {
@@ -440,6 +441,16 @@ std::vector<std::string> timer_t::tags()
   auto &keys = m_.keys();
   std::copy(keys.begin(), keys.end(), std::back_inserter(entries));
   return entries;
+}
+
+void timer_t::addPrintStatCallback(std::function<void()> f)
+{
+  _printStatCallbacks.push_back(f);
+}
+
+const std::vector<std::function<void()>> timer_t::printStatCallbacks()
+{
+ return _printStatCallbacks; 
 }
 
 } // namespace timer

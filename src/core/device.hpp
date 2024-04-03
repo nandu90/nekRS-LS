@@ -56,10 +56,10 @@ public:
     _device.finish();
   }
 
-  void compileKernel(const std::string &fullPath,
-                     const occa::properties &props,
-                     const std::string &suffix, 
-                     const MPI_Comm& comm) const;
+  occa::kernel compileKernel(const std::string &fullPath,
+                             const occa::properties &props,
+                             const std::string &suffix, 
+                             const MPI_Comm& comm) const;
 
   occa::kernel loadKernel(const std::string &fileName,
                           const std::string &kernelName,
@@ -80,7 +80,7 @@ public:
   size_t memoryUsage();
 
 private:
-  void wrapperCompileKernel(const std::string &fileName,
+  occa::kernel wrapperCompileKernel(const std::string &fileName,
                             const occa::properties &props_,
                             const std::string &suffix) const;
 

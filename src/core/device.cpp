@@ -110,9 +110,9 @@ occa::properties adjustKernelProps(const std::string& fileName, const occa::prop
 
 } // namespace
 
-void device_t::wrapperCompileKernel(const std::string &fileName,
-                                    const occa::properties &props_,
-                                    const std::string &suffix) const
+occa::kernel device_t::wrapperCompileKernel(const std::string &fileName,
+                                            const occa::properties &props_,
+                                            const std::string &suffix) const
 {
   if(!_compilationEnabled) {
     nekrsAbort(MPI_COMM_SELF,
@@ -132,7 +132,7 @@ void device_t::wrapperCompileKernel(const std::string &fileName,
   props["build/compile_only"] = true;
   props["build/load_only"] = false;
 
-  _device.buildKernel(fileName, "" /* dummy */, adjustKernelProps(fileName, props));
+  return _device.buildKernel(fileName, "" /* dummy */, adjustKernelProps(fileName, props));
 }
 
 occa::kernel device_t::wrapperLoadKernel(const std::string &fileName,
@@ -179,10 +179,10 @@ occa::kernel device_t::wrapperLoadKernel(const std::string &fileName,
   return knl;
 }
 
-void device_t::compileKernel(const std::string &fileName,
-                             const occa::properties &props,
-                             const std::string &suffix,
-                             const MPI_Comm &commIn) const
+occa::kernel device_t::compileKernel(const std::string &fileName,
+                                     const occa::properties &props,
+                                     const std::string &suffix,
+                                     const MPI_Comm &commIn) const
 {
   const auto collective = [&commIn]() 
   {
@@ -204,8 +204,9 @@ void device_t::compileKernel(const std::string &fileName,
     return (rank == 0) ? true : false; 
   }();
 
+  occa::kernel knl;
   if (buildRank) { 
-    this->wrapperCompileKernel(fileName, props, suffix); 
+    knl = this->wrapperCompileKernel(fileName, props, suffix); 
   }
   MPI_Barrier(comm); // finish compilation
 
@@ -216,6 +217,8 @@ void device_t::compileKernel(const std::string &fileName,
     fileBcast(fs::path(binaryFileName).parent_path(), dstPath, comm, platform->verbose);
   }
 #endif
+
+  return knl;
 }
 
 occa::kernel device_t::loadKernel(const std::string &fileName,

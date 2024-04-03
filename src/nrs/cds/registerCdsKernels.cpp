@@ -99,10 +99,6 @@ void registerCdsKernels(occa::properties kernelInfoBC)
     fileName = oklpath + "/nrs/cds/" + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, kernelInfoBC);
 
-    kernelName = "nStagesSum3";
-    fileName = oklpath + "/core/" + kernelName + ".okl";
-    platform->kernelRequests.add(section + kernelName, fileName, platform->kernelInfo);
-
     {
       occa::properties prop = meshProps;
       const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");

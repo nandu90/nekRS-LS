@@ -7,7 +7,7 @@
 #include "flopCounter.hpp"
 #include "timer.hpp"
 #include "comm.hpp"
-#include "inipp.hpp"
+#include "par.hpp"
 #include "device.hpp"
 #include "device.tpp"
 #include "solver.hpp"
@@ -47,7 +47,7 @@ public:
   timer::timer_t timer;
   occa::memoryPool o_memPool;
   kernelRequestManager_t kernelRequests;
-  inipp::Ini *par;
+  Par *par;
   solver_t *solver;
   bool serial;
   linAlg_t *linAlg;
@@ -66,4 +66,3 @@ public:
 #endif
 
 #include "occaWrapper.hpp"
-

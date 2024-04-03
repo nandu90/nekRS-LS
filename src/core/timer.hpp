@@ -44,6 +44,9 @@ struct timer_t {
 
   // obtain all tags registered with the timer
   std::vector<std::string> tags();
+
+  void addPrintStatCallback(std::function<void()>);
+  const std::vector<std::function<void()>> printStatCallbacks();
 };
 } // namespace timer
 

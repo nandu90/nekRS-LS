@@ -166,18 +166,20 @@ occa::kernel scatterManyKernel_long;
 
 void ogs::initKernels()
 {
-  const auto& props = ogs::kernelInfo;
 
-  auto buildKernel = [&props](const std::string _fileName, const std::string& kernelName)
+  auto buildKernel = [&](const std::string _fileName, const std::string& kernelName)
   {
+    const auto& props = ogs::kernelInfo;
+
     const auto oklpath = std::string(getenv("NEKRS_KERNEL_DIR")) + "/core/ogs/";
     const auto fileName = oklpath + _fileName + ".okl";
+    const auto reqName = fileName;
+
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
-      const auto reqName = fileName + "::" + std::string(props.hash().getString());
       platform->kernelRequests.add(reqName, fileName, props); 
       return occa::kernel();
     } else {
-      return platform->device.loadKernel(fileName, kernelName, props);
+      return platform->kernelRequests.load(reqName, kernelName);
     }
   };
 
