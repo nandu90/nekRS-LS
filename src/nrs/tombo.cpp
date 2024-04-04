@@ -9,7 +9,7 @@ occa::memory pressureSolve(nrs_t *nrs, double time, int stage)
   double flopCount = 0.0;
   platform->timer.tic("pressure rhs", 1);
 
-  auto o_stressTerm = [&]()
+  const auto o_stressTerm = [&]()
   {
     auto o_curl = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
 
@@ -25,11 +25,8 @@ occa::memory pressureSolve(nrs_t *nrs, double time, int stage)
     nrs->curlKernel(mesh->Nelements, 1, mesh->o_vgeo, mesh->o_D, nrs->fieldOffset, o_curl, o_stressTerm);
     flopCount += static_cast<double>(mesh->Nelements) * (18 * mesh->Np * mesh->Nq + 36 * mesh->Np);
  
-    return o_stressTerm;
-  }();
-
-  if (platform->options.compareArgs("VELOCITY STRESSFORMULATION", "TRUE")) {
-    nrs->pressureStressKernel(mesh->Nelements,
+    if (platform->options.compareArgs("VELOCITY STRESSFORMULATION", "TRUE")) {
+      nrs->pressureStressKernel(mesh->Nelements,
                               mesh->o_vgeo,
                               mesh->o_D,
                               nrs->fieldOffset,
@@ -37,8 +34,11 @@ occa::memory pressureSolve(nrs_t *nrs, double time, int stage)
                               nrs->o_Ue,
                               nrs->o_div,
                               o_stressTerm);
-    flopCount += static_cast<double>(mesh->Nelements) * (18 * mesh->Nq * mesh->Np + 100 * mesh->Np);
-  }
+      flopCount += static_cast<double>(mesh->Nelements) * (18 * mesh->Nq * mesh->Np + 100 * mesh->Np);
+    }
+    return o_stressTerm;
+  }();
+
 
   const auto o_gradDiv = [&]()
   { 
@@ -52,7 +52,6 @@ occa::memory pressureSolve(nrs_t *nrs, double time, int stage)
     flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
     return o_gradDiv;
   }();
-
 
   const auto o_lambda0 = [&]()
   {
@@ -148,7 +147,7 @@ occa::memory velocitySolve(nrs_t *nrs, double time, int stage)
   double flopCount = 0.0;
   platform->timer.tic("velocity rhs", 1);
 
-  auto [o_gradMueDiv, o_gradP] = [&]()
+  const auto o_gradMueDiv = [&]()
   {
     dfloat scale = 1./3;
     if (platform->options.compareArgs("VELOCITY STRESSFORMULATION", "TRUE")) scale = -2*scale;
@@ -168,13 +167,17 @@ occa::memory velocitySolve(nrs_t *nrs, double time, int stage)
                               o_mueDiv,
                               o_gradMueDiv);
     flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
-    o_mueDiv.free();
 
+    return o_gradMueDiv;
+  }();
+
+  const auto o_gradP = [&]()
+  {
     occa::memory o_gradP = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
     nrs->wgradientVolumeKernel(mesh->Nelements, mesh->o_vgeo, mesh->o_D, nrs->fieldOffset, nrs->o_P, o_gradP);
     flopCount += static_cast<double>(mesh->Nelements) * 18 * (mesh->Np * mesh->Nq + mesh->Np);
 
-    return std::tuple(o_gradMueDiv, o_gradP);
+    return o_gradP;
   }();
 
   const auto o_rhs = [&]()
@@ -182,9 +185,6 @@ occa::memory velocitySolve(nrs_t *nrs, double time, int stage)
     auto o_rhs = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
     nrs->velocityRhsKernel(mesh->Nlocal, nrs->fieldOffset, nrs->o_BF, o_gradMueDiv, o_gradP, o_rhs);
     flopCount += 9 * mesh->Nlocal;
-
-    o_gradMueDiv.free();
-    o_gradP.free();
 
     nrs->velocityNeumannBCKernel(mesh->Nelements,
                                  nrs->fieldOffset,
