@@ -50,7 +50,7 @@ The [master](https://github.com/Nek5000/nekRS) branch always points to the lates
 provides an early preview of the next upcoming release (do not use in a production environment).
 
 #
-If you're on an HPC system, ensure you log in to a compute node. Check if there's an `nrsqsub` script in the `bin` directory for your machine. If found, load the same modules. Then, just run:
+If you're on an HPC system, ensure you log in to a compute node. Check if there's an `nrsqsub` script in the `scripts` directory for your machine. If found, load the same modules. Then, just run:
 
 ```sh
 CC=mpicc CXX=mpic++ FC=mpif77 ./build.sh [-DCMAKE_INSTALL_PREFIX=$HOME/.local/nekrs] [<options>]
