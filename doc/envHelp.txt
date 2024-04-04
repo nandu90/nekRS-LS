@@ -1,24 +1,25 @@
-----------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------
 Variable			Value(s)   	Description / Comment
-----------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------------------
 NEKRS_HOME			string	     	Installation directory
 NEKRS_CACHE_DIR			string		Cache directory	
-NEKRS_GPU_MPI			0/1		Enable device aware MPI
+NEKRS_GPU_MPI			0/1[D]		Enable device aware MPI
 NEKRS_LOCAL_TMP_DIR		string		Node local temp directory
-NEKRS_CACHE_BCAST		0/1		Broadcast cache to NEKRS_LOCAL_TMP_DIR
-NEKRS_CACHE_LOCAL		0/1		Use node local cache (NEKRS_CACHE_DIR)
+NEKRS_CACHE_BCAST		0[D]/1		Broadcast cache to NEKRS_LOCAL_TMP_DIR after JIT compilation
+NEKRS_CACHE_LOCAL		0[D]/1		JIT compile + broadcast locally (on each compute node)
+                                                NEKRS_CACHE_DIR has to point to a local directory different from NEKRS_LOCAL_TMP_DIR
 
-NEKRS_MPI_THREAD_MULTIPLE	0/1		Use fully thread-safe MPI mode
+NEKRS_MPI_THREAD_MULTIPLE	0[D]/1		Use fully thread-safe MPI mode (only required for async coarse solve)
 
 NEKRS_SIGNUM_BACKTRACE		int		Signal number to trigger stack trace
 NEKRS_SIGNUM_TERM               int             Signal number to exit gracefully 
 NEKRS_SIGNUM_UPD                int             Signal number to process update (trigger) file
 
-NEKRS_UDF_INCLUDES		string		Optional include flags
+NEKRS_UDF_INCLUDES		string		Optional include flags ("file1;file2;file3")
 NEKRS_UDF_LDFLAGS		string		Operational linking flags
 
-OOGS_SYNC_RECV			0/1		Wait until all ranks have preposed recv (avoid unexpected msgs)
-OOGS_ENABLE_NBC_DEVICE		0/1		Enable device support for neighbor hood collectives
+OOGS_SYNC_RECV			0[D]/1		Wait until all ranks have preposed recv (avoid unexpected msgs)
+OOGS_ENABLE_NBC_DEVICE		0/1[D]		Enable device support for neighbor hood collectives
 
 OCCA_DIR			string		OCCA installation directory
-OCCA_VERBOSE			0/1		Enable verbose mode
+OCCA_VERBOSE			0[D]/1		Enable verbose mode
