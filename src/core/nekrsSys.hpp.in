@@ -130,7 +130,7 @@ int rank = 0;                                                                   
 MPI_Comm_rank(_nekrsCheckComm, &rank);                                                                       \
 if (rank == 0) {                                                                                             \
   char _errTxt[4096] = {0};                                                                                  \
-  sprintf(_errTxt,"Aborting in %s:\n%s " _nekrsCheckFormat, __FILE__, __func__, __VA_ARGS__);                  \
+  sprintf(_errTxt,"Aborting in %s:%s\n" _nekrsCheckFormat, __FILE__, __func__, __VA_ARGS__);                  \
   throw std::runtime_error(_errTxt);                                                                         \
 } else {                                                                                                     \
   throw std::runtime_error("");                                                                              \

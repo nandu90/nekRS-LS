@@ -105,8 +105,8 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 
   flopCounter = std::make_unique<flopCounter_t>();
 
-  tmpDir = "/";
-  if (cacheBcast) {
+  tmpDir = "";
+  if (cacheBcast || cacheLocal) {
     if (getenv("NEKRS_LOCAL_TMP_DIR")) {
       tmpDir = getenv("NEKRS_LOCAL_TMP_DIR");
     } else {
@@ -122,6 +122,20 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
                  EXIT_FAILURE,
                  "Cannot find NEKRS_LOCAL_TMP_DIR: %s\n",
                  tmpDir.c_str());
+    }
+
+    const auto multiSession = [&]() 
+    {
+      int retVal;
+      MPI_Comm_compare(comm.mpiComm, comm.mpiCommParent, &retVal);
+      return (retVal == MPI_IDENT) ? false : true;
+    }();
+
+    if (multiSession) {
+      int sessionID; 
+      options.getArgs("NEKNEK SESSION ID", sessionID);
+      tmpDir = fs::path(tmpDir) / fs::path("sess" + std::to_string(sessionID));
+      fs::create_directories(tmpDir);
     }
   }
 
@@ -207,21 +221,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 void platform_t::bcastJITKernelSourceFiles()
 {
   if (platform->verbose && comm.mpiRank == 0) {
-    std::cout << "broadcast kernel sources to " << getenv("NEKRS_LOCAL_TMP_DIR") << std::endl; 
-  }
-
-  auto nSessions = 1;
-  options.getArgs("NEKNEK NUMBER OF SESSIONS", nSessions);
-  if (nSessions > 1) {
-    auto sessionID = 0;
-    options.getArgs("NEKNEK SESSION ID", sessionID);
-
-    tmpDir = fs::path(tmpDir) / fs::path(std::string("nekrs_") + std::to_string(sessionID));
-
-    if (comm.mpiRank == 0) {
-      fs::create_directory(tmpDir);
-      nekrsCheck(!fs::exists(tmpDir), MPI_COMM_SELF, EXIT_FAILURE, "Cannot create %s\n", tmpDir.c_str());
-    }
+    std::cout << "broadcast kernel sources to " << platform->tmpDir << std::endl; 
   }
 
   const auto NEKRS_HOME_NEW = fs::path(tmpDir) / "nekrs";

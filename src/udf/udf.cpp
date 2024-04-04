@@ -225,9 +225,10 @@ void udfAutoKernels(const std::string &udfFileCache,
   fileSync(includeFile.c_str());
 }
 
-void udfBuild(const std::string &_udfFile, setupAide &options)
+void udfBuild(setupAide &options)
 {
-  udfFile = fs::absolute(_udfFile);
+  platform->options.getArgs("UDF FILE", udfFile);
+  udfFile = fs::absolute(udfFile);
   if (platform->comm.mpiRank == 0) {
     nekrsCheck(!fs::exists(udfFile), MPI_COMM_SELF, EXIT_FAILURE, "Cannot find %s!\n", udfFile.c_str());
   }
@@ -321,12 +322,6 @@ void udfBuild(const std::string &_udfFile, setupAide &options)
       oudfFile = platform->tmpDir / fs::path(oudfFile).filename();
       options.setArgs("UDF OKL FILE", std::string(oudfFile));
     }
-  }
-
-  if (platform->cacheBcast) {
-    fileBcast(udfFile, platform->tmpDir, comm, platform->verbose);
-    udfFile = std::string(platform->tmpDir / fs::path(udfFile).filename());
-    options.setArgs("UDF FILE", udfFile);
   }
 
   int err = 0;
@@ -506,7 +501,9 @@ void udfBuild(const std::string &_udfFile, setupAide &options)
     } // rank 0
 
     if (platform->cacheBcast || platform->cacheLocal) {
-      fileBcast(fs::path(udfFileCache).parent_path(), platform->tmpDir, comm, platform->verbose);
+      const auto dst = fs::path(platform->tmpDir) / "udf";
+      fileBcast(fs::path(udfLib), dst, comm, platform->verbose);
+      fileBcast(fs::path(oudfFileCache), dst, comm, platform->verbose);
     }
 
     return 0;

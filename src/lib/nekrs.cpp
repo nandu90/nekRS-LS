@@ -218,7 +218,7 @@ void setup(MPI_Comm commg_in,
   std::string udfFile;
   platform->options.getArgs("UDF FILE", udfFile);
   if (!udfFile.empty()) {
-    udfBuild(udfFile, platform->options);
+    udfBuild(platform->options);
   }
 
   if (platform->cacheBcast || platform->cacheLocal) {
