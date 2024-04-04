@@ -140,40 +140,60 @@ void kernelRequestManager_t::compile()
   }
 
   // compile requests (assumed to have a unique occa hash) on build ranks
+
+  constexpr int hashLength = 16 + 1; // null-terminated 
+  auto hashes = (char*) std::calloc(requests.size() * hashLength, sizeof(char)); 
+
+  auto reqIdStart = std::numeric_limits<long int>::max();
+  auto reqIdEnd = static_cast<long int>(1);
+
   if (rank < ranksCompiling) { 
     for (auto&& req : requests) {
-      const auto reqId = distance(requests.begin(), requests.find(req));
+      const auto reqId = std::distance(requests.begin(), requests.find(req));
       if (reqId % ranksCompiling == rank) {
+        reqIdStart = std::min(reqIdStart, static_cast<long int>(reqId));
+        reqIdEnd = std::max(reqIdEnd, static_cast<long int>(reqId));
+
         auto knl = device.compileKernel(req.fileName, req.props, req.suffix, MPI_COMM_SELF);
-        kernelHashMap[req.requestName] = knl.hash();
+        const auto hash = knl.hash().getString();
+        std::strncpy(hashes + reqId*hashLength, hash.c_str(), hashLength); 
         if (platform->verbose || platform->buildOnly) {
-          std::cout << "Compiling request <" << req.requestName << "> (" << knl.hash() << ") on rank " << rank << std::endl;
+          std::cout << "Compiling request <" << req.requestName << "> (" << hash << ") on rank " << rank << std::endl;
         }
       }
     }
   }
   MPI_Barrier(platform->comm.mpiComm); // finish compilation
 
-  // a-posteriori check for duplicated hash 
-  // causing a potential race condition
-  const auto duplicateHashFound = [&]()
-  {
-    std::unordered_set<std::string> encounteredHashes;
-    for (const auto& req : requests) {
-      const auto hash = kernelHashMap[req.requestName];
-      if (!encounteredHashes.insert(hash).second) {
-        std::cerr << req.requestName << "(" << hash << ")" << std::endl;
-        return true;
+  // a-posteriori check for duplicated hash causing a potential race condition
+  // no parallel version available yet 
+  if (platform->comm.mpiCommSize == 1) {
+    const auto duplicateHashFound = [&]()
+    {
+      if (platform->comm.mpiRank == 0) {
+        std::unordered_set<std::string> encounteredHashes;
+        for (const auto& req : requests) {
+          const auto reqId = distance(requests.begin(), requests.find(req));
+          char hash[hashLength];
+          std::strncpy(hash, hashes + reqId*hashLength, hashLength);
+          if (!encounteredHashes.insert(hash).second) {
+            std::cerr << "duplicate hash <" << hash << "> found for request: " << req.requestName << std::endl;
+            return true;
+          }
+        }
+        return false;
       }
-    }
-    return false;
-  }();
-  nekrsCheck(duplicateHashFound, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "more than one request is using the same hash!");
+      return false;
+    }();
+    nekrsCheck(duplicateHashFound, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "More than one compile request is using the same hash!");
+  }
+
+  free(hashes);
 
   // after this point it is illegal to compile kernels
   platform->device.compilationFinished();
 
-  if (platform->cacheBcast) {
+  if (platform->cacheBcast && !platform->buildOnly) {
     const auto srcPath = fs::path(getenv("OCCA_CACHE_DIR"));
     const std::string cacheDir = platform->tmpDir / fs::path("occa/"); 
     fileBcast(srcPath, fs::path(cacheDir) / "..", platform->comm.mpiComm, platform->verbose);

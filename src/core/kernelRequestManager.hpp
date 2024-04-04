@@ -78,9 +78,6 @@ private:
   // request name to request
   std::map<std::string, kernelRequest_t> requestMap;
 
-  // request name to kernel hash
-  std::map<std::string, std::string> kernelHashMap;
-
   // request and kernel name to kernel
   std::map<std::tuple<kernelRequest_t, std::string>, occa::kernel> kernelMap;
 
