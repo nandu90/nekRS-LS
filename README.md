@@ -35,7 +35,7 @@ Requirements:
 * MPI-3.1 or later
 * CMake version 3.21 or later 
 
-Download the latest release available under
+Download the latest [release](https://github.com/Nek5000/nekRS/releases) available under
 
 ```sh
 https://github.com/Nek5000/nekRS/archive/refs/tags/v24.0.tar.gz 
@@ -46,7 +46,7 @@ or clone our GitHub repository:
 ```sh
 https://github.com/Nek5000/nekRS.git
 ```
-The `master` branch always points to the latest stable release while `next`
+The [master](https://github.com/Nek5000/nekRS) branch always points to the latest stable release while [master](https://github.com/Nek5000/nekRS/tree/next) 
 provides an early preview of the next upcoming release (do not use in a production environment).
 
 #
@@ -73,7 +73,7 @@ then type `source $HOME/.bash_profile` in the current terminal window.
 We try hard not to break userland but the code is evolving quickly so things might change from one version to another without being backward compatible. Please consult `RELEASE.md` *before* using the code.  
 
 ```sh
-cd <directory outside of your installation or source folder>
+cd <directory outside of installation/source folder>
 cp -a $NEKRS_HOME/examples/turbPipePeriodic .
 mpirun -np 2 nekrs --setup turbPipe.par
 ```
@@ -95,8 +95,8 @@ All bugs are reported and tracked through [Issues](https://github.com/Nek5000/ne
 nekRS is released under the BSD 3-clause license (see `LICENSE` file). 
 All new contributions must be made under the BSD 3-clause license.
 
-## Citing nekRS
-[NekRS, a GPU-Accelerated Spectral Element Navier-Stokes Solver](https://www.sciencedirect.com/science/article/abs/pii/S0167819122000710) 
+## Citing
+If you find our project useful, please cite [NekRS, a GPU-Accelerated Spectral Element Navier-Stokes Solver](https://www.sciencedirect.com/science/article/abs/pii/S0167819122000710) 
 
 ## Acknowledgment
 This research was supported by the Exascale Computing Project (17-SC-20-SC), 
