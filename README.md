@@ -10,7 +10,7 @@
 [![Build Status](https://travis-ci.com/Nek5000/nekRS.svg?branch=master)](https://travis-ci.com/Nek5000/nekRS)
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-orange.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-**nekRS** is a fast and scaleable computational fluid dynamics (CFD) solver targeting HPC applications. The code started as an early fork of [libParanumal](https://github.com/paranumal/libparanumal) in 2019.
+**nekRS** is a fast and scalable computational fluid dynamics (CFD) solver targeting HPC applications. The code started as an early fork of [libParanumal](https://github.com/paranumal/libparanumal) in 2019.
 
 Capabilities:
 
@@ -50,14 +50,14 @@ The [master](https://github.com/Nek5000/nekRS) branch always points to the lates
 provides an early preview of the next upcoming release (do not use in a production environment).
 
 #
-If you're on an HPC system, ensure you log in to a compute node. Check if there's an `nrsqsub` script in the `scripts` directory for your machine. If found, load the same modules. Then, just run:
+If you're on an HPC system, ensure you log in to a compute node. Check if there's an `nrsqsub` script in the `scripts` directory for your system and load the same modules. Now, just run:
 
 ```sh
 CC=mpicc CXX=mpic++ FC=mpif77 ./build.sh [-DCMAKE_INSTALL_PREFIX=$HOME/.local/nekrs] [<options>]
 ```
 Adjust the compilers as necessary. Make sure to remove the previous build and installation directory if updating.
 
-## Setting the Enviroment
+## Setting the Environment
 
 Assuming you run `bash` and your install directory is $HOME/.local/nekrs, 
 add the following line to your $HOME/.bash_profile:
@@ -89,7 +89,7 @@ Please visit [GitHub Discussions](https://github.com/Nek5000/nekRS/discussions).
 Our project is hosted on [GitHub](https://github.com/Nek5000/nekRS). To learn how to contribute, see `CONTRIBUTING.md`.
 
 ## Reporting Bugs
-All bugs are reported and tracked through [Issues](https://github.com/Nek5000/nekRS/issues). If you are having trouble installing the code or getting your case to run properly, you should first vist our discussion group.
+All bugs are reported and tracked through [Issues](https://github.com/Nek5000/nekRS/issues). If you are having trouble installing the code or getting your case to run properly, you should first visit our discussion group.
 
 ## License
 nekRS is released under the BSD 3-clause license (see `LICENSE` file). 
