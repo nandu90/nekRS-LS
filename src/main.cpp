@@ -229,6 +229,7 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
       if (rank == 0) std::cout << "endTime or numSteps reached already -> skip timestepping\n"; 
     }
 
+    if (rank == 0) std::cout << std::endl;
     // time stepping loop 
 
     fflush(stdout);

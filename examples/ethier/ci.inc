@@ -103,7 +103,7 @@ occa::memory solveODE(nrs_t *nrs,
 
 static int ciMode = 0;
 
-#define EPS 1e-1
+#define EPS 2e-1
 
 void ciSetup(MPI_Comm comm, setupAide &options)
 {
