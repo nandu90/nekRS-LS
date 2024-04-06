@@ -1010,18 +1010,19 @@ void oogs::finish(occa::memory &o_v,
     ogsHostToc();
   }
 
-  unpackBuf(gs,
-            ogs->NhaloGather,
-            k,
-            stride,
-            gs->o_gatherOffsets,
-            gs->o_gatherIds,
-            ogs->o_haloGatherOffsets,
-            ogs->o_haloGatherIds,
-            type,
-            op,
-            gs->o_bufRecv,
-            o_v);
+  if (!gs->mode == OOGS_LOCAL)
+    unpackBuf(gs,
+              ogs->NhaloGather,
+              k,
+              stride,
+              gs->o_gatherOffsets,
+              gs->o_gatherIds,
+              ogs->o_haloGatherOffsets,
+              ogs->o_haloGatherIds,
+              type,
+              op,
+              gs->o_bufRecv,
+              o_v);
 }
 
 void oogs::startFinish(void *v, const int k, const dlong stride, const char *type, const char *op, oogs_t *h)
