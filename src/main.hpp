@@ -35,6 +35,8 @@ volatile sig_atomic_t sig_writeStackTrace = 0;
 
 volatile sig_atomic_t sig_terminate = 0;
 
+std::fexcept_t flag;
+
 struct cmdOptions
 {
   int buildOnly = 0;
@@ -167,6 +169,11 @@ cmdOptions* processCmdLineOptions(int argc, char** argv, const MPI_Comm &comm)
   MPI_Bcast(&cmdOpt->ciMode, sizeof(cmdOpt->ciMode), MPI_BYTE, 0, comm);
   MPI_Bcast(&cmdOpt->debug, sizeof(cmdOpt->debug), MPI_BYTE, 0, comm);
   MPI_Bcast(&cmdOpt->attach, sizeof(cmdOpt->attach), MPI_BYTE, 0, comm);
+
+  if (cmdOpt->debug) {
+    std::feclearexcept(FE_ALL_EXCEPT);
+    std::fegetexceptflag(&flag, FE_ALL_EXCEPT);
+  }
 
   if(cmdOpt->setupFile.empty() && cmdOpt->multiSessionFile.empty())
     printHelp++;

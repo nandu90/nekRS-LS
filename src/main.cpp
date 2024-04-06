@@ -219,6 +219,10 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
  
     double tSolveStepMin = std::numeric_limits<double>::max();
     double tSolveStepMax = std::numeric_limits<double>::min();
+
+    if (cmdOpt->debug && std::fetestexcept(FE_INVALID)) {
+      throw std::runtime_error("floating-point exception occured!");
+    }
  
     if (nekrs::endTime() > nekrs::startTime()) {
       if (rank == 0) std::cout << "\ntimestepping to time " << nekrs::endTime() << " ...\n";
