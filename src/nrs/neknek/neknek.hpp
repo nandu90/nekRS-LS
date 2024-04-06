@@ -18,7 +18,22 @@ class neknek_t
 public:
   neknek_t(nrs_t *_nrs, dlong _nsessions, dlong _sessionID);
 
-  void updateBoundary(int tstep, int stage);
+  void updateBoundary(int tstep, int stage, double time);
+  void exchange(bool allTimeStates = false, bool lag = false);
+
+  // multi-rate specific functions
+  void exchangeTimes(double time);
+  void setCorrectorTime(double time);
+
+  // private ?
+  void extrapolateBoundary(int tstep, double time, bool predictor);
+
+  // kludge: need to know whether we are in predictor or corrector part of step
+  // for multi-rate timestepping
+  void setPredictor(bool predictor)
+  {
+    predictorStep = predictor;
+  }
 
   // provide partition of unity function
   // this may be used, e.g., to do global integrations across the domain
@@ -26,6 +41,8 @@ public:
   occa::memory partitionOfUnity();
 
   void fixCoupledSurfaceFlux(occa::memory o_U);
+
+  double adjustDt(double dt);
 
   // performance metrics for printing
   dfloat tSync() const
@@ -119,12 +136,24 @@ public:
     return o_partition_;
   }
 
+  const occa::memory &o_scalarIndices() const
+  {
+    return o_scalarIndices_;
+  }
+
+  bool multirate() const
+  {
+    return multirate_;
+  }
+
   const std::vector<std::string> fieldList() const
   {
     return fields;
   }
 
 private:
+  void lag();
+  void extrapolate(int tstep);
   void reserveAllocation();
   void updateInterpPoints();
   void findIntPoints();
@@ -145,6 +174,8 @@ private:
   occa::memory o_pointMap_;
   occa::memory o_session_;
   occa::memory o_partition_;
+  occa::memory o_time_;
+  occa::memory o_scalarIndices_;
 
   // performance metrics for printing
   dfloat tSync_;
@@ -170,8 +201,15 @@ private:
   occa::kernel copyNekNekPointsKernel;
   occa::kernel computeFluxKernel;
   occa::kernel fixSurfaceFluxKernel;
+  occa::kernel extrapolateBoundaryKernel;
+  occa::kernel mapScalarKernel;
 
   bool recomputePartition = true;
+
+  bool multirate_ = false;
+
+  static constexpr int maxOrd = 3;
+  bool predictorStep = false;
 };
 
 #endif

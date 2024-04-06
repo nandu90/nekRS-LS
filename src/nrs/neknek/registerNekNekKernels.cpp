@@ -15,6 +15,10 @@ void registerNekNekKernels()
   std::string fileName = oklpath + "/nrs/neknek/" + kernelName + ".okl";
   platform->kernelRequests.add(kernelName, fileName, platform->kernelInfo);
 
+  kernelName = "mapScalar";
+  fileName = oklpath + "/nrs/neknek/" + kernelName + ".okl";
+  platform->kernelRequests.add(kernelName, fileName, platform->kernelInfo);
+
   auto surfaceFluxKernelInfo = platform->kernelInfo;
   surfaceFluxKernelInfo += meshKernelProperties(N);
   bcMap::addKernelConstants(surfaceFluxKernelInfo);
@@ -25,4 +29,13 @@ void registerNekNekKernels()
   kernelName = "fixSurfaceFlux";
   fileName = oklpath + "/nrs/neknek/" + kernelName + ".okl";
   platform->kernelRequests.add(kernelName, fileName, surfaceFluxKernelInfo);
+
+  auto extrapolateBoundaryInfo = platform->kernelInfo;
+  extrapolateBoundaryInfo["includes"].asArray();
+  extrapolateBoundaryInfo["includes"] += oklpath + "/nrs/neknek/timeInterpWeights.okl.hpp";
+  constexpr int NVfields{3};
+  extrapolateBoundaryInfo["defines/p_NVfields"] = NVfields;
+  kernelName = "extrapolateBoundary";
+  fileName = oklpath + "/nrs/neknek/" + kernelName + ".okl";
+  platform->kernelRequests.add(kernelName, fileName, extrapolateBoundaryInfo);
 }

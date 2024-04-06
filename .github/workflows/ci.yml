@@ -412,6 +412,10 @@ jobs:
       working-directory: ${{ env.NEKRS_EXAMPLES }}/eddyNekNek
       run: ${{ env.NEKRS_HOME }}/bin/nrsmpi eddyNekNekNekMv.sess 3 --cimode 2
 
+    - name: 'eddyNekNek, multirate timestepping'
+      working-directory: ${{ env.NEKRS_EXAMPLES }}/eddyNekNek
+      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi eddyNekNek.sess 2 --cimode 4
+
   ktauChannel:
     needs: install
     runs-on: ubuntu-latest

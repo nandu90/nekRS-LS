@@ -73,6 +73,9 @@ nScalars                    <int>                                      number of
 boundaryEXTOrder            <int>                                      boundary extrapolation order
                             1 [D]                                      order unity extrapolation is unconditionally stable
                                                                        higher orders, however, may require additional corrector steps
+multirate                   true, false [D]                            use multirate time stepping
+                              +correctorSteps=<int>                    multirate corrector steps
+                              0 [D]                                    NOTE: boundaryEXTOrder > 1 requires correctorSteps > 0
 ----------------------------------------------------------------------------------------------------------------------
 [PROBLEMTYPE]
 equation                    stokes

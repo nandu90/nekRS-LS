@@ -59,6 +59,7 @@ set(NRS_SRC
     src/nrs/nrs.cpp
     src/nrs/bdry/applyDirichlet.cpp
     src/nrs/timeStepper.cpp
+    src/nrs/multirateTimeStepper.cpp
     src/nrs/evaluateProperties.cpp
     src/nrs/evaluateDivergence.cpp
     src/core/registerCoreKernels.cpp
@@ -93,6 +94,7 @@ set(NRS_SRC
     src/pointInterpolation/registerPointInterpolationKernels.cpp
     src/nrs/neknek/neknek.cpp
     src/nrs/neknek/fixCoupledSurfaceFlux.cpp
+    src/nrs/neknek/multirateNekNek.cpp
     src/udf/udf.cpp
     src/udf/compileUDFKernels.cpp
     src/nrs/nekInterface/nekInterfaceAdapter.cpp

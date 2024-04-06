@@ -89,7 +89,13 @@ void velocityDirichletConditions(bcData *bc)
 
 void scalarDirichletConditions(bcData *bc)
 {
-  bc->s = bc->sinterp;
+  if(bc->scalarId == 0){
+    bc->s = bc->sinterp;
+  } else {
+    dfloat u, v, w;
+    exact(&u, &v, &w, bc->x, bc->y, bc->z, bc->time, p_visc);
+    bc->s = u;
+  }
 }
 
 @kernel void exactUVW(const dlong Ntotal,
@@ -202,7 +208,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 
 bool timeStepConverged(int stage)
 {
-  if (nrs->neknek->nEXT() == 1) {
+  if (nrs->neknek->nEXT() == 1 || nrs->neknek->multirate()) {
     return true;
   }
 
@@ -253,15 +259,28 @@ void UDF_ExecuteStep(double time, int tstep)
   platform->linAlg->abs(mesh->Nlocal, o_UerrZ);
   platform->linAlg->abs(mesh->Nlocal, o_Sexact);
 
-  const auto LinfUx = platform->linAlg->max(mesh->Nlocal, o_UerrX, platform->comm.mpiCommParent);
-  const auto LinfUy = platform->linAlg->max(mesh->Nlocal, o_UerrY, platform->comm.mpiCommParent);
-  const auto LinfUz = platform->linAlg->max(mesh->Nlocal, o_UerrZ, platform->comm.mpiCommParent);
-  const auto LinfS = platform->linAlg->max(mesh->Nlocal, o_Sexact, platform->comm.mpiCommParent);
-
+  const auto LinfUx = platform->linAlg->max(mesh->Nlocal, o_UerrX, platform->comm.mpiComm);
+  const auto LinfUy = platform->linAlg->max(mesh->Nlocal, o_UerrY, platform->comm.mpiComm);
+  const auto LinfUz = platform->linAlg->max(mesh->Nlocal, o_UerrZ, platform->comm.mpiComm);
+  const auto LinfS = platform->linAlg->max(mesh->Nlocal, o_Sexact, platform->comm.mpiComm);
+  
   if (platform->comm.mpiRank == 0) {
     printf("LinfUx = %g, LinfUy = %g, LinfUz = %g, LinfS = %g\n", LinfUx, LinfUy, LinfUz, LinfS);
   }
 
+  int innerSteps = 1;
+  platform->options.getArgs("MULTIRATE STEPS", innerSteps);
+  if(!nrs->neknek->multirate() || tstep % innerSteps == 0)
+  {
+    const auto LinfUxGlob = platform->linAlg->max(mesh->Nlocal, o_UerrX, platform->comm.mpiCommParent);
+    const auto LinfUyGlob = platform->linAlg->max(mesh->Nlocal, o_UerrY, platform->comm.mpiCommParent);
+    const auto LinfUzGlob = platform->linAlg->max(mesh->Nlocal, o_UerrZ, platform->comm.mpiCommParent);
+    const auto LinfSGlob = platform->linAlg->max(mesh->Nlocal, o_Sexact, platform->comm.mpiCommParent);
+    if (platform->comm.mpiRank == 0) {
+      printf("LinfUxGlob = %g, LinfUyGlob = %g, LinfUzGlob = %g, LinfSGlob = %g\n", LinfUxGlob, LinfUyGlob, LinfUzGlob, LinfSGlob);
+    }
+  }
+  
   if (ciMode) {
     ciTestErrors(nrs, time, tstep);
   }

@@ -409,9 +409,8 @@ double dt(int tstep)
              "Invalid time step size %.2e\n",
              dt_);
 
-  // during a neknek simulation, sync dt across all ranks
   if (nrs->neknek) {
-    MPI_Allreduce(MPI_IN_PLACE, &dt_, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiCommParent);
+    nrs->dt[0] = nrs->neknek->adjustDt(nrs->dt[0]);
   }
 
   // limit dt to 5 significant digits
@@ -457,6 +456,13 @@ int outputStep(double time, int tStep)
 void outputStep(int val)
 {
   nrs->isOutputStep = val;
+}
+
+int outputStep(double time, double dt, int tStep)
+{
+  int innerSteps = 1;
+  platform->options.getArgs("MULTIRATE STEPS", innerSteps);
+  return outputStep(time + innerSteps * dt, tStep);
 }
 
 void outfld(double time, int step, std::string suffix)
@@ -505,22 +511,11 @@ void lastStep(int val)
 
 int lastStep(double timeNew, int tstep, double elapsedTime)
 {
-  if (!platform->options.getArgs("STOP AT ELAPSED TIME").empty()) {
-    double maxElaspedTime;
-    platform->options.getArgs("STOP AT ELAPSED TIME", maxElaspedTime);
-    if (elapsedTime > 60.0 * maxElaspedTime) {
-      nrs->lastStep = 1;
-    }
-  } else if (endTime() >= 0) {
-    const double eps = 1e-10;
-    nrs->lastStep = fabs(timeNew - endTime()) < eps || timeNew > endTime();
-  } else {
-    nrs->lastStep = (tstep == numSteps());
-  }
-
+  int last = nrs->setLastStep(timeNew, tstep, elapsedTime);
   if (enforceLastStep) {
-    return 1;
+    last = 1;
   }
+  nrs->lastStep = last;
   return nrs->lastStep;
 }
 
@@ -683,6 +678,19 @@ bool runStep(int corrector)
   };
 
   return nrs->runStep(check, corrector);
+}
+
+int timeStep()
+{
+  return nrs->tstep;
+}
+
+double finalTimeStepSize(double time)
+{
+  int innerSteps = 1;
+  platform->options.getArgs("MULTIRATE STEPS", innerSteps);
+
+  return (endTime() - time) / innerSteps;
 }
 
 double finishStep()

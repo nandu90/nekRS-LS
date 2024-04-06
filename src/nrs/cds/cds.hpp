@@ -50,6 +50,9 @@ public:
   void makeNLT(double time, int tstep, occa::memory &o_Subcycling);
   occa::memory advectionSubcyling(int nEXT, double time, int scalarIdx);
 
+  void saveSolutionState();
+  void restoreSolutionState();
+
   userSource_t userSource = nullptr;
   userProperties_t userProperties = nullptr;
   userImplicitLinearTerm_t userImplicitLinearTerm = nullptr;
@@ -138,6 +141,11 @@ public:
   occa::kernel maskCopy2Kernel;
 
   occa::properties *kernelInfo;
+
+private:
+  occa::memory o_Ssave;
+  occa::memory o_NLTsave;
+  occa::memory o_Spropsave;
 };
 
 #endif

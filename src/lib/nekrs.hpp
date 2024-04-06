@@ -24,6 +24,7 @@ void udfExecuteStep(double time, int tstep, int isOutputStep);
 void outfld(double time, int step);
 void outfld(double time, int step, std::string suffix);
 int outputStep(double time, int tStep);
+int outputStep(double time, double dt, int tStep);
 void outputStep(int val);
 int finalize();
 void nekUserchk(void);
@@ -55,7 +56,8 @@ bool runStep(std::function<bool(int)> convergenceCheck, int corrector);
 bool runStep(int corrector);
 double finishStep();
 bool stepConverged();
-
+int timeStep();
+double finalTimeStepSize(double time);
 }
 
 #endif

@@ -27,6 +27,16 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("NEKNEK CORRECTOR STEPS", "0");
     options.setArgs("NEKNEK BOUNDARY EXT ORDER", "1");
   }
+  if (ciMode == 4) { // multi-rate
+    options.setArgs("NEKNEK CORRECTOR STEPS", "0");
+    options.setArgs("NEKNEK BOUNDARY EXT ORDER", "2");
+    options.setArgs("MULTIRATE TIMESTEPPER", "TRUE");
+    options.setArgs("MULTIRATE CORRECTOR STEPS", "1");
+    std::string casename = platform->options.getArgs("CASENAME");
+    if(casename == "inside" || casename == "insidemv"){
+      options.setArgs("DT", std::string("5e-5"));
+    }
+  }
   options.setArgs("VELOCITY SOLVER TOLERANCE", std::string("1e-12"));
   options.setArgs("SCALAR00 SOLVER TOLERANCE", std::string("1e-12"));
   options.setArgs("PRESSURE SOLVER TOLERANCE", std::string("1e-08"));
@@ -50,6 +60,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
 
 void ciTestPartitionOfUnity(nrs_t *nrs, double time, int tstep)
 {
+  if(nrs->neknek->multirate()) return;
   auto mesh = nrs->meshV;
   auto minMaxFld = [&](occa::memory o_a) {
     const auto minFld = platform->linAlg->min(mesh->Nlocal, o_a, platform->comm.mpiCommParent);
@@ -87,6 +98,8 @@ void ciTestPartitionOfUnity(nrs_t *nrs, double time, int tstep)
 
 void ciTestPointInterp(nrs_t *nrs, double time, int tstep)
 {
+  if(nrs->neknek->multirate()) return;
+
   // query velocity solution from inner session
   std::string casename = platform->options.getArgs("CASENAME");
   std::vector<dfloat> x;
@@ -200,12 +213,13 @@ void vizNekNekField(nrs_t *nrs)
 
 void ciTestInitialStep(nrs_t *nrs, double time, int tstep)
 {
+  if(nrs->neknek->multirate()) return;
   auto mesh = nrs->meshV;
   auto neknek = nrs->neknek;
   const auto neknekFieldOffset = neknek->fieldOffset();
   exactUVW(mesh->Nlocal, nrs->fieldOffset, time, mesh->o_x, mesh->o_y, mesh->o_z, nrs->o_U);
   
-  neknek->updateBoundary(tstep, 2); // pass in stage == 2 to prevent lagging
+  neknek->updateBoundary(tstep, 2, time); // pass in stage == 2 to prevent lagging
 
   auto o_Uexp = platform->o_memPool.reserve<dfloat>(nrs->NVfields * neknekFieldOffset);
   auto npt = neknek->npt();
@@ -246,6 +260,21 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
   const int rank = platform->comm.mpiRank;
 
   if (!nrs->lastStep) {
+    return;
+  }
+  
+  int innerSteps = 1;
+  platform->options.getArgs("MULTIRATE STEPS", innerSteps);
+  bool earlyReturn = nrs->neknek->multirate();
+  earlyReturn &= tstep % innerSteps != 0;
+  if(earlyReturn) return;
+
+  // bail if outer convergence has not been achieved for multirate timestepper
+  static int pass = -1;
+  pass++;
+  int numCorrectorSteps = 0;
+  platform->options.getArgs("MULTIRATE CORRECTOR STEPS", numCorrectorSteps);
+  if(ciMode == 4 && pass < numCorrectorSteps){
     return;
   }
 
@@ -292,6 +321,11 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
     expectedErrVy = 0.007;
     expectedErrVz = 8E-05;
     expectedErrS = 0.008;
+  } else if (ciMode == 4) {
+    expectedErrVx = 3E-06;
+    expectedErrVy = 3E-06;
+    expectedErrVz = 3E-06;
+    expectedErrS = 3E-06;
   }
 
   bool passed = true;

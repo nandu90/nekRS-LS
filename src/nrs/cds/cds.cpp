@@ -400,3 +400,23 @@ void cds_t::makeNLT(double time, int tstep, occa::memory &o_Usubcycling)
     }
   }
 }
+
+void cds_t::saveSolutionState()
+{
+  if (!o_Ssave.isInitialized()) {
+    o_Ssave = platform->device.malloc<dfloat>(o_S.length());
+    o_NLTsave = platform->device.malloc<dfloat>(o_NLT.length());
+    o_Spropsave = platform->device.malloc<dfloat>(o_prop.length());
+  }
+
+  o_Ssave.copyFrom(o_S, o_S.length());
+  o_NLTsave.copyFrom(o_NLT, o_NLT.length());
+  o_Spropsave.copyFrom(o_prop, o_prop.length());
+}
+
+void cds_t::restoreSolutionState()
+{
+  o_Ssave.copyTo(o_S, o_S.length());
+  o_NLTsave.copyTo(o_NLT, o_NLT.length());
+  o_Spropsave.copyTo(o_prop, o_prop.length());
+}

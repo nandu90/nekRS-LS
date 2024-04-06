@@ -5,7 +5,7 @@
 * Interpolation based velocity recycling
 * FP32 solver mode
 * CombinedPCG
-* Multi session nek-nek
+* Multi session nek-nek including multi-rate time stepping
 * CHT nek-nek support (solid overlaps)
 * HIP support for BoomerAMG
 * Intel GPU support

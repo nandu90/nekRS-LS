@@ -296,6 +296,15 @@ static occa::memory meshSolve(nrs_t* nrs, double time, int iter)
 
 void nrs_t::initStep(double time, dfloat _dt, int tstep)
 {
+  if (platform->options.compareArgs("MULTIRATE TIMESTEPPER", "TRUE")) {
+    initOuterStep(time, _dt, tstep);
+  } else {
+    initInnerStep(time, _dt, tstep);
+  }
+}
+
+void nrs_t::initInnerStep(double time, dfloat _dt, int tstep)
+{
   this->timePrevious = time;
 
   this->tstep = tstep;
@@ -485,6 +494,15 @@ void nrs_t::initStep(double time, dfloat _dt, int tstep)
 
 void nrs_t::finishStep()
 {
+  if (platform->options.compareArgs("MULTIRATE TIMESTEPPER", "TRUE")) {
+    finishOuterStep();
+  } else {
+    finishInnerStep();
+  }
+}
+
+void nrs_t::finishInnerStep()
+{
   this->dt[2] = this->dt[1];
   this->dt[1] = this->dt[0];
 
@@ -492,6 +510,15 @@ void nrs_t::finishStep()
 }
 
 bool nrs_t::runStep(std::function<bool(int)> convergenceCheck, int iter)
+{
+  if (platform->options.compareArgs("MULTIRATE TIMESTEPPER", "TRUE")) {
+    return runOuterStep(convergenceCheck, iter);
+  } else {
+    return runInnerStep(convergenceCheck, iter);
+  }
+}
+
+bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter)
 {
   mesh_t *mesh = this->meshV;
   cds_t *cds = this->cds;
@@ -503,7 +530,7 @@ bool nrs_t::runStep(std::function<bool(int)> convergenceCheck, int iter)
   const int isOutputStep = this->isOutputStep;
 
   if (this->neknek) {
-    this->neknek->updateBoundary(tstep, iter);
+    this->neknek->updateBoundary(tstep, iter, timeNew);
   }
 
   if (cds) {
@@ -596,4 +623,70 @@ bool nrs_t::runStep(std::function<bool(int)> convergenceCheck, int iter)
   }
 
   return this->timeStepConverged;
+}
+
+void nrs_t::saveSolutionState()
+{
+  const bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
+  if (!o_Usave.isInitialized()) {
+    o_Usave = platform->device.malloc<dfloat>(o_U.length());
+    o_Psave = platform->device.malloc<dfloat>(o_P.length());
+    o_NLTsave = platform->device.malloc<dfloat>(o_NLT.length());
+    o_Upropsave = platform->device.malloc<dfloat>(o_prop.length());
+    if (Nsubsteps) {
+      auto o_Urst_ = movingMesh ? o_relUrst : o_Urst;
+      o_Urstsave = platform->device.malloc<dfloat>(o_Urst_.length());
+    }
+    if (movingMesh) {
+      o_LMMsave = platform->device.malloc<dfloat>(_mesh->o_LMM.length());
+      o_Umeshsave = platform->device.malloc<dfloat>(_mesh->o_U.length());
+      o_xsave = platform->device.malloc<dfloat>(_mesh->o_x.length());
+      o_ysave = platform->device.malloc<dfloat>(_mesh->o_y.length());
+      o_zsave = platform->device.malloc<dfloat>(_mesh->o_z.length());
+    }
+  }
+
+  o_Usave.copyFrom(o_U, o_U.length());
+  o_Psave.copyFrom(o_P, o_P.length());
+  o_NLTsave.copyFrom(o_NLT, o_NLT.length());
+  o_Upropsave.copyFrom(o_prop, o_prop.length());
+  if (Nsubsteps) {
+    auto o_Urst_ = movingMesh ? o_relUrst : o_Urst;
+    o_Urstsave.copyFrom(o_Urst, o_Urst_.length());
+  }
+  if (cds) {
+    cds->saveSolutionState();
+  }
+
+  if (movingMesh) {
+    o_LMMsave.copyFrom(_mesh->o_LMM, _mesh->o_LMM.length());
+    o_Umeshsave.copyFrom(_mesh->o_U, _mesh->o_U.length());
+    o_xsave.copyFrom(_mesh->o_x, _mesh->o_x.length());
+    o_ysave.copyFrom(_mesh->o_y, _mesh->o_y.length());
+    o_zsave.copyFrom(_mesh->o_z, _mesh->o_z.length());
+  }
+}
+
+void nrs_t::restoreSolutionState()
+{
+  const bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
+  o_Usave.copyTo(o_U, o_U.length());
+  o_Psave.copyTo(o_P, o_P.length());
+  o_NLTsave.copyTo(o_NLT, o_NLT.length());
+  o_Upropsave.copyTo(o_prop, o_prop.length());
+  if (cds) {
+    cds->restoreSolutionState();
+  }
+  if (Nsubsteps) {
+    auto o_Urst_ = movingMesh ? o_relUrst : o_Urst;
+    o_Urstsave.copyTo(o_Urst, o_Urst_.length());
+  }
+  if (movingMesh) {
+    o_LMMsave.copyTo(_mesh->o_LMM, _mesh->o_LMM.length());
+    o_Umeshsave.copyTo(_mesh->o_U, _mesh->o_U.length());
+    o_xsave.copyTo(_mesh->o_x, _mesh->o_x.length());
+    o_ysave.copyTo(_mesh->o_y, _mesh->o_y.length());
+    o_zsave.copyTo(_mesh->o_z, _mesh->o_z.length());
+    _mesh->update();
+  }
 }

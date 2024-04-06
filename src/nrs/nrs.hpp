@@ -198,6 +198,9 @@ public:
   bool runStep(std::function<bool(int)> convergenceCheck, int stage);
   void finishStep();
 
+  void saveSolutionState();
+  void restoreSolutionState();
+
   void printMinMax();
   void printRunStat(int step);
   void printInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo);
@@ -236,8 +239,33 @@ public:
   writeFld(double t, int step, int outXYZ, int FP64, std::string suffix, int Nout = 0, bool uniform = false);
 
   void finalize();
+  int setLastStep(double timeNew, int tstep, double elapsedTime);
+  int lastStepLocalSession(double timeNew, int tstep, double elapsedTime);
 
 private:
+  void initInnerStep(double time, dfloat dt, int tstep);
+  bool runInnerStep(std::function<bool(int)> convergenceCheck, int stage);
+  void finishInnerStep();
+
+  void initOuterStep(double time, dfloat dt, int tstep);
+  bool runOuterStep(std::function<bool(int)> convergenceCheck, int stage);
+  void finishOuterStep();
+
+  int tStepOuterStart;
+  double timeOuterStart;
+
+  occa::memory o_Usave;
+  occa::memory o_Psave;
+  occa::memory o_NLTsave;
+  occa::memory o_Urstsave;
+  occa::memory o_Upropsave;
+
+  occa::memory o_LMMsave;
+  occa::memory o_Umeshsave;
+  occa::memory o_xsave;
+  occa::memory o_ysave;
+  occa::memory o_zsave;
+
   void setIC();
 
 };

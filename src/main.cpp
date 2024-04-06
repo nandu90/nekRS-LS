@@ -242,7 +242,9 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
       isLastStep = nekrs::lastStep(time + dt, tStep, elapsedTime);
       if (sig_terminate) isLastStep = 1;
 
-      if (isLastStep && nekrs::endTime() > 0) dt = nekrs::endTime() - time;
+      if (isLastStep && nekrs::endTime() > 0) {
+        dt = nekrs::finalTimeStepSize(time);
+      }
 
       int outputStep = nekrs::outputStep(time + dt, tStep);
       if (nekrs::writeInterval() == 0) outputStep = 0;
@@ -257,7 +259,8 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
       do {
         converged = nekrs::runStep(corrector++);
       } while (!converged);
-  
+
+      tStep = nekrs::timeStep();
       time = nekrs::finishStep();
  
       if(sig_processUpdFile) {

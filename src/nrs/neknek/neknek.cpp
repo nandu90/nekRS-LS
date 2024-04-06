@@ -27,10 +27,8 @@ bool isIntBc(int bcType, std::string field)
 
 bool neknekCoupled()
 {
-  auto fields = nrsFieldsToSolve(platform->options);
-
   int intFound = 0;
-  for (auto &&field : fields) {
+  for (auto &&field : nrsFieldsToSolve(platform->options)) {
     for (int bID = 1; bID <= bcMap::size(field); ++bID) {
       auto bcType = bcMap::id(bID, field);
       bool isInt = isIntBc(bcType, field);
@@ -51,12 +49,20 @@ void neknek_t::reserveAllocation()
   this->fieldOffset_ = alignStride<dfloat>(this->npt_);
   this->o_pointMap_ = platform->device.malloc<dlong>(nrs->_mesh->Nlocal);
 
+  int nStates = this->nEXT_ + 1;
+  if (this->multirate()) {
+    nStates += 1;
+  }
+
   if (this->npt_) {
     if (std::find(this->fields.begin(), this->fields.end(), "velocity") != this->fields.end()) {
-      this->o_U_ = platform->device.malloc<dfloat>(nrs->NVfields * this->fieldOffset_ * (this->nEXT_ + 1));
+      this->o_U_ = platform->device.malloc<dfloat>(nrs->NVfields * this->fieldOffset_ * nStates);
     }
     if (this->Nscalar_) {
-      this->o_S_ = platform->device.malloc<dfloat>(this->Nscalar_ * this->fieldOffset_ * (this->nEXT_ + 1));
+      this->o_S_ = platform->device.malloc<dfloat>(this->Nscalar_ * this->fieldOffset_ * nStates);
+    }
+    if (this->multirate()) {
+      this->o_time_ = platform->device.malloc<dfloat>(this->fieldOffset_ * (maxOrd + 1));
     }
   }
 }
@@ -213,65 +219,37 @@ void neknek_t::setup()
         "variable p0th is not supported!");
   }
 
-  std::vector<int> Nscalars(nsessions, 0);
-  Nscalars[this->sessionID_] = nrs->Nscalar;
-
-  MPI_Allreduce(MPI_IN_PLACE, Nscalars.data(), nsessions, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
-
-  auto minNscalar = *std::min_element(Nscalars.begin(), Nscalars.end());
-
-  bool allSame =
-      std::all_of(Nscalars.begin(), Nscalars.end(), [minNscalar](auto v) { return v == minNscalar; });
-
-  if (platform->comm.mpiRank == 0 && !allSame) {
-    std::cout << "WARNING: Nscalar is not the same across all sessions -> using the minimum value: "
-              << minNscalar << "\n";
-  }
-
-  this->Nscalar_ = minNscalar;
-
   int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
   MPI_Allreduce(MPI_IN_PLACE, &movingMesh, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
   this->globalMovingMesh = movingMesh;
 
-  this->fields = nrsFieldsToSolve(platform->options);
-
-  // remove scalar > minScalar and fields with no INT boundaries
-  for (auto &&field : this->fields) {
-    if (field.find("scalar") != std::string::npos) {
-      const auto id = std::stoi(field.substr(std::string("scalar").length()));
-      if (id + 1 > this->Nscalar_) {
-        this->fields.erase(std::remove(this->fields.begin(), this->fields.end(), field), this->fields.end());
-      }
-    }
-  }
-  for (auto &&field : this->fields) {
-    int intFound = 0;
-    if(bcMap::size(field)) {
+  this->fields = [&]()
+  {
+    std::vector<std::string> list;
+    for (auto &&field : nrsFieldsToSolve(platform->options)) {
+      int intFound = 0;
       for (dlong e = 0; e < mesh->Nelements; ++e) {
         for (dlong f = 0; f < mesh->Nfaces; ++f) {
-          auto bID = mesh->EToB[f + mesh->Nfaces * e];
-          auto bcType = bcMap::id(bID, field);
-          if (isIntBc(bcType, field)) {
+          if (isIntBc(bcMap::id(mesh->EToB[f + mesh->Nfaces * e], field), field)) {
             intFound = 1;
           }
         }
       }
+      MPI_Allreduce(MPI_IN_PLACE, &intFound, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+      if (intFound) {
+        list.push_back(field);
+      } 
     }
-    MPI_Allreduce(MPI_IN_PLACE, &intFound, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
 
-    if (!intFound) {
-      this->fields.erase(std::remove(this->fields.begin(), this->fields.end(), field), this->fields.end());
-    }
-  }
+    return list;
+  }();
 
-  // check if all remaining fields have all the same INT boundaries
+  // check if all exchanged fields (within the same session) share the same INT boundaries
   std::ostringstream errorLogger;
   std::set<int> intBIDs;
   for (auto &&field : this->fields) {
     for (int bID = 1; bID <= bcMap::size(field); ++bID) {
-      auto bcType = bcMap::id(bID, field);
-      bool isInt = isIntBc(bcType, field);
+      const auto isInt = isIntBc(bcMap::id(bID, field), field);
 
       if (isInt) {
         intBIDs.insert(bID);
@@ -286,6 +264,18 @@ void neknek_t::setup()
   int errorLength = errorLogger.str().length();
   MPI_Allreduce(MPI_IN_PLACE, &errorLength, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
   nekrsCheck(errorLength > 0, platform->comm.mpiCommParent, EXIT_FAILURE, "%s\n", errorLogger.str().c_str());
+
+  std::vector<int> scalarIndices(nrs->Nscalar, -1);
+  this->Nscalar_ = 0;
+  for (auto &&field : this->fields) {
+    if (field.find("scalar") != std::string::npos) {
+      const auto id = std::stoi(field.substr(std::string("scalar").length()));
+      scalarIndices[id] = this->Nscalar_;
+      this->Nscalar_++;
+    }
+  }
+
+  this->o_scalarIndices_ = platform->device.malloc<int>(nrs->Nscalar, scalarIndices.data());
 
   this->findIntPoints();
 
@@ -342,6 +332,8 @@ neknek_t::neknek_t(nrs_t *nrs_, dlong nsessions, dlong sessionID)
   // set boundary ext order to report to user, if not specified
   platform->options.setArgs("NEKNEK BOUNDARY EXT ORDER", std::to_string(this->nEXT_));
 
+  this->multirate_ = platform->options.compareArgs("MULTIRATE TIMESTEPPER", "TRUE");
+
   this->coeffEXT.resize(this->nEXT_);
   this->o_coeffEXT = platform->device.malloc<dfloat>(this->nEXT_);
 
@@ -350,89 +342,28 @@ neknek_t::neknek_t(nrs_t *nrs_, dlong nsessions, dlong sessionID)
   this->copyNekNekPointsKernel = platform->kernelRequests.load("copyNekNekPoints");
   this->computeFluxKernel = platform->kernelRequests.load("computeFlux");
   this->fixSurfaceFluxKernel = platform->kernelRequests.load("fixSurfaceFlux");
+  this->extrapolateBoundaryKernel = platform->kernelRequests.load("extrapolateBoundary");
+  this->mapScalarKernel = platform->kernelRequests.load("mapScalar");
 }
 
-void neknek_t::updateBoundary(int tstep, int stage)
+void neknek_t::updateBoundary(int tstep, int stage, double time)
 {
+  if (multirate()) {
+    extrapolateBoundary(tstep, time, predictorStep);
+    return;
+  }
+
   // do not invoke barrier -- this is performed later
   platform->timer.tic("neknek update boundary", 0);
 
-  // do not invoke barrier in timer_t::tic
-  platform->timer.tic("neknek sync", 0);
-  MPI_Barrier(platform->comm.mpiCommParent);
-  platform->timer.toc("neknek sync");
-  this->tSync_ = platform->timer.query("neknek sync", "HOST:MAX");
-
-  if (this->globalMovingMesh) {
-    platform->timer.tic("neknek updateInterpPoints", 1);
-    this->updateInterpPoints();
-    platform->timer.toc("neknek updateInterpPoints");
-
-    this->recomputePartition = true;
-  }
-
-  platform->timer.tic("neknek exchange", 1);
-
-  if (std::find(this->fields.begin(), this->fields.end(), "velocity") != this->fields.end()) {
-    this->interpolator->eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, this->fieldOffset_, this->o_U_);
-  }
-
-  if (this->Nscalar_) {
-    this->interpolator->eval(this->Nscalar_, nrs->fieldOffset, nrs->cds->o_S, this->fieldOffset_, this->o_S_);
-  }
+  const bool exchangeAllTimes = false;
+  const bool lagState = (stage == 1);
+  exchange(exchangeAllTimes, lagState);
 
   // lag state, update timestepper coefficients and compute extrapolated state
   if (stage == 1) {
-    auto *mesh = nrs->_mesh;
-    int extOrder = std::min(tstep, this->nEXT_);
-    int bdfOrder = std::min(tstep, nrs->nBDF);
-    nek::extCoeff(this->coeffEXT.data(), nrs->dt, extOrder, bdfOrder);
-
-    for (int i = this->nEXT_; i > extOrder; i--) {
-      this->coeffEXT[i - 1] = 0.0;
-    }
-
-    this->o_coeffEXT.copyFrom(this->coeffEXT.data(), this->nEXT_);
-
-    for (int s = this->nEXT_ + 1; s > 1; s--) {
-      auto N = nrs->NVfields * this->fieldOffset_;
-      if (std::find(this->fields.begin(), this->fields.end(), "velocity") != this->fields.end()) {
-        this->o_U_.copyFrom(this->o_U_, N, (s - 1) * N, (s - 2) * N);
-      }
-
-      N = this->Nscalar_ * this->fieldOffset_;
-      this->o_S_.copyFrom(this->o_S_, N, (s - 1) * N, (s - 2) * N);
-    }
-
-    if (this->npt_) {
-      if (std::find(this->fields.begin(), this->fields.end(), "velocity") != this->fields.end()) {
-        auto o_Uold = this->o_U_ + this->fieldOffset_ * nrs->NVfields;
-        nrs->extrapolateKernel(this->npt_,
-                               nrs->NVfields,
-                               this->nEXT_,
-                               this->fieldOffset_,
-                               this->o_coeffEXT,
-                               o_Uold,
-                               this->o_U_);
-      }
-
-      if (this->Nscalar_) {
-        auto o_Sold = this->o_S_ + this->fieldOffset_ * this->Nscalar_;
-        nrs->extrapolateKernel(this->npt_,
-                               this->Nscalar_,
-                               this->nEXT_,
-                               this->fieldOffset_,
-                               this->o_coeffEXT,
-                               o_Sold,
-                               this->o_S_);
-      }
-    }
+    extrapolate(tstep);
   }
-
-  platform->timer.toc("neknek exchange");
-
-  this->tExch_ = platform->timer.query("neknek exchange", "DEVICE:MAX");
-  this->ratio_ = this->tSync_ / this->tExch_;
 
   platform->timer.toc("neknek update boundary");
 }
@@ -498,4 +429,124 @@ occa::memory neknek_t::partitionOfUnity()
   o_interpDist.free();
 
   return this->o_partition_;
+}
+
+void neknek_t::lag()
+{
+  int nStates = this->nEXT_ + 1;
+  if (this->multirate()) {
+    nStates += 1;
+  }
+
+  for (int s = nStates; s > 1; s--) {
+    auto N = nrs->NVfields * this->fieldOffset_;
+    if (std::find(this->fields.begin(), this->fields.end(), "velocity") != this->fields.end()) {
+      this->o_U_.copyFrom(this->o_U_, N, (s - 1) * N, (s - 2) * N);
+    }
+
+    N = this->Nscalar_ * this->fieldOffset_;
+    this->o_S_.copyFrom(this->o_S_, N, (s - 1) * N, (s - 2) * N);
+  }
+}
+
+void neknek_t::extrapolate(int tstep)
+{
+  auto *mesh = nrs->meshV;
+  int extOrder = std::min(tstep, this->nEXT_);
+  int bdfOrder = std::min(tstep, nrs->nBDF);
+  nek::extCoeff(this->coeffEXT.data(), nrs->dt, extOrder, bdfOrder);
+
+  for (int i = this->nEXT_; i > extOrder; i--) {
+    this->coeffEXT[i - 1] = 0.0;
+  }
+
+  this->o_coeffEXT.copyFrom(this->coeffEXT.data(), this->nEXT_);
+
+  if (this->npt_) {
+    if (std::find(this->fields.begin(), this->fields.end(), "velocity") != this->fields.end()) {
+      auto o_Uold = this->o_U_ + this->fieldOffset_ * nrs->NVfields;
+      nrs->extrapolateKernel(this->npt_,
+                             nrs->NVfields,
+                             this->nEXT_,
+                             this->fieldOffset_,
+                             this->o_coeffEXT,
+                             o_Uold,
+                             this->o_U_);
+    }
+  }
+
+  if (this->Nscalar_ && this->npt_) {
+    auto o_Sold = this->o_S_ + this->fieldOffset_ * this->Nscalar_;
+    nrs->extrapolateKernel(this->npt_,
+                           this->Nscalar_,
+                           this->nEXT_,
+                           this->fieldOffset_,
+                           this->o_coeffEXT,
+                           o_Sold,
+                           this->o_S_);
+  }
+}
+
+void neknek_t::exchange(bool allTimeStates, bool lagState)
+{
+  // do not invoke barrier in timer_t::tic
+  platform->timer.tic("neknek sync", 0);
+  MPI_Barrier(platform->comm.mpiCommParent);
+  platform->timer.toc("neknek sync");
+  this->tSync_ = platform->timer.query("neknek sync", "HOST:MAX");
+
+  if (this->globalMovingMesh) {
+    platform->timer.tic("neknek updateInterpPoints", 1);
+    this->updateInterpPoints();
+    platform->timer.toc("neknek updateInterpPoints");
+
+    this->recomputePartition = true;
+  }
+
+  if (allTimeStates) {
+    auto nrsOrder = std::max(nrs->nBDF, nrs->nEXT);
+    nekrsCheck(nrsOrder < this->nEXT_,
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "neknek extrapolation order (%d) exceeds nekRS order (%d)\n",
+               this->nEXT_,
+               nrsOrder);
+  }
+
+  const auto nStates = allTimeStates ? nEXT_ : 1;
+
+  platform->timer.tic("neknek exchange", 1);
+
+  if (std::find(this->fields.begin(), this->fields.end(), "velocity") != this->fields.end()) {
+    this->interpolator->eval(nStates * nrs->NVfields,
+                             nrs->fieldOffset,
+                             nrs->o_U,
+                             this->fieldOffset_,
+                             this->o_U_);
+  }
+
+  if (this->Nscalar_) {
+    auto o_S = nrs->cds->o_S;
+    if (this->Nscalar_ != nrs->Nscalar) {
+      o_S = platform->o_memPool.reserve<dfloat>(nStates * this->Nscalar_ * nrs->fieldOffset);
+      this->mapScalarKernel(nrs->cds->mesh[0]->Nlocal,
+                            nrs->Nscalar,
+                            nrs->fieldOffset,
+                            nStates,
+                            this->Nscalar_,
+                            this->o_scalarIndices_,
+                            nrs->cds->o_S,
+                            o_S);
+    }
+    this->interpolator->eval(nStates * this->Nscalar_, nrs->fieldOffset, o_S, this->fieldOffset_, this->o_S_);
+  }
+
+  platform->timer.toc("neknek exchange");
+
+  this->tExch_ = platform->timer.query("neknek exchange", "DEVICE:MAX");
+  this->ratio_ = this->tSync_ / this->tExch_;
+
+  if (lagState) {
+    lag();
+  }
 }

@@ -1506,3 +1506,38 @@ void nrs_t::writeFld(double t, int step, int Nout, bool uniform)
 {
   this->writeFld(t, step, "", Nout, uniform);
 }
+
+int nrs_t::lastStepLocalSession(double timeNew, int tstep, double elapsedTime)
+{
+  double endTime = -1;
+  platform->options.getArgs("END TIME", endTime);
+
+  int numSteps = -1;
+  platform->options.getArgs("NUMBER TIMESTEPS", numSteps);
+
+  int last = 0;
+  if (!platform->options.getArgs("STOP AT ELAPSED TIME").empty()) {
+    double maxElaspedTime;
+    platform->options.getArgs("STOP AT ELAPSED TIME", maxElaspedTime);
+    if (elapsedTime > 60.0 * maxElaspedTime) {
+      last = 1;
+    }
+  } else if (endTime >= 0) {
+    const double eps = 1e-10;
+    last = fabs(timeNew - endTime) < eps || timeNew > endTime;
+  } else {
+    last = (tstep == numSteps);
+  }
+  return last;
+}
+
+int nrs_t::setLastStep(double timeNew, int tstep, double elapsedTime)
+{
+  int last = lastStepLocalSession(timeNew, tstep, elapsedTime);
+  if (platform->options.compareArgs("MULTIRATE TIMESTEPPER", "TRUE")) {
+    MPI_Allreduce(MPI_IN_PLACE, &last, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
+  }
+
+  lastStep = last;
+  return last;
+}

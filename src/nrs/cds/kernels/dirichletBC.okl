@@ -44,6 +44,7 @@
                          @ restrict const dlong*  neknekPoints,
                          @ restrict const dfloat* neknekU,
                          @ restrict const dfloat* neknekS,
+                         @ restrict const dlong* neknekScalarIndex,
                          @ restrict const dfloat *W,
                          @ restrict dfloat *S)
 {
@@ -94,7 +95,8 @@
 
           if (bcType == p_bcTypeINTS) {
             const int neknekId = neknekPoints[idM];
-            bc.sinterp = neknekS[neknekId + scalarId * neknekOffset];
+            const int neknekScalarId = neknekScalarIndex[scalarId];
+            bc.sinterp = neknekS[neknekId + neknekScalarId * neknekOffset];
             bc.uinterp = neknekU[neknekId + 0 * neknekOffset];
             bc.vinterp = neknekU[neknekId + 1 * neknekOffset];
             bc.winterp = neknekU[neknekId + 2 * neknekOffset];

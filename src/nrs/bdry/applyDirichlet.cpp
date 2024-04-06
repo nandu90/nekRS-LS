@@ -203,6 +203,7 @@ void applyDirichletScalars(nrs_t *nrs, double time, occa::memory& o_S, occa::mem
                              nrs->neknek ? nrs->neknek->o_pointMap() : o_NULL,
                              nrs->neknek ? nrs->neknek->o_U() : o_NULL,
                              nrs->neknek ? nrs->neknek->o_S() : o_NULL,
+                             nrs->neknek ? nrs->neknek->o_scalarIndices() : o_NULL,
                              *(cds->o_usrwrk),
                              o_SiDirichlet);
 
