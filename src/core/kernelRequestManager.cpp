@@ -53,27 +53,26 @@ void kernelRequestManager_t::add(kernelRequest_t request, bool checkUnique)
 
 occa::kernel kernelRequestManager_t::load(const std::string& requestName, const std::string& _kernelName)
 {
-  auto checkValid = true;
-  if (checkValid) {
-    const bool issueError = !processed() || (requestMap.find(requestName) == requestMap.end());
-    int errorFlag = issueError ? 1 : 0;
-    MPI_Allreduce(MPI_IN_PLACE, &errorFlag, 1, MPI_INT, MPI_MAX, platformRef.comm.mpiComm);
+  auto errTxt = [&]() {
+    const auto valid = processed() && (requestMap.find(requestName) != requestMap.end());
 
-    auto errTxt = [&]() {
-      std::stringstream txt;
-      txt << "\n";
-      txt << "Cannot find request " << "<" << requestName << ">" << "\n";
-      txt << "Available:\n";
-      for (auto &keyAndValue : requestMap) {
-        txt << "\t" << "<" << keyAndValue.second.requestName << ">" << "\n";
-      }
+    if (valid) return std::string();
 
-      txt << "===========================================================\n";
-      return txt.str();
-    };
+    std::stringstream txt;
+    txt << "\n";
+    txt << "Cannot find request " << "<" << requestName << ">" << "\n";
+    txt << "Available:\n";
+    for (auto &keyAndValue : requestMap) {
+      txt << "\t" << "<" << keyAndValue.second.requestName << ">" << "\n";
+    }
 
-    nekrsCheck(errorFlag, platformRef.comm.mpiComm, EXIT_FAILURE, "%s\n", errTxt().c_str());
-  }
+    txt << "===========================================================\n";
+    auto retVal = txt.str();
+
+    return retVal; 
+  }();
+
+  nekrsCheck(errTxt.size(), platformRef.comm.mpiComm, EXIT_FAILURE, "%s\n", errTxt.c_str());
 
   auto kernel = [&]() 
   {

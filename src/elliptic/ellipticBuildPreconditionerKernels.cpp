@@ -40,6 +40,7 @@ void ellipticBuildPreconditionerKernels(elliptic_t *elliptic)
   platform->options.getArgs("POLYNOMIAL DEGREE", M);
 
   const std::string orderSuffix = std::string("_") + std::to_string(mesh->N);
+  const std::string poissonPrefix = elliptic->poisson ? "poisson-" : "";
 
   {
     kernelName = "mask";
@@ -57,10 +58,11 @@ void ellipticBuildPreconditionerKernels(elliptic_t *elliptic)
     kernelName = "updateFourthKindChebyshev";
     elliptic->updateFourthKindChebyshevKernel = platform->kernelRequests.load(kernelName + orderSuffix);
 
-    kernelName = "ellipticBlockBuildDiagonalHex3D";
-    const std::string poissonPrefix = elliptic->poisson ? "poisson-" : "";
-    elliptic->ellipticBlockBuildDiagonalKernel =
+    if (mesh->N != M) { 
+      kernelName = "ellipticBlockBuildDiagonalHex3D";
+      elliptic->ellipticBlockBuildDiagonalKernel =
         platform->kernelRequests.load(poissonPrefix + kernelName + orderSuffix);
+    }
 
     kernelName = "ellipticBlockBuildDiagonalPfloatHex3D";
     elliptic->ellipticBlockBuildDiagonalPfloatKernel =

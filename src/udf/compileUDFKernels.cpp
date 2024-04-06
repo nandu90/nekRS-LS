@@ -51,13 +51,11 @@ occa::properties registerUDFKernels()
 occa::kernel oudfBuildKernel(occa::properties kernelInfo, const std::string& kernelName)
 {
   const auto registerOnly = platform->options.compareArgs("REGISTER ONLY", "TRUE") ? true : false;
-
   const auto fileName = platform->options.getArgs("OKL FILE CACHE");
-  
+  static std::vector<std::string> reqNames;
+ 
   auto knl = [&] ()
   {
-    static std::vector<std::string> reqNames;
-
     if (registerOnly) {
       // hash reqName as the user might call oudfBuildKernel using different props
       const auto reqName = "udf::" + std::string(kernelInfo.hash().getString());

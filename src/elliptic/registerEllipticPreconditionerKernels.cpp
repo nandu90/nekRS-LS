@@ -84,7 +84,6 @@ void registerJacobiKernels(const std::string &section, int N, int poissonEquatio
   const std::string optionsPrefix = createOptionsPrefix(section);
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/elliptic/");
 
-  // mixed-precision axmyz
   std::string kernelName = "axmyzManyPfloat";
   std::string fileName = oklpath + kernelName + extension;
   platform->kernelRequests.add(kernelName, fileName, platform->kernelInfo);
@@ -132,7 +131,6 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
     meshKernelInfo["defines/p_cubNq"] = cubNq;
     meshKernelInfo["defines/p_cubNp"] = cubNq * cubNq * cubNq;
 
-
     kernelName = "geometricFactorsHex3D";
     fileName = oklpath + "/mesh/" + kernelName + ".okl";
     const std::string meshPrefix = "pMGmesh-";
@@ -167,12 +165,16 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
     platform->kernelRequests.add(kernelName + orderSuffix, fileName, kernelInfo, orderSuffix);
 
     occa::properties buildDiagInfo = kernelInfo;
+    const std::string poissonPrefix = poissonEquation ? "poisson-" : "";
     if (poissonEquation)
       buildDiagInfo["defines/p_poisson"] = 1;
-    const std::string poissonPrefix = poissonEquation ? "poisson-" : "";
-    kernelName = "ellipticBlockBuildDiagonalHex3D";
-    fileName = oklpath + kernelName + ".okl";
-    platform->kernelRequests.add(poissonPrefix + kernelName + orderSuffix, fileName, buildDiagInfo, orderSuffix);
+
+    if (N != M) { 
+      kernelName = "ellipticBlockBuildDiagonalHex3D";
+      fileName = oklpath + kernelName + ".okl";
+      platform->kernelRequests.add(poissonPrefix + kernelName + orderSuffix, fileName, buildDiagInfo, orderSuffix);
+    }
+
     {
       occa::properties props = buildDiagInfo;
       props["defines/dfloat"] = pfloatString;

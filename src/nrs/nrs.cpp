@@ -764,7 +764,7 @@ void nrs_t::init()
   this->qqt = new QQt(this->gsh);
   this->qqtT = this->qqt;
 
-  if (platform->options.compareArgs("MESH SOLVER", "NONE")) {
+  if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
     auto meshT = this->_mesh;
     this->gshMesh = oogs::setup(meshT->ogs, this->NVfields, this->fieldOffset, ogsDfloat, NULL, OOGS_AUTO);
   }
