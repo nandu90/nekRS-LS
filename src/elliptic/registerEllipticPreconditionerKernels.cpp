@@ -169,9 +169,10 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
     if (poissonEquation)
       buildDiagInfo["defines/p_poisson"] = 1;
 
+    kernelName = "ellipticBlockBuildDiagonalHex3D";
+    fileName = oklpath + kernelName + ".okl";
+
     if (N != M) { 
-      kernelName = "ellipticBlockBuildDiagonalHex3D";
-      fileName = oklpath + kernelName + ".okl";
       platform->kernelRequests.add(poissonPrefix + kernelName + orderSuffix, fileName, buildDiagInfo, orderSuffix);
     }
 
