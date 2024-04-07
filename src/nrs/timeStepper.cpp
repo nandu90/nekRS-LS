@@ -523,6 +523,8 @@ bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter)
   mesh_t *mesh = this->meshV;
   cds_t *cds = this->cds;
 
+  this->outerCorrector = iter;
+
   const auto tstep = this->tstep;
   const double timeNew =
       this->timePrevious + setPrecision(this->dt[0], 5);

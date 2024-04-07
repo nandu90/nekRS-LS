@@ -259,10 +259,10 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
  
       nekrs::initStep(time, dt, tStep);
       
-      int corrector = 1;
+      int outerCorrector = 1;
       bool converged = false;
       do {
-        converged = nekrs::runStep(corrector++);
+        converged = nekrs::runStep(outerCorrector++);
       } while (!converged);
 
       tStep = nekrs::timeStep();
@@ -294,13 +294,15 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
       nekrs::updateTimer("elapsed", elapsedTime);
  
       if (nekrs::printInfoFreq()) {
-        if (tStep % nekrs::printInfoFreq() == 0)
+        if (tStep % nekrs::printInfoFreq() == 0) {
           nekrs::printInfo(time, tStep, true, false);
+        }
       }
  
       if(nekrs::runTimeStatFreq()) {
-        if (tStep % nekrs::runTimeStatFreq() == 0 || isLastStep)
+        if (tStep % nekrs::runTimeStatFreq() == 0 || isLastStep) {
           nekrs::printRuntimeStatistics(tStep);
+        }
       }
  
       if (tStep % 100 == 0) fflush(stdout);

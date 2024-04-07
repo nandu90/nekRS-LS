@@ -83,6 +83,7 @@ public:
 
   int tstep;
   int lastStep;
+  int outerCorrector;
   int isOutputStep;
   int outputForceStep;
 

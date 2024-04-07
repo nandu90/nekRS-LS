@@ -979,7 +979,11 @@ void ciTestErrors(nrs_t *nrs,
     CiEvalTest("pressure iter step=1", pIterErr <= 1, "with pIterErr: " + to_string_f(pIterErr));
     nekrsCheck(pIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
 
-    const int expectedNiterS = 12;
+    int expectedNiterS = 12;
+    if (ciMode == 19 && nrs->outerCorrector == 2) {
+      expectedNiterS = 6;
+    }
+
 
     if (ciMode != 12) {
       int sIterErr = abs(nrs->cds->solver[0]->Niter() - expectedNiterS);
