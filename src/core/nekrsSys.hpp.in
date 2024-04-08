@@ -107,8 +107,8 @@ if (_nekrsCheckErr) {                                                           
 int rank = 0;                                                                                                \
 MPI_Comm_rank(_nekrsCheckComm, &rank);                                                                       \
 if (rank == 0) {                                                                                             \
-  char _errTxt[4096] = {0};                                                                                  \
-  sprintf(_errTxt,_nekrsCheckFormat, __VA_ARGS__);                                                           \
+  char _errTxt[32768] = {0};                                                                                 \
+  snprintf(_errTxt, sizeof(_errTxt), _nekrsCheckFormat, __VA_ARGS__);                                        \
   throw cpptrace::runtime_error(_errTxt);                                                                    \
 } else {                                                                                                     \
   throw cpptrace::runtime_error("");                                                                         \
@@ -130,7 +130,7 @@ int rank = 0;                                                                   
 MPI_Comm_rank(_nekrsCheckComm, &rank);                                                                       \
 if (rank == 0) {                                                                                             \
   char _errTxt[32768] = {0};                                                                                 \
-  sprintf(_errTxt,"Aborting in %s:%s\n" _nekrsCheckFormat, __FILE__, __func__, __VA_ARGS__);                 \
+  snprintf(_errTxt, sizeof(_errTxt), "Aborting in %s:%s\n" _nekrsCheckFormat, __FILE__, __func__, __VA_ARGS__); \
   throw std::runtime_error(_errTxt);                                                                         \
 } else {                                                                                                     \
   throw std::runtime_error("");                                                                              \
@@ -155,7 +155,7 @@ constexpr double targetTimeBenchmark{0.2};
 
 constexpr int BLOCKSIZE = 256;
 constexpr int ALIGN_SIZE = 1024;
-constexpr int NSCALAR_MAX = 100;
+constexpr int NSCALAR_MAX = 99;
 const occa::memory o_NULL;
 
 template <typename T> unsigned int alignStride(unsigned int stride)
