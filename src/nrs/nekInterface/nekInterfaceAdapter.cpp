@@ -279,6 +279,15 @@ void xm1N(dfloat *_x, dfloat *_y, dfloat *_z, int N, dlong Nelements)
   const int Np = (N + 1) * (N + 1) * (N + 1);
   const int nxyz = nekData.nx1 * nekData.nx1 * nekData.nx1;
 
+  if ((N + 1) == nekData.nx1) {
+    for (int i = 0; i < Nelements * Np; i++) {
+      _x[i] = nekData.xm1[i];
+      _y[i] = nekData.ym1[i];
+      _z[i] = nekData.zm1[i];
+    }
+    return; 
+  }
+
   auto x = (double *)calloc(Np, sizeof(double));
   auto y = (double *)calloc(Np, sizeof(double));
   auto z = (double *)calloc(Np, sizeof(double));
