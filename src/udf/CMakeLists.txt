@@ -1,5 +1,5 @@
 project(libUDF LANGUAGES CXX)
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.21)
 
 set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
 
@@ -51,7 +51,7 @@ set(INCLUDE_DIRS
 # dummy
 add_library(OKL EXCLUDE_FROM_ALL okl.cpp)
 target_include_directories(OKL PRIVATE $ENV{NEKRS_UDF_INCLUDES} ${INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_definitions(OKL PRIVATE -D__okl__)
+target_compile_definitions(OKL PRIVATE __okl__)
 
 add_library(udf SHARED udf.cpp)
 target_link_libraries(udf PRIVATE MPI::MPI_CXX)
