@@ -134,10 +134,18 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("SCALAR00 SOLVER", "PCG+COMBINED");
   options.setArgs("SCALAR01 SOLVER", "PCG");
 
-  if (ciMode == 2 || ciMode == 19) {
+  if (ciMode == 2 || ciMode == 19 || ciMode == 22) {
     options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
     options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
+    if (ciMode == 22) {
+      options.setArgs("PRESSURE SOLVER TOLERANCE", std::string("1e-05"));
+      nekrsCheck(sizeof(dfloat) != sizeof(float),
+                 platform->comm.mpiComm,
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "CI test requires sizeof(dfloat) == sizeof(float)");
+    } 
   }
   if (ciMode == 3) {
     options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
@@ -975,6 +983,10 @@ void ciTestErrors(nrs_t *nrs,
       expectedNiterP = 19;
     }
 
+    if (ciMode == 22) {
+      expectedNiterP = 1;
+    }
+
     const int pIterErr = abs(NiterP - expectedNiterP);
     CiEvalTest("pressure iter step=1", pIterErr <= 1, "with pIterErr: " + to_string_f(pIterErr));
     nekrsCheck(pIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
@@ -1209,6 +1221,14 @@ void ciTestErrors(nrs_t *nrs,
     prErr = abs((err[1] - 7.11E-10) / err[1]);
     s01IterErr = abs(NiterS01 - 1.67); // nsteps
     s02IterErr = abs(NiterS02 - 1.67); // nli
+    break;
+  case 22:
+    velIterErr = abs(NiterU - 10);
+    s1Err = abs((err[2] - 1.75E-06) / err[2]);
+    s2Err = abs((err[3] - 1.77E-06) / err[3]);
+    pIterErr = abs(NiterP - 2);
+    vxErr = abs((err[0] - 6.82E-07) / err[0]);
+    prErr = abs((err[1] - 8.76E-06) / err[1]);
     break;
   }
 
