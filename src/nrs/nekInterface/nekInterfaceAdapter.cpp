@@ -485,7 +485,7 @@ void mkSIZE(int lx1,
   }
 
   int lx1m = lx1;
-  constexpr int nsessmax = 2;
+  constexpr int nsessmax = 1;
   constexpr int nMaxObj = 20;
 
   int count = 0;
@@ -513,9 +513,9 @@ void mkSIZE(int lx1,
     } else if (strstr(line, "parameter (lorder=") != NULL) {
       sprintf(line, "      parameter (lorder=%d)\n", 1);
     } else if (strstr(line, "parameter (lhis=") != NULL) {
-      sprintf(line, "      parameter (lhis=%d)\n", 100000);
+      sprintf(line, "      parameter (lhis=%d)\n", 1);
     } else if (strstr(line, "parameter (lelr=") != NULL) {
-      sprintf(line, "      parameter (lelr=%d)\n", std::max(128 * lelt, lelg));
+      sprintf(line, "      parameter (lelr=%d)\n", std::min(128 * lelt, lelg));
     } else if (strstr(line, "parameter (lx1m=") != NULL) {
       sprintf(line, "      parameter (lx1m=%d)\n", lx1m);
     } else if (strstr(line, "parameter (nsessmax=") != NULL) {
