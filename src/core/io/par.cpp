@@ -18,6 +18,7 @@ static std::ostringstream valueErrorLogger;
 std::string setupFile;
 int nscal = 0;
 bool cvodeRequested = false;
+MPI_Comm comm;
 
 static std::string mapTemperatureToScalarString()
 {
@@ -276,6 +277,26 @@ void makeStringsLowerCase()
   lowerCase(occaKeys);
   lowerCase(cvodeKeys);
   lowerCase(validSections);
+}
+
+void processError()
+{
+  const std::string valueErrors = valueErrorLogger.str();
+  errorLogger << valueErrors;
+  const std::string errorMessage = errorLogger.str();
+  int length = errorMessage.size();
+  MPI_Bcast(&length, 1, MPI_INT, 0, comm);
+
+  auto errTxt = [&]() {
+    std::stringstream txt;
+    txt << std::endl;
+    txt << errorMessage;
+    txt << "\nrun with `--help par` for more details\n";
+
+    return txt.str();
+  };
+
+  nekrsCheck(length > 0, comm, EXIT_FAILURE, "%s\n", errTxt().c_str());
 }
 
 const std::vector<std::string> &getValidKeys(const std::string &section)
@@ -2317,6 +2338,7 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
   bool foundDefaultScalarSection = false;
   int nNonTemperatureScalars = 0;
   int maxScalarId = 0;
+  int minScalarId = NSCALAR_MAX + 1;
 
   // optionalNscalar <-> [scalar] section
   if (optionalNscalar) {
@@ -2339,20 +2361,32 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
         nNonTemperatureScalars++;
         nscal++;
         maxScalarId = std::max(maxScalarId, parseScalarIntegerFromString(key).value());
+        minScalarId = std::min(minScalarId, parseScalarIntegerFromString(key).value());
       }
     }
   }
 
-  // provide check against specifying, e.g., [SCALAR02] without [SCALAR01]
-  // in non-default scalar case
-  if (!optionalNscalar && maxScalarId > nNonTemperatureScalars) {
-    append_error("scalar index " + std::to_string(maxScalarId) +
-                 " is larger than the number of [scalar0x] sections");
+  if (!foundDefaultScalarSection && nNonTemperatureScalars) {
+    if (ini->sections.count("temperature")) {
+      if (minScalarId != 1) append_error("scalar index needs to start from 1"); 
+    } else {
+      if (minScalarId != 0) append_error("scalar index needs to start from 0"); 
+    }
+  
+    processError();
+
+    int nScalarIds = maxScalarId - minScalarId + 1;
+    if (nNonTemperatureScalars != nScalarIds) {
+      append_error("scalar indices need to be continuous");
+      processError();
+    }
   }
+
 
   if (foundDefaultScalarSection && !optionalNscalar && nNonTemperatureScalars == 0) {
     append_error("[scalar] section specified, but no [scalar0x] section were found and generic::nscalars is "
                  "not specified");
+    processError();
   }
 
   options.setArgs("NUMBER OF SCALARS", std::to_string(nscal));
@@ -2629,26 +2663,7 @@ void Par::parse(setupAide &options)
 
   cleanupStaleKeys(rank, options, ini);
 
-  // error checking
-  {
-    const std::string valueErrors = valueErrorLogger.str();
-    errorLogger << valueErrors;
-    const std::string errorMessage = errorLogger.str();
-    int length = errorMessage.size();
-    MPI_Bcast(&length, 1, MPI_INT, 0, comm);
-
-    auto errTxt = [&]() {
-      std::stringstream txt;
-      txt << std::endl;
-      txt << errorMessage;
-      txt << "\nrun with `--help par` for more details\n";
-
-      return txt.str();
-    };
-
-    nekrsCheck(length > 0, comm, EXIT_FAILURE, "%s\n", errTxt().c_str());
-  }
-
+  processError();
 #if 0
   if (rank == 0) {
     std::cout << "Options are:\n";

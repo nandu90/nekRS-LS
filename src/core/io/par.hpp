@@ -24,8 +24,6 @@ public:
 
 private:
   setupAide options;
-  MPI_Comm comm;
-
 
 };
 
