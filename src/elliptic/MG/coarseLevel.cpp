@@ -89,7 +89,7 @@ void MGSolver_t::coarseLevel_t::setupSolver(
     settings[0] = 1;  /* custom settings              */
     settings[1] = 10; /* coarsening                   */
     if (useDevice) {
-      settings[1] = 8; /*  PMIS currently not supported on device */
+      settings[1] = 8; /*  HMIS currently not supported on device */
     }
     settings[2] = 6;    /* interpolation                */
     settings[3] = 1;    /* number of cycles             */
