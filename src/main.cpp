@@ -176,6 +176,13 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
     auto parKeyValuePairs = readPar(cmdOpt->setupFile, comm);
 
+    const auto multiSession = [&]()
+    {
+      int retVal;
+      MPI_Comm_compare(commGlobal, comm, &retVal);
+      return (retVal == MPI_IDENT) ? false : true;
+    }(); 
+
     nekrs::setup(commGlobal, 
                  comm, 
       	         cmdOpt->buildOnly, 
@@ -292,7 +299,7 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
       nekrs::updateTimer("elapsedStep", elapsedStep);
       nekrs::updateTimer("elapsedStepSum", elapsedStepSum);
       nekrs::updateTimer("elapsed", elapsedTime);
- 
+
       if (nekrs::printInfoFreq()) {
         if (tStep % nekrs::printInfoFreq() == 0) {
           nekrs::printInfo(time, tStep, true, false);

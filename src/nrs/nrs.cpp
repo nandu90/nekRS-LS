@@ -1534,9 +1534,13 @@ int nrs_t::lastStepLocalSession(double timeNew, int tstep, double elapsedTime)
 int nrs_t::setLastStep(double timeNew, int tstep, double elapsedTime)
 {
   int last = lastStepLocalSession(timeNew, tstep, elapsedTime);
+
+  // disable for now as it breaks the neknek sync timer
+#if 0 
   if (platform->options.compareArgs("MULTIRATE TIMESTEPPER", "TRUE")) {
     MPI_Allreduce(MPI_IN_PLACE, &last, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
   }
+#endif
 
   lastStep = last;
   return last;

@@ -550,3 +550,48 @@ void neknek_t::exchange(bool allTimeStates, bool lagState)
     lag();
   }
 }
+
+double neknek_t::adjustDt(double dt)
+{
+  if (!this->multirate()) {
+    double minDt = dt;
+    MPI_Allreduce(MPI_IN_PLACE, &minDt, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiCommParent);
+    double maxDt = dt;
+    MPI_Allreduce(MPI_IN_PLACE, &maxDt, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent);
+
+    const auto relErr = std::abs(maxDt - minDt)/maxDt;
+    nekrsCheck(relErr > 100*std::numeric_limits<double>::epsilon(),
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "Time step size needs to be the same across all sessions.\n"
+               "Max dt = %e, Min dt = %e\n",
+               maxDt,
+               minDt);
+
+    return dt;
+  }
+
+  double maxDt = dt;
+  MPI_Allreduce(MPI_IN_PLACE, &maxDt, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent);
+
+  double ratio = maxDt / dt;
+  int timeStepRatio = std::floor(ratio);
+  double maxErr = std::abs(ratio - timeStepRatio);
+
+  MPI_Allreduce(MPI_IN_PLACE, &maxErr, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent);
+  nekrsCheck(maxErr > 1e-4,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "Multirate time stepping requires a fixed integer time step size ratio\n"
+             "Max dt = %e, dt = %e, ratio = %e, ratioErr = %e\n",
+             maxDt,
+             dt,
+             ratio,
+             maxErr);
+
+  // rescale dt to be an _exact_ integer multiple of minDt
+  dt = maxDt / timeStepRatio;
+  platform->options.setArgs("MULTIRATE STEPS", std::to_string(timeStepRatio));
+  return dt;
+}
+

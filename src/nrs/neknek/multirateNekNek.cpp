@@ -2,39 +2,6 @@
 #include "nrs.hpp"
 #include "platform.hpp"
 
-double neknek_t::adjustDt(double dt)
-{
-  if (!this->multirate()) {
-    double minDt = dt;
-    MPI_Allreduce(MPI_IN_PLACE, &minDt, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiCommParent);
-    return minDt;
-  }
-
-  double maxDt = dt;
-  MPI_Allreduce(MPI_IN_PLACE, &maxDt, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent);
-
-  double ratio = maxDt / dt;
-  int timeStepRatio = std::floor(ratio);
-  double maxErr = std::abs(ratio - timeStepRatio);
-
-  MPI_Allreduce(MPI_IN_PLACE, &maxErr, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent);
-  nekrsCheck(maxErr > 1e-4,
-             platform->comm.mpiComm,
-             EXIT_FAILURE,
-             "Multirate time stepping requires a constant time step size across all ranks.\n"
-             "Max dt = %e, dt = %e, ratio = %e, timeStepRatio = %d, maxErr = %e\n",
-             maxDt,
-             dt,
-             ratio,
-             timeStepRatio,
-             maxErr);
-
-  // rescale dt to be an _exact_ integer multiple of minDt
-  dt = maxDt / timeStepRatio;
-  platform->options.setArgs("MULTIRATE STEPS", std::to_string(timeStepRatio));
-  return dt;
-}
-
 void neknek_t::exchangeTimes(double time)
 {
   if (!this->multirate()) {

@@ -409,8 +409,9 @@ double dt(int tstep)
              "Invalid time step size %.2e\n",
              dt_);
 
-  if (nrs->neknek) {
-    nrs->dt[0] = nrs->neknek->adjustDt(nrs->dt[0]);
+  // neknek doesn't support variable dt 
+  if (nrs->neknek && tstep == 1) {
+    dt_ = nrs->neknek->adjustDt(dt_);
   }
 
   // limit dt to 5 significant digits
