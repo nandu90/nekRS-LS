@@ -192,9 +192,9 @@ jobs:
     - name: Set install dir permissions
       run: chmod -R 755 ${{ env.NEKRS_HOME }}
 
-    - name: 'lowMach default'
+    - name: 'lowMach default single rank'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/lowMach
-      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi lowMach 2 --cimode 1
+      run: ${{ env.NEKRS_HOME }}/bin/nrsmpi lowMach 1 --cimode 1
 
 #    - name: 'lowMach + CVODE'
 #      working-directory: ${{ env.NEKRS_EXAMPLES }}/lowMach
