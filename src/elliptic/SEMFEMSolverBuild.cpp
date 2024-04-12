@@ -282,14 +282,14 @@ SEMFEMSolver_t::matrix_t *SEMFEMSolver_t::build(const int N_,
     const int numRows = row_end - row_start + 1;
 
     {
-      long long numRowsGlobal64;
-      long long numRows64 = numRows;
-      comm_allreduce(&comm, gs_long_long, gs_add, &numRows64, 1, &numRowsGlobal64);
-      nekrsCheck(numRowsGlobal64 > std::numeric_limits<int>::max(),
+      long long numRowsBigSum;
+      long long numRowsBig = numRows;
+      comm_allreduce(&comm, gs_long_long, gs_add, &numRowsBig, 1, &numRowsBigSum);
+      nekrsCheck(numRowsBigSum > std::numeric_limits<hypreWrapper::BigInt>::max(),
                  comm.c,
                  EXIT_FAILURE,
                  "%s\n",
-                 "Number of global rows requires BigInt support!");
+                 "hypreWrapper::BigInt too small!");
     }
 
     hypreWrapper::BigInt *ownedRows = (hypreWrapper::BigInt *)calloc(numRows, sizeof(hypreWrapper::BigInt));
