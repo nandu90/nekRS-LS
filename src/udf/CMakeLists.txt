@@ -20,7 +20,7 @@ set(FINDPTSDIR ${NEKRS_INSTALL_DIR}/pointInterpolation/findpts)
 set(INCLUDE_DIRS
   ${CASE_DIR}
   ${FINDPTSDIR}
-  ${GSDIR}
+  ${GSDIR}/include
   ${NEKRS_INSTALL_DIR}
   ${NEKRS_INSTALL_DIR}/include
   ${NEKRS_INSTALL_DIR}/include/mesh

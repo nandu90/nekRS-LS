@@ -34,6 +34,6 @@ target_include_directories(gs INTERFACE ${GS_SOURCE_DIR}/build/include)
 set(file_pattern "\.cu$|\.hip$|\.okl$|\.c$|\.hpp$|\.tpp$|\.h$$")
 
 install(DIRECTORY
-        ${GS_SOURCE_DIR}/src/
+        ${GS_SOURCE_DIR}/build/include 
         DESTINATION gslib
         FILES_MATCHING REGEX "\.h$")
