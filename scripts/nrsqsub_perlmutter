@@ -1,7 +1,8 @@
 #!/bin/bash
 
-source $NEKRS_HOME/bin/nrsqsub_utils
+: ${QUEUE:="regular"} # https://docs.nersc.gov/jobs/policy/#perlmutter-gpu
 
+source $NEKRS_HOME/bin/nrsqsub_utils
 setup $# 1
 
 gpu_per_node=4
@@ -9,6 +10,8 @@ cores_per_socket=16
 let nn=$nodes*$gpu_per_node
 let ntasks=nn
 backend=CUDA
+
+chk_case $ntasks
 
 striping_unit=16777216
 max_striping_factor=128
@@ -26,10 +29,10 @@ MPICH_MPIIO_HINTS="*:striping_unit=${striping_unit}:striping_factor=${striping_f
 SFILE=s.bin
 echo "#!/bin/bash" > $SFILE
 echo "#SBATCH -A $PROJ_ID" >>$SFILE
-echo "#SBATCH -J nekRS_$case" >>$SFILE
+echo "#SBATCH -J $jobname" >>$SFILE
 echo "#SBATCH -o %x-%j.out" >>$SFILE
-echo "#SBATCH -t $time" >>$SFILE
-echo "#SBATCH -N $nodes" >>$SFILE
+echo "#SBATCH -t ${time}:00" >>$SFILE
+echo "#SBATCH -N $qnodes" >>$SFILE
 echo "#SBATCH -q $QUEUE" >>$SFILE
 echo "#SBATCH -C gpu" >>$SFILE
 echo "#SBATCH --exclusive" >>$SFILE
@@ -66,17 +69,15 @@ echo "  mkdir \$NEKRS_LOCAL_TMP_DIR" >> $SFILE
 echo "fi" >> $SFILE
 
 if [ $NEKRS_SKIP_BUILD_ONLY -eq 0 ]; then
-echo "# precompilation" >>$SFILE
-echo "srun -N 1 $bin --backend $backend --device-id 0 --setup $case --build-only $ntasks" >>$SFILE
-echo "if [ \$? -ne 0 ]; then" >> $SFILE
-echo "  exit" >> $SFILE
-echo "fi" >> $SFILE
+  echo -e "\n# precompilation" >>$SFILE
+  CMD_build="srun -N 1 $bin --backend $backend --device-id 0 --setup \$case_tmp $extra_args --build-only \$ntasks_tmp"
+  add_build_CMD "$SFILE" "$CMD_build" "$ntasks"
 fi
-echo "" >> $SFILE
 
-echo "date" >>$SFILE
-echo "srun $bin --backend $backend --setup $case" >>$SFILE
-
+if [ $NEKRS_BUILD_ONLY -eq 0 ]; then
+  echo -e "\n# actual run" >>$SFILE
+  echo "srun $bin --backend $backend --setup $case $extra_args" >>$SFILE
+fi
 sbatch $SFILE
 
 # clean-up

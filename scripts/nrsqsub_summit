@@ -1,4 +1,11 @@
 #!/bin/bash
+#
+: ${QUEUE:="batch"}
+
+mlist="
+module load gcc/9.1.0 cmake/3.23.1 cuda/11.0.3
+module unload darshan-runtime
+"
 
 source $NEKRS_HOME/bin/nrsqsub_utils
 setup $# 1
@@ -16,6 +23,8 @@ if [ $CPUONLY -eq 1 ]; then
   let ntasks=$nn*$cores_per_socket
 fi
 
+chk_case $ntasks
+
 
 export ROMIO_HINTS="$(pwd)/.romio_hint"
 if [ ! -f "$ROMIO_HINTS" ]; then
@@ -32,16 +41,17 @@ fi
 SFILE=s.bin
 echo "#!/bin/bash" > $SFILE
 echo "#BSUB -P $PROJ_ID" >>$SFILE
-echo "#BSUB -J nekRS_$case" >>$SFILE
+echo "#BSUB -J $jobname" >>$SFILE
 echo "#BSUB -alloc_flags NVME" >>$SFILE
 echo "#BSUB -W $time" >>$SFILE
-echo "#BSUB -nnodes $nodes" >>$SFILE
+echo "#BSUB -nnodes $qnodes" >>$SFILE
 
 echo "" >> $SFILE
 echo "export CPUONLY=$CPUONLY" >> $SFILE
 echo "export NEKRS_HOME=$NEKRS_HOME" >> $SFILE
 echo "export NEKRS_CACHE_BCAST=$NEKRS_CACHE_BCAST" >> $SFILE
 echo "export NEKRS_GPU_MPI=1" >> $SFILE
+echo "module load DefApps-2023" >> $SFILE
 echo "if [ \$CPUONLY -eq 1 ]; then" >> $SFILE
 echo "  module load xl" >> $SFILE
 echo "  XL_HOME=\"\$OLCF_XLC_ROOT\"" >> $SFILE
@@ -50,8 +60,8 @@ echo "  export OCCA_CXXFLAGS=\"-O3 -qarch=pwr9 -qhot\" " >> $SFILE
 echo "  export OCCA_LDFLAGS=\"\$XL_HOME/lib/libibmc++.a\"" >> $SFILE
 echo "fi" >> $SFILE
 
-echo "module load gcc" >> $SFILE
-echo "module unload darshan-runtime" >> $SFILE
+add_modules "$SFILE" "${mlist}"
+echo "module list" >> $SFILE
 
 echo "" >> $SFILE
 echo "# work-around for barrier issue" >> $SFILE
@@ -87,10 +97,6 @@ echo "fi " >> $SFILE
 
 echo "" >> $SFILE
 
-echo "" >> $SFILE
-echo "date" >>$SFILE
-echo "" >> $SFILE
-
 echo "export NVME_HOME=\"/mnt/bb/$USER/\"" >> $SFILE
 echo "if [ \$NEKRS_CACHE_BCAST -eq 1 ]; then" >> $SFILE
 echo "  export NEKRS_LOCAL_TMP_DIR=\$NVME_HOME" >> $SFILE
@@ -99,19 +105,21 @@ echo "" >> $SFILE
 
 
 if [ $NEKRS_SKIP_BUILD_ONLY -eq 0 ]; then
-echo "jsrun --smpiargs='-gpu' -X 1 -n\$gpu_per_node -r\$gpu_per_node -a1 -c4 -g1 -b rs -d packed \$bin --setup \$case --backend \$backend --device-id 0 --build-only \$ntasks" >> $SFILE
-echo "if [ \$$? -ne 0 ]; then" >> $SFILE
-echo "  exit" >> $SFILE
-echo "fi" >> $SFILE
+  echo -e "\n# precompilation" >>$SFILE
+  CMD_build="jsrun --smpiargs='-gpu' -X 1 -n\$gpu_per_node -r\$gpu_per_node -a1 -c4 -g1 -b rs -d packed \$bin --setup \$case_tmp --backend \$backend --device-id 0 $extra_args --build-only \$ntasks_tmp"
+  add_build_CMD "$SFILE" "$CMD_build" "$ntasks"
 fi
 
-echo "if [ \$CPUONLY -eq 1 ]; then" >> $SFILE
-echo "  jsrun -X 1 -n\$nn -a\$cores_per_socket -c\$cores_per_socket -g0 -b packed:1 -d packed \$bin --setup \$case --backend \$backend" >> $SFILE
-echo "else" >> $SFILE
-echo "  jsrun --smpiargs='-gpu' -X 1 -n\$nn -r\$gpu_per_node -a1 -c4 -g1 -b rs -d packed \$bin --setup \$case --backend \$backend --device-id 0" >> $SFILE
-echo "fi" >> $SFILE
+if [ $NEKRS_BUILD_ONLY -eq 0 ]; then
+  echo -e "\n# actual run" >>$SFILE
+  echo "if [ \$CPUONLY -eq 1 ]; then" >> $SFILE
+  echo "  jsrun -X 1 -n\$nn -a\$cores_per_socket -c\$cores_per_socket -g0 -b packed:1 -d packed \$bin --setup \$case --backend \$backend $extra_args" >> $SFILE
+  echo "else" >> $SFILE
+  echo "  jsrun --smpiargs='-gpu' -X 1 -n\$nn -r\$gpu_per_node -a1 -c4 -g1 -b rs -d packed \$bin --setup \$case --backend \$backend --device-id 0 $extra_args" >> $SFILE
+  echo "fi" >> $SFILE
+fi
 
-bsub $SFILE
+bsub -q $QUEUE $SFILE
 
 # clean-up
 rm -rf $SFILE $ROMIO_HINTS
