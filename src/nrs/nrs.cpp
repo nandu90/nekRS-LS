@@ -842,33 +842,6 @@ void nrs_t::init()
     }
   }
 
-#if 0
-  // set required memPool size to avoid resize
-  // scalar: 7, advSub: 6*dim + 1, velocity solve: 7*dim+1, pressure solve: 2*nVector + 7 + MG 
-  const auto requiredPoolSize = [&]()
-  {
-    int requiredPoolSize = 7;
-
-    if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
-      requiredPoolSize = std::max(requiredPoolSize, 22);
-    } 
-
-    if (this->flow) {
-      requiredPoolSize = std::max(requiredPoolSize, 22);
-
-      int nRestartVectors = 0;
-      platform->options.getArgs("PRESSURE PGMRES RESTART", nRestartVectors);
-      if (platform->options.compareArgs("PRESSURE SOLVER", "PGMRES+FLEXIBLE")) nRestartVectors *= 2;
-      requiredPoolSize = std::max(requiredPoolSize, 7 + nRestartVectors );
-    }
-
-    requiredPoolSize += 3; // safety factor
-    return requiredPoolSize;
-  }();
-  std::cout << "requiredPoolSize: " << requiredPoolSize << std::endl;
-  platform->o_memPool.reserve<dfloat>(requiredPoolSize * static_cast<size_t>(this->meshV->Nlocal)); 
-#endif
-
   this->setIC();
 
   // CVODE can only be initialized once the initial condition is known

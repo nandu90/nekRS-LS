@@ -18,6 +18,7 @@ class neknek_t
 public:
   neknek_t(nrs_t *_nrs, dlong _nsessions, dlong _sessionID);
 
+
   void updateBoundary(int tstep, int stage, double time);
   void exchange(bool allTimeStates = false, bool lag = false);
 
@@ -41,6 +42,8 @@ public:
   occa::memory partitionOfUnity();
 
   void fixCoupledSurfaceFlux(occa::memory o_U);
+
+  void setTimerLevel(const std::string& level);
 
   double adjustDt(double dt);
 
@@ -210,6 +213,8 @@ private:
 
   static constexpr int maxOrd = 3;
   bool predictorStep = false;
+
+  TimerLevel findptsTimerLevel = TimerLevel::Basic;
 };
 
 #endif

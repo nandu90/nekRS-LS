@@ -403,16 +403,16 @@ double dt(int tstep)
     }
   }
 
+  if (nrs->neknek) {
+    // call only once as neknek doesn't support variable dt 
+    if (tstep == 1) dt_ = nrs->neknek->adjustDt(dt_); 
+  }
+
   nekrsCheck(dt_ < 1e-10 || std::isnan(dt_) || std::isinf(dt_),
-             platform->comm.mpiComm,
+             MPI_COMM_SELF,
              EXIT_FAILURE,
              "Invalid time step size %.2e\n",
              dt_);
-
-  // neknek doesn't support variable dt 
-  if (nrs->neknek && tstep == 1) {
-    dt_ = nrs->neknek->adjustDt(dt_);
-  }
 
   // limit dt to 5 significant digits
   dt_ = setPrecision(dt_, 5);

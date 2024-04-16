@@ -89,7 +89,6 @@ void neknek_t::updateInterpPoints()
 
   this->interpolator.reset();
   this->interpolator = std::make_shared<pointInterpolation_t>(mesh, bb_tol, tol, true, sessionID_, true);
-  this->interpolator->setTimerLevel(TimerLevel::Basic);
   this->interpolator->setTimerName("neknek_t::");
 
   // neknekX[:] = mesh->x[pointMap[:]]
@@ -124,7 +123,6 @@ void neknek_t::findIntPoints()
 
   this->interpolator.reset();
   this->interpolator = std::make_shared<pointInterpolation_t>(mesh, bb_tol, tol, true, sessionID_, true);
-  this->interpolator->setTimerLevel(TimerLevel::Basic);
   this->interpolator->setTimerName("neknek_t::");
 
   // int points are the same for all neknek fields
@@ -354,7 +352,7 @@ void neknek_t::updateBoundary(int tstep, int stage, double time)
   }
 
   // do not invoke barrier -- this is performed later
-  platform->timer.tic("neknek update boundary", 0);
+  platform->timer.tic("neknek update boundary");
 
   const bool exchangeAllTimes = false;
   const bool lagState = (stage == 1);
@@ -490,13 +488,13 @@ void neknek_t::extrapolate(int tstep)
 void neknek_t::exchange(bool allTimeStates, bool lagState)
 {
   // do not invoke barrier in timer_t::tic
-  platform->timer.tic("neknek sync", 0);
+  platform->timer.tic("neknek sync");
   MPI_Barrier(platform->comm.mpiCommParent);
   platform->timer.toc("neknek sync");
   this->tSync_ = platform->timer.query("neknek sync", "HOST:MAX");
 
   if (this->globalMovingMesh) {
-    platform->timer.tic("neknek updateInterpPoints", 1);
+    platform->timer.tic("neknek updateInterpPoints");
     this->updateInterpPoints();
     platform->timer.toc("neknek updateInterpPoints");
 
@@ -515,7 +513,7 @@ void neknek_t::exchange(bool allTimeStates, bool lagState)
 
   const auto nStates = allTimeStates ? nEXT_ : 1;
 
-  platform->timer.tic("neknek exchange", 1);
+  platform->timer.tic("neknek exchange");
 
   if (std::find(this->fields.begin(), this->fields.end(), "velocity") != this->fields.end()) {
     this->interpolator->eval(nStates * nrs->NVfields,
@@ -594,4 +592,3 @@ double neknek_t::adjustDt(double dt)
   platform->options.setArgs("MULTIRATE STEPS", std::to_string(timeStepRatio));
   return dt;
 }
-

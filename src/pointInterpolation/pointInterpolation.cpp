@@ -119,7 +119,7 @@ occa::memory pointInterpolation_t::distance()
 void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, bool matchSession)
 {
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic("pointInterpolation_t::find", 1);
+    platform->timer.tic("pointInterpolation_t::find");
   }
 
   int iErr = 0;
@@ -196,7 +196,7 @@ void pointInterpolation_t::eval(dlong nFields,
              "find has not been called prior to eval!");
 
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic("pointInterpolation_t::eval", 1);
+    platform->timer.tic("pointInterpolation_t::eval");
   }
 
   nekrsCheck(mesh->Nlocal > inputFieldOffset,
@@ -240,7 +240,7 @@ void pointInterpolation_t::eval(dlong nFields,
              "find has not been called prior to eval!");
 
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic("pointInterpolation_t::eval", 1);
+    platform->timer.tic("pointInterpolation_t::eval");
   }
 
   nekrsCheck(mesh->Nlocal > inputFieldOffset,
