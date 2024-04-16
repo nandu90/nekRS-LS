@@ -231,27 +231,7 @@ namespace occa
                          function = &(k.function());
 
                          migrateLocalDecls(k);
-                         if (!success)
-                           return;
-
-                         variable_t sycl_nditem(syclNdItem, "item_");
-
-                         variable_t sycl_handler(syclHandler, "handler_");
-                         sycl_handler.vartype.setReferenceToken(
-                             new operatorToken(sycl_handler.source->origin, op::address));
-
-                         variable_t sycl_ndrange(syclNdRange, "range_");
-                         sycl_ndrange += pointer_t();
-
-                         variable_t sycl_queue(syclQueue, "queue_");
-                         sycl_queue += pointer_t();
-
-                         function->addArgumentFirst(sycl_ndrange);
-                         function->addArgumentFirst(sycl_queue);
-
-                         lambda_t &cg_function = *(new lambda_t(capture_t::byReference));
-                         cg_function.addArgument(sycl_handler);
-
+                         if (!success) return;
 
                          int simd_length = simd_length_default;
                          if (k.hasAttribute("simd_length")) {
@@ -259,11 +239,16 @@ namespace occa
                            simd_length = attr.args[0].expr->evaluate();
                          }
 
+                         variable_t sycl_nditem(syclNdItem, "item_");
+
                          dpcppLambda_t& sycl_kernel = *(new dpcppLambda_t(capture_t::byValue, simd_length));
                          sycl_kernel.addArgument(sycl_nditem);
                          sycl_kernel.body->swap(k);
 
                          lambdaNode sycl_kernel_node(sycl_kernel.source, sycl_kernel);
+
+                         variable_t sycl_ndrange(syclNdRange, "range_");
+                         sycl_ndrange += pointer_t();
 
                          leftUnaryOpNode sycl_ndrange_node(
                              sycl_ndrange.source,
@@ -274,43 +259,39 @@ namespace occa
                          parallelfor_args.push_back(&sycl_ndrange_node);
                          parallelfor_args.push_back(&sycl_kernel_node);
 
+                         std::string parallelfor_name = "parallel_for<class ";
+                         std::string_view function_name = function->name();
+                         function_name.remove_prefix(6); // Remove _occa_ from start of kernel name
+                         parallelfor_name += function_name;
+
+                         const std::string hash_string = settings.get<std::string>("hash");
+                         if (!hash_string.empty()) {
+                          parallelfor_name += hash_string;
+                         }
+                         parallelfor_name += ">";
+
                          identifierNode parallelfor_node(
                              new identifierToken(originSource::builtin, "parfor"),
-                             "parallel_for");
+                             parallelfor_name);
 
                          callNode parallelfor_call_node(
                              parallelfor_node.token,
                              parallelfor_node,
                              parallelfor_args);
 
-                         binaryOpNode cgh_parallelfor(
-                             sycl_handler.source,
-                             op::dot,
-                             variableNode(sycl_handler.source, sycl_handler.clone()),
-                             parallelfor_call_node);
+                         variable_t sycl_queue(syclQueue, "queue_");
+                         sycl_queue += pointer_t();
 
-                         cg_function.body->add(*(new expressionStatement(nullptr, cgh_parallelfor)));
-
-                         lambdaNode cg_function_node(cg_function.source, cg_function);
-                         exprNodeVector submit_args;
-                         submit_args.push_back(&cg_function_node);
-
-                         identifierNode submit_node(
-                             new identifierToken(originSource::builtin, "qsub"),
-                             "submit");
-
-                         callNode submit_call_node(
-                             submit_node.token,
-                             submit_node,
-                             submit_args);
-
-                         binaryOpNode q_submit(
+                         binaryOpNode q_parallelfor(
                              sycl_queue.source,
                              op::arrow,
                              variableNode(sycl_queue.source, sycl_queue.clone()),
-                             submit_call_node);
+                             parallelfor_call_node);
 
-                         k.addFirst(*(new expressionStatement(nullptr, q_submit)));
+                         k.addFirst(*(new expressionStatement(nullptr, q_parallelfor)));
+
+                         function->addArgumentFirst(sycl_ndrange);
+                         function->addArgumentFirst(sycl_queue);
                        }
                        else
                        {
