@@ -17,14 +17,11 @@ struct timer_t {
   void enable();
   void disable();
 
-  void tic(const std::string tag);
-  void tic(const std::string tag, int ifSync);
+  void tic(const std::string tag, int ifSync = 0);
   void toc(const std::string tag);
-  void hostTic(const std::string tag);
-  void hostTic(const std::string tag, int ifSync);
+  void hostTic(const std::string tag, int ifSync = 0);
   void hostToc(const std::string tag);
-  void deviceTic(const std::string tag);
-  void deviceTic(const std::string tag, int ifSync);
+  void deviceTic(const std::string tag, int ifSync = 0);
   void deviceToc(const std::string tag);
 
   void set(const std::string tag, double time, long long int count = 1);
@@ -39,8 +36,7 @@ struct timer_t {
   void printStatEntry(std::string name, double tTag, long long int nCalls, double tNorm);
   std::tuple<double, long long int> sumAllMatchingTags(std::function<bool(std::string)> predicate, const std::string metric);
 
-  // print every entry in the map
-  void printAll();
+  void print(std::string timerName = "", long long int GDOFs = 0);
 
   // obtain all tags registered with the timer
   std::vector<std::string> tags();
