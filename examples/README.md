@@ -2,6 +2,7 @@
 
 |                          | GAB | KTC | LMA | TPF | MVC | HMI | EDN | CHT |
 |--------------------------|-----|-----|-----|-----|-----|-----|-----|-----|
+| in-situ viz              |     |     |     |  x  |     |     |     |     |
 | lowMach                  |     |     |  x  |     |  x  |     |     |     |
 | varying p0th             |     |     |     |     |  x  |     |     |     |
 | inflow recycling         |     |     |     |  x  |     |     |     |     |
@@ -24,7 +25,7 @@
 | conjugate heat transfer  |     |     |     |     |     |     |     |  x  |
 | RANS (k-tau)             |     |  x  |     |     |     |     |     |     |
 | surfaceIntegral          |     |  x  |     |     |     |     |     |     |
-| viscous drag             |     |  x  |     |     |     |     |     |     |
+| aero forces              |     |  x  |     |     |     |     |     |     |
 | mesh manipulation        |  x  |     |     |     |     |     |     |     |
 | moving mesh (ALE)        |     |     |     |     |  x  |  x  |     |     |
 | constant flow rate       |     |  x  |     |     |     |     |     |     |
