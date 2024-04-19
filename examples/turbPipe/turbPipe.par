@@ -41,3 +41,4 @@ regularization = avm+highestModalDecay
 # adjust to actual mesh 
 NSLABS  = 60
 NELSLAB = 132 
+renderStep = 100 # ascent

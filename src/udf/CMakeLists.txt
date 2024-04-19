@@ -71,6 +71,13 @@ target_link_options(udf PRIVATE "LINKER:-undefined,dynamic_lookup")
 endif()
 target_link_options(udf PRIVATE "$ENV{NEKRS_UDF_LDFLAGS}")
 
+find_package(Ascent
+             HINTS $ENV{NEKRS_ASCENT_INSTALL_DIR})
+if (ASCENT_FOUND)
+  target_link_libraries(udf PRIVATE ascent::ascent_mpi)
+  target_compile_definitions(udf PUBLIC NEKRS_ENABLE_ASCENT)
+endif()
+
 if(EXISTS "${CASE_DIR}/udf.cmake")
   message("including ${CASE_DIR}/udf.cmake")
   include(${CASE_DIR}/udf.cmake)
