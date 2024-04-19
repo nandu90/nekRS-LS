@@ -45,7 +45,7 @@ We understand that this release includes several breaking changes. These were ne
 ## Known Bugs / Restrictions
 
 * Code is not fully optimized on CPUs and Intel GPUs
-* [507](https://github.com/Nek5000/nekRS/issues/485)
+* [507](https://github.com/Nek5000/nekRS/issues/507)
 * [485](https://github.com/Nek5000/nekRS/issues/485)
 * [258](https://github.com/Nek5000/nekRS/issues/258)
 
