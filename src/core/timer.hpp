@@ -36,7 +36,7 @@ struct timer_t {
   void printStatEntry(std::string name, double tTag, long long int nCalls, double tNorm);
   std::tuple<double, long long int> sumAllMatchingTags(std::function<bool(std::string)> predicate, const std::string metric);
 
-  void print(std::string timerName = "", long long int GDOFs = 0);
+  void print(std::string tag = "", long long int DOF = 0);
 
   // obtain all tags registered with the timer
   std::vector<std::string> tags();

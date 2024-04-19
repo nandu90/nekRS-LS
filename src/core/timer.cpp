@@ -144,14 +144,23 @@ void timer_t::disableSync()
   enable_sync_ = 0;
 }
 
-void timer_t::reset(const std::string tag)
+void timer_t::reset(const std::string timerName)
 {
-  std::map<std::string, tagData>::iterator it = m_.find(tag);
-  if (it != m_.end()) {
-    it->second.startTime = 0;
-    it->second.hostElapsed = 0;
-    it->second.deviceElapsed = 0;
-    it->second.count = 0;
+  const auto timerTags = platform->timer.tags();
+  std::vector<std::string> filteredTags;
+  std::copy_if(timerTags.begin(),
+               timerTags.end(),
+               std::back_inserter(filteredTags),
+               [&](const std::string &tag) { return tag.find(timerName) == 0; });
+
+  for (auto &&tag : filteredTags) {
+    std::map<std::string, tagData>::iterator it = m_.find(tag);
+    if (it != m_.end()) {
+      it->second.startTime = 0;
+      it->second.hostElapsed = 0;
+      it->second.deviceElapsed = 0;
+      it->second.count = 0;
+    }
   }
 }
 
@@ -385,7 +394,7 @@ void timer_t::printStatEntry(std::string name, double time, double tNorm)
   }
 }
 
-void timer_t::print(std::string timerName, long long int GDOF)
+void timer_t::print(std::string timerName, long long int DOF)
 {
   const auto timerTags = tags();
 
@@ -479,10 +488,11 @@ void timer_t::print(std::string timerName, long long int GDOF)
         ss << std::setprecision(1) << std::fixed << 100.0 * tTag / tRoot;
         absPercentage.push_back(ss.str());
 
-        if (GDOF) {
+        if (DOF) {
+          const double GDOFs = DOF/(1e9 * platform->comm.mpiCommSize);
           ss.str("");
           ss.clear();
-          ss << std::setprecision(3) << std::scientific << GDOF / tCall;
+          ss << std::setprecision(3) << std::scientific << GDOFs / tCall;
           throughputs.push_back(ss.str());
         }
       }
@@ -513,10 +523,10 @@ void timer_t::print(std::string timerName, long long int GDOF)
   table[2] = calls;
   table[3] = relPercentage;
   table[4] = absPercentage;
-  if (GDOF) table[5] = throughputs;
+  if (DOF) table[5] = throughputs;
 
   std::vector<std::string> headers = {"Operation", "time", "calls", "rel %", "abs %"};
-  if (GDOF) headers.push_back("GDOF/s/rank");
+  if (DOF) headers.push_back("GDOF/s/rank");
 
   if (platform->comm.mpiRank == 0) {
     std::cout << "\n";

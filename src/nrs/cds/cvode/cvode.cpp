@@ -1540,164 +1540,16 @@ void cvode_t::printInfo(bool printVerboseInfo)
 
 void cvode_t::printTimers()
 {
-  const auto timerTags = platform->timer.tags();
-
-  // filter out tags that do not start with timerName
-  std::vector<std::string> filteredTags;
-  std::copy_if(timerTags.begin(),
-               timerTags.end(),
-               std::back_inserter(filteredTags),
-               [&](const std::string &tag) { return tag.find(timerName) == 0; });
-
-  // construct tree where parent entries are the portion of the tag left of the last '::'
-  std::map<std::string, std::vector<std::string>> tree;
-
-  for (auto &&tag : filteredTags) {
-    auto pos = tag.rfind("::");
-    if (pos == std::string::npos) {
-      tree[""].push_back(tag);
-    } else {
-      auto parent = tag.substr(0, pos);
-      tree[parent].push_back(tag);
-    }
-  }
-
-  auto pos = timerName.rfind("::");
-  const auto start = timerName.substr(0, pos);
-
-  std::ios oldState(nullptr);
-  oldState.copyfmt(std::cout);
-
   auto mesh = cds->meshV;
   long long int NglobalElements = mesh->Nelements;
   MPI_Allreduce(MPI_IN_PLACE, &NglobalElements, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm);
-  const double GDOF = (NglobalElements * mesh->N * mesh->N * mesh->N * this->cvodeScalarIds.size()) /
-                      (1e9 * platform->comm.mpiCommSize);
-
-  // gather timer information from tree
-  std::vector<std::string> operations;
-  std::vector<std::string> times;
-  std::vector<std::string> calls;
-  std::vector<std::string> relPercentage;
-  std::vector<std::string> absPercentage;
-  std::vector<std::string> throughputs;
-
-  std::cout.setf(std::ios::fixed);
-  std::function<void(std::string, std::string, std::string, int)> gatherTreeStats;
-  gatherTreeStats = [&](std::string tag, std::string rootTag, std::string parentTag, int level) {
-    if (level > 0) {
-      if (level == 1) {
-        rootTag = tag; // set as root of timer tree
-      }
-      const auto tTag = platform->timer.query(tag, "DEVICE:MAX");
-      const auto nCalls = platform->timer.count(tag);
-
-      if (nCalls == 0) {
-        return; // nothing to print
-      }
-
-      auto tParent = platform->timer.query(parentTag, "DEVICE:MAX");
-
-      if (tParent < 0.0) {
-        tParent = tTag;
-      }
-
-      const auto tRoot = platform->timer.query(rootTag, "DEVICE:MAX");
-
-      const auto tCall = tTag / nCalls;
-
-      // trim parentTag from the current tag
-      auto pos = tag.rfind(parentTag);
-      auto trimmedTag = tag.substr(pos + parentTag.length() + 2);
-
-      if (platform->comm.mpiRank == 0) {
-        std::ostringstream ss;
-        for (int i = 0; i < level; ++i) {
-          ss << "> ";
-        }
-        ss << trimmedTag;
-        operations.push_back(ss.str());
-
-        ss.str("");
-        ss.clear();
-        ss << std::setprecision(3) << std::scientific << tTag;
-        times.push_back(ss.str());
-
-        ss.str("");
-        ss.clear();
-        ss << std::setw(6) << nCalls;
-        calls.push_back(ss.str());
-
-        ss.str("");
-        ss.clear();
-        ss << std::setprecision(1) << std::fixed << 100.0 * tTag / tParent;
-        relPercentage.push_back(level == 1 ? "" : ss.str());
-
-        ss.str("");
-        ss.clear();
-        ss << std::setprecision(1) << std::fixed << 100.0 * tTag / tRoot;
-        absPercentage.push_back(ss.str());
-
-        ss.str("");
-        ss.clear();
-        ss << std::setprecision(3) << std::scientific << GDOF / tCall;
-        throughputs.push_back(ss.str());
-      }
-    }
-
-    std::vector<std::string> children;
-    for (auto &&child : tree[tag]) {
-      children.push_back(child);
-    }
-
-    // sort children by max time, from largest to smallest
-    std::sort(children.begin(), children.end(), [&](const std::string &a, const std::string &b) {
-      const auto ta = platform->timer.query(a, "DEVICE:MAX");
-      const auto tb = platform->timer.query(b, "DEVICE:MAX");
-      return ta > tb;
-    });
-
-    for (auto &&child : children) {
-      gatherTreeStats(child, rootTag, tag, level + 1);
-    }
-  };
-
-  gatherTreeStats(start, "", "", 0);
-
-  std::map<int, std::vector<std::string>> table;
-  table[0] = operations;
-  table[1] = times;
-  table[2] = calls;
-  table[3] = relPercentage;
-  table[4] = absPercentage;
-  table[5] = throughputs;
-
-  std::vector<std::string> headers = {"Operation", "time", "calls", "rel %", "abs %", "GDOF/s/rank"};
-
-  if (platform->comm.mpiRank == 0) {
-    std::cout << "\n";
-    std::cout << "Timers for " << start << ":\n";
-    printTable(table, headers, "    ");
-    std::cout << "\n";
-  }
-
-  std::cout.copyfmt(oldState);
+  const long long int DOF = (NglobalElements * std::pow(mesh->N, 3) * this->cvodeScalarIds.size());
+  platform->timer.print(timerName, DOF);
 }
 
 void cvode_t::resetTimers()
 {
-  const auto timerTags = platform->timer.tags();
-
-  // filter out tags that do not start with timerName
-  std::vector<std::string> filteredTags;
-  std::copy_if(timerTags.begin(),
-               timerTags.end(),
-               std::back_inserter(filteredTags),
-               [&](const std::string &tag) { return tag.find(timerName) == 0; });
-
-  for (auto &&tag : filteredTags) {
-    platform->timer.reset(tag);
-  }
+  platform->timer.reset(timerName);
 }
 
 std::string cvode_t::rhsTagName() const
