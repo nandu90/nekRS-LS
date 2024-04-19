@@ -2,9 +2,9 @@
 
 ## What is new? 
 
-* Interpolation based velocity recycling
 * FP32 solver mode
-* CombinedPCG
+* Interpolation based velocity recycling
+* Ascent In-situ visualisation plugin.
 * Multi session nek-nek including multi-rate time stepping
 * CHT nek-nek support (solid overlaps)
 * HIP support for BoomerAMG
