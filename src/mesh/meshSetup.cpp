@@ -233,7 +233,7 @@ mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &k
   }
 
   if (platform->comm.mpiRank == 0 && mesh->N < 5) {
-    std::cout << std::endl << "    WARNING: N < 5 may degrade performance\n!" << std::endl;
+    std::cout << std::endl << "    WARNING: N < 5 may degrade performance!\n" << std::endl;
   }
 
   loadKernels(mesh);
