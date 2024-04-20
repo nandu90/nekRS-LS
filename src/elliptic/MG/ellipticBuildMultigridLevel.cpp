@@ -141,10 +141,10 @@ elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf
     const std::string kernelSuffix =
         std::string("_Nf_") + std::to_string(Nf) + std::string("_Nc_") + std::to_string(Nc);
 
-    kernelName = "ellipticPreconCoarsen" + suffix + kernelSuffix;
+    kernelName = "elliptic::coarsen" + suffix + kernelSuffix;
     precon->coarsenKernel = platform->kernelRequests.load(kernelName);
 
-    kernelName = "ellipticPreconProlongate" + suffix + kernelSuffix;
+    kernelName = "elliptic::prolongate" + suffix + kernelSuffix;
     precon->prolongateKernel = platform->kernelRequests.load(kernelName);
   }
 

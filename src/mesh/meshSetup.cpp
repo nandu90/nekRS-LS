@@ -182,6 +182,15 @@ static void loadKernels(mesh_t *mesh)
 
   mesh->velocityDirichletKernel = platform->kernelRequests.load(meshPrefix + "velocityDirichletBCHex3D");
   mesh->nStagesSumVectorKernel = platform->kernelRequests.load(meshPrefix + "nStagesSumVector");
+
+  { 
+    const auto prefix = "coarsenHex3D_Nf_" + std::to_string(mesh->N);
+    for (int N = 1; N < mesh->N + 1; N++) {
+      if (N != mesh->N) continue;
+      mesh->coarsenKernel[mesh->N] = 
+        platform->kernelRequests.load(meshPrefix + prefix + std::string("_Nc_") + std::to_string(N));
+    }
+  }
 }
 
 mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &kernelInfo)

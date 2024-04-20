@@ -9,9 +9,6 @@ void registerMeshKernels(occa::properties kernelInfoBC)
   platform->options.getArgs("CUBATURE POLYNOMIAL DEGREE", pCub);
 
   std::vector<int> Nlist = {p};
-  if (p != 2) {
-    Nlist.push_back(2);
-  }
 
   for (auto &N : Nlist) {
     const int Nq = N + 1;
@@ -48,6 +45,24 @@ void registerMeshKernels(occa::properties kernelInfoBC)
       kernelName = "velocityDirichletBCHex3D";
       fileName = oklpath + "/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, kernelInfoBC);
+
+      for (int Nc = 1; Nc < N + 1; Nc++) { 
+        auto props = kernelInfo;
+        props["defines/p_NqFine"] = N + 1;
+        props["defines/p_NqCoarse"] = Nc + 1;
+        props["defines/pfloat"] = dfloatString;
+
+        props["defines/p_NpFine"] = (N + 1) * (N + 1) * (N + 1); 
+        props["defines/p_NpCoarse"] = (Nc + 1) * (Nc + 1) * (Nc + 1);;
+
+        kernelName = "coarsenHex3D";
+        const std::string orderSuffix =
+          std::string("_Nf_") + std::to_string(N) + std::string("_Nc_") + std::to_string(Nc);
+
+        const std::string ext = platform->serial ? ".c" : ".okl";
+        fileName = oklpath + "/mesh/" + kernelName + ext;
+        platform->kernelRequests.add(meshPrefix + kernelName + orderSuffix, fileName, props);
+      }
 
       meshKernelInfo = kernelInfo;
       int nAB = 3;

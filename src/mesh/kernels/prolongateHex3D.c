@@ -24,86 +24,86 @@
 
  */
 
-@kernel void ellipticPreconProlongateHex3D(const dlong Nelements,
-                                           @ restrict const pfloat *R,
-                                           @ restrict const pfloat *qc,
-                                           @ restrict pfloat *qN)
+extern "C" void FUNC(prolongateHex3D)(const dlong& Nelements,
+                                      const pfloat* __restrict__  R,
+                                      const pfloat* __restrict__  qc,
+                                      pfloat* __restrict__  qN)
 {
-  for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
-    @exclusive dfloat r_q[p_NqFine];
+  dfloat r_q[p_NqCoarse][p_NqFine][p_NqFine];
 
-    @shared dfloat s_q[p_NqCoarse][p_NqCoarse];
-    @shared dfloat s_Pq[p_NqFine][p_NqCoarse];
+  dfloat s_q[p_NqCoarse][p_NqCoarse];
+  dfloat s_Pq[p_NqFine][p_NqCoarse];
 
-    @shared dfloat s_R[p_NqCoarse][p_NqFine];
+  dfloat s_R[p_NqCoarse][p_NqFine];
+  for(int j = 0; j < p_NqCoarse; ++j){
+    for(int i = 0; i < p_NqFine; ++i) {
+      int t = i + j * p_NqFine;
+      const dfloat r = R[t];
+      s_R[j][i] = r;
+    }
+  }
+#ifdef __NEKRS__OMP__
+  #pragma omp parallel for private(s_Pq, r_q, s_q)
+#endif
+  for(dlong e = 0; e < Nelements; ++e) {
 
-    for (int j = 0; j < p_NqFine; ++j; @inner(1))
-      for (int i = 0; i < p_NqFine; ++i; @inner(0)) {
-        int t = i + j * p_NqFine;
-        if (t < p_NqCoarse * p_NqFine)
-          s_R[0][t] = R[t];
-      }
 
-    @barrier();
-
-    for (int j = 0; j < p_NqFine; ++j; @inner(1))
-      for (int i = 0; i < p_NqFine; ++i; @inner(0)) {
+    for(int j = 0; j < p_NqCoarse; ++j)
+      for(int i = 0; i < p_NqFine; ++i) {
         const int t = i + j * p_NqFine;
+        if(t < p_NqCoarse * p_NqCoarse) {
+          #pragma unroll
+          for(int k = 0; k < p_NqFine; ++k)
+            r_q[j][i][k] = 0;
 
-        if (t < p_NqCoarse * p_NqCoarse) {
-          for (int k = 0; k < p_NqFine; ++k)
-            r_q[k] = 0;
-
-          for (int k = 0; k < p_NqCoarse; ++k) {
+          for(int k = 0; k < p_NqCoarse; ++k) {
             const int id = t + k * p_NqCoarse * p_NqCoarse + e * p_NpCoarse;
             const dfloat tmp = qc[id];
 
-            for (int m = 0; m < p_NqFine; ++m)
-              r_q[m] += s_R[k][m] * tmp;
+            #pragma unroll
+            for(int m = 0; m < p_NqFine; ++m)
+              r_q[j][i][m] += s_R[k][m] * tmp;
           }
         }
       }
 
-    for (int k = 0; k < p_NqFine; ++k) {
-      @barrier();
+    for(int k = 0; k < p_NqFine; ++k) {
 
-      for (int j = 0; j < p_NqFine; ++j; @inner(1))
-        for (int i = 0; i < p_NqFine; ++i; @inner(0)) {
+      for(int j = 0; j < p_NqCoarse; ++j)
+        for(int i = 0; i < p_NqFine; ++i) {
           const int t = i + j * p_NqFine;
-          if (t < p_NqCoarse * p_NqCoarse) {
+          if(t < p_NqCoarse * p_NqCoarse) {
             const int ti = t % p_NqCoarse;
             const int tj = t / p_NqCoarse;
 
-            s_q[tj][ti] = r_q[k];
+            s_q[tj][ti] = r_q[j][i][k];
           }
         }
 
-      @barrier();
-
-      for (int j = 0; j < p_NqFine; ++j; @inner(1))
-        for (int i = 0; i < p_NqFine; ++i; @inner(0)) {
+      for(int j = 0; j < p_NqCoarse; ++j)
+        for(int i = 0; i < p_NqFine; ++i) {
           const int t = i + j * p_NqFine;
 
-          if (t < p_NqCoarse * p_NqFine) {
+          if(t < p_NqCoarse * p_NqFine) {
             const int ti = t % p_NqCoarse;
             const int tj = t / p_NqCoarse;
 
             dfloat res = 0;
 
-            for (int m = 0; m < p_NqCoarse; ++m)
+            #pragma unroll
+            for(int m = 0; m < p_NqCoarse; ++m)
               res += s_R[m][tj] * s_q[m][ti];
 
             s_Pq[tj][ti] = res;
           }
         }
 
-      @barrier();
-
-      for (int j = 0; j < p_NqFine; ++j; @inner(1))
-        for (int i = 0; i < p_NqFine; ++i; @inner(0)) {
+      for(int j = 0; j < p_NqFine; ++j)
+        for(int i = 0; i < p_NqFine; ++i) {
           dfloat res = 0;
 
-          for (int m = 0; m < p_NqCoarse; ++m)
+          #pragma unroll
+          for(int m = 0; m < p_NqCoarse; ++m)
             res += s_R[m][i] * s_Pq[j][m];
 
           const int id = i + j * p_NqFine + k * p_NqFine * p_NqFine + e * p_NpFine;

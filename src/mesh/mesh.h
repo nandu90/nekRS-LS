@@ -37,6 +37,7 @@
 #define HEXAHEDRA 12
 
 struct mesh_t {
+
   // Distance pseudo function
   // type refers to the type of distance function
   //   type = "cheap_dist" : nek5000-style cheap_dist
@@ -53,6 +54,10 @@ struct mesh_t {
   // returns a single distance field
   occa::memory minDistance(int nbID, const occa::memory &o_bID, std::string type, int maxIter = 10000);
   std::vector<dfloat> minDistance(const std::vector<dlong> &bID, std::string type, int maxIter = 10000);
+
+  void coarsen(mesh_t *meshC, const occa::memory& o_z, occa::memory& o_zC);
+  void map2Uniform(int Nu, const occa::memory& o_z, occa::memory& o_zUni);
+  void map2Uniform(const occa::memory& o_z, occa::memory& o_zUni);
 
   void move();
   void update(bool updateHost = false);
@@ -150,6 +155,7 @@ struct mesh_t {
   dlong Nggeo;
 
   // volume node info
+  static constexpr int Nmax = 10; 
   int N, Np;
   dfloat *r, *s, *t; // coordinates of local nodes
   dfloat *MM;
@@ -248,6 +254,8 @@ struct mesh_t {
 
   occa::kernel maskKernel;
   occa::kernel maskPfloatKernel;
+
+  std::array<occa::kernel, Nmax + 1> coarsenKernel;
 
   occa::kernel geometricFactorsKernel;
   occa::kernel surfaceGeometricFactorsKernel;

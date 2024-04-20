@@ -299,12 +299,13 @@ void registerMultigridLevelKernels(const std::string &section, int Nf, int N, in
         std::string("_Nf_") + std::to_string(Nf) + std::string("_Nc_") + std::to_string(Nc);
     const std::string fileExtension = serial ? ".c" : ".okl";
 
-    fileName = oklpath + "ellipticPreconCoarsen" + suffix + fileNameExtension;
-    kernelName = "ellipticPreconCoarsen" + suffix;
-    platform->kernelRequests.add(kernelName + orderSuffix, fileName, coarsenProlongateKernelInfo, orderSuffix);
-    fileName = oklpath + "ellipticPreconProlongate" + suffix + fileNameExtension;
-    kernelName = "ellipticPreconProlongate" + suffix;
-    platform->kernelRequests.add(kernelName + orderSuffix, fileName, coarsenProlongateKernelInfo, orderSuffix);
+    const std::string knlpath = getenv("NEKRS_KERNEL_DIR");
+    fileName = knlpath + "/mesh/coarsen" + suffix + fileNameExtension;
+    kernelName = "coarsen" + suffix;
+    platform->kernelRequests.add("elliptic::" + kernelName + orderSuffix, fileName, coarsenProlongateKernelInfo, orderSuffix);
+    fileName = knlpath + "/mesh/prolongate" + suffix + fileNameExtension;
+    kernelName = "prolongate" + suffix;
+    platform->kernelRequests.add("elliptic::" + kernelName + orderSuffix, fileName, coarsenProlongateKernelInfo, orderSuffix);
   }
 
   if (N == 1) {

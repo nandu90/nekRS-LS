@@ -23,10 +23,10 @@
    SOFTWARE.
 
  */
-@kernel void ellipticPreconCoarsenHex3D(const dlong Nelements,
-                                        @ restrict const pfloat *R,
-                                        @ restrict const pfloat *qf,
-                                        @ restrict pfloat *qc)
+@kernel void coarsenHex3D(const dlong Nelements,
+                          @ restrict const pfloat *R,
+                          @ restrict const pfloat *qf,
+                          @ restrict pfloat *qc)
 {
   for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
     @exclusive dfloat r_q[p_NqCoarse];
