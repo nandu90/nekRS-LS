@@ -1,13 +1,13 @@
 #include "mesh.h"
 #include "platform.hpp"
 
-void mesh_t::coarsen(mesh_t *meshC, const occa::memory& o_z, occa::memory& o_zC)
+void mesh_t::interpolate(mesh_t *meshC, const occa::memory& o_z, occa::memory& o_zC)
 {
   const auto Nc = meshC->N;
 
   auto o_J = [&]() 
   {
-    static std::array<occa::memory, this->Nmax + 1> o_J;
+    static std::array<occa::memory, this->maxNqIntp> o_J;
     if (o_J[Nc].isInitialized()) return o_J[Nc];
 
     std::vector<dfloat> J(this->Nq * meshC->Nq);
@@ -17,19 +17,20 @@ void mesh_t::coarsen(mesh_t *meshC, const occa::memory& o_z, occa::memory& o_zC)
     return o_J[Nc];
   };
 
-  this->coarsenKernel[Nc](this->Nelements, o_J(), o_z, o_zC);
+  this->intpKernel[Nc](this->Nelements, o_J(), o_z, o_zC);
 }
 
 void mesh_t::map2Uniform(int Nu, const occa::memory& o_z, occa::memory& o_zU)
 {
-  nekrsCheck(Nu > this->N, 
+  nekrsCheck(Nu > this->maxNqIntp - 1, 
              MPI_COMM_SELF, 
              EXIT_FAILURE, 
-             "%s\n", "N of uniform grid has to be smaller or equal to N");
+             "%s\n", 
+             "N of uniform grid has to be smaller or equal to %d", this->maxNqIntp - 1);
 
   auto o_J = [&]() 
   {
-    static std::array<occa::memory, this->Nmax> o_J;
+    static std::array<occa::memory, this->maxNqIntp> o_J;
     if (o_J[Nu].isInitialized()) return o_J[Nu];
 
     std::vector<dfloat> r(Nu + 1);
@@ -46,11 +47,11 @@ void mesh_t::map2Uniform(int Nu, const occa::memory& o_z, occa::memory& o_zU)
     return o_J[Nu];
   };
 
-  auto kernel = this->coarsenKernel[Nu];
+  auto kernel = this->intpKernel[Nu];
   kernel(this->Nelements, o_J(), o_z, o_zU);
 }
 
 void mesh_t::map2Uniform(const occa::memory& o_z, occa::memory& o_zU)
 {
- map2Uniform(this->N, o_z, o_zU); 
+  map2Uniform(this->N, o_z, o_zU); 
 }

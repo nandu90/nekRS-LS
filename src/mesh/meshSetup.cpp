@@ -185,9 +185,16 @@ static void loadKernels(mesh_t *mesh)
 
   { 
     const auto prefix = "coarsenHex3D_Nf_" + std::to_string(mesh->N);
-    for (int N = 1; N < mesh->N + 1; N++) {
-      mesh->coarsenKernel[mesh->N] = 
+    for (int N = 1; N < mesh->N; N++) {
+      mesh->intpKernel[N] = 
         platform->kernelRequests.load(meshPrefix + prefix + std::string("_Nc_") + std::to_string(N));
+    }
+  }
+  { 
+    for (int N = mesh->N; N < mesh->maxNqIntp - 1; N++) {
+      const auto prefix = "prolongateHex3D_Nf_" + std::to_string(N);
+      mesh->intpKernel[N] = 
+        platform->kernelRequests.load(meshPrefix + prefix + std::string("_Nc_") + std::to_string(mesh->N));
     }
   }
 }

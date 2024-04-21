@@ -3,7 +3,7 @@ set(MESH_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/mesh)
 set(MESH_SOURCES
     ${MESH_SOURCE_DIR}/planarAvg.cpp
     ${MESH_SOURCE_DIR}/meshSetup.cpp
-    ${MESH_SOURCE_DIR}/meshInterp.cpp
+    ${MESH_SOURCE_DIR}/meshIntp.cpp
     ${MESH_SOURCE_DIR}/meshSurface.cpp
     ${MESH_SOURCE_DIR}/meshDistance.cpp
     ${MESH_SOURCE_DIR}/meshNekReader.cpp

@@ -46,7 +46,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
       fileName = oklpath + "/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, kernelInfoBC);
 
-      for (int Nc = 1; Nc < N + 1; Nc++) { 
+      for (int Nc = 1; Nc < N; Nc++) { 
         auto props = kernelInfo;
         props["defines/p_NqFine"] = N + 1;
         props["defines/p_NqCoarse"] = Nc + 1;
@@ -55,11 +55,29 @@ void registerMeshKernels(occa::properties kernelInfoBC)
         props["defines/p_NpFine"] = (N + 1) * (N + 1) * (N + 1); 
         props["defines/p_NpCoarse"] = (Nc + 1) * (Nc + 1) * (Nc + 1);;
 
-        kernelName = "coarsenHex3D";
+        const std::string ext = platform->serial ? ".c" : ".okl";
         const std::string orderSuffix =
           std::string("_Nf_") + std::to_string(N) + std::string("_Nc_") + std::to_string(Nc);
 
+        kernelName = "coarsenHex3D";
+        fileName = oklpath + "/mesh/" + kernelName + ext;
+        platform->kernelRequests.add(meshPrefix + kernelName + orderSuffix, fileName, props);
+      }
+
+      for (int Nf = N; Nf < mesh_t::maxNqIntp - 1; Nf++) { 
+        auto props = kernelInfo;
+        props["defines/p_NqFine"] = Nf + 1;
+        props["defines/p_NqCoarse"] = N + 1;
+        props["defines/pfloat"] = dfloatString;
+
+        props["defines/p_NpFine"] = (Nf + 1) * (Nf + 1) * (Nf + 1); 
+        props["defines/p_NpCoarse"] = (N + 1) * (N + 1) * (N + 1);;
+
         const std::string ext = platform->serial ? ".c" : ".okl";
+        const std::string orderSuffix =
+          std::string("_Nf_") + std::to_string(Nf) + std::string("_Nc_") + std::to_string(N);
+
+        kernelName = "prolongateHex3D";
         fileName = oklpath + "/mesh/" + kernelName + ext;
         platform->kernelRequests.add(meshPrefix + kernelName + orderSuffix, fileName, props);
       }
