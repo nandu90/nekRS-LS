@@ -186,7 +186,6 @@ static void loadKernels(mesh_t *mesh)
   { 
     const auto prefix = "coarsenHex3D_Nf_" + std::to_string(mesh->N);
     for (int N = 1; N < mesh->N + 1; N++) {
-      if (N != mesh->N) continue;
       mesh->coarsenKernel[mesh->N] = 
         platform->kernelRequests.load(meshPrefix + prefix + std::string("_Nc_") + std::to_string(N));
     }
