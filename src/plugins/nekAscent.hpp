@@ -244,16 +244,6 @@ void nekAscent::run(const double time, const int tstep)
   // add trigger
   conduit::Node triggers;
 
-  // set action file
-  std::string casename = platform->options.getArgs("CASENAME");
-  {
-    std::string buf = "";
-    platform->par->extract("ascent", "actionfile", buf);
-    if (!buf.empty()) {
-      actionFile = buf;
-    }
-  }
-
   triggers["t1/params/condition"] = "True"; // control the condition in udf, not ascent
   triggers["t1/params/actions_file"] = actionFile;
 
