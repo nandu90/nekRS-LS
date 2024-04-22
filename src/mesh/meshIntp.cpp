@@ -5,6 +5,12 @@ void mesh_t::interpolate(mesh_t *meshC, const occa::memory& o_z, occa::memory& o
 {
   const auto Nc = meshC->N;
 
+  nekrsCheck(Nc > this->maxNqIntp - 1, 
+             MPI_COMM_SELF, 
+             EXIT_FAILURE, 
+             "%s\n", 
+             "target N has to be smaller or equal to %d", this->maxNqIntp - 1);
+
   auto o_J = [&]() 
   {
     static std::array<occa::memory, this->maxNqIntp> o_J;
@@ -34,8 +40,8 @@ void mesh_t::map2Uniform(int Nu, const occa::memory& o_z, occa::memory& o_zU)
     if (o_J[Nu].isInitialized()) return o_J[Nu];
 
     std::vector<dfloat> r(Nu + 1);
-    r[0] = -1.;
-    r[Nu] = 1.;
+    r[0] = -1.0;
+    r[Nu] = 1.0;
 
     const auto dr = (r[Nu] - r[0]) / Nu;
     for(int i = 1; i < Nu; i++) r[i] = r[i-1] + dr;

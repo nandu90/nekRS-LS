@@ -64,7 +64,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
         platform->kernelRequests.add(meshPrefix + kernelName + orderSuffix, fileName, props);
       }
 
-      for (int Nf = N; Nf < mesh_t::maxNqIntp - 1; Nf++) { 
+      for (int Nf = N; Nf < mesh_t::maxNqIntp; Nf++) { 
         auto props = kernelInfo;
         props["defines/p_NqFine"] = Nf + 1;
         props["defines/p_NqCoarse"] = N + 1;
