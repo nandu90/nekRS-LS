@@ -240,9 +240,6 @@ dfloat nrs_t::adjustDt(int tstep)
   const auto CFLmax = 1.2 * targetCFL;
   const auto CFLmin = 0.8 * targetCFL;
 
-  if (platform->verbose && platform->comm.mpiRank == 0)
-    printf("adjustDt: CFL= %g CFLpred= %g CFLmax= %g CFLmin= %g\n", CFL, CFLpred, CFLmax, CFLmin); 
-
   if (CFL > CFLmax || CFLpred > CFLmax || CFL < CFLmin) {
     const double A = (unitTimeCFL - unitTimeCFLold) / dtOld;
     const double B = unitTimeCFL;
@@ -266,6 +263,11 @@ dfloat nrs_t::adjustDt(int tstep)
     }
   }
   firstTime = false;
+
+  if (platform->verbose && platform->comm.mpiRank == 0)
+    printf("adjustDt: dt=%g CFL= %g CFLpred= %g CFLmax= %g CFLmin= %g\n", 
+           dt_, CFL, CFLpred, CFLmax, CFLmin); 
+
   return dt_;
 }
 

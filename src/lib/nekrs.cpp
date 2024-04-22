@@ -398,7 +398,7 @@ double dt(int tstep)
       dfloat maxDt = 0;
       platform->options.getArgs("MAX DT", maxDt);
       if (maxDt > 0) {
-        dt_ = std::min(nrs->dt[0], dt_);
+        dt_ = std::min(maxDt, dt_);
       }
     }
   }
