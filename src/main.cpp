@@ -139,16 +139,18 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
     char hostname[256];
     gethostname(hostname, sizeof(hostname));
     fprintf(stderr, "rank %d on %s: pid<%d>\n", rank, hostname, getpid());
-    if (rank == 0) {
-      fprintf(stderr, "Attach debugger, then send <SIGCONT> to continue\n");
-    }
-    sigset_t signalSet;
-    sigemptyset(&signalSet);
-    sigaddset(&signalSet, SIGCONT);
 
-    int signal;
-    sigwait(&signalSet, &signal); 
-    MPI_Barrier(comm); // block until signal is received 
+    if (rank == 0) {
+      fprintf(stderr, "Attach debugger, then send <SIGCONT> to rank0 to continue\n");
+
+      sigset_t signalSet;
+      sigemptyset(&signalSet);
+      sigaddset(&signalSet, SIGCONT);
+      int signal;
+      sigwait(&signalSet, &signal); 
+    }
+
+    MPI_Barrier(comm); // block until signal on rank0 is received 
   }
 
   auto abort = [&](const std::string& txt)
