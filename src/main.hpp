@@ -243,10 +243,11 @@ std::map<std::string, std::map<std::string, std::string>> readPar(const std::str
   }
   MPI_Bcast(fileBuf, fsize, MPI_CHAR, 0, comm);
 
+  auto par = new inipp::Ini();
+
   std::stringstream is;
   is.write(fileBuf, fsize);
 
-  auto par = new inipp::Ini();
   par->parse(is);
   par->interpolate();
 

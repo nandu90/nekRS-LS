@@ -178,6 +178,20 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
     auto parKeyValuePairs = readPar(cmdOpt->setupFile, comm);
 
+    {
+      auto it = parKeyValuePairs.find("general");
+      if (it != parKeyValuePairs.end()) {
+        auto jt = it->second.find("logfile"); 
+        if (jt != it->second.end()) {
+          auto outputFile = jt->second;
+          if (rank == 0) std::cout << "redirecting output to " << outputFile << " ...\n";
+          const int fd = open(outputFile.c_str(), O_WRONLY|O_CREAT|O_APPEND, S_IWUSR|S_IRUSR);
+          dup2(fd, fileno(stderr));
+          dup2(fd, fileno(stdout));
+        }
+      } 
+    }
+
     const auto multiSession = [&]()
     {
       int retVal;

@@ -127,6 +127,7 @@ static std::vector<std::string> generalKeys = {
     {"timestepper"},
     {"subCyclingSteps"},
     {"subCycling"},
+    {"logfile"},
     {"writeControl"},
     {"writeInterval"},
     {"constFlowRate"},
