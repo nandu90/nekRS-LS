@@ -27,10 +27,8 @@ occa::memory mesh_t::intpMatrix(std::vector<dfloat> M)
     return Jt;
   };
 
-  o_J[M.size() - 1] = platform->device.malloc(J.size());
-
-  // o_J[M.size() - 1].copyFrom((M.size() < this->Nq) ? J.data() : transposeJ().data()); 
-  o_J[M.size() - 1].copyFrom(J.data()); 
+  o_J[M.size() - 1] = platform->device.malloc<dfloat>(J.size());
+  o_J[M.size() - 1].copyFrom((M.size() < this->Nq) ? J.data() : transposeJ().data()); 
 
   return o_J[M.size() - 1];
 }
@@ -43,7 +41,8 @@ void mesh_t::interpolate(mesh_t *mesh, const occa::memory& o_z, occa::memory& o_
              "%s\n", 
              "number of elements must match");
 
-  std::vector<dfloat> M(mesh->r, mesh->Nq);
+  std::vector<dfloat> M(mesh->Nq);
+  for(int i = 0; i < M.size(); i++) M[i] = mesh->r[i];
   this->intpKernel[mesh->N](this->Nelements, intpMatrix(M), o_z, o_zM);
 }
 
@@ -60,6 +59,7 @@ void mesh_t::map2Uniform(int Nu, const occa::memory& o_z, occa::memory& o_zU)
     return r;
   }();
 
+  for(int i = 0; i < U.size(); i++) std::cout << U[i] << std::endl;
   this->intpKernel[Nu](this->Nelements, intpMatrix(U), o_z, o_zU);
 }
 
