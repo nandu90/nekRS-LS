@@ -59,7 +59,6 @@ void mesh_t::map2Uniform(int Nu, const occa::memory& o_z, occa::memory& o_zU)
     return r;
   }();
 
-  for(int i = 0; i < U.size(); i++) std::cout << U[i] << std::endl;
   this->intpKernel[Nu](this->Nelements, intpMatrix(U), o_z, o_zU);
 }
 
