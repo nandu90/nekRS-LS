@@ -255,7 +255,8 @@ void pMGLevel::buildCoarsenerQuadHex(mesh_t **meshLevels, int Nf, int Nc)
     }
   }
 
-  o_R = platform->device.malloc<pfloat>(Nfq * Ncq, R);
+  o_R = platform->device.malloc<pfloat>(Nfq * Ncq);
+  o_R.copyFrom(R);
 
   free(R);
   free(cToFInterp);

@@ -71,7 +71,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
         props["defines/pfloat"] = dfloatString;
 
         props["defines/p_NpFine"] = (Nf + 1) * (Nf + 1) * (Nf + 1); 
-        props["defines/p_NpCoarse"] = (N + 1) * (N + 1) * (N + 1);;
+        props["defines/p_NpCoarse"] = (N + 1) * (N + 1) * (N + 1);
 
         const std::string ext = platform->serial ? ".c" : ".okl";
         const std::string orderSuffix =

@@ -55,6 +55,7 @@ struct mesh_t {
   occa::memory minDistance(int nbID, const occa::memory &o_bID, std::string type, int maxIter = 10000);
   std::vector<dfloat> minDistance(const std::vector<dlong> &bID, std::string type, int maxIter = 10000);
 
+  occa::memory intpMatrix(std::vector<dfloat> M);
   void interpolate(mesh_t *meshC, const occa::memory& o_z, occa::memory& o_zC);
   void map2Uniform(int Nu, const occa::memory& o_z, occa::memory& o_zUni);
   void map2Uniform(const occa::memory& o_z, occa::memory& o_zUni);
