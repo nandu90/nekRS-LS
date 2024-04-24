@@ -110,7 +110,7 @@ static void initializeAscent()
 
   nekAscent::mAscent.open(ascent_opts);
 
-  platform->timer.set("nekAscentInitialize", tSetup);
+  platform->timer.set("nekAscentInitialize", MPI_Wtime() - tStart);
   if (platform->comm.mpiRank == 0) {
     conduit::Node about;
     ascent::about(about);
