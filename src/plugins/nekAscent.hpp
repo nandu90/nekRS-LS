@@ -272,7 +272,7 @@ void nekAscent::run(const double time, const int tstep)
 
   platform->timer.tic("nekAscentRun", 1);
   if (platform->comm.mpiRank == 0) {
-    printf("running nekAscent actions ...\n");
+    std::cout << "processing " << actionFile << std::endl;
   }
 
   const int verbose = platform->options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;

@@ -18,6 +18,8 @@ NEKRS_SIGNUM_UPD                int             Signal number to process update 
 NEKRS_UDF_INCLUDES		string		Optional include flags ("file1;file2;file3")
 NEKRS_UDF_LDFLAGS		string		Operational linking flags
 
+NEKRS_ASCENT_INSTALL_DIR        string
+
 OOGS_SYNC_RECV			0[D]/1		Wait until all ranks have preposed recv (avoid unexpected msgs)
 OOGS_ENABLE_NBC_DEVICE		0/1[D]		Enable device support for neighbor hood collectives
 
