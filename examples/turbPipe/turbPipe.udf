@@ -1,10 +1,11 @@
 #include "velRecycling.hpp"
 #include "tavg.hpp"
-//#include "nekAscent.hpp"
+#include "nekAscent.hpp"
 
 static int NSLABS;
 static int NELSLAB;
 static int renderStep;
+deviceMemory<dfloat> o_qcriterion;
 
 #ifdef __okl__
 
@@ -110,23 +111,26 @@ void UDF_Setup()
 
 #ifdef NEKRS_ASCENT_ENABLED 
   {
-    cds_t *cds = nrs->cds;
-    mesh_t *meshV = nrs->meshV;
-    mesh_t* meshT;
-    (nrs->cds) ? meshT = cds->mesh[0] : meshT = meshV; // cht
-
-    std::vector<nekAscent::field> fields;
+    auto cds = nrs->cds;
+    auto meshV = nrs->meshV;
+    auto meshT = (nrs->cds) ? cds->mesh[0] : meshV;
 
     auto o_u = nrs->o_U.slice(0 * nrs->fieldOffset , nrs->fieldOffset);
     auto o_v = nrs->o_U.slice(1 * nrs->fieldOffset , nrs->fieldOffset);
     auto o_w = nrs->o_U.slice(2 * nrs->fieldOffset , nrs->fieldOffset);
     auto o_s = cds->o_S.slice(0 * cds->fieldOffset[0], cds->fieldOffset[0]);
-    fields.push_back(std::make_tuple("vel_x", o_u, meshV->Nlocal));
-    fields.push_back(std::make_tuple("vel_y", o_v, meshV->Nlocal));
-    fields.push_back(std::make_tuple("vel_z", o_w, meshV->Nlocal));
-    fields.push_back(std::make_tuple("temperature", o_s, meshT->Nlocal));
+    o_qcriterion.resize(meshT->Nlocal);
 
-    nekAscent::setup(meshT, fields, "ascent.yaml");
+    std::vector<nekAscent::field> fields;
+    fields.push_back(std::make_tuple("vel_x", o_u, meshV));
+    fields.push_back(std::make_tuple("vel_y", o_v, meshV));
+    fields.push_back(std::make_tuple("vel_z", o_w, meshV));
+    fields.push_back(std::make_tuple("Qcriterion", o_qcriterion, meshV));
+    fields.push_back(std::make_tuple("scalar00", o_s, meshT));
+
+    const int Nviz = 1.5 * mesh->N;
+    const auto uniform = true;
+    nekAscent::setup(meshT, fields, "ascent.yaml", Nviz, uniform);
   }
 #endif
 }
@@ -153,7 +157,9 @@ void UDF_ExecuteStep(double time, int tstep)
   }
 
 #ifdef NEKRS_ASCENT_ENABLED 
-  if (tstep % renderStep == 0)
+  if (tstep % renderStep == 0) {
+    nrs->Qcriterion(nrs->o_U, o_qcriterion);
     nekAscent::run(time, tstep);
+  }
 #endif
 }
