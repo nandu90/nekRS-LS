@@ -232,6 +232,7 @@ public:
   occa::memory strainRate(bool smooth = true);
 
   void Qcriterion(const occa::memory &o_U, occa::memory &o_Q);
+  occa::memory Qcriterion(const occa::memory &o_U);
 
   void writeFld(double t, int step, int Nout = 0, bool uniform = false);
   void writeFld(double t, int step, std::string suffix, int Nout = 0, bool uniform = false);
