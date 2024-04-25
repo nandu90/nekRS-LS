@@ -125,7 +125,7 @@ if(USING_NVHPC)
   set(OCCA_CUDA_COMPILER_FLAGS "${OCCA_CUDA_COMPILER_FLAGS} -ccbin ${MPI_UNDERLYING_COMPILER}")
 endif()
 set(OCCA_HIP_COMPILER_FLAGS "-w -O3 -g -ffp-contract=fast -funsafe-math-optimizations -ffast-math -munsafe-fp-atomics" CACHE STRING "HIP flags for OCCA JIT compile")
-set(OCCA_DPCPP_COMPILER_FLAGS "-w -O3 -fsycl -gline-tables-only -ffp-contract=fast" CACHE STRING "DPC++ flags for OCCA JIT compile")
+set(OCCA_DPCPP_COMPILER_FLAGS "-w -O3 -g -fsycl" CACHE STRING "DPC++ flags for OCCA JIT compile")
 set(OCCA_OPENCL_COMPILER_FLAGS "-w -cl-std=CL2.0 -cl-unsafe-math-optimizations -cl-fast-relaxed-math -cl-mad-enable -cl-no-signed-zeros" CACHE STRING "OPENCL flags for OCCA JIT compile")
 
 set(OCCA_FOUND ON)

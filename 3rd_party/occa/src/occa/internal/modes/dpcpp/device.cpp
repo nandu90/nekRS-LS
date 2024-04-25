@@ -151,8 +151,9 @@ namespace occa
       }
     }
 
-    void device::setArchCompilerFlags(occa::json &kernelProps)
+    void device::setArchCompilerFlags(std::string& compilerFlags)
     {
+      setDeviceArchCompilerFlags(dpcppDevice, compilerFlags);
     }
 
     void device::compileKernel(const std::string &hashDir,
@@ -164,14 +165,14 @@ namespace occa
       occa::json allProps = kernelProps;
       const bool verbose = allProps.get("verbose", false);
 
-      setArchCompilerFlags(allProps);
-
       const bool compilingOkl = allProps.get("okl/enabled", true);
 
       const std::string compiler = allProps["compiler"];
       std::string compilerFlags = allProps["compiler_flags"];
       std::string compilerSharedFlags = kernelProps["compiler_shared_flags"];
       std::string compilerLinkerFlags = kernelProps["compiler_linker_flags"];
+
+      setArchCompilerFlags(compilerFlags);
 
       if (!compilingOkl)
       {

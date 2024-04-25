@@ -54,7 +54,7 @@ namespace occa
                                                    lang::sourceMetadata_t &deviceMetadata,
                                                    const occa::json &kernelProps) override;
 
-      void setArchCompilerFlags(occa::json &kernelProps);
+      void setArchCompilerFlags(std::string& compilerFlags);
 
       void compileKernel(const std::string &hashDir,
                          const std::string &kernelName,

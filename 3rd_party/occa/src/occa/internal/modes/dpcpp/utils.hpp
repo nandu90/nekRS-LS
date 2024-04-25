@@ -33,6 +33,10 @@ namespace occa {
       setLinkerFlags(dpcpp_properties);
     }
 
+    std::string getDeviceArchString(const ::sycl::device& sycl_device);
+    void setDeviceArchCompilerFlags(const ::sycl::device& sycl_device, 
+                                    std::string& compiler_flags);
+
     occa::dpcpp::device& getDpcppDevice(modeDevice_t* device_);
     occa::dpcpp::stream& getDpcppStream(const occa::stream& stream_);
     occa::dpcpp::streamTag &getDpcppStreamTag(const occa::streamTag& tag);
