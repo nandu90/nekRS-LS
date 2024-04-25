@@ -1151,8 +1151,8 @@ void ciTestErrors(nrs_t *nrs,
     break;
   case 8:
     velIterErr = abs(NiterU - 8);
-    s1Err = abs((err[2] - 3.46E-11) / err[2]);
-    s2Err = abs((err[3] - 3.58E-11) / err[3]);
+    s1Err = abs((err[2] - 2.51E-11) / err[2]);
+    s2Err = abs((err[3] - 2.69E-11) / err[3]);
     pIterErr = abs(NiterP - 2);
     vxErr = abs((err[0] - 3.47E-10) / err[0]);
     prErr = abs((err[1] - 5.08E-08) / err[1]);

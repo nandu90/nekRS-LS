@@ -398,8 +398,8 @@ jobs:
       working-directory: ${{ env.NEKRS_EXAMPLES }}/eddyNekNek
       run: |
         ${{ env.NEKRS_HOME }}/bin/nrsmpi eddyNekNek.sess 2 --cimode 1
-        cat inside/inside.log
-        cat outside/outside.log
+        cat inside/logfile
+        cat outside/logfile
 
     - name: 'eddyNekNekMv'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/eddyNekNek
