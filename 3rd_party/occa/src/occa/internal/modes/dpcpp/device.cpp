@@ -24,6 +24,9 @@ namespace occa
       occa::json &kernelProps = properties["kernel"];
       setCompilerLinkerOptions(kernelProps);
       arch = dpcppDevice.get_info<::sycl::info::device::name>();
+      #ifdef SYCL_EXT_ONEAPI_BACKEND_LEVEL_ZERO
+        enable_timing = (::sycl::backend::ext_oneapi_level_zero != device_.get_backend());
+      #endif
     }
 
     hash_t device::hash() const
@@ -93,6 +96,8 @@ namespace occa
     double device::timeBetween(const occa::streamTag &startTag,
                                const occa::streamTag &endTag)
     {
+      if (!enable_timing) return 0;
+
       auto& dpcppStartTag{getDpcppStreamTag(startTag)};
       auto& dpcppEndTag{getDpcppStreamTag(endTag)};
 
