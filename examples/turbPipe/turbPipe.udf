@@ -7,6 +7,10 @@ static int NELSLAB;
 static int renderStep;
 deviceMemory<dfloat> o_qcriterion;
 
+#ifdef NEKRS_ASCENT_ENABLED
+std::vector<nekAscent::field> nekAscentFields;
+#endif
+
 #ifdef __okl__
 
 #include "turbPipe.oudf"
@@ -121,16 +125,15 @@ void UDF_Setup()
     auto o_s = cds->o_S.slice(0 * cds->fieldOffset[0], cds->fieldOffset[0]);
     o_qcriterion.resize(meshT->Nlocal);
 
-    std::vector<nekAscent::field> fields;
-    fields.push_back(std::make_tuple("vel_x", o_u, meshV));
-    fields.push_back(std::make_tuple("vel_y", o_v, meshV));
-    fields.push_back(std::make_tuple("vel_z", o_w, meshV));
-    fields.push_back(std::make_tuple("Qcriterion", o_qcriterion, meshV));
-    fields.push_back(std::make_tuple("scalar00", o_s, meshT));
+    nekAscentFields.push_back(std::make_tuple("vel_x", o_u, meshV));
+    nekAscentFields.push_back(std::make_tuple("vel_y", o_v, meshV));
+    nekAscentFields.push_back(std::make_tuple("vel_z", o_w, meshV));
+    nekAscentFields.push_back(std::make_tuple("Qcriterion", o_qcriterion, meshV));
+    nekAscentFields.push_back(std::make_tuple("scalar00", o_s, meshT));
 
     const int Nviz = 1.5 * mesh->N;
     const auto uniform = true;
-    nekAscent::setup(meshT, fields, "ascent.yaml", Nviz, uniform);
+    nekAscent::setup(meshT, "ascent.yaml", Nviz, uniform);
   }
 #endif
 }
@@ -159,7 +162,7 @@ void UDF_ExecuteStep(double time, int tstep)
 #ifdef NEKRS_ASCENT_ENABLED 
   if (tstep % renderStep == 0) {
     nrs->Qcriterion(nrs->o_U, o_qcriterion);
-    nekAscent::run(time, tstep);
+    nekAscent::run(time, tstep, nekAscentFields);
   }
 #endif
 }
