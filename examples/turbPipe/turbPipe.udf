@@ -1,6 +1,6 @@
 #include "velRecycling.hpp"
 #include "tavg.hpp"
-#include "nekAscent.hpp"
+//#include "nekAscent.hpp"
 
 static int NSLABS;
 static int NELSLAB;
