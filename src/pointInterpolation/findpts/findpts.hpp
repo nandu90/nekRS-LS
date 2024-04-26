@@ -26,7 +26,7 @@ struct data_t {
   std::vector<dlong> proc;
   std::vector<dlong> el;
   std::vector<dfloat> r;
-  std::vector<dfloat> dist2;
+  std::vector<dfloat> dist2; // distance squared from found to requested point (in xyz space)
 
   dlong *code_base;
   dlong *proc_base;
@@ -197,9 +197,18 @@ private:
   occa::memory o_distfint;
 
   // results after find call
+
+  // 0 - inside an element
+  // 1 - closest point on a border
+  //     (perhaps exactly, or maybe just near --- check dist2)
+  // 2 - not found (bbox_tol controls cut-off between code 1 and 2)
   occa::memory o_code;
+
+  // remote processor on which the point was found
   occa::memory o_proc;
+  // element on remote processor in which the point was found
   occa::memory o_el;
+  // parametric coordinates for point
   occa::memory o_r;
 
   // data for wtend

@@ -756,6 +756,7 @@ void findpts_t::findptsEvalImpl(dfloat *out,
       constexpr int growthFactor = 2;
       o_in = platform->device.malloc(growthFactor * Nbytes);
     }
+    o_in.copyFrom(in, Nbytes);
   }
 
   {

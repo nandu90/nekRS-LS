@@ -1748,7 +1748,7 @@ void lpm_t::writeFld()
                         "header_type=\"UInt64\">\n";
   message += "\t<UnstructuredGrid>\n";
   message += "\t\t<FieldData>\n";
-  message += "\t\t\t<DataArray type=\"Float32\" Name=\"TIME\" NumberOfTuples=\"1\" format=\"ascii\"> " +
+  message += "\t\t\t<DataArray type=\"Float32\" Name=\"TimeValue\" NumberOfTuples=\"1\" format=\"ascii\"> " +
              std::to_string(time) + " </DataArray>\n";
   message += "\t\t\t<DataArray type=\"Int32\" Name=\"CYCLE\" NumberOfTuples=\"1\" format=\"ascii\"> " +
              std::to_string(out_step) + " </DataArray>\n";
