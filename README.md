@@ -46,7 +46,7 @@ or clone our GitHub repository:
 ```sh
 https://github.com/Nek5000/nekRS.git
 ```
-The [master](https://github.com/Nek5000/nekRS) branch always points to the latest stable release while [master](https://github.com/Nek5000/nekRS/tree/next) 
+The [master](https://github.com/Nek5000/nekRS) branch always points to the latest stable release while [next](https://github.com/Nek5000/nekRS/tree/next) 
 provides an early preview of the next upcoming release (do not use in a production environment).
 
 #
