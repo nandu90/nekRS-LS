@@ -4,9 +4,9 @@
 
 * FP32 solver mode
 * Interpolation based velocity recycling
-* Ascent In-situ visualisation plugin.
+* Ascent in situ visualisation plugin
 * Multi session nek-nek including multi-rate time stepping
-* CHT nek-nek support (solid overlaps)
+* CHT nek-nek support
 * HIP support for BoomerAMG
 * Intel GPU support
 * Aero forces
