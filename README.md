@@ -15,7 +15,7 @@
 Capabilities:
 
 * Incompressible and low Mach-number Navier-Stokes + scalar transport 
-* High-order curvilinear conformal spectral elements in space 
+* High-order curvilinear conformal Hex spectral elements in space 
 * Variable time step 2nd/3rd order semi-implicit time integration
 * MPI + [OCCA](https://github.com/libocca/occa) supporting CUDA, HIP, DPC++, SERIAL (C++)
 * LES and RANS turbulence models
