@@ -6,10 +6,10 @@
 : ${QUEUE:=""}
 : ${CPUONLY:=0}
 : ${NEKRS_CACHE_BCAST:=0}
-: ${NEKRS_SKIP_BUILD_ONLY:=0} # skip precompilation
-: ${NEKRS_BUILD_ONLY:=0}      # skip runs
-: ${NEKRS_FP32:=0}
-: ${NEKRS_EXTRA_ARGS:=""}
+: ${SKIP_BUILD_ONLY:=0} # skip precompilation
+: ${BUILD_ONLY:=0}      # skip runs
+: ${FP32:=0}
+: ${OPT_ARGS:=""}
 
 ###############################################################################
 # global variables
@@ -20,7 +20,7 @@ nodes=$2
 time=$3
 
 bin=$NEKRS_HOME/bin/nekrs
-if [ $NEKRS_FP32 -gt 0 ]; then
+if [ $FP32 -gt 0 ]; then
   bin=$NEKRS_HOME/bin/nekrs-fp32
 fi
 
@@ -42,7 +42,7 @@ jobname="nekRS_"
 if [ $nsessions -gt 1 ]; then
   jobname+="nn_"
 fi
-if [ $NEKRS_BUILD_ONLY -eq 1 ]; then
+if [ $BUILD_ONLY -eq 1 ]; then
   jobname+="build_"
 fi
 jobname+=$case
@@ -51,7 +51,7 @@ if [ "$nsessions" -gt 1 ] 2> /dev/null; then
   case=$case.sess
 fi
 
-if [ $NEKRS_BUILD_ONLY -eq 0 ]; then
+if [ $BUILD_ONLY -eq 0 ]; then
   qnodes=$nodes
   if [ $nsessions -gt $nodes ] 2> /dev/null; then
     qnodes=$nsessions
@@ -61,12 +61,12 @@ else
   if [ $nsessions -gt 1 ]; then
     qnodes=$nsessions
   fi
-  NEKRS_SKIP_BUILD_ONLY=0
+  SKIP_BUILD_ONLY=0
 fi
 
 extra_args=""
-if [ ! -z $NEKRS_EXTRA_ARGS ]; then
-  extra_args="${NEKRS_EXTRA_ARGS}"
+if [ ! -z $OPT_ARGS ]; then
+  extra_args="${OPT_ARGS}"
 fi
 
 ###############################################################################
@@ -80,20 +80,18 @@ ulimit -s unlimited 2>/dev/null
 if [ $2 -gt 0 ]; then
 
   if [ $1 -ne 3 ] || [ "$case" == "-h" ] || [ "$case" == "--help" ]; then
-    echo "Usage: [PROJ_ID] [QUEUE] [<env-var>] $0 <casename> <number of compute nodes> <hh:mm>"
-    echo "Usage: $0 [OPTION]"
-    echo "  -h, --help               print this message"
-    echo "Environment Vaiables"
+    echo "Usage: [<env-var>] $0 <casename> <number of compute nodes> <hh:mm>"
+    echo ""
     echo "  env-var                 Values(s)   Description / Comment"
-    echo "--------------------------------------------------------------------------------"
-    echo "  NEKRS_HOME              string      path to nekrs installation"
+    echo "  ------------------------------------------------------------------------------------"
+    echo "  NEKRS_HOME              string      path to installation"
     echo "  PROJ_ID                 string      "
     echo "  QUEUE                   string      "
     echo "  CPUONLY                 0/1         backend=serial"
-    echo "  NEKRS_SKIP_BUILD_ONLY   0/1         skip precompilation"
-    echo "  NEKRS_BUILD_ONLY        0/1         skip run"
-    echo "  NEKRS_FP32              0/1         single precision"
-    echo "  NEKRS_EXTRA_ARGS        string      ex. \"--cimode 1 --debug\""
+    echo "  SKIP_BUILD_ONLY         0/1         skip precompilation"
+    echo "  BUILD_ONLY              0/1         skip run"
+    echo "  FP32                    0/1         run solver in single precision"
+    echo "  OPT_ARGS                string      optional arguements e..g. \"--cimode 1 --debug\""
     exit 1
   fi
 

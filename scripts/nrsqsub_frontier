@@ -100,7 +100,7 @@ echo "    exit 1" >> $SFILE
 echo "fi" >> $SFILE
 
 echo "export LD_LIBRARY_PATH=$bin_nvme_libs:${LD_LIBRARY_PATH}" >> $SFILE
-if [ $NEKRS_FP32 -eq 0 ]; then
+if [ $FP32 -eq 0 ]; then
 echo "export LD_PRELOAD=$bin_nvme_libs/libnekrs.so:$bin_nvme_libs/libocca.so:$bin_nvme_libs/libnekrs-hypre-device.so:$bin_nvme_libs/libnekrs-hypre.so" >> $SFILE
 else
 echo "export LD_PRELOAD=$bin_nvme_libs/libnekrs-fp32.so:$bin_nvme_libs/libocca.so:$bin_nvme_libs/libnekrs-hypre-device.so:$bin_nvme_libs/libnekrs-hypre.so" >> $SFILE
@@ -110,14 +110,14 @@ echo "ls -ltra $NVME_HOME" >> $SFILE
 echo "ls -ltra $bin_nvme_libs" >> $SFILE
 echo "ldd $bin_nvme" >> $SFILE
 
-if [ $NEKRS_SKIP_BUILD_ONLY -eq 0 ]; then
+if [ $SKIP_BUILD_ONLY -eq 0 ]; then
   echo -e "\n# precompilation" >>$SFILE
   CMD_build="srun -N 1 -n $gpu_per_node $bin_nvme --backend $backend --device-id 0 $extra_args --setup \$case_tmp --build-only \$ntasks_tmp"
   add_build_CMD "$SFILE" "$CMD_build" "$ntasks"
 fi
 
 
-if [ $NEKRS_BUILD_ONLY -eq 0 ]; then
+if [ $BUILD_ONLY -eq 0 ]; then
   echo -e "\n# actual run" >>$SFILE
   echo "srun -N $nodes -n $ntasks $bin_nvme --backend $backend --device-id 0 $extra_args --setup $case" >>$SFILE
 fi
