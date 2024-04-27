@@ -24,7 +24,7 @@ Capabilities:
 * Overlapping overset grids
 * Conjugate fluid-solid heat transfer
 * Various boundary conditions
-* VisIt & Paraview support for data analysis and visualization
+* VisIt & Paraview for data analysis and visualization including in-situ support through Ascent
 * Legacy interface to [Nek5000](https://github.com/Nek5000/Nek5000) 
 
 ## Build Instructions
