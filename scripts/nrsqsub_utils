@@ -16,6 +16,7 @@
 ###############################################################################
 
 case=$1
+case="${case%.*}"
 nodes=$2
 time=$3
 
@@ -80,7 +81,7 @@ ulimit -s unlimited 2>/dev/null
 if [ $2 -gt 0 ]; then
 
   if [ $1 -ne 3 ] || [ "$case" == "-h" ] || [ "$case" == "--help" ]; then
-    echo "Usage: [<env-var>] $0 <casename> <number of compute nodes> <hh:mm>"
+    echo "Usage: [<env-var>] $0 <par or sess file> <number of compute nodes> <hh:mm>"
     echo ""
     echo "  env-var                 Values(s)   Description / Comment"
     echo "  ------------------------------------------------------------------------------------"
@@ -92,6 +93,8 @@ if [ $2 -gt 0 ]; then
     echo "  BUILD_ONLY              0/1         skip run"
     echo "  FP32                    0/1         run solver in single precision"
     echo "  OPT_ARGS                string      optional arguements e..g. \"--cimode 1 --debug\""
+    echo ""
+    echo "Example: PROJ_ID=foo QUEUE=production $0 turbChannel.par 2 01:00"
     exit 1
   fi
 
