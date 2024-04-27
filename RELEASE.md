@@ -7,12 +7,14 @@
 * Ascent in situ visualisation plugin
 * Multi session nek-nek including multi-rate time stepping
 * CHT nek-nek support
+* Improved JIT compilation performance
 * HIP support for BoomerAMG
 * Intel GPU support
 * Aero forces
 * Various bug fixes
 
 ## Good to know
+* AmgX is no longer available use HYPRE instead
 * `nek::userchk` is no longer called automatically during setup 
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
 * send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd` (no automatic check every N steps)
