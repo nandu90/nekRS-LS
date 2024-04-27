@@ -21,6 +21,8 @@ dealiasing                  true [D], false
   cubaturePolynomialOrder   <int>
                             3/2*(polynomialOrder+1) -1 [D] 
 
+redirectOutputTo            <string>
+
 startFrom                   "<string>"
                               + time=<float>                           reset to specified time 
                               + x                                      read mesh coordinates 
