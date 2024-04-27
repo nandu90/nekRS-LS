@@ -100,23 +100,12 @@ int main(int argc, char** argv)
   MPI_Comm commGlobal;
   MPI_Comm_dup(MPI_COMM_WORLD, &commGlobal);
 
-MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+  MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
-  {
-    if(!getenv("NEKRS_HOME")) {
-      std::cout << "FATAL ERROR: Cannot find env variable NEKRS_HOME!" << "\n";
-      fflush(stdout);
-      MPI_Abort(commGlobal, EXIT_FAILURE);
-    }
-
-    std::string bin(getenv("NEKRS_HOME"));
-    bin += "/bin/nekrs";
-    const char* ptr = realpath(bin.c_str(), NULL);
-    if(!ptr) {
-      std::cout << "FATAL ERROR: Cannot find " << bin << "!\n";
-      fflush(stdout);
-      MPI_Abort(commGlobal, EXIT_FAILURE);
-    }
+  if(!getenv("NEKRS_HOME")) {
+    std::cout << "FATAL ERROR: Cannot find env variable NEKRS_HOME!" << "\n";
+    fflush(stdout);
+    MPI_Abort(commGlobal, EXIT_FAILURE);
   }
 
   cmdOptions* cmdOpt = processCmdLineOptions(argc, argv, commGlobal);
@@ -126,14 +115,6 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
   int rank, size;
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &size);
-
-  if (rank == 0) {
-     time_t now = time(0);
-     tm *gmtm = gmtime(&now);
-     char *dt = asctime(gmtm);
-     std::cout << "UTC time: " << dt << std::endl;
-  }
-  MPI_Barrier(comm);
 
   if (cmdOpt->attach) {
     char hostname[256];
@@ -181,7 +162,7 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
     {
       auto it = parKeyValuePairs.find("general");
       if (it != parKeyValuePairs.end()) {
-        auto jt = it->second.find("logfile"); 
+        auto jt = it->second.find("redirectoutputto"); 
         if (jt != it->second.end()) {
           auto outputFile = jt->second;
           if (rank == 0) std::cout << "redirecting output to " << outputFile << " ...\n";
@@ -190,6 +171,13 @@ MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
           dup2(fd, fileno(stdout));
         }
       } 
+    }
+
+    if (rank == 0) {
+       time_t now = time(0);
+       tm *gmtm = gmtime(&now);
+       char *dt = asctime(gmtm);
+       std::cout << "UTC time: " << dt << std::endl;
     }
 
     const auto multiSession = [&]()
