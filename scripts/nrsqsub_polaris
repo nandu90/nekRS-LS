@@ -1,5 +1,7 @@
 #!/bin/bash
 
+NEKRS_HOME=/lus/grand/projects/CSC249ADCD04/ylan/.local/nekrs_stefan_private
+
 : ${QUEUE:="prod"} # debug, debug-scaling, prod https://docs.alcf.anl.gov/running-jobs/job-and-queue-scheduling/
 
 source $NEKRS_HOME/bin/nrsqsub_utils
@@ -51,17 +53,18 @@ echo "echo Running on nodes \`cat \$PBS_NODEFILE\`" >>$SFILE
 echo "module use /soft/modulefiles" >> $SFILE
 echo "module use /opt/cray/pe/lmod/modulefiles/mix_compilers" >> $SFILE
 echo "module load libfabric" >> $SFILE
-echo "module load cpe-cuda" >> $SFILE
 echo "module load PrgEnv-gnu" >> $SFILE
 echo "module load nvhpc-mixed" >> $SFILE
-echo "module load cmake" >> $SFILE
+echo "module load craype-x86-milan craype-accel-nvidia80" >> $SFILE
+echo "module load spack-pe-base cmake" >> $SFILE
 echo "module list" >> $SFILE
+
 
 echo "nvidia-smi" >> $SFILE
 echo "ulimit -s unlimited " >>$SFILE
 
 # known issue after ss11 update
-echo "export LD_PRELOAD=/opt/cray/pe/gcc/11.2.0/snos/lib64/libstdc++.so.6" >> $SFILE
+echo "export LD_PRELOAD=/opt/cray/pe/gcc/12.2.0/snos/lib64/libstdc++.so.6" >> $SFILE
 
 echo "export NEKRS_HOME=$NEKRS_HOME" >>$SFILE
 echo "export NEKRS_GPU_MPI=$NEKRS_GPU_MPI" >>$SFILE
