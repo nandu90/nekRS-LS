@@ -10,7 +10,7 @@
 [![Build Status](https://travis-ci.com/Nek5000/nekRS.svg?branch=master)](https://travis-ci.com/Nek5000/nekRS)
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-orange.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-**nekRS** is a fast and scalable computational fluid dynamics (CFD) solver targeting HPC applications. The code started as an early fork of [libParanumal](https://github.com/paranumal/libparanumal) in 2019.
+**nekRS** is a fast and scalable computational fluid dynamics (CFD) solver targeting HPC applications. The code started as an early fork of [libParanumal](https://github.com/paranumal/libparanumal) in 2019, with the intention of supplanting its precursor, [nek5000](https://github.com/Nek5000/Nek5000).
 
 Capabilities:
 
@@ -25,7 +25,7 @@ Capabilities:
 * Conjugate fluid-solid heat transfer
 * Various boundary conditions
 * VisIt & Paraview for data analysis and visualization including in-situ support through Ascent
-* Legacy interface to [Nek5000](https://github.com/Nek5000/Nek5000) 
+* Legacy interface
 
 ## Build Instructions
 
