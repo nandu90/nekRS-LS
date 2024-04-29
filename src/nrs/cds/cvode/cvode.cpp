@@ -792,6 +792,7 @@ void cvode_t::applyDirichlet(double time)
                              o_NULL,
                              o_NULL,
                              o_NULL,
+                             o_NULL,
                              *(cds->o_usrwrk),
                              o_Si);
       if (sweep == 0) {
