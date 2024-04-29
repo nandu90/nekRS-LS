@@ -66,7 +66,7 @@ else
 fi
 
 extra_args=""
-if [ ! -z $OPT_ARGS ]; then
+if [ ! -z "$OPT_ARGS" ]; then
   extra_args="${OPT_ARGS}"
 fi
 
