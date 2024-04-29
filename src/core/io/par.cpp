@@ -192,18 +192,24 @@ static std::vector<std::string> meshKeys = {
 
 static std::vector<std::string> velocityKeys = {
     {"density"},
+    {"rho"},
     {"viscosity"},
+    {"mu"},
 };
 
 static std::vector<std::string> temperatureKeys = {
-    {"rhoCp"},
+    {"heatcapacity"},
+    {"rhocp"},
     {"conductivity"},
+    {"k"},
     {"absolutetol"},
 };
 
 static std::vector<std::string> scalarKeys = {
+    {"density"},
     {"rho"},
     {"diffusivity"},
+    {"d"},
     {"absolutetol"},
 };
 
@@ -2170,7 +2176,7 @@ void parseVelocitySection(const int rank, setupAide &options, inipp::Ini *ini)
     options.setArgs("DENSITY", to_string_f(rho));
   }
 
-  if (ini->extract("velocity", "viscosity", sbuf)) {
+  if (ini->extract("velocity", "viscosity", sbuf) || ini->extract("velocity", "mu", sbuf)) {
     int err = 0;
     double viscosity = te_interp(sbuf.c_str(), &err);
     if (err) {
@@ -2319,7 +2325,7 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
     parseSolverTolerance(rank, options, ini, "temperature");
 
     std::string sbuf;
-    if (ini->extract("temperature", "conductivity", sbuf)) {
+    if (ini->extract("temperature", "conductivity", sbuf) || ini->extract("temperature", "k", sbuf)) {
       int err = 0;
       double diffusivity = te_interp(sbuf.c_str(), &err);
       if (err) {
@@ -2331,7 +2337,7 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
       options.setArgs("SCALAR" + sid + " DIFFUSIVITY", to_string_f(diffusivity));
     }
 
-    if (ini->extract("temperature", "rhocp", sbuf)) {
+    if (ini->extract("temperature", "rhocp", sbuf) || ini->extract("temperature", "heatcapacity", sbuf)) {
       int err = 0;
       double rhoCp = te_interp(sbuf.c_str(), &err);
       if (err) {
@@ -2455,7 +2461,7 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
     parseSolverTolerance(rank, options, ini, parScope);
 
     std::string sbuf;
-    if (ini->extract(parScope, "diffusivity", sbuf)) {
+    if (ini->extract(parScope, "diffusivity", sbuf) || ini->extract(parScope, "d", sbuf)) {
       int err = 0;
       double diffusivity = te_interp(sbuf.c_str(), &err);
       if (err) {
@@ -2467,7 +2473,7 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
       options.setArgs("SCALAR" + sid + " DIFFUSIVITY", to_string_f(diffusivity));
     }
 
-    if (ini->extract(parScope, "rho", sbuf)) {
+    if (ini->extract(parScope, "rho", sbuf) || ini->extract(parScope, "density", sbuf)) {
       int err = 0;
       double rho = te_interp(sbuf.c_str(), &err);
       if (err) {

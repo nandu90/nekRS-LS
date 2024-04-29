@@ -1,6 +1,8 @@
 ----------------------------------------------------------------------------------------------------------------------
 Key                         Value(s)                                   Description / Comment
 ----------------------------------------------------------------------------------------------------------------------
+userSections                <string>                                   user defined par sections
+
 [OCCA]
 
 backend                     SERIAL, CUDA, HIP, DPCPP, OPENCL           default defined by env var OCCA_MODE_DEFAULT
@@ -28,8 +30,8 @@ startFrom                   "<string>"
                               + x                                      read mesh coordinates 
                               + u                                      read velocity 
                               + t
-                              + s1
-                              + int                                    interpolate restart data onto mesh
+                              + s1 s2 s3 ...
+                              + int                                    interpolate restart data onto current mesh
 
 timeStepper                 tombo1, tombo2 [D], tombo3
 
@@ -185,30 +187,31 @@ writeToFieldFile            true, false [D]                            output me
 [VELOCITY]
 
 density                     <float>                                    density
+rho
 
 viscosity                   <float>                                    dynamic viscosity
+mu
 ----------------------------------------------------------------------------------------------------------------------
 [TEMPERATURE]
 
-rhoCp                       <float>                                    rho*Cp 
+heatCapacity                <float>                                    rho*Cp 
+rhoCp
 
-conductivity                <float>                                    thermal conductivity 
+conductivity                <float>                                    thermal conductivity
+k 
 ----------------------------------------------------------------------------------------------------------------------
 [SCALAR]                                                               default scalar section, see general::nScalars
                                                                        all non-temperature scalars will have settings
                                                                        as set from this section, unless explicitly overriden
 
-rho                         <float>                                    density
+density                     <float>                                    density
+rho
 
-diffusivity                 <float>                                    diffusivity 
+diffusivity                 <float>                                    diffusivity
+D
 ----------------------------------------------------------------------------------------------------------------------
 [SCALAR01]
 
-rho                         <float>                                    density
-
-diffusivity                 <float>                                    diffusivity 
-----------------------------------------------------------------------------------------------------------------------
-[SCALAR02]
 ...
 ----------------------------------------------------------------------------------------------------------------------
 [BOOMERAMG]
@@ -222,10 +225,6 @@ nonGalerkinTol              <float>                                    set 0 to 
 aggressiveCoarseningLevels  <int>
 chebyshevRelaxOrder         <int>
 chebyshevFraction           <float>
-----------------------------------------------------------------------------------------------------------------------
-[AMGX]
-
-configFile                  <string>                                   AmgX JSON configuration file
 ----------------------------------------------------------------------------------------------------------------------
 [CVODE]
 solver                      cbGMRES [D], GMRES                         linear solver
