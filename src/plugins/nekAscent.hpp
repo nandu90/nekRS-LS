@@ -191,7 +191,6 @@ void nekAscent::setup(mesh_t *mesh_,
   uniform = uniform_;
   const int Nin = (Nin_) ? Nin_ : mesh_in->N;
 
-  platform->par->addValidSection("ascent");
   platform->timer.addPrintStatCallback(printStat);
 
   interpolate = (uniform || (Nin != mesh_in->N));

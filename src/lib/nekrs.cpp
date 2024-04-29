@@ -137,9 +137,13 @@ void setup(MPI_Comm commg_in,
 
   if (rank == 0) {
     printHeader();
-    if (sizeof(dfloat) == sizeof(float)) {
-      std::cout << "FP precision: 32-bit" << std::endl;
+    std::cout << "default precision: "; 
+    if (sizeof(dfloat) == sizeof(double)) {
+      std::cout << "FP64" << std::endl;
+    } if (sizeof(dfloat) == sizeof(float)) {
+      std::cout << "FP32" << std::endl;
     }
+
     std::cout << "MPI tasks: " << size << std::endl << std::endl;
   }
 

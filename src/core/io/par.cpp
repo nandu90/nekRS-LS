@@ -114,6 +114,11 @@ static std::string parseValueForKey(std::string token, std::string key)
 static bool enforceLowerCase = false;
 
 static std::vector<std::string> nothing = {};
+
+static std::vector<std::string> noSectionKeys = {
+    {"userSections"}
+};
+
 static std::vector<std::string> generalKeys = {
     {"dt"},
     {"endTime"},
@@ -247,6 +252,7 @@ static std::vector<std::string> deprecatedKeys = {
 };
 
 static std::vector<std::string> validSections = {
+    {""},
     {"general"},
     {"neknek"},
     {"temperature"},
@@ -264,6 +270,7 @@ static std::vector<std::string> validSections = {
 
 void makeStringsLowerCase()
 {
+  lowerCase(noSectionKeys);
   lowerCase(generalKeys);
   lowerCase(neknekKeys);
   lowerCase(problemTypeKeys);
@@ -307,6 +314,10 @@ const std::vector<std::string> &getValidKeys(const std::string &section)
     enforceLowerCase = true;
   }
 
+  if (section == "") {
+    return noSectionKeys;
+  }
+
   if (section == "general") {
     return generalKeys;
   }
@@ -347,7 +358,7 @@ const std::vector<std::string> &getValidKeys(const std::string &section)
   }
 }
 
-void validateKeys(const inipp::Ini::Sections &sections)
+void validate(const inipp::Ini::Sections &sections, const std::vector<std::string>& userSections)
 {
   int err = 0;
   bool generalExists = false;
@@ -390,8 +401,7 @@ void validateKeys(const inipp::Ini::Sections &sections)
     }
 
     // check that section exists
-    if (std::find(validSections.begin(), validSections.end(), sec.first) == validSections.end() &&
-        !isScalar) {
+    if (std::find(validSections.begin(), validSections.end(), sec.first) == validSections.end() && !isScalar) {
       std::ostringstream error;
       error << "Invalid section name: " << sec.first << std::endl;
       append_error(error.str());
@@ -399,6 +409,8 @@ void validateKeys(const inipp::Ini::Sections &sections)
     } else {
       const auto &validKeys = getValidKeys(sec.first);
       for (auto const &val : sec.second) {
+        if (std::find(userSections.begin(), userSections.end(), sec.first) != userSections.end()) continue; 
+
         if (std::find(validKeys.begin(), validKeys.end(), val.first) == validKeys.end()) {
           if (std::find(commonKeys.begin(), commonKeys.end(), val.first) == commonKeys.end()) {
             std::ostringstream error;
@@ -2631,8 +2643,19 @@ void Par::parse(setupAide &options)
   int rank;
   MPI_Comm_rank(comm, &rank);
 
+  const auto userSections = [&]()
+  {
+    std::string value;
+    ini->extract("", "usersections", value);
+    return serializeString(value, ',');
+  }();
+
+  for(auto& section : userSections) {
+    addValidSection(section);
+  }
+
   if (rank == 0) {
-    validateKeys(ini->sections);
+    validate(ini->sections, userSections);
   }
   if (rank == 0) {
     printDeprecation(ini->sections);
