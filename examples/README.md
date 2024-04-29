@@ -2,6 +2,7 @@
 
 |                          | GAB | KTC | LMA | TPF | MVC | HMI | EDN | CHT |
 |--------------------------|-----|-----|-----|-----|-----|-----|-----|-----|
+| fld::elementFilter       |     |     |     |  x  |     |     |     |     |
 | in-situ viz              |     |     |     |  x  |     |     |     |     |
 | lowMach                  |     |     |  x  |     |  x  |     |     |     |
 | varying p0th             |     |     |     |     |  x  |     |     |     |

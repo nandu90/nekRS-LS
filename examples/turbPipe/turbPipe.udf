@@ -27,7 +27,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 void UDF_Setup()
 {
   auto nrs = dynamic_cast<nrs_t*>(platform->solver);
-  mesh_t *mesh = nrs->meshV;
+  auto mesh = nrs->meshV;
   const auto zLen = abs( 
               platform->linAlg->max(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm) - 
               platform->linAlg->min(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm)
@@ -78,7 +78,7 @@ void UDF_Setup()
   // velocity recycling
   const dfloat uBulk = 1.0;
   const int bID = 1;
-  dfloat zRecycLayer = 0.25 * zLen;
+  const dfloat zRecycLayer = 0.25 * zLen;
 #if 0
   // does not work with current mesh
   const hlong offset = NELSLAB * std::round(NSLABS * zRecycLayer / zLen);
@@ -86,6 +86,19 @@ void UDF_Setup()
 #else
   velRecycling::setup(nrs->o_usrwrk, 0.0, 0.0, zRecycLayer, bID, uBulk);
 #endif
+
+  // remove recycling section from field output
+  const auto subMeshElements = [&] ()
+  {
+    std::vector<int> elements;
+    for(int e = 0; e < mesh->Nelements; e++) {
+       auto zmaxLocal = std::numeric_limits<dfloat>::lowest();
+       for(int i = 0; i < mesh->Np; i++) zmaxLocal = std::max(mesh->z[i + e * mesh->Np], zmaxLocal);
+       if (zmaxLocal > zRecycLayer) elements.push_back(e);
+    }
+    return elements;
+  }();
+  fld::elementFilter.set(subMeshElements);
 
   {
     std::vector< std::vector<deviceMemory<dfloat>> > tavgFields;

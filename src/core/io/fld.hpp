@@ -6,17 +6,17 @@
 class ElementFilter
 {
   public:
-    // mask: local element ids
-    void set(const std::vector<long>& mask) 
+    // mask: local element indices to include 
+    void set(const std::vector<int>& mask) 
     { 
       _mask = mask;
     };
     void clear() { _mask.clear(); };
 
-    std::vector<long> mask() const { return _mask; };
+    std::vector<int> mask() const { return _mask; };
 
   private:
-    std::vector<long> _mask;
+    std::vector<int> _mask;
 };
 
 namespace fld {

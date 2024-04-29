@@ -195,7 +195,9 @@ void outfld(const char *filename,
     for(int i = 0; i < nekData.lelt; i++) nek_out_mask[i] = 1; 
 
     // filter elements
-    if(fld::elementFilter.mask().size() > 0) {
+    int filterEnabled = fld::elementFilter.mask().size() ? 1 : 0;
+    MPI_Allreduce(MPI_IN_PLACE, &filterEnabled, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+    if(filterEnabled) {
       for(int i = 0; i < nekData.lelt; i++) nek_out_mask[i] = 0; 
       for(auto& entry : fld::elementFilter.mask()) {
         nek_out_mask[entry] = 1;
