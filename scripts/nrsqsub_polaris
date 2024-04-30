@@ -80,7 +80,7 @@ echo "export CUDA_VISIBLE_DEVICES=\$gpu_id" >>$CMD
 echo "\$*" >>$CMD
 chmod 755 $CMD
 
-if [ $SKIP_BUILD_ONLY -eq 0 ]; then
+if [ $RUN_ONLY -eq 0 ]; then
   echo -e "\n# precompilation" >>$SFILE
   CMD_build="mpiexec -n $gpu_per_node -ppn $gpu_per_node -d $cores_per_numa --cpu-bind depth ./$CMD $bin --setup \${case_tmp} --backend ${backend} --device-id 0 $extra_args --build-only \$ntasks_tmp"
   add_build_CMD "$SFILE" "$CMD_build" "$ntasks"

@@ -105,7 +105,7 @@ echo "fi" >> $SFILE
 echo "" >> $SFILE
 
 
-if [ $SKIP_BUILD_ONLY -eq 0 ]; then
+if [ $RUN_ONLY -eq 0 ]; then
   echo -e "\n# precompilation" >>$SFILE
   CMD_build="jsrun --smpiargs='-gpu' -X 1 -n\$gpu_per_node -r\$gpu_per_node -a1 -c4 -g1 -b rs -d packed \$bin --setup \$case_tmp --backend \$backend --device-id 0 $extra_args --build-only \$ntasks_tmp"
   add_build_CMD "$SFILE" "$CMD_build" "$ntasks"

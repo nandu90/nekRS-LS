@@ -6,8 +6,8 @@
 : ${QUEUE:=""}
 : ${CPUONLY:=0}
 : ${NEKRS_CACHE_BCAST:=0}
-: ${SKIP_BUILD_ONLY:=0} # skip precompilation
-: ${BUILD_ONLY:=0}      # skip runs
+: ${RUN_ONLY:=0}
+: ${BUILD_ONLY:=0}
 : ${FP32:=0}
 : ${OPT_ARGS:=""}
 
@@ -62,7 +62,7 @@ else
   if [ $nsessions -gt 1 ]; then
     qnodes=$nsessions
   fi
-  SKIP_BUILD_ONLY=0
+  RUN_ONLY=0
 fi
 
 extra_args=""
@@ -89,8 +89,8 @@ if [ $2 -gt 0 ]; then
     echo "  PROJ_ID                 string      "
     echo "  QUEUE                   string      "
     echo "  CPUONLY                 0/1         backend=serial"
-    echo "  SKIP_BUILD_ONLY         0/1         skip precompilation"
-    echo "  BUILD_ONLY              0/1         skip run"
+    echo "  RUN_ONLY                0/1         skip pre-compilation"
+    echo "  BUILD_ONLY              0/1         run pre-compilation only"
     echo "  FP32                    0/1         run solver in single precision"
     echo "  OPT_ARGS                string      optional arguements e.g. \"--cimode 1 --debug\""
     echo ""
