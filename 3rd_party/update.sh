@@ -1,8 +1,6 @@
 #!/bin/bash
 set -a
 
-git stash
-
 if [ "$1" == "nek" ]; then
 
 git rm -rf 3rd_party/nek5000 3rd_party/nek5000_parRSB
@@ -59,5 +57,3 @@ else
 echo "$1 not found"
 
 fi
-
-git stash apply
