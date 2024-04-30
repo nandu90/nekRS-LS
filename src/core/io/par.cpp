@@ -846,9 +846,12 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
   }
 
   if (boomer) {
+    const auto MGsemfem = options.compareArgs(parSectionName + "MULTIGRID SEMFEM", "TRUE");
+
     std::string smoother;
     options.getArgs(parSectionName + "MULTIGRID SMOOTHER", smoother);
-    if (smoother.find("DAMPEDJACOBI") != std::string::npos) {
+
+    if ((smoother.find("DAMPEDJACOBI") != std::string::npos) && !MGsemfem) {
       options.setArgs("BOOMERAMG ITERATIONS", "2");
     }
   }

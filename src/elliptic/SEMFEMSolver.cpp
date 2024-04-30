@@ -84,7 +84,7 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
     settings[11] = 1;   /* chebyRelaxOrder */
     settings[12] = 0.3; /* chebyRelaxOrder */
 
-    if (elliptic->options.compareArgs("MULTIGRID SEMFEM", "TRUE")) {
+    if (elliptic->options.compareArgs("MULTIGRID SEMFEM", "TRUE") && elliptic->mesh->N == 1) {
       settings[4] = 16;
       settings[6] = 16;
     }
