@@ -67,9 +67,16 @@ if(NEKRS_USE_DFLOAT_FLOAT)
 endif()
 
 if(APPLE)
-target_link_options(udf PRIVATE "LINKER:-undefined,dynamic_lookup")
+  target_link_options(udf PRIVATE "LINKER:-undefined,dynamic_lookup")
 endif()
-target_link_options(udf PRIVATE "$ENV{NEKRS_UDF_LDFLAGS}")
+
+foreach(LIB $ENV{NEKRS_UDF_LIBS})
+ target_link_libraries(udf PRIVATE ${LIB}) 
+endforeach()
+
+#foreach(PATH $ENV{NEKRS_UDF_RPATH})
+#  target_link_options(udf PRIVATE "LINKER:-rpath,${PATH}")
+#endforeach()
 
 find_package(Ascent
              HINTS $ENV{NEKRS_ASCENT_INSTALL_DIR})

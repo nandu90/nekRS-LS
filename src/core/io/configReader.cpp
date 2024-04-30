@@ -108,14 +108,24 @@ void configRead(MPI_Comm comm)
     setenv("NEKRS_UDF_INCLUDES", buf.c_str(), 1);
   }
 
-  ini.extract("general", "nekrs_udf_libs", buf);
-  if (getenv("NEKRS_UDF_LDFLAGS")) {
+  ini.extract("general", "nekrs_udf_rpath", buf);
+  if (getenv("NEKRS_UDF_RPATH")) {
     if (!buf.empty()) {
-      buf = std::string(getenv("NEKRS_UDF_LDFLAGS")) + " " + buf;
+      buf = std::string(getenv("NEKRS_UDF_RPATH")) + " " + buf;
     }
   }
   if (!buf.empty()) {
-    setenv("NEKRS_UDF_LDFLAGS", buf.c_str(), 1);
+    setenv("NEKRS_UDF_RPATH", buf.c_str(), 1);
+  }
+
+  ini.extract("general", "nekrs_udf_libs", buf);
+  if (getenv("NEKRS_UDF_LIBS")) {
+    if (!buf.empty()) {
+      buf = std::string(getenv("NEKRS_UDF_LIBS")) + " " + buf;
+    }
+  }
+  if (!buf.empty()) {
+    setenv("NEKRS_UDF_LIBS", buf.c_str(), 1);
   }
 
   ini.extract("general", "occa_cxx", buf);

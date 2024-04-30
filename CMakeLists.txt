@@ -241,7 +241,9 @@ include(cmake/hypre.cmake)
 # external plugins
 file(GLOB plugins LIST_DIRECTORIES true ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/plugins/*)
 set(FOUND_PLUGINS "")
-set(PLUGINS_RPATH "")
+set(UDF_RPATH "")
+set(UDF_LIBS "")
+set(UDF_INCLUDES "")
 foreach(DIR ${plugins})
   get_filename_component(PLUGIN_NAME ${DIR} NAME)
   IF(IS_DIRECTORY ${DIR})
@@ -251,9 +253,10 @@ foreach(DIR ${plugins})
   ELSE()
       CONTINUE()
   ENDIF()
-  set(UDF_LIBS "${UDF_LIBS} ${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}${PLUGIN_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
-  set(PLUGINS_RPATH "${PLUGINS_RPATH};${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib")
-  set(UDF_INCLUDES "${UDF_INCLUDES};${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/include")
+
+  list(APPEND UDF_RPATH "${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib")
+  list(APPEND UDF_LIBS "${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}${PLUGIN_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+  list(APPEND UDF_INCLUDES "${CMAKE_INSTALL_PREFIX}/3rd_party/${PLUGIN_NAME}/include")
 endforeach()
 
 # cvode
@@ -349,8 +352,6 @@ endif()
 ###############################################################################
 # install
 ###############################################################################
-set_target_properties(nekrs-bin PROPERTIES INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${PLUGINS_RPATH}")
-
 if(OCCA_CUDA_ENABLED)
   set(BACKEND_DEFAULT "CUDA" CACHE STRING "Default occa mode")
 elseif(OCCA_HIP_ENABLED)
