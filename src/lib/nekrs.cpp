@@ -214,11 +214,13 @@ void setup(MPI_Comm commg_in,
     nekrsCheck(size > nelgv, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "MPI tasks > number of elements!");
   }
 
+  bcMap::setup();
+
+  setenv("PARRSB_FIND_DISCONNECTED_COMPONENTS", "0", 1);
   if (debug) {
     setenv("PARRSB_VERBOSE_LEVEL", "3", 1);
+    setenv("PARRSB_FIND_DISCONNECTED_COMPONENTS", "1", 1);
   }
-
-  bcMap::setup();
 
   nek::bootstrap();
 
