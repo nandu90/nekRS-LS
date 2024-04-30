@@ -2,11 +2,6 @@
 #
 : ${QUEUE:="batch"}
 
-mlist="
-module load gcc/9.1.0 cmake/3.23.1 cuda/11.0.3
-module unload darshan-runtime
-"
-
 source $NEKRS_HOME/bin/nrsqsub_utils
 setup $# 1
 
@@ -60,7 +55,8 @@ echo "  export OCCA_CXXFLAGS=\"-O3 -qarch=pwr9 -qhot\" " >> $SFILE
 echo "  export OCCA_LDFLAGS=\"\$XL_HOME/lib/libibmc++.a\"" >> $SFILE
 echo "fi" >> $SFILE
 
-add_modules "$SFILE" "${mlist}"
+echo "module load cmake" >> $SFILE # 3.27.7
+echo "module load gcc/9.1.0 cuda/11.0.3" >> $SFILE
 echo "module list" >> $SFILE
 
 echo "" >> $SFILE
@@ -79,7 +75,12 @@ echo "" >> $SFILE
 
 # repeat computation in user s.bin file for better readability
 echo "bin=\$NEKRS_HOME/bin/nekrs" >> $SFILE
+echo "nsessions=$nsessions" >> $SFILE
 echo "case=$1" >> $SFILE
+echo "case=\"\${case%.*}\"" >> $SFILE
+echo "if [ "\$nsessions" -gt 1 ] 2> /dev/null; then" >> $SFILE
+echo "  case=\$case.sess" >> $SFILE
+echo "fi" >>$SFILE
 echo "nodes=$2" >> $SFILE
 echo "gpu_per_node=6" >> $SFILE
 echo "cores_per_socket=21" >> $SFILE
@@ -111,6 +112,7 @@ if [ $SKIP_BUILD_ONLY -eq 0 ]; then
 fi
 
 if [ $BUILD_ONLY -eq 0 ]; then
+  link_neknek_logfile "$SFILE"
   echo -e "\n# actual run" >>$SFILE
   echo "if [ \$CPUONLY -eq 1 ]; then" >> $SFILE
   echo "  jsrun -X 1 -n\$nn -a\$cores_per_socket -c\$cores_per_socket -g0 -b packed:1 -d packed \$bin --setup \$case --backend \$backend $extra_args" >> $SFILE

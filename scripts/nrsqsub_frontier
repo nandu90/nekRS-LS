@@ -48,10 +48,10 @@ echo "module load PrgEnv-amd" >> $SFILE
 echo "module load craype-accel-amd-gfx90a" >> $SFILE
 echo "module load cray-mpich" >> $SFILE
 echo "module load rocm" >> $SFILE
-#echo "module use /sw/frontier/ascent/modulefiles/" >> $SFILE
-#echo "module load ascent/0.9.2-develop" >> $SFILE
+echo "module load cmake" >> $SFILE
+echo "module use /sw/frontier/ascent/modulefiles/" >> $SFILE
+echo "module load ascent" >> $SFILE
 echo "module unload cray-libsci" >> $SFILE
-echo "module unload darshan-runtime" >> $SFILE
 echo "module list" >> $SFILE
 
 echo "rocm-smi" >>$SFILE
@@ -61,8 +61,8 @@ echo "squeue -u \$USER" >>$SFILE
 
 echo "export MPICH_GPU_SUPPORT_ENABLED=1" >>$SFILE
 
-## Ascent
-#echo "export NEKRS_ASCENT_INSTALL_DIR=\"/sw/frontier/ascent/install/install/ascent-develop/\"" >> $SFILE
+# Ascent
+echo "export NEKRS_ASCENT_INSTALL_DIR=\"/sw/frontier/ascent/install/install/ascent-develop/\"" >> $SFILE
 
 ## These must be set before compiling so the executable picks up GTL
 echo "export PE_MPICH_GTL_DIR_amd_gfx90a=\"-L${CRAY_MPICH_ROOTDIR}/gtl/lib\"" >> $SFILE
@@ -118,6 +118,7 @@ fi
 
 
 if [ $BUILD_ONLY -eq 0 ]; then
+  link_neknek_logfile "$SFILE"
   echo -e "\n# actual run" >>$SFILE
   echo "srun -N $nodes -n $ntasks $bin_nvme --backend $backend --device-id 0 $extra_args --setup $case" >>$SFILE
 fi

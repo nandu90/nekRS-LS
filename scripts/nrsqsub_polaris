@@ -1,7 +1,5 @@
 #!/bin/bash
 
-NEKRS_HOME=/lus/grand/projects/CSC249ADCD04/ylan/.local/nekrs_stefan_private
-
 : ${QUEUE:="prod"} # debug, debug-scaling, prod https://docs.alcf.anl.gov/running-jobs/job-and-queue-scheduling/
 
 source $NEKRS_HOME/bin/nrsqsub_utils
@@ -63,9 +61,6 @@ echo "module list" >> $SFILE
 echo "nvidia-smi" >> $SFILE
 echo "ulimit -s unlimited " >>$SFILE
 
-# known issue after ss11 update
-echo "export LD_PRELOAD=/opt/cray/pe/gcc/12.2.0/snos/lib64/libstdc++.so.6" >> $SFILE
-
 echo "export NEKRS_HOME=$NEKRS_HOME" >>$SFILE
 echo "export NEKRS_GPU_MPI=$NEKRS_GPU_MPI" >>$SFILE
 
@@ -92,6 +87,7 @@ if [ $SKIP_BUILD_ONLY -eq 0 ]; then
 fi
 
 if [ $BUILD_ONLY -eq 0 ]; then
+  link_neknek_logfile "$SFILE"
   echo -e "\n# actual run" >>$SFILE
   echo "mpiexec -n $ntasks -ppn $gpu_per_node -d $cores_per_numa --cpu-bind depth ./$CMD $bin --setup ${case} --backend ${backend} --device-id 0 $extra_args" >>$SFILE
 fi
