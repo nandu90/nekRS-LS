@@ -180,7 +180,9 @@ void setup(MPI_Comm commg_in,
     options->setArgs("THREAD MODEL", value);
   }
   if (!_backend.empty()) {
-    options->setArgs("THREAD MODEL", _backend);
+    std::string value(_backend);
+    upperCase(value);
+    options->setArgs("THREAD MODEL", value);
   }
   if (!_deviceID.empty()) {
     options->setArgs("DEVICE NUMBER", _deviceID);
