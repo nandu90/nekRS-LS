@@ -5,7 +5,7 @@ userSections                <string>                                   user defi
 
 [OCCA]
 
-backend                     SERIAL, CUDA, HIP, DPCPP, OPENCL           default defined by env var OCCA_MODE_DEFAULT
+backend                     SERIAL, CUDA, HIP, DPCPP, OPENCL           default defined in $NEKRS_HOME/nekrs.conf
 
 deviceNumber                <int>, LOCAL-RANK [D]
 

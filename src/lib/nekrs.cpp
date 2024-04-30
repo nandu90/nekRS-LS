@@ -175,7 +175,9 @@ void setup(MPI_Comm commg_in,
 
   // precedence: cmd arg, par, env-var
   if (options->getArgs("THREAD MODEL").length() == 0) {
-    options->setArgs("THREAD MODEL", getenv("NEKRS_OCCA_MODE_DEFAULT"));
+    std::string value(getenv("NEKRS_OCCA_MODE_DEFAULT"));
+    upperCase(value);
+    options->setArgs("THREAD MODEL", value);
   }
   if (!_backend.empty()) {
     options->setArgs("THREAD MODEL", _backend);

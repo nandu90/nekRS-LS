@@ -1,4 +1,3 @@
-project(libUDF LANGUAGES CXX)
 cmake_minimum_required(VERSION 3.21)
 
 set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
@@ -14,14 +13,10 @@ set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
 
 #set(CMAKE_VERBOSE_MAKEFILE on)
 
-set(GSDIR ${NEKRS_INSTALL_DIR}/gslib)
-set(FINDPTSDIR ${NEKRS_INSTALL_DIR}/pointInterpolation/findpts)
-
 set(INCLUDE_DIRS
   ${CASE_DIR}
-  ${FINDPTSDIR}
-  ${GSDIR}/include
-  ${NEKRS_INSTALL_DIR}
+  ${GSDIR}/gslib/include
+  ${NEKRS_INSTALL_DIR}/occa/include
   ${NEKRS_INSTALL_DIR}/include
   ${NEKRS_INSTALL_DIR}/include/mesh
   ${NEKRS_INSTALL_DIR}/include/core
@@ -45,7 +40,6 @@ set(INCLUDE_DIRS
   ${NEKRS_INSTALL_DIR}/include/nrs/cds/regularization
   ${NEKRS_INSTALL_DIR}/include/pointInterpolation
   ${NEKRS_INSTALL_DIR}/include/pointInterpolation/findpts
-  ${NEKRS_INSTALL_DIR}/occa/include
 )
 
 # dummy
