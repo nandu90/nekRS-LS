@@ -844,6 +844,22 @@ void nrs_t::init()
 
   this->setIC();
 
+  if (this->cds) {
+    if (this->userScalarSource) {
+      cds->userSource = this->userScalarSource;
+    }
+    if (this->userProperties) {
+      cds->userProperties = this->userProperties;
+    }
+    if(this->userScalarImplicitLinearTerm) {
+      this->cds->userImplicitLinearTerm = this->userScalarImplicitLinearTerm;
+    }
+  }
+
+  double startTime;
+  platform->options.getArgs("START TIME", startTime);
+  this->evaluateProperties(startTime);
+
   // CVODE can only be initialized once the initial condition is known
   if (cds) {
     if (cds->cvode) {
@@ -876,25 +892,11 @@ void nrs_t::setIC()
     printf("calling UDF_Setup ... \n");
   }
   fflush(stdout);
-
   udf.setup();
-
   if (platform->comm.mpiRank == 0) {
     printf("done\n");
   }
   fflush(stdout);
-
-  if (this->cds) {
-    if (this->userScalarSource) {
-      cds->userSource = this->userScalarSource;
-    }
-    if (this->userProperties) {
-      cds->userProperties = this->userProperties;
-    }
-    if(this->userScalarImplicitLinearTerm) {
-      this->cds->userImplicitLinearTerm = this->userScalarImplicitLinearTerm;
-    }
-  }
 
   this->_mesh->o_x.copyFrom(this->_mesh->x);
   this->_mesh->o_y.copyFrom(this->_mesh->y);
@@ -939,7 +941,6 @@ void nrs_t::setIC()
 
   nek::ocopyToNek(startTime, 0); // ensure both codes see the same mesh + IC
 
-  this->evaluateProperties(startTime);
 }
 
 void nrs_t::printRunStat(int step)
