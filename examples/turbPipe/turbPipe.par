@@ -9,11 +9,11 @@ polynomialOrder = 7
 stopAt = endTime
 endTime = 200
 
-#dt = 6.0e-3
-dt = targetCFL=4 + max=1e-2 + initial=6e-3
-
 timeStepper = tombo2
-subCyclingSteps = 2
+
+#dt = 6.0e-3
+#subCyclingSteps = 2
+dt = targetCFL=4 + max=1e-2 + initial=6e-3
 
 writeControl = simulationTime 
 writeInterval = 10
