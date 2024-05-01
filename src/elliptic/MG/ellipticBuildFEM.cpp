@@ -57,7 +57,8 @@ void ellipticBuildFEM(elliptic_t* elliptic,
   mesh_t *mesh = elliptic->mesh;
   MPI_Barrier(platform->comm.mpiComm);
   const double tStart = MPI_Wtime();
-  if(platform->comm.mpiRank == 0) printf("building FEM matrix ... ");
+  if(platform->comm.mpiRank == 0) 
+    printf("building FEM matrix (lambdaAvg=%g) ... ", elliptic->lambda0Avg);
   fflush(stdout);
 
   switch(elliptic->elementType) {
