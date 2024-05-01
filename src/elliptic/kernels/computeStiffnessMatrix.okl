@@ -218,7 +218,7 @@ void J_xr_map(double J_xr[3][3], double q_r[4][3], double x_t[3][4])
                                     @ restrict const double *x,
                                     @ restrict const double *y,
                                     @ restrict const double *z,
-                                    @ restrict const double *mask,
+                                    @ restrict const int *mask,
                                     @ restrict const long long *glo_num,
                                     @ restrict const long long *rows,
                                     @ restrict const long long *row_offsets,
@@ -319,7 +319,7 @@ void J_xr_map(double J_xr[3][3], double q_r[4][3], double x_t[3][4])
             }
             for (int i = 0; i < n_dim + 1; i++) {
               for (int j = 0; j < n_dim + 1; j++) {
-                if ((mask[idx[t_map[t][i]] + e * p_Np] > 0.0) && (mask[idx[t_map[t][j]] + e * p_Np] > 0.0)) {
+                if (mask[idx[t_map[t][i]] + e * p_Np] && mask[idx[t_map[t][j]] + e * p_Np]) {
                   long long row = glo_num[idx[t_map[t][i]] + e * p_Np];
                   long long col = glo_num[idx[t_map[t][j]] + e * p_Np];
                   long long local_row_id;

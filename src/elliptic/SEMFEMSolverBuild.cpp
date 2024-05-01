@@ -12,8 +12,8 @@ namespace
 {
 void quadrature_rule(double q_r[4][3], double q_w[4])
 {
-  double a = (5.0 + 3.0 * sqrt(5.0)) / 20.0;
-  double b = (5.0 - sqrt(5.0)) / 20.0;
+  const double a = (5.0 + 3.0 * sqrt(5.0)) / 20.0;
+  const double b = (5.0 - sqrt(5.0)) / 20.0;
 
   q_r[0][0] = a;
   q_r[0][1] = b;
@@ -34,7 +34,7 @@ void quadrature_rule(double q_r[4][3], double q_w[4])
   q_w[3] = 1.0 / 24.0;
 }
 
-long long bisection_search_index(const long long *sortedArr, long long value, long long start, long long end)
+long long bisection_search_index(const long long *sortedArr, const long long value, const long long start, const long long end)
 {
   long long fail = -1;
   long long L = start;
@@ -52,7 +52,7 @@ long long bisection_search_index(const long long *sortedArr, long long value, lo
   return fail;
 }
 
-long long linear_search_index(const long long *unsortedArr, long long value, long long start, long long end)
+long long linear_search_index(const long long *unsortedArr, const long long value, const long long start, const long long end)
 {
   long long fail = -1;
   for (long long idx = start; idx < end; ++idx) {
@@ -112,30 +112,18 @@ void dphi(double deriv[3], int q)
 }
 
 /* Math functions */
-long long maximum(long long a, long long b)
-{
-  return a > b ? a : b;
-}
-
 double determinant(double A[3][3])
 {
-  /*
-   * Computes the determinant of a matrix
-   */
-
-  double d_1 = A[0][0] * (A[1][1] * A[2][2] - A[2][1] * A[1][2]);
-  double d_2 = A[0][1] * (A[1][0] * A[2][2] - A[2][0] * A[1][2]);
-  double d_3 = A[0][2] * (A[1][0] * A[2][1] - A[2][0] * A[1][1]);
+  const double d_1 = A[0][0] * (A[1][1] * A[2][2] - A[2][1] * A[1][2]);
+  const double d_2 = A[0][1] * (A[1][0] * A[2][2] - A[2][0] * A[1][2]);
+  const double d_3 = A[0][2] * (A[1][0] * A[2][1] - A[2][0] * A[1][1]);
 
   return d_1 - d_2 + d_3;
 }
 
 void inverse(double invA[3][3], double A[3][3])
 {
-  /*
-   * Computes the inverse of a matrix
-   */
-  double inv_det_A = 1.0 / determinant(A);
+  const double inv_det_A = 1.0 / determinant(A);
   invA[0][0] = inv_det_A * (A[1][1] * A[2][2] - A[2][1] * A[1][2]);
   invA[0][1] = inv_det_A * (A[0][2] * A[2][1] - A[2][2] * A[0][1]);
   invA[0][2] = inv_det_A * (A[0][1] * A[1][2] - A[1][1] * A[0][2]);
@@ -178,45 +166,38 @@ void J_xr_map(double J_xr[3][3], double q_r[4][3], double x_t[3][4])
   }
 }
 
-static occa::kernel computeStiffnessMatrixKernel;
 static occa::memory o_x;
 static occa::memory o_y;
 static occa::memory o_z;
 static bool constructOnHost = false;
 
-void load();
+struct COOGraph {
+  int nrows;
+  long long nnz;
+  std::vector<long long> rows;
+  std::vector<long long> rowOffsets;
+  std::vector<int> ncols; // size of each column
+  std::vector<long long> cols;
+  std::vector<float> vals;
+};
 
-void construct_coo_graph();
-void fem_assembly_device(hypreWrapper::IJ_t &hypreIJ);
-void fem_assembly_host(hypreWrapper::IJ_t &hypreIJ);
+COOGraph construct_coo_graph();
 
-void matrix_distribution();
-void fem_assembly(hypreWrapper::IJ_t &hypreIJ);
+void assemble(hypreWrapper::IJ_t &hypreIJ);
+void fem_assembly_device(hypreWrapper::IJ_t &hypreIJ, COOGraph& coo_graph);
+void fem_assembly_host(hypreWrapper::IJ_t &hypreIJ, COOGraph& coo_graph);
+
+void distribute_matrix();
 void mesh_connectivity(int[8][3], int[8][4]);
-long long maximum(long long, long long);
 
 static constexpr int n_dim = 3;
 static int n_x, n_y, n_z, n_elem;
 static int n_xyz, n_xyze;
 static long long *glo_num;
-static double *pmask;
+static int *pmask;
 static double lambda0;
-static int num_loc_dofs;
-static long long *dof_map;
 static long long row_start;
 static long long row_end;
-
-struct COOGraph {
-  int nrows;
-  long long nnz;
-  long long *rows;
-  long long *rowOffsets;
-  int *ncols;
-  long long *cols;
-  float *vals;
-};
-
-static COOGraph coo_graph;
 
 } // namespace
 
@@ -228,59 +209,57 @@ struct gs_data {
 static struct gs_data *gsh;
 
 /* Interface definition */
-SEMFEMSolver_t::matrix_t *SEMFEMSolver_t::build(const int N_,
-                                                const int n_elem_,
-                                                occa::memory _o_x,
-                                                occa::memory _o_y,
-                                                occa::memory _o_z,
-                                                double *pmask_,
-                                                double lambda0_,
-                                                hypreWrapper::IJ_t &hypreIJ,
-                                                MPI_Comm mpiComm,
-                                                long long int *gatherGlobalNodes)
+
+// construct COO matrix using Hypre's IJ interface 
+SEMFEMSolver_t::matrix_t SEMFEMSolver_t::build(const int N_,
+                                               const int n_elem_,
+                                               occa::memory _o_x,
+                                               occa::memory _o_y,
+                                               occa::memory _o_z,
+                                               const std::vector<int>& pmask_,
+                                               double lambda0_,
+                                               MPI_Comm mpiComm,
+                                               long long int *gatherGlobalNodes)
 {
+  // assume same number of points in each direction
   n_x = N_;
   n_y = N_;
   n_z = N_;
+  n_xyz = n_x * n_y * n_z;
+
   o_x = _o_x;
   o_y = _o_y;
   o_z = _o_z;
+
   n_elem = n_elem_;
-  pmask = pmask_;
+  pmask = (int*)(pmask_.data());
   lambda0 = lambda0_;
 
-  n_xyz = n_x * n_y * n_z;
   n_xyze = n_x * n_y * n_z * n_elem;
-  int NuniqueBases = n_xyze;
 
   {
     comm_ext world;
     world = (comm_ext)mpiComm;
     comm_init(&comm, world);
     gsh = gs_setup(gatherGlobalNodes,
-                   NuniqueBases,
+                   n_xyze,
                    &comm,
                    0,
                    gs_pairwise,
                    /* mode */ 0);
   }
 
-  constructOnHost = !platform->device.deviceAtomic;
+  constructOnHost = !platform->device.deviceAtomic; // false on CPUs as atomics are supported 
 
-  if (!constructOnHost) {
-    load();
-  }
+  hypreWrapper::IJ_t hypreIJ;
 
-  matrix_distribution();
+  assemble(hypreIJ);
 
-  fem_assembly(hypreIJ);
+  matrix_t matrix;
+  matrix.rowStart = row_start;
+  matrix.rowEnd = row_end;
 
-  auto matrix = new matrix_t();
-
-  {
-
-    const int numRows = row_end - row_start + 1;
-
+    const int numRows = static_cast<int>(row_end - row_start + 1);
     {
       long long numRowsBigSum;
       long long numRowsBig = numRows;
@@ -292,13 +271,13 @@ SEMFEMSolver_t::matrix_t *SEMFEMSolver_t::build(const int N_,
                  "hypreWrapper::BigInt too small!");
     }
 
-    hypreWrapper::BigInt *ownedRows = (hypreWrapper::BigInt *)calloc(numRows, sizeof(hypreWrapper::BigInt));
+    auto ownedRows = (hypreWrapper::BigInt *)calloc(numRows, sizeof(hypreWrapper::BigInt));
     int ctr = 0;
     for (long long row = row_start; row <= row_end; ++row) {
       ownedRows[ctr++] = row;
     }
 
-    hypreWrapper::Int *ncols = (hypreWrapper::Int *)calloc(numRows, sizeof(hypreWrapper::Int));
+    auto ncols = (hypreWrapper::Int *)calloc(numRows, sizeof(hypreWrapper::Int));
     hypreIJ.MatrixGetRowCounts(numRows, ownedRows, ncols);
 
     int nnz = 0;
@@ -306,14 +285,13 @@ SEMFEMSolver_t::matrix_t *SEMFEMSolver_t::build(const int N_,
       nnz += ncols[i];
     }
 
-    // construct COO matrix from Hypre matrix
-    hypreWrapper::BigInt *hAj = (hypreWrapper::BigInt *)calloc(nnz, sizeof(hypreWrapper::BigInt));
-    hypreWrapper::Real *hAv = (hypreWrapper::Real *)calloc(nnz, sizeof(hypreWrapper::Real));
+    auto hAj = (hypreWrapper::BigInt *)calloc(nnz, sizeof(hypreWrapper::BigInt));
+    auto hAv = (hypreWrapper::Real *)calloc(nnz, sizeof(hypreWrapper::Real));
     hypreIJ.MatrixGetValues(-numRows, ncols, ownedRows, &hAj[0], &hAv[0]);
 
-    long long *Ai = (long long *)calloc(nnz, sizeof(long long));
-    long long *Aj = (long long *)calloc(nnz, sizeof(long long));
-    double *Av = (double *)calloc(nnz, sizeof(double));
+    auto Ai = (long long *)calloc(nnz, sizeof(long long));
+    auto Aj = (long long *)calloc(nnz, sizeof(long long));
+    auto Av = (double *)calloc(nnz, sizeof(double));
     for (int n = 0; n < nnz; ++n) {
       Aj[n] = hAj[n];
       Av[n] = hAv[n];
@@ -334,39 +312,38 @@ SEMFEMSolver_t::matrix_t *SEMFEMSolver_t::build(const int N_,
     double dropTol = 0.0;
     platform->options.getArgs("AMG DROP TOLERANCE", dropTol);
 
-    int nnzTol = 0;
+    matrix.nnz = 0;
     for (int n = 0; n < nnz; ++n) {
       if (std::abs(Av[n]) > dropTol) {
-        nnzTol++;
+        matrix.nnz++;
       }
     }
 
-    long long *AiTol = (long long *)calloc(nnzTol, sizeof(long long));
-    long long *AjTol = (long long *)calloc(nnzTol, sizeof(long long));
-    double *AvTol = (double *)calloc(nnzTol, sizeof(double));
+    matrix.dofMap.resize(numRows);
+    for (dlong idx = 0; idx < n_xyze; idx++) {
+      if ((row_start <= glo_num[idx]) && (glo_num[idx] <= row_end)) {
+        matrix.dofMap[glo_num[idx] - row_start] = idx;
+      }
+    }
+
+    matrix.Ai.resize(matrix.nnz);
+    matrix.Aj.resize(matrix.nnz);
+    matrix.Av.resize(matrix.nnz);
 
     int idx = 0;
     for (int n = 0; n < nnz; ++n) {
       if (std::abs(Av[n]) > dropTol) {
-        AiTol[idx] = Ai[n];
-        AjTol[idx] = Aj[n];
-        AvTol[idx] = Av[n];
+        matrix.Ai [idx] = Ai[n];
+        matrix.Aj [idx] = Aj[n];
+        matrix.Av [idx] = Av[n];
         idx++;
       }
     }
-
     free(Ai);
     free(Aj);
     free(Av);
 
-    matrix->Ai = AiTol;
-    matrix->Aj = AjTol;
-    matrix->Av = AvTol;
-    matrix->nnz = nnzTol;
-    matrix->rowStart = row_start;
-    matrix->rowEnd = row_end;
-    matrix->dofMap = dof_map;
-  }
+  free(glo_num);
 
   return matrix;
 }
@@ -374,17 +351,14 @@ SEMFEMSolver_t::matrix_t *SEMFEMSolver_t::build(const int N_,
 namespace
 {
 
-/* FEM Assembly definition */
-void matrix_distribution()
+/*
+ * Ranks the global numbering array after removing the Dirichlet nodes
+ * which is then used in the assembly of the matrices to map grid points 
+ * to rows of the matrix
+ */
+void distribute_matrix()
 {
-  /*
-   * Ranks the global numbering array after removing the Dirichlet nodes
-   * which is then used in the assembly of the matrices to map degrees of
-   * freedom to rows of the matrix
-   */
 
-  int idx;
-  buffer my_buffer;
   long long idx_start = n_xyze;
   long long scan_out[2], scan_buf[2];
   comm_scan(scan_out, &comm, gs_long_long, gs_add, &idx_start, 1, scan_buf);
@@ -392,8 +366,8 @@ void matrix_distribution()
 
   glo_num = (long long *)malloc(n_xyze * sizeof(long long));
 
-  for (idx = 0; idx < n_xyze; idx++) {
-    if (pmask[idx] > 0.0) {
+  for (int idx = 0; idx < n_xyze; idx++) {
+    if (pmask[idx]) {
       glo_num[idx] = idx_start + (long long)idx;
     } else {
       glo_num[idx] = -1;
@@ -406,7 +380,7 @@ void matrix_distribution()
   long long maximum_value_local = 0;
   long long maximum_value = 0;
 
-  for (idx = 0; idx < n_xyze; idx++) {
+  for (int idx = 0; idx < n_xyze; idx++) {
     maximum_value_local = (glo_num[idx] > maximum_value_local) ? glo_num[idx] : maximum_value_local;
   }
 
@@ -424,7 +398,7 @@ void matrix_distribution()
   ranking_transfer.n = n_xyze;
   struct ranking_tuple *ranking_tuple_array = (struct ranking_tuple *)ranking_transfer.ptr;
 
-  for (idx = 0; idx < ranking_transfer.n; idx++) {
+  for (int idx = 0; idx < ranking_transfer.n; idx++) {
     ranking_tuple_array[idx].rank = glo_num[idx];
     ranking_tuple_array[idx].proc = glo_num[idx] / nstar;
     ranking_tuple_array[idx].idx = idx;
@@ -435,6 +409,7 @@ void matrix_distribution()
   sarray_transfer(ranking_tuple, &ranking_transfer, proc, 1, &crystal_router_handle);
   ranking_tuple_array = (struct ranking_tuple *)ranking_transfer.ptr;
 
+  buffer my_buffer;
   buffer_init(&my_buffer, 1);
   sarray_sort(ranking_tuple, ranking_transfer.ptr, ranking_transfer.n, rank, 1, &my_buffer);
 
@@ -442,7 +417,7 @@ void matrix_distribution()
   long long current_count = 0;
   ranking_tuple_array[0].rank = current_count;
 
-  for (idx = 1; idx < ranking_transfer.n; idx++) {
+  for (int idx = 1; idx < ranking_transfer.n; idx++) {
 
     if (ranking_tuple_array[idx].rank > current_rank) {
       current_count++;
@@ -461,7 +436,7 @@ void matrix_distribution()
   comm_scan(scan_out, &comm, gs_long_long, gs_add, &current_count, 1, scan_buf);
   rank_start = scan_out[0];
 
-  for (idx = 0; idx < ranking_transfer.n; idx++) {
+  for (int idx = 0; idx < ranking_transfer.n; idx++) {
     ranking_tuple_array[idx].rank += rank_start;
   }
 
@@ -471,7 +446,7 @@ void matrix_distribution()
   buffer_init(&my_buffer, 1);
   sarray_sort(ranking_tuple, ranking_transfer.ptr, ranking_transfer.n, idx, 0, &my_buffer);
 
-  for (idx = 0; idx < n_xyze; idx++) {
+  for (int idx = 0; idx < n_xyze; idx++) {
     glo_num[idx] = ranking_tuple_array[idx].rank;
   }
 
@@ -479,10 +454,9 @@ void matrix_distribution()
   crystal_free(&crystal_router_handle);
 }
 
-void construct_coo_graph()
+/* Mesh connectivity (Can be changed to fill-out or one-per-vertex) */
+COOGraph construct_coo_graph()
 {
-
-  /* Mesh connectivity (Can be changed to fill-out or one-per-vertex) */
   constexpr int num_fem = 8;
   int v_coord[8][3];
   int t_map[8][4];
@@ -529,7 +503,7 @@ void construct_coo_graph()
     for (auto &&idx_row_lookup_and_col_lookups : rowIdxToColIdxMap) {
       auto row_lookup = idx_row_lookup_and_col_lookups.first;
       for (auto &&col_lookup : idx_row_lookup_and_col_lookups.second) {
-        if (pmask[e * n_xyz + row_lookup] > 0.0 && pmask[e * n_xyz + col_lookup] > 0.0) {
+        if (pmask[e * n_xyz + row_lookup] && pmask[e * n_xyz + col_lookup]) {
           long long row = glo_num[e * n_xyz + row_lookup];
           long long col = glo_num[e * n_xyz + col_lookup];
           graph[row].emplace(col);
@@ -537,56 +511,54 @@ void construct_coo_graph()
       }
     }
   }
-  const int nrows = graph.size();
-  long long *rows = (long long *)malloc(nrows * sizeof(long long));
-  long long *rowOffsets = (long long *)malloc((nrows + 1) * sizeof(long long));
-  int *ncols = (int *)malloc(nrows * sizeof(int));
-  long long nnz = 0;
-  long long ctr = 0;
 
+  COOGraph coo_graph;
+  coo_graph.nrows = graph.size();
+  coo_graph.rows.resize(coo_graph.nrows);
+  coo_graph.rowOffsets.resize(coo_graph.nrows + 1);
+  coo_graph.ncols.resize(coo_graph.nrows);
+
+  coo_graph.nnz = 0;
+  long long ctr = 0;
   for (auto &&row_and_colset : graph) {
-    rows[ctr++] = row_and_colset.first;
-    nnz += row_and_colset.second.size();
+    coo_graph.rows[ctr++] = row_and_colset.first;
+    coo_graph.nnz += row_and_colset.second.size();
   }
-  long long *cols = (long long *)malloc(nnz * sizeof(long long));
-  float *vals = (float *)calloc(nnz, sizeof(float));
-  std::sort(rows, rows + nrows);
+
+  coo_graph.cols.resize(coo_graph.nnz);
+  coo_graph.vals.resize(coo_graph.nnz);
+
+  std::sort(coo_graph.rows.begin(), coo_graph.rows.end());
   long long entryCtr = 0;
-  rowOffsets[0] = 0;
-  for (auto localrow = 0; localrow < nrows; ++localrow) {
-    const long long row = rows[localrow];
+  coo_graph.rowOffsets[0] = 0;
+  for (auto localrow = 0; localrow < coo_graph.nrows; ++localrow) {
+    const auto row = coo_graph.rows[localrow];
     const auto &colset = graph[row];
     const auto size = colset.size();
-    ncols[localrow] = size;
-    rowOffsets[localrow + 1] = rowOffsets[localrow] + size;
+    coo_graph.ncols[localrow] = size;
+    coo_graph.rowOffsets[localrow + 1] = coo_graph.rowOffsets[localrow] + size;
     for (auto &&col : colset) {
-      cols[entryCtr++] = col;
+      coo_graph.cols[entryCtr++] = col;
     }
   }
 
-  coo_graph.nrows = nrows;
-  coo_graph.nnz = nnz;
-  coo_graph.rows = rows;
-  coo_graph.rowOffsets = rowOffsets;
-  coo_graph.ncols = ncols;
-  coo_graph.vals = vals;
-  coo_graph.cols = cols;
+  return coo_graph;
 }
 
-void fem_assembly_host(hypreWrapper::IJ_t &hypreIJ)
+void fem_assembly_host(hypreWrapper::IJ_t &hypreIJ, COOGraph& coo_graph)
 {
-
-  const int nrows = coo_graph.nrows;
-  long long *rows = coo_graph.rows;
-  long long *rowOffsets = coo_graph.rowOffsets;
-  int *ncols = coo_graph.ncols;
-  long long *cols = coo_graph.cols;
-  float *vals = coo_graph.vals;
+  const auto nrows = coo_graph.nrows;
+  auto& rows = coo_graph.rows;
+  auto& rowOffsets = coo_graph.rowOffsets;
+  auto& ncols = coo_graph.ncols;
+  auto& cols = coo_graph.cols;
+  auto& vals = coo_graph.vals;
 
   double q_r[4][3];
   double q_w[4];
   int v_coord[8][3];
   int t_map[8][4];
+
   quadrature_rule(q_r, q_w);
   mesh_connectivity(v_coord, t_map);
 
@@ -680,15 +652,15 @@ void fem_assembly_host(hypreWrapper::IJ_t &hypreIJ)
             }
             for (int i = 0; i < n_dim + 1; i++) {
               for (int j = 0; j < n_dim + 1; j++) {
-                if ((pmask[idx[t_map[t][i]] + e * n_x * n_x * n_x] > 0.0) &&
-                    (pmask[idx[t_map[t][j]] + e * n_x * n_x * n_x] > 0.0)) {
-                  long long row = glo_num[idx[t_map[t][i]] + e * n_x * n_x * n_x];
-                  long long col = glo_num[idx[t_map[t][j]] + e * n_x * n_x * n_x];
-                  long long local_row_id = bisection_search_index(rows, row, 0, nrows);
-                  long long start = rowOffsets[local_row_id];
-                  long long end = rowOffsets[local_row_id + 1];
+                if (pmask[idx[t_map[t][i]] + e * n_x * n_x * n_x] &&
+                    pmask[idx[t_map[t][j]] + e * n_x * n_x * n_x]) {
+                  const auto row = glo_num[idx[t_map[t][i]] + e * n_x * n_x * n_x];
+                  const auto col = glo_num[idx[t_map[t][j]] + e * n_x * n_x * n_x];
+                  const auto local_row_id = bisection_search_index(rows.data(), row, 0, nrows);
+                  const auto start = rowOffsets[local_row_id];
+                  const auto end = rowOffsets[local_row_id + 1];
 
-                  long long id = linear_search_index(cols, col, start, end);
+                  const auto id = linear_search_index(cols.data(), col, start, end);
                   vals[id] += lambda0 * A_loc[i][j];
                 }
               }
@@ -699,50 +671,49 @@ void fem_assembly_host(hypreWrapper::IJ_t &hypreIJ)
     }
   }
 
-  int err = hypreIJ.MatrixAddToValues(nrows, ncols, rows, cols, vals);
+  int err = hypreIJ.MatrixAddToValues(nrows, ncols.data(), rows.data(), cols.data(), vals.data());
   nekrsCheck(err != 0, comm.c, EXIT_FAILURE, "%s\n", "hypreWrapper::IJMatrixAddToValues failed!");
 
-  free(rows);
-  free(rowOffsets);
-  free(ncols);
-  free(cols);
-  free(vals);
   free(x);
   free(y);
   free(z);
 }
 
-void fem_assembly_device(hypreWrapper::IJ_t &hypreIJ)
+void fem_assembly_device(hypreWrapper::IJ_t &hypreIJ, COOGraph& coo_graph)
 {
+  const auto nrows = coo_graph.nrows;
+  auto& rows = coo_graph.rows;
+  auto& rowOffsets = coo_graph.rowOffsets;
+  auto& ncols = coo_graph.ncols;
+  auto& cols = coo_graph.cols;
+  auto& vals = coo_graph.vals;
 
-  const int nrows = coo_graph.nrows;
-  long long *rows = coo_graph.rows;
-  long long *rowOffsets = coo_graph.rowOffsets;
-  int *ncols = coo_graph.ncols;
-  long long nnz = coo_graph.nnz;
-  long long *cols = coo_graph.cols;
-  float *vals = coo_graph.vals;
+  const auto nnz = coo_graph.nnz;
 
-  occa::memory o_mask = platform->device.malloc<double>(n_xyze);
+  occa::memory o_mask = platform->device.malloc<int>(n_xyze);
   o_mask.copyFrom(pmask);
 
   occa::memory o_glo_num = platform->device.malloc<long long>(n_xyze);
   o_glo_num.copyFrom(glo_num);
 
   occa::memory o_rows = platform->device.malloc<long long>(nrows);
-  o_rows.copyFrom(rows);
+  o_rows.copyFrom(rows.data());
 
   occa::memory o_rowOffsets = platform->device.malloc<long long>((nrows + 1));
-  o_rowOffsets.copyFrom(rowOffsets);
+  o_rowOffsets.copyFrom(rowOffsets.data());
 
   occa::memory o_cols = platform->device.malloc<long long>(nnz);
-  o_cols.copyFrom(cols);
+  o_cols.copyFrom(cols.data());
 
   occa::memory o_vals = platform->device.malloc<float>(nnz);
-  o_vals.copyFrom(vals);
+  o_vals.copyFrom(vals.data());
 
+
+  static occa::kernel computeStiffnessMatrixKernel;
+  if (!computeStiffnessMatrixKernel.isInitialized()) 
+    computeStiffnessMatrixKernel = platform->kernelRequests.load("computeStiffnessMatrix");
   computeStiffnessMatrixKernel(n_elem,
-                               (int)nrows,
+                               nrows,
                                o_x,
                                o_y,
                                o_z,
@@ -752,39 +723,30 @@ void fem_assembly_device(hypreWrapper::IJ_t &hypreIJ)
                                o_rowOffsets,
                                o_cols,
                                o_vals);
-  o_vals.copyTo(vals, nnz);
+  o_vals.copyTo(vals.data(), nnz);
 
-  int err = hypreIJ.MatrixAddToValues(nrows, ncols, rows, cols, vals);
+  int err = hypreIJ.MatrixAddToValues(nrows, ncols.data(), rows.data(), cols.data(), vals.data());
   nekrsCheck(err != 0, comm.c, EXIT_FAILURE, "%s\n", "hypreWrapper::IJMatrixAddToValues failed!");
-
-  free(rows);
-  free(rowOffsets);
-  free(ncols);
-  free(cols);
-  free(vals);
 }
 
-void fem_assembly(hypreWrapper::IJ_t &hypreIJ)
+/*
+ * Assembles the low-order FEM matrices from the spectral element mesh
+ */
+void assemble(hypreWrapper::IJ_t &hypreIJ)
 {
-  /*
-   * Assembles the low-order FEM matrices from the spectral element mesh
-   *
-   * Returns A_fem and B_fem
-   */
-
-  /* Variables */
   double tStart = MPI_Wtime();
   if (comm.id == 0) {
     printf("building matrix ... ");
   }
-  int idx;
+
+  distribute_matrix();
 
   row_start = 0;
   row_end = 0;
 
-  for (idx = 0; idx < n_xyze; idx++) {
+  for (int idx = 0; idx < n_xyze; idx++) {
     if (glo_num[idx] >= 0) {
-      row_end = maximum(row_end, glo_num[idx]);
+      row_end = std::max(row_end, glo_num[idx]);
     }
   }
 
@@ -794,34 +756,19 @@ void fem_assembly(hypreWrapper::IJ_t &hypreIJ)
     row_start = scan_out[0] + 1;
   }
 
-  num_loc_dofs = row_end - row_start + 1;
-
-  dof_map = (long long *)malloc(num_loc_dofs * sizeof(long long));
-
-  for (idx = 0; idx < n_xyze; idx++) {
-    if ((row_start <= glo_num[idx]) && (glo_num[idx] <= row_end)) {
-      dof_map[glo_num[idx] - row_start] = idx;
-    }
-  }
-
   /* Assemble FE matrices with boundary conditions applied */
   hypreIJ.MatrixCreate(comm.c, row_start, row_end, row_start, row_end);
   hypreIJ.MatrixSetObjectType();
   hypreIJ.MatrixInitialize();
 
-  construct_coo_graph();
-
+  auto coo_graph = construct_coo_graph();
   if (constructOnHost) {
-    fem_assembly_host(hypreIJ);
+    fem_assembly_host(hypreIJ, coo_graph);
   } else {
-    fem_assembly_device(hypreIJ);
+    fem_assembly_device(hypreIJ, coo_graph);
   }
+  hypreIJ.MatrixAssemble();
 
-  {
-    hypreIJ.MatrixAssemble();
-  }
-
-  free(glo_num);
 
   MPI_Barrier(comm.c);
   if (comm.id == 0) {
@@ -829,14 +776,8 @@ void fem_assembly(hypreWrapper::IJ_t &hypreIJ)
   }
 }
 
-void load()
-{
-  computeStiffnessMatrixKernel = platform->kernelRequests.load("computeStiffnessMatrix");
-}
-
 void mesh_connectivity(int v_coord[8][3], int t_map[8][4])
 {
-
   (v_coord)[0][0] = 0;
   (v_coord)[0][1] = 0;
   (v_coord)[0][2] = 0;

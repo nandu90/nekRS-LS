@@ -40,40 +40,35 @@ public:
   SEMFEMSolver_t(elliptic_t *);
   ~SEMFEMSolver_t();
 
-  void run(occa::memory &, occa::memory &);
+  void run(const occa::memory &, occa::memory &);
 
 private:
-  dlong numRowsSEMFEM;
   occa::memory o_dofMap;
-  occa::memory o_SEMFEMBuffer1;
-  occa::memory o_SEMFEMBuffer2;
-  void *SEMFEMBuffer1_h_d;
-  void *SEMFEMBuffer2_h_d;
+
   void *boomerAMG = nullptr;
   AMGX_t *AMGX = nullptr;
-
-  elliptic_t *elliptic;
+  elliptic_t *elliptic = nullptr;
 
   struct matrix_t {
-    long long *Ai;
-    long long *Aj;
-    double *Av;
     int nnz;
     long long rowStart;
     long long rowEnd;
-    long long *dofMap;
+
+    std::vector<long long> Ai;
+    std::vector<long long> Aj;
+    std::vector<double> Av;
+    std::vector<dlong> dofMap;
   };
 
-  matrix_t *build(const int N_,
-                  const int n_elem_,
-                  occa::memory _o_x,
-                  occa::memory _o_y,
-                  occa::memory _o_z,
-                  double *pmask_,
-                  double lambda,
-                  hypreWrapper::IJ_t &hypreIJ,
-                  MPI_Comm comm,
-                  long long int *gatherGlobalNodes);
+  matrix_t build(const int N_,
+                 const int n_elem_,
+                 occa::memory _o_x,
+                 occa::memory _o_y,
+                 occa::memory _o_z,
+                 const std::vector<int>& pmask_,
+                 double lambda,
+                 MPI_Comm comm,
+                 long long int *gatherGlobalNodes);
 };
 
 #endif

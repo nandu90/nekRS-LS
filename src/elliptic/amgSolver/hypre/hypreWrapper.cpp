@@ -1,3 +1,5 @@
+#include <string>
+#include <stdexcept>
 #include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -196,9 +198,8 @@ boomerAMG_t::boomerAMG_t(int _nRows,
 
   const int err = HYPRE_BoomerAMGSetup(*solver, par_A, par_b, par_x);
   if (err > 0) {
-    if (rank == 0)
-      printf("HYPRE_BoomerAMGSetup failed with %d!\n", err);
-    MPI_Abort(comm, err);
+    std::string txt = "HYPRE_BoomerAMGSetup failed with " + std::to_string(err);
+    throw std::runtime_error(txt);
   }
 
 #ifdef _OPENMP
@@ -232,9 +233,8 @@ void __attribute__((visibility("default"))) boomerAMG_t::solve(void *bin, void *
 
   const int err = HYPRE_BoomerAMGSolve(*solver, par_A, par_b, par_x);
   if (err > 0) {
-    if (rank == 0)
-      printf("HYPRE_BoomerAMGSolve failed with %d!\n", err);
-    MPI_Abort(comm, err);
+    std::string txt = "HYPRE_BoomerAMGSolve failed with " + std::to_string(err);
+    throw std::runtime_error(txt);
   }
 #ifdef _OPENMP
   omp_set_num_threads(_Nthreads);

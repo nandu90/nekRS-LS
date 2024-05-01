@@ -1,5 +1,5 @@
 @kernel void scatter(const dlong numRows,
-                     @ restrict const hlong *dof_map,
+                     @ restrict const dlong *dof_map,
                      @ restrict const pfloat *z,
                      @ restrict pfloat *buffer)
 {

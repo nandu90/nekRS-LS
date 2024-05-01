@@ -198,7 +198,6 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
 
   if (options.compareArgs("MULTIGRID COARSE SOLVE", "TRUE")) {
     if (options.compareArgs("MULTIGRID SEMFEM", "TRUE")) {
-
       precon->SEMFEMSolver = new SEMFEMSolver_t(ellipticCoarse);
       if (options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE")) {
         auto baseLevel = (pMGLevel *)levels[numMGLevels - 1];
@@ -206,24 +205,24 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
         precon->MGSolver->coarseLevel->solvePtr =
             [elliptic, baseLevel](MGSolver_t::coarseLevel_t *coarseLevel,
                                   occa::memory &o_rhs,
-                                  occa::memory &o_x) {
-              occa::memory o_res = baseLevel->o_res;
+                                  occa::memory &o_x) 
+            {
+              auto& o_res = baseLevel->o_res;
               baseLevel->smooth(o_rhs, o_x, true);
               baseLevel->residual(o_rhs, o_x, o_res);
               
-              auto o_tmp = platform->o_memPool.reserve<pfloat>(baseLevel->Nrows); 
-              auto precon = elliptic->precon;
-              precon->SEMFEMSolver->run(o_res, o_tmp);
+              auto o_tmp = platform->o_memPool.reserve<pfloat>(o_x.size()); 
+              elliptic->precon->SEMFEMSolver->run(o_res, o_tmp);
 
-              platform->linAlg->paxpby(baseLevel->Nrows, 1.0, o_tmp, 1.0, o_x);
+              platform->linAlg->paxpby(o_x.size(), 1.0, o_tmp, 1.0, o_x);
               baseLevel->smooth(o_rhs, o_x, false);
             };
       }
       else {
         precon->MGSolver->coarseLevel->solvePtr =
-            [elliptic](MGSolver_t::coarseLevel_t *, occa::memory &o_rhs, occa::memory &o_x) {
-              auto precon = elliptic->precon;
-              precon->SEMFEMSolver->run(o_rhs, o_x);
+            [elliptic](MGSolver_t::coarseLevel_t *, occa::memory &o_rhs, occa::memory &o_x) 
+            {
+              elliptic->precon->SEMFEMSolver->run(o_rhs, o_x);
             };
       }
     }

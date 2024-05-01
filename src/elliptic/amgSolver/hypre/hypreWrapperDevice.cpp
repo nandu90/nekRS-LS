@@ -39,10 +39,8 @@ boomerAMG_t::boomerAMG_t(int _nRows,
   MPI_Comm_rank(comm, &rank);
 
   if (sizeof(HYPRE_Real) != ((useFP32) ? sizeof(float) : sizeof(double))) {
-    if (rank == 0) {
-      printf("hypreWrapperDevice: HYPRE floating point precision does not match!\n");
-      MPI_Abort(comm, 1);
-    }
+    std::string txt = hypreWrapperDevice: HYPRE floating point precision does not match!; 
+    throw std::runtime_error(txt);
   }
 
   if ((int)param[0]) {
@@ -241,9 +239,8 @@ boomerAMG_t::boomerAMG_t(int _nRows,
   HYPRE_IJMatrixGetObject(*A, (void **)&par_A);
   const int err = HYPRE_BoomerAMGSetup(*solver, par_A, par_b, par_x);
   if (err > 0) {
-    if (rank == 0)
-      printf("HYPRE_BoomerAMGDeviceSetup failed with %d!\n", err);
-    MPI_Abort(comm, err);
+    std::string txt = "HYPRE_BoomerAMGDeviceSetup failed with " + std::to_string(err); 
+    throw std::runtime_error(txt);
   }
 
   HYPREinit = 1;
@@ -272,9 +269,8 @@ boomerAMG_t::solve(const occa::memory &o_b, const occa::memory &o_x)
 
   const int err = HYPRE_BoomerAMGSolve(*solver, par_A, par_b, par_x);
   if (err > 0) {
-    if (rank == 0)
-      printf("HYPRE_BoomerAMGDeviceSolve failed with %d!\n", err);
-    MPI_Abort(comm, err);
+    std::string txt = "HYPRE_BoomerAMGDeviceSolve failed with " + std::to_string(err); 
+    throw std::runtime_error(txt);
   }
 
   // sync copy (blocks host until buffer is ready)
@@ -316,21 +312,15 @@ boomerAMG_t::boomerAMG_t(int nrows,
                    const double *param,
                    int verbose)
 {
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (rank == 0)
-    printf("ERROR: HYPRE+DEVICE not enabled! Recompile with -DENABLE_HYPRE_GPU=ON\n");
-  MPI_Abort(MPI_COMM_WORLD, 1);
+  std::string txt = "HYPRE+DEVICE not enabled! Recompile with -DENABLE_HYPRE_GPU=ON";
+  throw std::runtime_error(txt);
 }
 
 void __attribute__((visibility("default")))
 boomerAMG_t::solve(const occa::memory &o_b, const occa::memory &o_x)
 {
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (rank == 0)
-    printf("ERROR: HYPRE+DEVICE not enabled! Recompile with -DENABLE_HYPRE_GPU=ON\n");
-  MPI_Abort(MPI_COMM_WORLD, 1);
+  std::string txt = "HYPRE+DEVICE not enabled! Recompile with -DENABLE_HYPRE_GPU=ON";
+  throw std::runtime_error(txt);
 }
 
 __attribute__((visibility("default"))) boomerAMG_t::~boomerAMG_t()
