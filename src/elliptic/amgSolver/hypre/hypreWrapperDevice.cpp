@@ -39,7 +39,7 @@ boomerAMG_t::boomerAMG_t(int _nRows,
   MPI_Comm_rank(comm, &rank);
 
   if (sizeof(HYPRE_Real) != ((useFP32) ? sizeof(float) : sizeof(double))) {
-    std::string txt = hypreWrapperDevice: HYPRE floating point precision does not match!; 
+    std::string txt = "hypreWrapperDevice: HYPRE floating point precision does not match!"; 
     throw std::runtime_error(txt);
   }
 

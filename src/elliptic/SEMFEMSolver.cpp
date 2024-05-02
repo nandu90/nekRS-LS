@@ -64,8 +64,8 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
     settings[12] = 0.3; /* chebyRelaxFraction */
 
     if (elliptic->options.compareArgs("MULTIGRID SEMFEM", "TRUE") && elliptic->mesh->N == 1) {
-      settings[4] = 16;
       settings[6] = 16;
+      settings[4] = settings[6];
     }
 
     platform->options.getArgs("BOOMERAMG COARSEN TYPE", settings[1]);
