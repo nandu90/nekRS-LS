@@ -557,11 +557,11 @@ void *udfLoadFunction(const char *fname, int errchk)
 void udfLoad()
 {
   *(void **)(&udf.setup0) = udfLoadFunction("UDF_Setup0", 0);
-  *(void **)(&udf.setup) = udfLoadFunction("UDF_Setup", 0);
+  *(void **)(&udf.setup) = udfLoadFunction("UDF_Setup", 1);
   *(void **)(&udf.loadKernels) = udfLoadFunction("UDF_LoadKernels", 0);
   *(void **)(&udf.autoloadKernels) = udfLoadFunction("UDF_AutoLoadKernels", 0);
   *(void **)(&udf.autoloadPlugins) = udfLoadFunction("UDF_AutoLoadPlugins", 1);
-  *(void **)(&udf.executeStep) = udfLoadFunction("UDF_ExecuteStep", 0);
+  *(void **)(&udf.executeStep) = udfLoadFunction("UDF_ExecuteStep", 1);
 }
 
 void udfEcho()
