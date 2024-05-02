@@ -409,6 +409,7 @@ endif()
 
 include(cmake/install_kernels.cmake)
 
+install(FILES LICENSE RELEASE.md README.md DESTINATION .)
 install(FILES ${CMAKE_BINARY_DIR}/nekrsSys.hpp DESTINATION include/core)
 install(DIRECTORY src/ DESTINATION include FILES_MATCHING REGEX "\.hpp$|\.h$|\.tpp$")
 install(FILES src/udf/CMakeLists.txt DESTINATION udf)
