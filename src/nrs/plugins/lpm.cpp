@@ -379,7 +379,8 @@ void lpm_t::initialize(int nParticles, double t0, const std::vector<dfloat> &y0)
              y0.size(),
              nParticles * nDOFs_);
 
-  auto o_y0 = platform->device.malloc<dfloat>(y0.size(), y0.data());
+  auto o_y0 = platform->device.malloc<dfloat>(y0.size());
+  o_y0.copyFrom(y0.data());
   this->initialize(nParticles, t0, o_y0);
 }
 
@@ -1362,8 +1363,10 @@ void lpm_t::addParticles(int newNParticles,
              ydotNewPart.size(),
              expectedYdotSize);
 
-  auto o_yNewPart = platform->device.malloc<dfloat>(expectedYSize, yNewPart.data());
-  auto o_propNewPart = platform->device.malloc<dfloat>(expectedPropSize, propNewPart.data());
+  auto o_yNewPart = platform->device.malloc<dfloat>(expectedYSize);
+  o_yNewPart.copyFrom(yNewPart.data());
+  auto o_propNewPart = platform->device.malloc<dfloat>(expectedPropSize);
+  o_propNewPart.copyFrom(propNewPart.data());
   auto o_ydotNewPart = platform->device.malloc<dfloat>(expectedYdotSize);
 
   addParticles(newNParticles, o_yNewPart, o_propNewPart, o_ydotNewPart);

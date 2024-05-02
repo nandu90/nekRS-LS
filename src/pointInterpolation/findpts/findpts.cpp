@@ -190,18 +190,13 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
     std::free(buffer);
   }
 
-  occa::properties props;
-  props["host"] = true;
-
   const auto NbytesR = dim * pn * sizeof(dfloat);
   if (NbytesR > pool::h_r.size()) {
     if (pool::h_r.size()) {
       pool::h_r.free();
     }
-    void *buffer = std::calloc(NbytesR, 1);
-    pool::h_r = platform->device.malloc(NbytesR, buffer, props);
+    pool::h_r = platform->device.mallocHost(NbytesR);
     pool::r = (dfloat *)pool::h_r.ptr();
-    std::free(buffer);
   }
 
   const auto NbytesEl = pn * sizeof(dlong);
@@ -209,10 +204,8 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
     if (pool::h_el.size()) {
       pool::h_el.free();
     }
-    void *buffer = std::calloc(NbytesEl, 1);
-    pool::h_el = platform->device.malloc(NbytesEl, buffer, props);
+    pool::h_el = platform->device.mallocHost(NbytesEl);
     pool::el = (dlong *)pool::h_el.ptr();
-    std::free(buffer);
   }
 
   const auto NbytesCode = pn * sizeof(dlong);
@@ -220,10 +213,8 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
     if (pool::h_code.size()) {
       pool::h_code.free();
     }
-    void *buffer = std::calloc(NbytesCode, 1);
-    pool::h_code = platform->device.malloc(NbytesCode, buffer, props);
+    pool::h_code = platform->device.mallocHost(NbytesCode);
     pool::code = (dlong *)pool::h_code.ptr();
-    std::free(buffer);
   }
 
   const auto NbytesDist2 = pn * sizeof(dfloat);
@@ -231,10 +222,8 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
     if (pool::h_dist2.size()) {
       pool::h_dist2.free();
     }
-    void *buffer = std::calloc(NbytesDist2, 1);
-    pool::h_dist2 = platform->device.malloc(NbytesDist2, buffer, props);
+    pool::h_dist2 = platform->device.mallocHost(NbytesDist2);
     pool::dist2 = (dfloat *)pool::h_dist2.ptr();
-    std::free(buffer);
   }
 
   const auto NbytesOut = nOutputFields * outputOffset * sizeof(dfloat);
@@ -242,10 +231,8 @@ static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
     if (pool::h_out.size()) {
       pool::h_out.free();
     }
-    void *buffer = std::calloc(NbytesOut, 1);
-    pool::h_out = platform->device.malloc(NbytesOut, buffer, props);
+    pool::h_out = platform->device.mallocHost(NbytesOut);
     pool::out = (dfloat *)pool::h_out.ptr();
-    std::free(buffer);
   }
 }
 } // namespace pool

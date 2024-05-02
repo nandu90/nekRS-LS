@@ -247,15 +247,18 @@ occa::memory device_t::mallocHost(size_t Nbytes)
   props["host"] = true;
 
   void *buffer = std::calloc(Nbytes, 1);
-  occa::memory h_scratch = _device.malloc(Nbytes, buffer, props);
+  occa::memory h_scratch = _device.malloc(Nbytes, props);
+  h_scratch.copyFrom(buffer);
   std::free(buffer);
+
   return h_scratch;
 }
 
 occa::memory device_t::malloc(size_t Nbytes, const occa::properties &properties)
 {
   void *buffer = std::calloc(Nbytes, 1);
-  occa::memory o_returnValue = _device.malloc(Nbytes, buffer, properties);
+  occa::memory o_returnValue = _device.malloc(Nbytes, properties);
+  o_returnValue.copyFrom(buffer);
   std::free(buffer);
   return o_returnValue;
 }
@@ -263,27 +266,26 @@ occa::memory device_t::malloc(size_t Nbytes, const occa::properties &properties)
 occa::memory device_t::malloc(size_t Nbytes, const void *src, const occa::properties &properties)
 {
   auto props = properties;
-#if 0
   if (platform->serial) props["use_host_pointer"] = true;
-#endif
 
-  void *buffer;
-  buffer = std::calloc(Nbytes, 1);
-  const void *init_ptr = (src) ? src : buffer;
-  occa::memory o_returnValue = _device.malloc(Nbytes, init_ptr, props);
-  std::free(buffer);
+  occa::memory o_returnValue = _device.malloc(Nbytes, src, props);
   return o_returnValue;
 }
 
 occa::memory device_t::malloc(size_t Nword, size_t wordSize, const occa::memory &src)
 {
-  return _device.malloc(Nword * wordSize, src);
+  occa::properties props;
+  if (platform->serial) props["use_host_pointer"] = true;
+
+  occa::memory o_returnValue = _device.malloc(Nword * wordSize, src, props);
+  return o_returnValue;
 }
 
 occa::memory device_t::malloc(size_t Nword, size_t wordSize)
 {
   void *buffer = std::calloc(Nword, wordSize);
-  occa::memory o_returnValue = _device.malloc(Nword * wordSize, buffer);
+  occa::memory o_returnValue = _device.malloc(Nword * wordSize);
+  o_returnValue.copyFrom(buffer);
   std::free(buffer);
   return o_returnValue;
 }
