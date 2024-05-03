@@ -81,7 +81,7 @@ void UDF_Setup()
 
 void UDF_ExecuteStep(double time, int tstep)
 {
-  if (nrs->isOutputStep) {
+  if (nrs->isCheckpointStep) {
     nek::ocopyToNek(time, tstep);
     nek::userchk();
   }

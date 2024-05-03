@@ -15,8 +15,8 @@ timeStepper = tombo2
 #subCyclingSteps = 2
 dt = targetCFL=4 + max=1e-2 + initial=6e-3
 
-writeControl = simulationTime 
-writeInterval = 10
+checkpointControl = simulationTime 
+checkpointInterval = 10
 
 regularization = hpfrt + nModes=1 + scalingCoeff=10
 

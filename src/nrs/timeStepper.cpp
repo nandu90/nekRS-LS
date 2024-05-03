@@ -531,7 +531,7 @@ bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter)
   const double timeNew =
       this->timePrevious + setPrecision(this->dt[0], 5);
 
-  const int isOutputStep = this->isOutputStep;
+  const int isCheckpointStep = this->isCheckpointStep;
 
   if (this->neknek) {
     this->neknek->updateBoundary(tstep, iter, timeNew);
@@ -612,10 +612,10 @@ bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter)
 
   platform->timer.tic("udfExecuteStep", 1);
   nek::ifoutfld(0);
-  this->isOutputStep = 0;
-  if (isOutputStep && this->timeStepConverged) {
+  this->isCheckpointStep = 0;
+  if (isCheckpointStep && this->timeStepConverged) {
     nek::ifoutfld(1);
-    this->isOutputStep = 1;
+    this->isCheckpointStep = 1;
   }
   if (udf.executeStep) {
     udf.executeStep(timeNew, tstep);

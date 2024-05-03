@@ -4,7 +4,7 @@ polynomialOrder = 7
 numSteps = 100
 dt = 1e-04
 timeStepper = tombo2
-writeInterval = 20
+checkpointInterval = 20
 
 udf = "../eddy.udf"
 usr = "../inside/inside.usr"

@@ -23,12 +23,13 @@ namespace fld {
 
 extern ElementFilter elementFilter;
 
-void write(std::string suffix, double t, int step, int outXYZ, int FP64,
-           const occa::memory& o_s, int NSfields, int Nout = 0, bool uniform = false);
+void write(std::string suffix, double t, int step,
+           const std::vector<occa::memory>& o_s, 
+           bool outXYZ = true, bool FP64 = false, int Nout = 0, bool uniform = false);
 
-void write(std::string suffix, double t, int step, int outXYZ, int FP64,
-           const occa::memory& o_u, const occa::memory& o_p,  const occa::memory& o_s,
-           int NSfields, int Nout = 0, bool uniform = false);
+void write(std::string suffix, double t, int step,
+           const std::vector<occa::memory>& o_u, const occa::memory& o_p, const std::vector<occa::memory>& o_s,
+           bool outXYZ = true, bool FP64 = false, int Nout = 0, bool uniform = false);
 
 }
 

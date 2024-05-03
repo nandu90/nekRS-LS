@@ -27,11 +27,11 @@ static int rank, size;
 static MPI_Comm commg, comm;
 
 static double currDt;
-static double lastOutputTime = 0;
-static int firstOutfld = 1;
+static double lastCheckpointTime = 0;
 static int enforceLastStep = 0;
-static int enforceOutputStep = 0;
+static int enforceCheckpointStep = 0;
 static bool initialized = false;
+std::string outputMeshSave;
 
 void printFileStdout(std::string file)
 {
@@ -74,14 +74,14 @@ setupAide *setDefaultSettings(std::string casename)
   options->setArgs("STDOUT PAR", "TRUE");
   options->setArgs("STDOUT UDF", "TRUE");
 
-  options->setArgs("SOLUTION OUTPUT INTERVAL", "-1");
-  options->setArgs("SOLUTION OUTPUT CONTROL", "STEPS");
+  options->setArgs("CHECKPOINT INTERVAL", "-1");
+  options->setArgs("CHECKPOINT CONTROL", "STEPS");
+  options->setArgs("CHECKPOINT OUTPUT MESH", "FALSE");
+  options->setArgs("CHECKPOINT PRECISION", "FP32");
 
   options->setArgs("START TIME", "0.0");
 
   options->setArgs("ENABLE GS COMM OVERLAP", "TRUE");
-
-  options->setArgs("CHECKPOINT OUTPUT MESH", "FALSE");
 
   const auto dropTol = 5.0 * std::numeric_limits<pfloat>::epsilon();
   options->setArgs("AMG DROP TOLERANCE", to_string_f(setPrecision(dropTol, 2)));
@@ -101,10 +101,9 @@ namespace nekrs
 
 void reset()
 {
-  lastOutputTime = 0;
-  firstOutfld = 1;
+  lastCheckpointTime = 0;
   enforceLastStep = 0;
-  enforceOutputStep = 0;
+  enforceCheckpointStep = 0;
 }
 
 double startTime(void)
@@ -360,10 +359,10 @@ void copyFromNek(double time, int tstep)
   nek::ocopyToNek(time, tstep);
 }
 
-void udfExecuteStep(double time, int tstep, int isOutputStep)
+void udfExecuteStep(double time, int tstep, int isCheckpointStep)
 {
-  nrs->isOutputStep = isOutputStep;
-  if (nrs->isOutputStep) {
+  nrs->isCheckpointStep = isCheckpointStep;
+  if (nrs->isCheckpointStep) {
     nek::ifoutfld(1);
   }
 
@@ -375,7 +374,7 @@ void udfExecuteStep(double time, int tstep, int isOutputStep)
 
   // reset
   nek::ifoutfld(0);
-  nrs->isOutputStep = 0;
+  nrs->isCheckpointStep = 0;
 }
 
 void nekUserchk(void)
@@ -432,73 +431,54 @@ double dt(int tstep)
 double writeInterval(void)
 {
   double val = -1;
-  platform->options.getArgs("SOLUTION OUTPUT INTERVAL", val);
+  platform->options.getArgs("CHECKPOINT INTERVAL", val);
   return (val > 0) ? val : -1;
 }
 
 int writeControlRunTime(void)
 {
-  return platform->options.compareArgs("SOLUTION OUTPUT CONTROL", "SIMULATIONTIME");
+  return platform->options.compareArgs("CHECKPOINT CONTROL", "SIMULATIONTIME");
 }
 
-int outputStep(double time, int tStep)
+int checkpointStep(double time, int tStep)
 {
   int outputStep = 0;
   if (writeControlRunTime()) {
     double val;
     platform->options.getArgs("START TIME", val);
-    if (lastOutputTime == 0 && val > 0) {
-      lastOutputTime = val;
+    if (lastCheckpointTime == 0 && val > 0) {
+      lastCheckpointTime = val;
     }
-    outputStep = ((time - lastOutputTime) + 1e-10) > nekrs::writeInterval();
+    outputStep = ((time - lastCheckpointTime) + 1e-10) > nekrs::writeInterval();
   } else {
     if (writeInterval() > 0) {
       outputStep = (tStep % (int)writeInterval() == 0);
     }
   }
 
-  if (enforceOutputStep) {
-    enforceOutputStep = 0;
+  if (enforceCheckpointStep) {
+    enforceCheckpointStep = 0;
     return 1;
   }
   return outputStep;
 }
 
-void outputStep(int val)
+void checkpointStep(int val)
 {
-  nrs->isOutputStep = val;
+  nrs->isCheckpointStep = val;
 }
 
-int outputStep(double time, double dt, int tStep)
+int checkpointStep(double time, double dt, int tStep)
 {
   int innerSteps = 1;
   platform->options.getArgs("MULTIRATE STEPS", innerSteps);
-  return outputStep(time + innerSteps * dt, tStep);
+  return checkpointStep(time + innerSteps * dt, tStep);
 }
 
-void outfld(double time, int step, std::string suffix)
+void writeCheckpoint(double time, int step)
 {
-  std::string oldValue;
-  platform->options.getArgs("CHECKPOINT OUTPUT MESH", oldValue);
-
-  if (firstOutfld) {
-    platform->options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
-  }
-
-  if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
-    platform->options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
-  }
-
-  nrs->writeFld(time, step, suffix);
-  lastOutputTime = time;
-  firstOutfld = 0;
-
-  platform->options.setArgs("CHECKPOINT OUTPUT MESH", oldValue);
-}
-
-void outfld(double time, int step)
-{
-  outfld(time, step, "");
+  nrs->writeCheckpoint(time, step);
+  lastCheckpointTime = time;
 }
 
 double endTime(void)
@@ -601,7 +581,7 @@ void processUpdFile()
     std::string checkpoint;
     ini.extract("", "checkpoint", checkpoint);
     if (checkpoint == "true") {
-      enforceOutputStep = 1;
+      enforceCheckpointStep = 1;
     }
 
     std::string endTime;
@@ -628,7 +608,7 @@ void processUpdFile()
       if (rank == 0) {
         txt += "  set writeInterval = " + writeInterval + "\n";
       }
-      platform->options.setArgs("SOLUTION OUTPUT INTERVAL", writeInterval);
+      platform->options.setArgs("CHECKPOINT INTERVAL", writeInterval);
     }
 
     if (rank == 0) {

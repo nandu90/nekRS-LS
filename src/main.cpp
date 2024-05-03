@@ -223,7 +223,7 @@ int main(int argc, char** argv)
     int isLastStep = 0;
     nekrs::lastStep(isLastStep);
  
-    nekrs::udfExecuteStep(time, tStep, /* outputStep */ 0);
+    nekrs::udfExecuteStep(time, tStep, /* checkpointStep */ 0);
     nekrs::resetTimer("udfExecuteStep");
  
     double elapsedStepSum = 0;
@@ -262,11 +262,11 @@ int main(int argc, char** argv)
         dt = nekrs::finalTimeStepSize(time);
       }
 
-      int outputStep = nekrs::outputStep(time + dt, tStep);
-      if (nekrs::writeInterval() == 0) outputStep = 0;
-      if (isLastStep) outputStep = 1;
-      if (nekrs::writeInterval() < 0) outputStep = 0;
-      nekrs::outputStep(outputStep);
+      int checkpointStep = nekrs::checkpointStep(time + dt, tStep);
+      if (nekrs::writeInterval() == 0) checkpointStep = 0;
+      if (isLastStep) checkpointStep = 1;
+      if (nekrs::writeInterval() < 0) checkpointStep = 0;
+      nekrs::checkpointStep(checkpointStep);
  
       nekrs::initStep(time, dt, tStep);
       
@@ -289,7 +289,7 @@ int main(int argc, char** argv)
           nekrs::printInfo(time, tStep, false, true);
       }
  
-      if (outputStep) nekrs::outfld(time, tStep);
+      if (checkpointStep) nekrs::writeCheckpoint(time, tStep);
  
       MPI_Barrier(comm);
       const double elapsedStep = MPI_Wtime() - timeStartStep;

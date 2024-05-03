@@ -84,7 +84,7 @@ public:
   int tstep;
   int lastStep;
   int outerCorrector;
-  int isOutputStep;
+  int isCheckpointStep;
   int outputForceStep;
 
   int Nsubsteps = 0;
@@ -234,11 +234,7 @@ public:
   void Qcriterion(const occa::memory &o_U, occa::memory &o_Q);
   occa::memory Qcriterion(const occa::memory &o_U);
 
-  void writeFld(double t, int step, int Nout = 0, bool uniform = false);
-  void writeFld(double t, int step, std::string suffix, int Nout = 0, bool uniform = false);
-  void writeFld(double t, int step, int outXYZ, int FP64, int Nout = 0, bool uniform = false);
-  void
-  writeFld(double t, int step, int outXYZ, int FP64, std::string suffix, int Nout = 0, bool uniform = false);
+  void writeCheckpoint(double t, int step, bool enforceOutXYZ = false, bool enforceFP64 = false, int Nout = 0, bool uniform = false);
 
   void finalize();
   int setLastStep(double timeNew, int tstep, double elapsedTime);

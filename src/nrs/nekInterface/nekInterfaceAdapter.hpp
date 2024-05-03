@@ -109,12 +109,11 @@ namespace nek {
 void outfld(const char *filename,
             double t,
             int step,
-            int coords,
-            int FP64,
-            const occa::memory& o_u,
+            bool coords,
+            bool FP64,
+            const std::vector<occa::memory>& o_u,
             const occa::memory& o_p,
-            const occa::memory& o_s,
-            int NSfields,
+            const std::vector<occa::memory>& o_s,
             int Nro = 0,
             bool uniform = false);
 void uic(int ifield);

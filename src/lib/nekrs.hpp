@@ -20,12 +20,11 @@ void setup(MPI_Comm commg_in,
            int sessionID,
            int debug);
 void copyFromNek(double time, int tstep);
-void udfExecuteStep(double time, int tstep, int isOutputStep);
-void outfld(double time, int step);
-void outfld(double time, int step, std::string suffix);
-int outputStep(double time, int tStep);
-int outputStep(double time, double dt, int tStep);
-void outputStep(int val);
+void udfExecuteStep(double time, int tstep, int isCheckpointStep);
+void writeCheckpoint(double time, int step);
+int checkpointStep(double time, int tStep);
+int checkpointStep(double time, double dt, int tStep);
+void checkpointStep(int val);
 int finalize();
 void nekUserchk(void);
 int runTimeStatFreq();

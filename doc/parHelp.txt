@@ -51,9 +51,12 @@ dt                          <float> [D]
 subCyclingSteps             <int>, auto                                number of OIFS sub-steps for advection
                             0 [D]                             
 
-writeControl                steps [D], simulationTime,                 checkpoint frequency unit
+checkpointPrecision         <int>
+                            32[D], 64 
 
-writeInterval               <int>, <float>                             checkpoint frequency in writeControl units
+checkpointControl           steps [D], simulationTime,                 checkpoint frequency unit
+
+checkpointInterval          <int>, <float>                             checkpoint frequency in writeControl units
                             0 [D]                                      at the end of the simluation
                             -1                                         disable checkpointing 
 
@@ -181,8 +184,6 @@ connectivityTol             <float>
                             0.2 [D]
 
 file                        "<string>"                                 name of .re2 file
-
-writeToFieldFile            true, false [D]                            output mesh in all field writes
 ----------------------------------------------------------------------------------------------------------------------
 [VELOCITY]
 

@@ -90,12 +90,11 @@ namespace nek
 void outfld(const char *filename,
             double time,
             int step,
-            int coords,
-            int FP64,
-            const occa::memory &o_u,
+            bool coords,
+            bool FP64,
+            const std::vector<occa::memory>& o_u,
             const occa::memory &o_p,
-            const occa::memory &o_s,
-            int NSfields,
+            const std::vector<occa::memory>& o_s,
             int Nout, 
             bool uniform)
 {
@@ -120,22 +119,22 @@ void outfld(const char *filename,
   std::vector<double> vx;
   std::vector<double> vy;
   std::vector<double> vz;
-  if (o_u.isInitialized()) {
+  if (o_u.size()) {
     auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
 
-    auto o_vx = o_u + (0 * nrs->fieldOffset);
-    platform->copyDfloatToDoubleKernel(Nlocal, o_vx, o_tmpDouble);
-    vx.resize(Nlocal);
+    auto o_vx = o_u[0];
+    platform->copyDfloatToDoubleKernel(o_vx.size(), o_vx, o_tmpDouble);
+    vx.resize(Nlocal, 0);
     o_tmpDouble.copyTo(vx.data(), o_tmpDouble.size());
 
-    auto o_vy = o_u + (1 * nrs->fieldOffset);
-    platform->copyDfloatToDoubleKernel(Nlocal, o_vy, o_tmpDouble);
-    vy.resize(Nlocal);
+    auto o_vy = o_u[1];
+    platform->copyDfloatToDoubleKernel(o_vy.size(), o_vy, o_tmpDouble);
+    vy.resize(Nlocal, 0);
     o_tmpDouble.copyTo(vy.data(), o_tmpDouble.size());
 
-    auto o_vz = o_u + (2 * nrs->fieldOffset);
-    platform->copyDfloatToDoubleKernel(Nlocal, o_vz, o_tmpDouble);
-    vz.resize(Nlocal);
+    auto o_vz = o_u[2];
+    platform->copyDfloatToDoubleKernel(o_vz.size(), o_vz, o_tmpDouble);
+    vz.resize(Nlocal, 0);
     o_tmpDouble.copyTo(vz.data(), o_tmpDouble.size());
   }
 
@@ -144,25 +143,25 @@ void outfld(const char *filename,
     auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
 
     platform->copyDfloatToDoubleKernel(Nlocal, o_p, o_tmpDouble);
-    pr.resize(Nlocal);
+    pr.resize(Nlocal, 0);
     o_tmpDouble.copyTo(pr.data(), o_tmpDouble.size());
   }
 
   int nps = 0;
   std::vector<double> temp;
   std::vector<double> ps;
-  if (o_s.isInitialized() && NSfields) {
+  if (o_s.size()) {
     const dlong nekFieldOffset = nekData.lelt * mesh->Np;
 
-    ps.resize(NSfields * nekFieldOffset);
+    ps.resize(o_s.size() * nekFieldOffset, 0);
     auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
 
-    for (int is = 0; is < NSfields; is++) {
-      occa::memory o_Si = o_s + (is * nrs->fieldOffset);
-      platform->copyDfloatToDoubleKernel(Nlocal, o_Si, o_tmpDouble);
+    for (int is = 0; is < o_s.size(); is++) {
+      occa::memory o_Si = o_s[is];
+      platform->copyDfloatToDoubleKernel(o_Si.size(), o_Si, o_tmpDouble);
 
       if (is == 0 && platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE")) {
-        temp.resize(Nlocal);
+        temp.resize(Nlocal, 0);
         o_tmpDouble.copyTo(temp.data(), o_tmpDouble.size());
       } else {
         o_tmpDouble.copyTo(ps.data() + nps*nekFieldOffset, o_tmpDouble.size());

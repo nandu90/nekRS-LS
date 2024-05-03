@@ -232,7 +232,7 @@ void UDF_ExecuteStep(double time, int tstep)
     particles->migrate();
   }
 
-  if (nrs->isOutputStep) {
+  if (nrs->isCheckpointStep) {
     nek::ocopyToNek(time, tstep);
     nek::userchk(); // compute lambda2
     nek::ocopyFromNek(time);

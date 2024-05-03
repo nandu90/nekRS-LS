@@ -134,10 +134,13 @@ static std::vector<std::string> generalKeys = {
     {"subCycling"},
     {"redirectoutputto"},
     {"writeControl"},
+    {"checkpointControl"},
     {"writeInterval"},
+    {"checkpointInterval"},
     {"constFlowRate"},
     {"verbose"},
     {"variableDT"},
+    {"checkpointprecision"},
     {"nScalars"}, // sans temperature
 
     {"oudf"},
@@ -187,7 +190,6 @@ static std::vector<std::string> meshKeys = {
     {"connectivitytol"},
     {"boundaryidmapV"},
     {"boundaryidmap"},
-    {"writetofieldfile"},
 };
 
 static std::vector<std::string> velocityKeys = {
@@ -253,7 +255,8 @@ static std::vector<std::string> deprecatedKeys = {
     {"filterWeight"},
     {"filterModes"},
     {"filterCutoffRatio"},
-
+    {"writeControl"},
+    {"writeInterval"},
     {"stressFormulation"},
 };
 
@@ -2002,22 +2005,37 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *ini)
     append_error(error.str());
   }
 
+  int checkpointPrecision  = 0;
+  if (ini->extract("general", "checkpointprecision", checkpointPrecision)) { 
+    if (checkpointPrecision = 64) 
+      options.setArgs("CHECKPOINT PRECISION", "FP64");
+    else if (checkpointPrecision = 32) 
+      options.setArgs("CHECKPOINT PRECISION", "FP32");
+    else
+      append_error("invalid checkpointPrecision");
+  }
+
   double writeInterval = 0;
-  ini->extract("general", "writeinterval", writeInterval);
-  options.setArgs("SOLUTION OUTPUT INTERVAL", std::to_string(writeInterval));
+  if (!ini->extract("general", "writeinterval", writeInterval)) {
+    ini->extract("general", "checkpointinterval", writeInterval);
+  } 
+  options.setArgs("CHECKPOINT INTERVAL", std::to_string(writeInterval));
 
   std::string writeControl;
-  if (ini->extract("general", "writecontrol", writeControl)) {
+  if (!ini->extract("general", "writecontrol", writeControl)) {
+    ini->extract("general", "checkpointcontrol", writeControl);
+  }
 
+  if (writeControl.size()) {
     checkValidity(rank, {"steps", "simulationtime"}, writeControl);
 
     if (writeControl == "steps") {
-      options.setArgs("SOLUTION OUTPUT CONTROL", "STEPS");
+      options.setArgs("CHECKPOINT CONTROL", "STEPS");
     } else if (writeControl == "simulationtime") {
-      options.setArgs("SOLUTION OUTPUT CONTROL", "SIMULATIONTIME");
+      options.setArgs("CHECKPOINT CONTROL", "SIMULATIONTIME");
     } else {
       std::ostringstream error;
-      error << "Could not parse general::writeControl = " << writeControl;
+      error << "could not parse general::checkpointControl = " << writeControl;
       append_error(error.str());
     }
   }
@@ -2103,25 +2121,8 @@ void parseMeshSection(const int rank, setupAide &options, inipp::Ini *ini)
       options.setArgs("MESHV BOUNDARY ID MAP", boundaryIDs);
     }
 
-    {
-      const std::vector<std::string> validValues = {
-          {"yes"},
-          {"true"},
-          {"1"},
-          {"no"},
-          {"false"},
-          {"0"},
-      };
-      std::string checkpointOutputMesh;
-      if (ini->extract("mesh", "writetofieldfile", checkpointOutputMesh)) {
-
-        checkValidity(rank, validValues, checkpointOutputMesh);
-        if (checkForTrue(checkpointOutputMesh)) {
-          options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
-        } else {
-          options.setArgs("CHECKPOINT OUTPUT MESH", "FALSE");
-        }
-      }
+    if (options.compareArgs("MOVING MESH", "TRUE")) {
+      options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
     }
   }
 }

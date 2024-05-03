@@ -38,7 +38,7 @@ void UDF_ExecuteStep(double time, int tstep)
 
   weightedHistogram(0.0, 1.0, mesh->Nlocal, mesh->o_LMM, nrs->cds->o_S, o_hist); 
 
-  if (nrs->isOutputStep) {
+  if (nrs->isCheckpointStep) {
     std::vector<float> hist(o_hist.size());
     o_hist.copyTo(hist.data());
     MPI_Allreduce(MPI_IN_PLACE, hist.data(), hist.size(), MPI_FLOAT, MPI_SUM, platform->comm.mpiComm);

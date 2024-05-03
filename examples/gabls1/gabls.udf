@@ -482,7 +482,7 @@ void UDF_ExecuteStep(double time, int tstep)
 
   oogs::startFinish(nrs->qqtH, "+", o_divTau, nrs->fieldOffset, 3);
 
-  if (nrs->isOutputStep) {
+  if (nrs->isCheckpointStep) {
     if (platform->comm.mpiRank == 0) {
       printf("uAvgWall: %g  wAvgWall: %g  magUWall: %g  tempAvgWall: %g\n"
              "uTau: %g  thetaTau: %g  rLength: %g\n",

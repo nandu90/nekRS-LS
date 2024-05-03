@@ -1443,42 +1443,39 @@ void nrs_t::printInfo(double time, int tstep, bool printStepInfo, bool printVerb
              "Unreasonable CFL!");
 }
 
-void nrs_t::writeFld(double t, int step, int outXYZ, int FP64, std::string suffix, int Nout, bool uniform)
+void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforceFP64, int Nout, bool uniform)
 {
-  int Nscalar = 0;
-  occa::memory o_s;
-  if (this->Nscalar) {
-    o_s = this->cds->o_S;
-    Nscalar = this->Nscalar;
-  }
-  fld::write(suffix, t, step, outXYZ, FP64, this->o_U, this->o_P, o_s, Nscalar, Nout, uniform);
-}
+  const std::string suffix = "";
 
-void nrs_t::writeFld(double t, int step, int outXYZ, int FP64, int Nout, bool uniform)
-{
-  this->writeFld(t, step, outXYZ, FP64, "", Nout, uniform);
-}
-
-void nrs_t::writeFld(double t, int step, std::string suffix, int Nout, bool uniform)
-{
-  std::string precision;
-  platform->options.getArgs("CHECKPOINT PRECISION", precision);
-  int FP64 = 0;
-  if (precision == "DP" || precision == "FP64") {
-    FP64 = 1;
+  std::string outputMeshSave;
+  static bool firstTime = true;
+  if (firstTime) {
+    platform->options.getArgs("CHECKPOINT OUTPUT MESH", outputMeshSave);
+    platform->options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
   }
 
-  int outXYZ = 1;
-  if (platform->options.compareArgs("CHECKPOINT OUTPUT MESH", "FALSE")) {
-    outXYZ = 0;
+  auto FP64 = platform->options.compareArgs("CHECKPOINT PRECISION", "FP64"); 
+  if (enforceFP64) FP64 = true;
+
+  auto outXYZ = platform->options.compareArgs("CHECKPOINT OUTPUT MESH", "TRUE"); 
+  if (enforceOutXYZ) outXYZ = true;
+ 
+  std::vector<occa::memory> o_Slist;
+  for (int i = 0; i < Nscalar; i++) {
+    auto o_Si = cds->o_S.slice(cds->fieldOffsetScan[i], cds->fieldOffset[i]);
+    o_Slist.push_back(o_Si);
   }
+  std::vector<occa::memory> o_Ulist;
+  for (int i = 0; i < meshV->dim; i++) { 
+    auto o_Ui = o_U.slice(i*fieldOffset, meshV->Nlocal); 
+    o_Ulist.push_back(o_Ui);
+  }
+  fld::write(suffix, t, step, o_Ulist, o_P, o_Slist, outXYZ, FP64, Nout, uniform);
 
-  this->writeFld(t, step, outXYZ, FP64, suffix, Nout, uniform);
-}
-
-void nrs_t::writeFld(double t, int step, int Nout, bool uniform)
-{
-  this->writeFld(t, step, "", Nout, uniform);
+  if (firstTime) {
+    platform->options.setArgs("CHECKPOINT OUTPUT MESH", outputMeshSave);
+    firstTime = false;
+  }
 }
 
 int nrs_t::lastStepLocalSession(double timeNew, int tstep, double elapsedTime)

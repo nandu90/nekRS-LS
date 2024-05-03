@@ -156,12 +156,22 @@ void UDF_ExecuteStep(double time, int tstep)
   auto nrs = dynamic_cast<nrs_t*>(platform->solver);
   mesh_t *mesh = nrs->meshV;
 
+  if (tstep == 0) {
+    nrs->writeCheckpoint(time, tstep); 
+
+#if 0
+    std::vector<occa::memory> o_fldList;
+    o_fldList.push_back(nrs->o_U.slice(2*nrs->fieldOffset, mesh->Nlocal));
+    fld::write("foo", time, tstep, o_fldList);
+#endif
+  }
+
   velRecycling::copy();
   if (nrs->timeStepConverged) {
     tavg::run(time);
   }
 
-  if (nrs->isOutputStep) {
+  if (nrs->isCheckpointStep) {
     auto o_UZ = nrs->o_U + 2 * nrs->fieldOffset;
     const dfloat ubar =
         platform->linAlg->innerProd(mesh->Nlocal, o_UZ, mesh->o_LMM, platform->comm.mpiComm) / mesh->volume;
@@ -175,6 +185,7 @@ void UDF_ExecuteStep(double time, int tstep)
 #ifdef NEKRS_ASCENT_ENABLED 
   if (tstep % renderStep == 0) {
     nrs->Qcriterion(nrs->o_U, o_qcriterion);
+    fld::write("qcrit", time, tstep, true, false, o_qcriterion, mesh->N, /* uniform */true);
     nekAscent::run(time, tstep, nekAscentFields);
   }
 #endif
