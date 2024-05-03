@@ -32,15 +32,14 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
     return mask;
   }();
 
-  const auto matrix = build(mesh->Nq,
-                            mesh->Nelements,
-                            mesh->o_x,
-                            mesh->o_y,
-                            mesh->o_z,
-                            mask,
-                            lambda0,
-                            platform->comm.mpiComm,
-                            mesh->globalIds);
+  const auto matrix = buildMatrix(mesh->Nq,
+                                  mesh->Nelements,
+                                  mesh->o_x,
+                                  mesh->o_y,
+                                  mesh->o_z,
+                                  mask,
+                                  lambda0,
+                                  mesh->ogs->hostGsh);
 
   const auto numRows = static_cast<int>(matrix.rowEnd - matrix.rowStart + 1);
 

@@ -60,15 +60,14 @@ private:
     std::vector<dlong> dofMap;
   };
 
-  matrix_t build(const int N_,
-                 const int n_elem_,
-                 occa::memory _o_x,
-                 occa::memory _o_y,
-                 occa::memory _o_z,
-                 const std::vector<int>& pmask_,
-                 double lambda,
-                 MPI_Comm comm,
-                 long long int *gatherGlobalNodes);
+  matrix_t buildMatrix(const int N_,
+                       const int n_elem_,
+                       occa::memory _o_x,
+                       occa::memory _o_y,
+                       occa::memory _o_z,
+                       const std::vector<int>& pmask_,
+                       double lambda,
+                       void *gsh);
 };
 
 #endif

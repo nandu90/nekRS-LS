@@ -206,20 +206,20 @@ static struct comm comm;
 struct gs_data {
   struct comm comm;
 };
-static struct gs_data *gsh;
+static struct gs_data *gsh = nullptr;
 
 /* Interface definition */
 
 // construct COO matrix using Hypre's IJ interface 
-SEMFEMSolver_t::matrix_t SEMFEMSolver_t::build(const int N_,
-                                               const int n_elem_,
-                                               occa::memory _o_x,
-                                               occa::memory _o_y,
-                                               occa::memory _o_z,
-                                               const std::vector<int>& pmask_,
-                                               double lambda0_,
-                                               MPI_Comm mpiComm,
-                                               long long int *gatherGlobalNodes)
+SEMFEMSolver_t::matrix_t SEMFEMSolver_t::buildMatrix(
+  const int N_,
+  const int n_elem_,
+  occa::memory _o_x,
+  occa::memory _o_y,
+  occa::memory _o_z,
+  const std::vector<int>& pmask_,
+  double lambda0_,
+  void *gsh_)
 {
   // assume same number of points in each direction
   n_x = N_;
@@ -235,19 +235,10 @@ SEMFEMSolver_t::matrix_t SEMFEMSolver_t::build(const int N_,
   pmask = (int*)(pmask_.data());
   lambda0 = lambda0_;
 
-  n_xyze = n_x * n_y * n_z * n_elem;
+  comm_init(&comm, platform->comm.mpiComm); 
+  gsh = static_cast<gs_data*>(gsh_);
 
-  {
-    comm_ext world;
-    world = (comm_ext)mpiComm;
-    comm_init(&comm, world);
-    gsh = gs_setup(gatherGlobalNodes,
-                   n_xyze,
-                   &comm,
-                   0,
-                   gs_pairwise,
-                   /* mode */ 0);
-  }
+  n_xyze = n_x * n_y * n_z * n_elem;
 
   constructOnHost = !platform->device.deviceAtomic; // false on CPUs as atomics are supported 
 

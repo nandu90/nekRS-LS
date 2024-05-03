@@ -128,11 +128,9 @@ struct mesh_t {
   void *haloSendRequests;
   void *haloRecvRequests;
 
-  // CG gather-scatter info
   hlong *globalIds;
-  void *gsh, *hostGsh; // gslib struct pointer
-  ogs_t *ogs;          // occa gs pointer
-  oogs_t *oogs;        // occa gs pointer
+  ogs_t *ogs;
+  oogs_t *oogs;
 
   // list of all elements
   // elementList[e] = e
