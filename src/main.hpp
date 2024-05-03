@@ -218,6 +218,9 @@ std::map<std::string, std::map<std::string, std::string>> readPar(const std::str
 
   const auto setupFile = _setupFile + ".par";
 
+  if (rank == 0) 
+   std::cout << "reading " << setupFile << std::endl; 
+
   int err = 0;
   if (rank == 0) {
     if (!file_exist(setupFile)) {
