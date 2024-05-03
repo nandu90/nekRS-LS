@@ -126,11 +126,10 @@ coarseGridDiscretization    FEM [D]                                    linear fi
                             SEMFEM                                     linear FEM approx on high-order nodes
 
 coarseSolver/semfemSolver   smoother                                     
-                            AMGX                                       NVIDIA's AMG solver
                             boomerAMG [D]                              HYPRE's AMG solver
                               +cpu [D for multigrid]
                               +device [D for SEMFEM] 
-                                +overlap                                 overlap coarse grid solve in additive MG cycle
+                                +overlap                               overlap coarse grid solve in additive MG cycle
 
 pMGSchedule                 p=<int>, degree=<int>, ...                 custom polynomial order and Chebyshev order for each pMG level
 
@@ -147,7 +146,7 @@ boundaryTypeMap             <...>, <...>, ...                          boundary 
                             none                                       not used or internal 
                             zeroValue                                  zero Dirichlet (w, wall)
                             codedFixedValue                            user specified Dirichlet (v, t, inlet)
-                            interpolation                              interpolated fixed value in overlap (int)
+                            interpolation                              neknek boundary (int)
                             zeroXValue/zeroGradient                    symmetry x-normal plane (slipx, symx)
                             zeroYValue/zeroGradient                    symmetry y-normal plane (slipy, symy)
                             zeroZValue/zeroGradient                    symmetry z-normal plane (slipz, symz)
@@ -159,7 +158,7 @@ boundaryTypeMap             <...>, <...>, ...                          boundary 
                             zeroXYValue/fixedGradient                  (onx) 
                             zeroYZValue/fixedGradient                  (ony)
                             zeroXZValue/fixedGradient                  (onz)
-                            zeroGradient                               (i, insulated, o, outlet, outflow) 
+                            zeroGradient                               (I, insulated, O, outlet, outflow) 
                             fixedGradient                              (f, flux, o, outlet, outflow)
 
 regularization                                                         
