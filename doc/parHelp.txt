@@ -240,3 +240,9 @@ maxSteps                    <int>
 sharedRho                   true, false [D]                            use same "density" field for all but the first scalar
 jtvRecycleProperties        true [D], false                            recycle property (freeze) evaluation for Jv
 dealiasing                  true, false
+----------------------------------------------------------------------------------------------------------------------
+
+NOTES
+* section name and key/value pairs are treated as case insensitive
+* values enclosed within quotes maintain case sensitivity
+* values prefixed with 'env::' are interpreted as references to environment variables 
