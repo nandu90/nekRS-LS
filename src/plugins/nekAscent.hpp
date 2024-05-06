@@ -20,8 +20,11 @@ void setup(mesh_t *mesh_,
            const std::string& inputFile,
            int Nin_ = 0,
            bool uniform_ = false);
-void run(const double time, const int tstep, const std::vector<nekAscent::field>& userFieldList);
+void run(const double time, const int tstep);
 void finalize();
+void addScalarField(const std::string& name, occa::memory o_fld, mesh_t *mesh_fld);
+void addVectorField(const std::string& name, occa::memory o_fld, mesh_t *mesh_fld, dlong offset);
+void clearData();
 
 ascent::Ascent mAscent;
 } // namespace nekAscent
@@ -30,6 +33,7 @@ namespace
 {
 conduit::Node mesh_data;
 
+std::vector<nekAscent::field> userFieldList;
 occa::memory o_connectivity;
 
 mesh_t *mesh_in;
@@ -93,7 +97,7 @@ static void initializeAscent()
   fflush(stdout);
 }
 
-static void updateFieldData(const std::vector<nekAscent::field>& userFieldList, occa::memory& o_fields)
+static void updateFieldData(occa::memory& o_fields)
 {
   platform->timer.tic("nekAscent::run::update");
 
@@ -161,6 +165,23 @@ static void updateFieldData(const std::vector<nekAscent::field>& userFieldList, 
   }
 
   platform->timer.toc("nekAscent::run::update");
+}
+
+void nekAscent::addScalarField(const std::string& name, occa::memory o_fld, mesh_t *mesh_fld)
+{
+  userFieldList.push_back(std::tuple{name, o_fld.slice(0, mesh_fld->Nlocal), mesh_fld});
+}
+
+void nekAscent::addVectorField(const std::string& name, occa::memory o_fld, mesh_t *mesh_fld, dlong offset)
+{
+  userFieldList.push_back(std::tuple{name + "_x", o_fld.slice(0 * offset, mesh_fld->Nlocal), mesh_fld});
+  userFieldList.push_back(std::tuple{name + "_y", o_fld.slice(1 * offset, mesh_fld->Nlocal), mesh_fld});
+  userFieldList.push_back(std::tuple{name + "_z", o_fld.slice(2 * offset, mesh_fld->Nlocal), mesh_fld});
+}
+
+void nekAscent::clearData()
+{
+  userFieldList.clear();
 }
 
 void nekAscent::setup(mesh_t *mesh_,
@@ -267,7 +288,7 @@ void nekAscent::setup(mesh_t *mesh_,
 }
 
 
-void nekAscent::run(const double time, const int tstep, const std::vector<nekAscent::field>& userFieldList)
+void nekAscent::run(const double time, const int tstep)
 {
   nekrsCheck(!setupCalled, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "called prior to nekAscent::setup()!");
 
@@ -280,7 +301,7 @@ void nekAscent::run(const double time, const int tstep, const std::vector<nekAsc
   mesh_data["state/time"] = time;
 
   occa::memory o_work;
-  updateFieldData(userFieldList, o_work); 
+  updateFieldData(o_work); 
 
   mAscent.publish(mesh_data);
 
