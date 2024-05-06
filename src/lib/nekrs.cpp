@@ -136,11 +136,11 @@ void setup(MPI_Comm commg_in,
 
   if (rank == 0) {
     printHeader();
-    std::cout << "default precision: "; 
+    std::cout << "default FP precision: "; 
     if (sizeof(dfloat) == sizeof(double)) {
-      std::cout << "FP64" << std::endl;
+      std::cout << "64" << std::endl;
     } if (sizeof(dfloat) == sizeof(float)) {
-      std::cout << "FP32" << std::endl;
+      std::cout << "32" << std::endl;
     }
 
     std::cout << "MPI tasks: " << size << std::endl << std::endl;
@@ -539,10 +539,7 @@ int updateFileCheckFreq()
 void printRuntimeStatistics(int step)
 {
   platform->solver->printRunStat(step);
-
-  for (auto& callback : platform->timer.printStatCallbacks()) {
-    callback();
-  }
+  platform->timer.printUserStat();
 }
 
 void processUpdFile()

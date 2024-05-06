@@ -44,24 +44,6 @@ bool uniform = false;
 std::string actionFile;
 } // namespace
 
-static void printStat()
-{
-  const int verbose = platform->options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
-  const int rank = platform->comm.mpiRank;
-
-  if (verbose && rank == 0) {
-    conduit::Node ascent_info, opts;
-    nekAscent::mAscent.info(ascent_info);
-    opts["num_children_threshold"] = -1;
-    opts["num_elements_threshold"] = -1;
-    opts["depth"] = 1;
-    ascent_info.to_summary_string_stream(std::cout, opts);
-    std::cout << std::endl;
-  }
-
-  platform->timer.print("nekAscent::");
-}
-
 static void errHandler(const std::string &msg,
                        const std::string &file,
                        int line)
@@ -191,7 +173,7 @@ void nekAscent::setup(mesh_t *mesh_,
   uniform = uniform_;
   const int Nin = (Nin_) ? Nin_ : mesh_in->N;
 
-  platform->timer.addPrintStatCallback(printStat);
+  platform->timer.addUserStat("nekAscent::");
 
   interpolate = (uniform || (Nin != mesh_in->N));
 

@@ -19,9 +19,10 @@ NEKRS_SIGNUM_TERM               int             Signal number to exit gracefully
 NEKRS_SIGNUM_UPD                int             Signal number to process update (trigger) file
 
 NEKRS_UDF_INCLUDES		string		Optional include flags ("file1;file2;file3")
-NEKRS_UDF_LIBS		        string		Optional libraries
+NEKRS_UDF_LIBS		        string		Optional libraries ("/path/to/lib/lib1.so;/path/to/lib/lib2.so")
 
 NEKRS_ASCENT_INSTALL_DIR        string
+NEKRS_ADIOS2_INSTALL_DIR        string
 
 OOGS_SYNC_RECV			0[D]/1		Wait until all ranks have preposed recv (avoid unexpected msgs)
 OOGS_ENABLE_NBC_DEVICE		0/1[D]		Enable device support for neighbor hood collectives

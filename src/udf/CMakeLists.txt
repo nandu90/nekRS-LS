@@ -79,7 +79,14 @@ if (ASCENT_FOUND)
   target_compile_definitions(udf PUBLIC NEKRS_ENABLE_ASCENT)
 endif()
 
+find_package(adios2
+             HINTS $ENV{NEKRS_ADIOS2_INSTALL_DIR})
+if (ADIOS2_FOUND)
+  target_link_libraries(udf PRIVATE adios2::cxx11_mpi)
+  target_compile_definitions(udf PUBLIC NEKRS_ENABLE_ADIOS)
+endif()
+
 if(EXISTS "${CASE_DIR}/udf.cmake")
-  message("including ${CASE_DIR}/udf.cmake")
+  message("-- Found ${CASE_DIR}/udf.cmake")
   include(${CASE_DIR}/udf.cmake)
 endif()

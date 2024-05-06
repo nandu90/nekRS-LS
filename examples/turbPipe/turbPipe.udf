@@ -1,6 +1,7 @@
 #include "velRecycling.hpp"
 #include "tavg.hpp"
 //#include "nekAscent.hpp"
+//#include "nekAdios.hpp"
 
 static int NSLABS;
 static int NELSLAB;
@@ -9,6 +10,10 @@ deviceMemory<dfloat> o_qcriterion;
 
 #ifdef NEKRS_ASCENT_ENABLED
 std::vector<nekAscent::field> nekAscentFields;
+#endif
+
+#ifdef NEKRS_ADIOS_ENABLED
+NekAdios *nekAdios;
 #endif
 
 #ifdef __okl__
@@ -126,6 +131,8 @@ void UDF_Setup()
     tavg::setup(nrs->fieldOffset, tavgFields);
   }
 
+  o_qcriterion.resize(nrs->meshV->Nlocal);
+
 #ifdef NEKRS_ASCENT_ENABLED 
   {
     auto cds = nrs->cds;
@@ -136,7 +143,6 @@ void UDF_Setup()
     auto o_v = nrs->o_U.slice(1 * nrs->fieldOffset , nrs->fieldOffset);
     auto o_w = nrs->o_U.slice(2 * nrs->fieldOffset , nrs->fieldOffset);
     auto o_s = cds->o_S.slice(0 * cds->fieldOffset[0], cds->fieldOffset[0]);
-    o_qcriterion.resize(meshT->Nlocal);
 
     nekAscentFields.push_back(std::make_tuple("vel_x", o_u, meshV));
     nekAscentFields.push_back(std::make_tuple("vel_y", o_v, meshV));
@@ -144,9 +150,17 @@ void UDF_Setup()
     nekAscentFields.push_back(std::make_tuple("Qcriterion", o_qcriterion, meshV));
     nekAscentFields.push_back(std::make_tuple("scalar00", o_s, meshT));
 
-    const int Nviz = 1.5 * mesh->N;
+    const auto Nviz = 1.5 * mesh->N;
     const auto uniform = true;
-    nekAscent::setup(meshT, "ascent.yaml", Nviz, uniform);
+    nekAscent::setup(nrs->_mesh, "ascent.yaml", Nviz, uniform);
+  }
+#endif
+
+#ifdef NEKRS_ADIOS_ENABLED
+  { 
+    const auto Nviz = 1.5 * mesh->N;
+    const auto uniform = true;
+    nekAdios = new NekAdios(nrs->_mesh, "simdata", Nviz, uniform);
   }
 #endif
 }
@@ -158,12 +172,6 @@ void UDF_ExecuteStep(double time, int tstep)
 
   if (tstep == 0) {
     nrs->writeCheckpoint(time, tstep); 
-
-#if 0
-    std::vector<occa::memory> o_fldList;
-    o_fldList.push_back(nrs->o_U.slice(2*nrs->fieldOffset, mesh->Nlocal));
-    fld::write("foo", time, tstep, o_fldList);
-#endif
   }
 
   velRecycling::copy();
@@ -179,13 +187,30 @@ void UDF_ExecuteStep(double time, int tstep)
       printf(" uBulk: %g\n", ubar);
     }
 
+    nrs->Qcriterion(nrs->o_U, o_qcriterion);
+
+#ifdef NEKRS_ADIOS_ENABLED 
+    {
+      auto meshV = nrs->meshV;
+      auto meshT = (nrs->cds) ? nrs->cds->mesh[0] : meshV;
+
+      std::vector<NekAdios::field> fields;
+      fields.push_back(std::make_tuple("velocity", nrs->o_U.slice(0, mesh->dim * nrs->fieldOffset), meshV, nrs->fieldOffset));
+      fields.push_back(std::make_tuple("scalar00", nrs->cds->o_S.slice(0, mesh->Nlocal), meshT, 0));
+      fields.push_back(std::make_tuple("Qcriterion", o_qcriterion, meshV, 0));
+      nekAdios->write<float>(time, tstep, fields);
+      if (nrs->lastStep) nekAdios->close();
+    }
+#endif
+
     tavg::outfld();
   }
 
 #ifdef NEKRS_ASCENT_ENABLED 
   if (tstep % renderStep == 0) {
-    nrs->Qcriterion(nrs->o_U, o_qcriterion);
-    fld::write("qcrit", time, tstep, true, false, o_qcriterion, mesh->N, /* uniform */true);
+    std::vector<occa::memory> o_fldList;
+    //o_fldList.push_back(o_qcriterion);
+    //fld::write("qcrit", time, tstep, o_fldList, true, false, mesh->N, true);
     nekAscent::run(time, tstep, nekAscentFields);
   }
 #endif

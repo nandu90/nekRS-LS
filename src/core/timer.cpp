@@ -27,7 +27,7 @@ orderedMap<std::string, tagData> m_;
 const int NEKRS_TIMER_INVALID_KEY = -1;
 const int NEKRS_TIMER_INVALID_METRIC = -2;
 
-std::vector<std::function<void()>> _printStatCallbacks;
+std::vector<std::string> userStat;
 
 int ifSync_;
 
@@ -525,12 +525,12 @@ void timer_t::print(std::string timerName, long long int DOF)
   table[4] = absPercentage;
   if (DOF) table[5] = throughputs;
 
-  std::vector<std::string> headers = {"Operation", "time", "calls", "rel %", "abs %"};
+  std::vector<std::string> headers = {"name", "time", "calls", "rel %", "abs %"};
   if (DOF) headers.push_back("GDOF/s/rank");
 
   if (platform->comm.mpiRank == 0) {
     std::cout << "\n";
-    std::cout << "Timers for " << start << ":\n";
+    std::cout << "timers for " << start << ":\n";
     printTable(table, headers, "    ");
     std::cout << "\n";
   }
@@ -546,15 +546,16 @@ std::vector<std::string> timer_t::tags()
   return entries;
 }
 
-void timer_t::addPrintStatCallback(std::function<void()> f)
+void timer_t::addUserStat(const std::string& tag)
 {
-  _printStatCallbacks.push_back(f);
+  userStat.push_back(tag);
 }
 
-const std::vector<std::function<void()>> timer_t::printStatCallbacks()
+void timer_t::printUserStat()
 {
- return _printStatCallbacks; 
+  for(const auto& entry : userStat) { 
+    platform->timer.print(entry);
+  }
 }
-
 
 } // namespace timer

@@ -261,6 +261,8 @@ endforeach()
 
 # cvode
 if (ENABLE_CVODE)
+  message(FATAL_ERROR "CVODE is not currently supported!")
+
   # workaround to resolve name conflict (used be OCCA and CVODE)
   set(ENABLE_CUDA ${OCCA_CUDA_ENABLED})
   set(ENABLE_HIP ${OCCA_HIP_ENABLED})
