@@ -328,6 +328,10 @@ int main(int argc, char** argv)
   {
     abort(std::string(e.what()));
   }
+  catch (const std::invalid_argument& e)
+  {
+    abort(std::string(e.what()));
+  }
 #ifdef CPPTRACE_ENABLED
   catch (const cpptrace::exception& e)
   {
