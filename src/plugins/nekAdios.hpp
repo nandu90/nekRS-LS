@@ -13,15 +13,13 @@
 
 class NekAdios
 {
-public:
-  using field = std::tuple<std::string, occa::memory, mesh_t *, dlong>;
-
 private:
   adios2::ADIOS *adios;
   adios2::IO io;
   adios2::Engine engine;
 
-  std::vector <NekAdios::field> userFieldList;
+  using field = std::tuple<std::string, occa::memory, mesh_t *, dlong>;
+  std::vector <field> userFieldList;
 
   uint32_t VTK_CELL_TYPE;
 
@@ -39,7 +37,7 @@ private:
   uint32_t NumberOfPoints;
 
   std::string
-  vtkSchema(uint32_t NumberOfPoints, uint32_t NumOfCells, const std::vector<NekAdios::field> &userFieldList)
+  vtkSchema(uint32_t NumberOfPoints, uint32_t NumOfCells, const std::vector<field> &userFieldList)
   {
     std::string schema = R"( 
     <VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">

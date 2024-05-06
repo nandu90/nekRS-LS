@@ -14,7 +14,6 @@
 
 namespace nekAscent
 {
-using field = std::tuple<std::string, occa::memory, mesh_t *>;
 
 void setup(mesh_t *mesh_,
            const std::string& inputFile,
@@ -33,7 +32,8 @@ namespace
 {
 conduit::Node mesh_data;
 
-std::vector<nekAscent::field> userFieldList;
+using field = std::tuple<std::string, occa::memory, mesh_t *>;
+std::vector<field> userFieldList;
 occa::memory o_connectivity;
 
 mesh_t *mesh_in;
