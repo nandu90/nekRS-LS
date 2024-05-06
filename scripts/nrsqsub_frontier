@@ -71,6 +71,7 @@ echo "export PE_MPICH_GTL_LIBS_amd_gfx90a=\"-lmpi_gtl_hsa\"" >> $SFILE
 echo "ulimit -s unlimited " >>$SFILE
 echo "export NEKRS_HOME=$NEKRS_HOME" >>$SFILE
 echo "export NEKRS_GPU_MPI=1 " >>$SFILE
+echo "export OOGS_ENABLE_NBC_DEVICE=1" >>$SFILE
 
 echo "export NVME_HOME=$NVME_HOME" >>$SFILE
 
