@@ -72,18 +72,22 @@ endforeach()
 #  target_link_options(udf PRIVATE "LINKER:-rpath,${PATH}")
 #endforeach()
 
-find_package(Ascent
-             HINTS $ENV{NEKRS_ASCENT_INSTALL_DIR})
-if (ASCENT_FOUND)
-  target_link_libraries(udf PRIVATE ascent::ascent_mpi)
-  target_compile_definitions(udf PUBLIC NEKRS_ENABLE_ASCENT)
+if(DEFINED ENV{NEKRS_ASCENT_INSTALL_DIR})
+  find_package(Ascent
+               HINTS $ENV{NEKRS_ASCENT_INSTALL_DIR})
+  if (ASCENT_FOUND)
+    target_link_libraries(udf PRIVATE ascent::ascent_mpi)
+    target_compile_definitions(udf PUBLIC NEKRS_ENABLE_ASCENT)
+  endif()
 endif()
 
-find_package(adios2
-             HINTS $ENV{NEKRS_ADIOS2_INSTALL_DIR})
-if (ADIOS2_FOUND)
-  target_link_libraries(udf PRIVATE adios2::cxx11_mpi)
-  target_compile_definitions(udf PUBLIC NEKRS_ENABLE_ADIOS)
+if(DEFINED ENV{NEKRS_ADIOS2_INSTALL_DIR})
+  find_package(adios2
+               HINTS $ENV{NEKRS_ADIOS2_INSTALL_DIR})
+  if (ADIOS2_FOUND)
+    target_link_libraries(udf PRIVATE adios2::cxx11_mpi)
+    target_compile_definitions(udf PUBLIC NEKRS_ENABLE_ADIOS)
+  endif()
 endif()
 
 if(EXISTS "${CASE_DIR}/udf.cmake")
