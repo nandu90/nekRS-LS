@@ -46,6 +46,7 @@ public:
   occa::properties kernelInfo;
   timer::timer_t timer;
   occa::memoryPool o_memPool;
+  occa::memoryPool memPool;
   kernelRequestManager_t kernelRequests;
   Par *par;
   solver_t *solver;

@@ -57,7 +57,7 @@ struct mesh_t {
 
   occa::memory intpMatrix(std::vector<dfloat> M);
   void interpolate(mesh_t *meshC, const occa::memory& o_z, occa::memory& o_zC);
-  void map2Uniform(int Nu, const occa::memory& o_z, occa::memory& o_zUni);
+  void map2Uniform(mesh_t *meshU, const occa::memory& o_z, occa::memory& o_zU);
   void map2Uniform(const occa::memory& o_z, occa::memory& o_zUni);
 
   void move();

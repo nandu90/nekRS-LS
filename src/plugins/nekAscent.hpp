@@ -128,9 +128,9 @@ static void updateFieldData(occa::memory& o_fields)
     const bool movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
     if (updateMesh || movingMesh) {
       if (uniform) {
-        mesh_in->map2Uniform(mesh_vis->N, mesh_in->o_x, mesh_vis->o_x);
-        mesh_in->map2Uniform(mesh_vis->N, mesh_in->o_y, mesh_vis->o_y);
-        mesh_in->map2Uniform(mesh_vis->N, mesh_in->o_z, mesh_vis->o_z);
+        mesh_in->map2Uniform(mesh_vis, mesh_in->o_x, mesh_vis->o_x);
+        mesh_in->map2Uniform(mesh_vis, mesh_in->o_y, mesh_vis->o_y);
+        mesh_in->map2Uniform(mesh_vis, mesh_in->o_z, mesh_vis->o_z);
       } else {
         mesh_in->interpolate(mesh_vis, mesh_in->o_x, mesh_vis->o_x);
         mesh_in->interpolate(mesh_vis, mesh_in->o_y, mesh_vis->o_y);
@@ -151,7 +151,7 @@ static void updateFieldData(occa::memory& o_fields)
 
     if (interpolate) {
       if (uniform) {
-        mesh_fld->map2Uniform(mesh_vis->N, o_fldIn, o_fld);
+        mesh_fld->map2Uniform(mesh_vis, o_fldIn, o_fld);
       } else {
         mesh_fld->interpolate(mesh_vis, o_fldIn, o_fld);
       }

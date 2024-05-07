@@ -139,17 +139,17 @@ void UDF_Setup()
     nekAscent::addScalarField("scalar00", cds->o_S.slice(cds->fieldOffsetScan[0]), meshT);
     nekAscent::addScalarField("Qcriterion", o_qcriterion, meshV);
 
-    const auto Nviz = 1.5 * mesh->N;
-    const auto uniform = true;
+    const int Nviz = 1.5 * mesh->N;
+    const auto uniform = false;
     nekAscent::setup(nrs->_mesh, "ascent.yaml", Nviz, uniform);
   }
 #endif
 
 #ifdef NEKRS_ADIOS_ENABLED
   {
-    const auto Nviz = 1.5 * mesh->N;
+    const int Nviz = 1.5 * mesh->N;
     const auto uniform = true;
-    nekAdios = new NekAdios(nrs->_mesh, "simdata", Nviz, uniform);
+    nekAdios = new NekAdios(nrs->_mesh, "simdata"); // Nviz, uniform);
 
     auto meshV = nrs->meshV;
     auto meshT = (nrs->cds) ? nrs->cds->mesh[0] : meshV;

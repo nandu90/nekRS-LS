@@ -179,7 +179,6 @@ private:
 
 } // namespace
 
-// =======================================================================================================
 template <typename FPType>
 LVector_t<FPType>::LVector_t(const std::vector<mesh_t *> &meshes, bool oallocate)
     : meshes_(meshes), oallocate_(oallocate), fieldOffset_(meshes.size(), 0),
@@ -236,19 +235,16 @@ LVector_t<FPType>::LVector_t(const std::vector<mesh_t *> &meshes, bool oallocate
   this->LToEKernel_ = platform->kernelRequests.load("LToE" + suffix);
 }
 
-// =======================================================================================================
 template <typename FPType> occa::memory &LVector_t<FPType>::optr()
 {
   return this->o_L_;
 }
 
-// =======================================================================================================
 template <typename FPType> const occa::memory &LVector_t<FPType>::optr() const
 {
   return this->o_L_;
 }
 
-// =======================================================================================================
 template <typename FPType>
 void LVector_t<FPType>::optr(const std::vector<dlong> &fieldOffsets, occa::memory &o_L)
 {
@@ -256,7 +252,6 @@ void LVector_t<FPType>::optr(const std::vector<dlong> &fieldOffsets, occa::memor
   this->optr(o_L);
 }
 
-// =======================================================================================================
 template <typename FPType> void LVector_t<FPType>::optr(occa::memory &o_L)
 {
   nekrsCheck(o_L.byte_size() <= this->size(),
@@ -273,7 +268,6 @@ template <typename FPType> void LVector_t<FPType>::optr(occa::memory &o_L)
   this->o_L_ = o_L;
 }
 
-// =======================================================================================================
 template <typename FPType> void LVector_t<FPType>::fieldOffsets(const std::vector<dlong> &fieldOffsets)
 {
   if (this->nFields() == 0) {
@@ -310,25 +304,21 @@ template <typename FPType> void LVector_t<FPType>::fieldOffsets(const std::vecto
   this->o_fieldOffsetScan_.copyFrom(this->fieldOffsetScan_.data());
 }
 
-// =======================================================================================================
 template <typename FPType> const std::vector<dlong> &LVector_t<FPType>::fieldOffsets() const
 {
   return this->fieldOffset_;
 }
 
-// =======================================================================================================
 template <typename FPType> const std::vector<dlong> &LVector_t<FPType>::fieldOffsetScans() const
 {
   return this->fieldOffsetScan_;
 }
 
-// =======================================================================================================
 template <typename FPType> const occa::memory &LVector_t<FPType>::invDegree(int field) const
 {
   return this->o_invDegrees_.at(meshes_.at(field));
 }
 
-// =======================================================================================================
 template <typename FPType> void LVector_t<FPType>::copyToE(const dlong EFieldOffset, occa::memory &o_E) const
 {
   // loop over unique mesh objects to minimize number of kernel calls
@@ -344,7 +334,6 @@ template <typename FPType> void LVector_t<FPType>::copyToE(const dlong EFieldOff
   }
 }
 
-// =======================================================================================================
 template <typename FPType>
 void LVector_t<FPType>::copyFromE(const dlong EFieldOffset, const occa::memory &o_E)
 {
@@ -361,43 +350,36 @@ void LVector_t<FPType>::copyFromE(const dlong EFieldOffset, const occa::memory &
   }
 }
 
-// =======================================================================================================
 template <typename FPType> dlong LVector_t<FPType>::nFields() const
 {
   return this->meshes_.size();
 }
 
-// =======================================================================================================
 template <typename FPType> dlong LVector_t<FPType>::fieldOffset(int field) const
 {
   return this->fieldOffset_.at(field);
 }
 
-// =======================================================================================================
 template <typename FPType> dlong LVector_t<FPType>::fieldOffsetScan(int field) const
 {
   return this->fieldOffsetScan_.at(field);
 }
 
-// =======================================================================================================
 template <typename FPType> dlong LVector_t<FPType>::Nlocal(int field) const
 {
   return this->Nlocals_.at(field);
 }
 
-// =======================================================================================================
 template <typename FPType> dlong LVector_t<FPType>::size() const
 {
   return this->fieldOffsetSum_;
 }
 
-// =======================================================================================================
 template <typename FPType> const std::vector<mesh_t *> &LVector_t<FPType>::meshes() const
 {
   return this->meshes_;
 }
 
-// =======================================================================================================
 template <typename FPType> void LVector_t<FPType>::registerKernels()
 {
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/");
@@ -429,7 +411,6 @@ template <typename FPType> void LVector_t<FPType>::registerKernels()
   }
 }
 
-// =======================================================================================================
 template <typename FPType> std::string LVector_t<FPType>::FPTypeString()
 {
   if (std::is_same<FPType, dfloat>::value) {

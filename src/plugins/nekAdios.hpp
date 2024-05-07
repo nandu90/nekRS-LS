@@ -21,7 +21,11 @@ private:
   using field = std::tuple<std::string, occa::memory, mesh_t *, dlong>;
   std::vector <field> userFieldList;
 
-  uint32_t VTK_CELL_TYPE;
+  std::vector<occa::memory> fldDataOut;
+  occa::memory verticesOut;
+  std::vector<occa::memory> work;
+
+  const uint32_t VTK_CELL_TYPE = 12; // VTK_HEXAHEDRON
 
   bool uniform;
 
@@ -33,39 +37,34 @@ private:
   mesh_t *mesh;
   mesh_t *mesh_vis;
 
-  uint32_t NumOfCells;
-  uint32_t NumberOfPoints;
-
-  std::string
-  vtkSchema(uint32_t NumberOfPoints, uint32_t NumOfCells, const std::vector<field> &userFieldList)
+  std::string vtkSchema()
   {
-    std::string schema = R"( 
+    std::string schema = R"(
     <VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">
-       <UnstructuredGrid>
-         <Piece NumberOfPoints=")" +
-                         std::to_string(NumberOfPoints) + R"(" NumberOfCells=")" + std::to_string(NumOfCells) +
-                         R"(">
-           <Points>
-             <DataArray Name="vertices" />
-           </Points>
-           <Cells>
-             <DataArray Name="connectivity" />
-             <DataArray Name="types" />
-           </Cells>
-           <PointData>
-  )";
+        <UnstructuredGrid>
+            <Piece NumberOfPoints="NumOfPoints" NumberOfCells="NumOfCells">
+                <Points>
+                    <DataArray Name="vertices" />
+                </Points>
+                <Cells>
+                    <DataArray Name="connectivity" />
+                    <DataArray Name="types" />
+                </Cells>
+                <PointData>
+    )";
+
 
     for (auto &entry : userFieldList) {
       const auto fieldName = std::get<0>(entry);
-      schema += "        <DataArray Name=\"" + fieldName + "\"/>\n";
+      schema += " <DataArray Name=\"" + fieldName + "\"/>\n";
     }
 
     schema += R"( <DataArray Name="TIME"> TIME </DataArray> )";
 
     schema += R"( 
-           </PointData>
-         </Piece>
-       </UnstructuredGrid>
+                </PointData>
+            </Piece>
+        </UnstructuredGrid>
     </VTKFile>
   )";
 
@@ -124,11 +123,7 @@ public:
 
     movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
 
-    NumOfCells = mesh_vis->Nelements * std::pow(mesh_vis->N, mesh_vis->dim);
-    NumberOfPoints = mesh_vis->Nlocal;
-
     timerPrefix = "nekAdios_" + streamName + "::";
-    VTK_CELL_TYPE = 12; // VTK_HEXAHEDRON
 
     platform->timer.addUserStat(timerPrefix);
 
@@ -161,9 +156,7 @@ public:
   ~NekAdios()
   {
     if (mesh_vis != mesh) {
-      free(mesh_vis->x);
-      free(mesh_vis->y);
-      free(mesh_vis->z);
+      meshFree(mesh_vis);
 
       mesh_vis->o_x.free();
       mesh_vis->o_y.free();
@@ -182,14 +175,81 @@ public:
     userFieldList.push_back(std::tuple{name, o_fld.slice(0, mesh_fld->dim * offset), mesh_fld, offset});
   }
 
-  void clearData()
+  void clearFieldData()
   {
     userFieldList.clear();
+  }
+
+  template <typename OutputType>
+  void convertField(mesh_t *mesh_fld, const std::vector<occa::memory> &o_fld, occa::memory& fldData)
+  {
+    const auto dim_fld = o_fld.size(); 
+    nekrsCheck(dim_fld != 1 && dim_fld != 3,
+               MPI_COMM_SELF,
+               EXIT_FAILURE,
+               "%s %d\n",
+               "invalid field dimension=",
+               dim_fld);
+
+    auto fldDataPtr = static_cast<OutputType*>(fldData.ptr());
+    for (int n = 0; n < fldData.size(); ++n) fldDataPtr[n] = 1;
+
+    auto fld = [&](const int dim_i) 
+    {
+      nekrsCheck(o_fld[dim_i].dtype().name() != dfloatString,
+                 MPI_COMM_SELF,
+                 EXIT_FAILURE,
+                 "%s %s\n",
+                 "invalid field data type=",
+                 o_fld[dim_i].dtype().name().c_str());
+
+      if (!uniform && (mesh_vis->N == mesh_fld->N)) {
+        return o_fld[dim_i]; 
+      } 
+
+      auto o_out = platform->o_memPool.reserve<dfloat>(mesh_vis->Nlocal);
+
+      if (uniform) {
+        mesh_fld->map2Uniform(mesh_vis, o_fld[dim_i], o_out);
+      } else {
+        mesh_fld->interpolate(mesh_vis, o_fld[dim_i], o_out);
+      }
+
+      o_out.copyTo(work[dim_i]);
+      
+      return work[dim_i];
+    };
+
+    if (dim_fld == 1) {
+      auto fld0 = fld(0);
+      auto fld0Ptr = static_cast<dfloat*>(fld0.ptr());
+
+      for (int n = 0; n < fld0.size(); ++n) {
+        fldDataPtr[n] = fld0Ptr[n];
+      }
+    } else if (dim_fld == 3) {
+      auto fld0 = fld(0);
+      auto fld0Ptr = static_cast<dfloat*>(fld0.ptr());
+   
+      auto fld1 = fld(1);
+      auto fld1Ptr = static_cast<dfloat*>(fld1.ptr());
+
+      auto fld2 = fld(2);
+      auto fld2Ptr = static_cast<dfloat*>(fld2.ptr());
+
+      // VTK expects AOS
+      for (int n = 0; n < fld0.size(); ++n) {
+        fldDataPtr[n * 3 + 0] = fld0Ptr[n];
+        fldDataPtr[n * 3 + 1] = fld1Ptr[n];
+        fldDataPtr[n * 3 + 2] = fld2Ptr[n];
+      }
+    }
   }
 
   template <typename OutputType = float>
   void write(double time, int tstep)
   {
+
     nekrsCheck(!initialized, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "called prior to initialization!");
 
     platform->timer.tic(timerPrefix + "write");
@@ -200,38 +260,52 @@ public:
     const double tStart = MPI_Wtime();
 
     static bool firstTime = true;
-    size_t bytes = 0;
 
-    // ensure that the data remains valid until EndStep() is reached
-    std::vector<OutputType> vertices;
-    std::vector<uint64_t> etov;
-    std::vector<std::vector<OutputType>> fldData;
+    // pre-allocate all required host pool memory as 
+    // no resizing is allowed prior to PerformPuts()
+    verticesOut = platform->memPool.reserve<OutputType>(mesh_vis->dim * mesh_vis->Nlocal);
+    for (auto &entry : userFieldList) {
+      auto& o_fld = std::get<1>(entry);
+      auto& offset_fld = std::get<3>(entry);
+      const auto dim_fld = (offset_fld) ? o_fld.size() / offset_fld : 1;
+
+      fldDataOut.push_back(platform->memPool.reserve<OutputType>(dim_fld * mesh_vis->Nlocal)); 
+    }
+    for (int i = 0; i < mesh_vis->dim; i++) {
+      work.push_back(platform->memPool.reserve<dfloat>(mesh_vis->Nlocal));
+    }
+
+    if (firstTime) { 
+      io.DefineAttribute<std::string>("vtk.xml", vtkSchema());
+    }
 
     engine.BeginStep();
+
+    size_t writtenBytes;
 
     auto var_time = defineVariable<double>("TIME");
     engine.Put(var_time, time);
 
-    if (firstTime) { 
-      io.DefineAttribute<std::string>("vtk.xml", vtkSchema(NumberOfPoints, NumOfCells, userFieldList));
-    }
-
     if (firstTime || movingMesh) {
+      auto putMode = adios2::Mode::Sync;
+
       if (firstTime) {
         auto var_types = defineVariable<uint32_t>("types");
-        engine.Put(var_types, VTK_CELL_TYPE);
+        engine.Put(var_types, VTK_CELL_TYPE, putMode);
 
+        const uint32_t NumOfCells = mesh_vis->Nelements * std::pow(mesh_vis->N, mesh_vis->dim);
         auto var_NumOfCells = defineVariable<uint32_t>("NumOfCells");
-        engine.Put(var_NumOfCells, NumOfCells);
+        engine.Put(var_NumOfCells, NumOfCells, putMode);
 
-        auto var_NumberOfPoints = defineVariable<uint32_t>("NumberOfPoints");
-        engine.Put(var_NumberOfPoints, NumberOfPoints);
+        auto var_NumOfPoints = defineVariable<uint32_t>("NumOfPoints");
+        engine.Put(var_NumOfPoints, static_cast<uint32_t>(mesh_vis->Nlocal), putMode);
 
         auto var_connectivity = defineVariable<uint64_t>("connectivity",
             {static_cast<size_t>(NumOfCells), static_cast<size_t>(mesh_vis->Nverts + 1)});
 
+        const auto etov = [&] ()
         {
-          etov.resize(NumOfCells * (mesh_vis->Nverts + 1));
+          std::vector<uint64_t> etov(NumOfCells * (mesh_vis->Nverts + 1));
           const auto Nq = mesh_vis->Nq;
           const auto NqPlane = Nq * Nq;
 
@@ -258,15 +332,19 @@ public:
               }
             }
           }
-        }
-        engine.Put(var_connectivity, etov.data());
-        bytes += etov.size() * sizeof(uint64_t);
+
+          return etov;
+        }();
+
+        engine.Put(var_connectivity, etov.data(), putMode);
+        writtenBytes += etov.size() * sizeof(uint64_t);
       }
 
+#if 0
       if (uniform) {
-        mesh->map2Uniform(mesh_vis->N, mesh->o_x, mesh_vis->o_x);
-        mesh->map2Uniform(mesh_vis->N, mesh->o_y, mesh_vis->o_y);
-        mesh->map2Uniform(mesh_vis->N, mesh->o_z, mesh_vis->o_z);
+        mesh->map2Uniform(mesh_vis, mesh->o_x, mesh_vis->o_x);
+        mesh->map2Uniform(mesh_vis, mesh->o_y, mesh_vis->o_y);
+        mesh->map2Uniform(mesh_vis, mesh->o_z, mesh_vis->o_z);
       } else if (mesh_vis->N != mesh->N) {
         mesh->interpolate(mesh_vis, mesh->o_x, mesh_vis->o_x);
         mesh->interpolate(mesh_vis, mesh->o_y, mesh_vis->o_y);
@@ -276,108 +354,80 @@ public:
       mesh_vis->o_y.copyTo(mesh_vis->y);
       mesh_vis->o_z.copyTo(mesh_vis->z);
 
-      auto var_vertices =
-          defineVariable<OutputType>("vertices", {static_cast<size_t>(NumberOfPoints), static_cast<size_t>(mesh_vis->dim)});
-      vertices.resize(NumberOfPoints * mesh_vis->dim);
+      vertices.resize(mesh_vis->Nlocal * mesh_vis->dim);
 
       // VTK expects AOS
-      for (int i = 0; i < NumberOfPoints; ++i) {
+      for (int i = 0; i < mesh_vis->Nlocal; ++i) {
         vertices[i * mesh_vis->dim + 0] = mesh_vis->x[i];
         vertices[i * mesh_vis->dim + 1] = mesh_vis->y[i];
         vertices[i * mesh_vis->dim + 2] = mesh_vis->z[i];
       }
+#endif
 
-      engine.Put(var_vertices, vertices.data());
-      bytes += vertices.size() * sizeof(OutputType);
+      std::vector<occa::memory> o_xyz;
+      o_xyz.push_back(mesh->o_x);
+      o_xyz.push_back(mesh->o_y);
+      o_xyz.push_back(mesh->o_z);
+
+      convertField<OutputType>(mesh, o_xyz, verticesOut);
+
+      auto var_vertices =
+          defineVariable<OutputType>("vertices", {static_cast<size_t>(mesh_vis->Nlocal), static_cast<size_t>(mesh_vis->dim)});
+
+      engine.Put(var_vertices, static_cast<OutputType*>(verticesOut.ptr()), putMode);
+      writtenBytes += verticesOut.size() * sizeof(OutputType);
 
       firstTime = false; 
     }
 
+    int fldIdx = 0;
     for (auto &entry : userFieldList) {
-      const auto& fieldName = std::get<0>(entry);
-      const auto& o_fld = std::get<1>(entry);
-      const auto& mesh_fld = std::get<2>(entry);
-      const auto& offset_fld = std::get<3>(entry);
+      auto& fieldName = std::get<0>(entry);
+      auto& o_fld = std::get<1>(entry);
+      auto& mesh_fld = std::get<2>(entry);
+      auto& offset_fld = std::get<3>(entry);
 
-      nekrsCheck(o_fld.dtype().name() != ogsDfloat,
-                 MPI_COMM_SELF,
-                 EXIT_FAILURE,
-                 "%s %s\n",
-                 "invalid field data type=",
-                 o_fld.dtype().name().c_str());
+      std::vector<occa::memory> o_fldVec;
+      o_fldVec.push_back(o_fld.slice(0 * offset_fld, mesh_fld->Nlocal));
+      o_fldVec.push_back(o_fld.slice(1 * offset_fld, mesh_fld->Nlocal));
+      o_fldVec.push_back(o_fld.slice(2 * offset_fld, mesh_fld->Nlocal));
 
-      const auto dim_fld = (offset_fld) ? static_cast<int>(o_fld.size() / offset_fld) : 1;
-      nekrsCheck(!(dim_fld == 1 || dim_fld == 3),
-                 MPI_COMM_SELF,
-                 EXIT_FAILURE,
-                 "%s %d\n",
-                 "invalid field dimension=",
-                 dim_fld);
-
-      const auto expectedSize = (dim_fld > 1) ? dim_fld * offset_fld : mesh_fld->Nlocal;
-      nekrsCheck(o_fld.size() < expectedSize,
-                 MPI_COMM_SELF,
-                 EXIT_FAILURE,
-                 "%s %s\n",
-                 "invalid field data type=",
-                 o_fld.dtype().name().c_str());
-
-      std::vector<OutputType> fldEntry(dim_fld * NumberOfPoints, 0);
-      for (int dim_i = 0; dim_i < dim_fld; dim_i++) {
-        auto o_fldEntryOut = [&]()
-        {
-          const auto o_fldEntry = o_fld.slice(dim_i * offset_fld, mesh_fld->Nlocal);
-
-          if (uniform || (mesh_vis->N != mesh_fld->N)) {
-            auto o_fldEntryOut = 
-              platform->o_memPool.reserve<dfloat>(mesh_fld->Nelements * mesh_vis->Np);
-            if (uniform) {
-              mesh_fld->map2Uniform(mesh_vis->N, o_fldEntry, o_fldEntryOut);
-            } else {
-              mesh_fld->interpolate(mesh_vis, o_fldEntry, o_fldEntryOut);
-            }
-
-            return o_fldEntryOut;
-          }
-
-          return o_fldEntry;
-        }();
-
-        std::vector<dfloat> fldEntryOut(o_fldEntryOut.size());
-        o_fldEntryOut.copyTo(fldEntryOut.data());
-
-        // VTK expects AOS
-        for (int n = 0; n < fldEntryOut.size(); ++n) {
-          fldEntry[n * dim_fld + dim_i] = fldEntryOut[n];
-        }
-      }
-      fldData.push_back(fldEntry);
-
+      auto& fldDataOutEntry = fldDataOut[fldIdx++];
+      convertField<OutputType>(mesh_fld, o_fldVec, fldDataOutEntry);
+ 
       const auto count = [&]() {
+        size_t dim_fld = fldDataOutEntry.size() / mesh_vis->Nlocal;
         if (dim_fld > 1) {
-          return adios2::Dims{static_cast<size_t>(NumberOfPoints), static_cast<size_t>(dim_fld)};
+          return adios2::Dims{static_cast<size_t>(mesh_vis->Nlocal), dim_fld};
         } else {
-          return adios2::Dims{static_cast<size_t>(NumberOfPoints)};
+          return adios2::Dims{static_cast<size_t>(mesh_vis->Nlocal)};
         }
       }();
 
       auto var = defineVariable<OutputType>(fieldName, count);
-      engine.Put(var, fldEntry.data());
-      bytes += fldEntry.size() * sizeof(OutputType);
+      engine.Put(var, static_cast<OutputType*>(fldDataOutEntry.ptr()));
+      writtenBytes += fldDataOutEntry.size() * sizeof(OutputType);
     }
 
-
+    engine.PerformPuts();
     engine.EndStep();
 
+    verticesOut.free();
+    fldDataOut.clear();
+    work.clear();
+
     platform->timer.toc(timerPrefix + "write");
+
+    MPI_Barrier(platform->comm.mpiComm);
     if (platform->comm.mpiRank == 0) {
       const auto timeWrite = MPI_Wtime() - tStart;
-      printf(" done (%gs, %.1gGB/s)\n", timeWrite, bytes/timeWrite/1e9);
+      printf(" done (%gs, %.2fGB/s)\n", timeWrite, writtenBytes/timeWrite/1e9);
     }
     fflush(stdout);
 
     initialized = true;
   }
+
 
 };
 

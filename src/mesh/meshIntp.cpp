@@ -35,20 +35,19 @@ occa::memory mesh_t::intpMatrix(std::vector<dfloat> M)
 
 void mesh_t::interpolate(mesh_t *mesh, const occa::memory& o_z, occa::memory& o_zM)
 {
-  nekrsCheck(this->Nelements != mesh->Nelements, 
-             MPI_COMM_SELF, 
-             EXIT_FAILURE, 
-             "%s\n", 
-             "number of elements must match");
-
   std::vector<dfloat> M(mesh->Nq);
   for(int i = 0; i < M.size(); i++) M[i] = mesh->r[i];
+
   platform->linAlg->fill(mesh->Nlocal, 0.0, o_zM);
-  this->intpKernel[mesh->N](this->Nelements, intpMatrix(M), o_z, o_zM);
+
+  const dlong nel = std::min(this->Nelements, mesh->Nelements);
+  this->intpKernel[mesh->N](nel, intpMatrix(M), o_z, o_zM);
 }
 
-void mesh_t::map2Uniform(int Nu, const occa::memory& o_z, occa::memory& o_zU)
+void mesh_t::map2Uniform(mesh_t *meshU, const occa::memory& o_z, occa::memory& o_zU)
 {
+  const auto Nu = meshU->N;
+
   auto U = [&]()
   {
     std::vector<dfloat> r(Nu + 1);
@@ -66,5 +65,5 @@ void mesh_t::map2Uniform(int Nu, const occa::memory& o_z, occa::memory& o_zU)
 
 void mesh_t::map2Uniform(const occa::memory& o_z, occa::memory& o_zU)
 {
-  map2Uniform(this->N, o_z, o_zU); 
+  map2Uniform(this, o_z, o_zU); 
 }

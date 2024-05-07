@@ -215,6 +215,14 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
     o_memPool = device.occaDevice().createMemoryPool(properties);
     o_memPool.setAlignment(ALIGN_SIZE);
   }
+
+  {
+    occa::json properties;
+    properties["resize_through_host"] = 1;
+    properties["host"] = true;
+    memPool = device.occaDevice().createMemoryPool(properties);
+    memPool.setAlignment(ALIGN_SIZE);
+  }
 }
 
 // input files required for JIT kernel compilation or load 
