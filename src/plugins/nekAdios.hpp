@@ -109,14 +109,6 @@ public:
         meshNew->Nfaces = mesh->Nfaces;
         meshNew->NfaceVertices = mesh->NfaceVertices;
         meshLoadReferenceNodesHex3D(meshNew, N, 0);
-
-        meshNew->x = (dfloat*) std::calloc(meshNew->Nlocal, sizeof(dfloat));
-        meshNew->y = (dfloat*) std::calloc(meshNew->Nlocal, sizeof(dfloat));
-        meshNew->z = (dfloat*) std::calloc(meshNew->Nlocal, sizeof(dfloat));
-
-        meshNew->o_x = platform->device.malloc<dfloat>(meshNew->Nlocal);
-        meshNew->o_y = platform->device.malloc<dfloat>(meshNew->Nlocal);
-        meshNew->o_z = platform->device.malloc<dfloat>(meshNew->Nlocal);
       }
       return meshNew;
     }();
@@ -157,10 +149,6 @@ public:
   {
     if (mesh_vis != mesh) {
       meshFree(mesh_vis);
-
-      mesh_vis->o_x.free();
-      mesh_vis->o_y.free();
-      mesh_vis->o_z.free();
     }
     close();
   }
