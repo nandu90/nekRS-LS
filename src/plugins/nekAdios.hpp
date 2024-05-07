@@ -192,7 +192,7 @@ public:
                dim_fld);
 
     auto fldDataPtr = static_cast<OutputType*>(fldData.ptr());
-    for (int n = 0; n < fldData.size(); ++n) fldDataPtr[n] = 1;
+    for (int n = 0; n < fldData.size(); ++n) fldDataPtr[n] = 0;
 
     auto fld = [&](const int dim_i) 
     {
@@ -340,30 +340,6 @@ public:
         writtenBytes += etov.size() * sizeof(uint64_t);
       }
 
-#if 0
-      if (uniform) {
-        mesh->map2Uniform(mesh_vis, mesh->o_x, mesh_vis->o_x);
-        mesh->map2Uniform(mesh_vis, mesh->o_y, mesh_vis->o_y);
-        mesh->map2Uniform(mesh_vis, mesh->o_z, mesh_vis->o_z);
-      } else if (mesh_vis->N != mesh->N) {
-        mesh->interpolate(mesh_vis, mesh->o_x, mesh_vis->o_x);
-        mesh->interpolate(mesh_vis, mesh->o_y, mesh_vis->o_y);
-        mesh->interpolate(mesh_vis, mesh->o_z, mesh_vis->o_z);
-      }
-      mesh_vis->o_x.copyTo(mesh_vis->x);
-      mesh_vis->o_y.copyTo(mesh_vis->y);
-      mesh_vis->o_z.copyTo(mesh_vis->z);
-
-      vertices.resize(mesh_vis->Nlocal * mesh_vis->dim);
-
-      // VTK expects AOS
-      for (int i = 0; i < mesh_vis->Nlocal; ++i) {
-        vertices[i * mesh_vis->dim + 0] = mesh_vis->x[i];
-        vertices[i * mesh_vis->dim + 1] = mesh_vis->y[i];
-        vertices[i * mesh_vis->dim + 2] = mesh_vis->z[i];
-      }
-#endif
-
       std::vector<occa::memory> o_xyz;
       o_xyz.push_back(mesh->o_x);
       o_xyz.push_back(mesh->o_y);
@@ -374,7 +350,7 @@ public:
       auto var_vertices =
           defineVariable<OutputType>("vertices", {static_cast<size_t>(mesh_vis->Nlocal), static_cast<size_t>(mesh_vis->dim)});
 
-      engine.Put(var_vertices, static_cast<OutputType*>(verticesOut.ptr()), putMode);
+      engine.Put(var_vertices, static_cast<OutputType*>(verticesOut.ptr()));
       writtenBytes += verticesOut.size() * sizeof(OutputType);
 
       firstTime = false; 
@@ -388,9 +364,10 @@ public:
       auto& offset_fld = std::get<3>(entry);
 
       std::vector<occa::memory> o_fldVec;
-      o_fldVec.push_back(o_fld.slice(0 * offset_fld, mesh_fld->Nlocal));
-      o_fldVec.push_back(o_fld.slice(1 * offset_fld, mesh_fld->Nlocal));
-      o_fldVec.push_back(o_fld.slice(2 * offset_fld, mesh_fld->Nlocal));
+      const auto dim_fld = (offset_fld) ? o_fld.size() / offset_fld : 1;
+      for (int i = 0; i < dim_fld; i++) {
+        o_fldVec.push_back(o_fld.slice(i * offset_fld, mesh_fld->Nlocal));
+      }
 
       auto& fldDataOutEntry = fldDataOut[fldIdx++];
       convertField<OutputType>(mesh_fld, o_fldVec, fldDataOutEntry);
