@@ -1,0 +1,177 @@
+#include "udf.hpp"
+
+static constexpr double  L = 2*M_PI; // domain (box) length
+
+#ifdef __okl__
+
+@kernel void kEnergy(const dlong Ntotal, 
+                     const dlong offset,
+                     @ restrict const dfloat *U, 
+                     @ restrict dfloat *k)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    const dfloat u = U[n + 0 * offset];
+    const dfloat v = U[n + 1 * offset];
+    const dfloat w = U[n + 2 * offset];
+    k[n + 0 * offset] = 0.5 * (u*u + v*v + w*w);
+  }
+}
+
+@kernel void Au(const dlong Ntotal,
+                const dlong offset,
+                const dfloat A,
+                @ restrict const dfloat *U,
+                @ restrict dfloat *NU)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    const dfloat u = U[n + 0 * offset];
+    const dfloat v = U[n + 1 * offset];
+    const dfloat w = U[n + 2 * offset];
+    NU[n + 0 * offset] = A*u;
+    NU[n + 1 * offset] = A*v;
+    NU[n + 2 * offset] = A*w;
+  }
+}
+
+#endif
+
+// according to Eq(7) in https://doi.org/10.1063/1.4944629
+void linearForcing(dfloat time)
+{
+  const auto G = 10.0; 
+
+  dfloat mue, rho;
+  platform->options.getArgs("VISCOSITY", mue);
+  platform->options.getArgs("DENSITY", rho);
+  const auto nu = mue / rho;
+
+
+  // mue = 1 / Re_lambda  where Re_lambda = sqrt(15 * u' * l / nu)
+  const auto l = 0.19 * L;   // integral length scale (given by method)
+  const auto uPrime = 1. / l;
+  const auto invTau0 = uPrime / l;
+  const auto k0 = 1.5 * uPrime * uPrime;
+
+  auto mesh = nrs->meshV;
+
+  auto o_Uprime = [&]() 
+  {
+    poolDeviceMemory<dfloat> o_Uprime(nrs->NVfields * nrs->fieldOffset);
+    poolDeviceMemory<dfloat> o_Uavg(nrs->NVfields * nrs->fieldOffset); 
+
+    auto o_uAvg = o_Uavg + 0 * nrs->fieldOffset;
+    auto o_vAvg = o_Uavg + 1 * nrs->fieldOffset;
+    auto o_wAvg = o_Uavg + 2 * nrs->fieldOffset;
+
+    const auto o_UVW = nrs->o_U;
+    auto avg = platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_UVW + 0*nrs->fieldOffset, platform->comm.mpiComm) / mesh->volume;
+    platform->linAlg->fill(mesh->Nlocal, avg, o_uAvg);
+
+    avg = platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_UVW + 1*nrs->fieldOffset, platform->comm.mpiComm) / mesh->volume;
+    platform->linAlg->fill(mesh->Nlocal, avg, o_vAvg);
+
+    avg = platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_UVW + 2*nrs->fieldOffset, platform->comm.mpiComm) / mesh->volume;
+    platform->linAlg->fill(mesh->Nlocal, avg, o_wAvg);
+ 
+    platform->linAlg->axpbyz(nrs->NVfields * nrs->fieldOffset, 1.0, nrs->o_U, -1.0, o_Uavg, o_Uprime); 
+    return o_Uprime; 
+  }();
+
+  const auto magSijSqrVolAvg = [&]()
+  {
+    auto o_Sij = nrs->strainRate();
+    poolDeviceMemory<dfloat> o_magSijSqr(nrs->fieldOffset);
+    platform->linAlg->magSqrSymTensor(mesh->Nlocal, nrs->fieldOffset, o_Sij, o_magSijSqr); 
+    return platform->linAlg->innerProd(mesh->Nlocal,
+                                       o_magSijSqr,
+                                       mesh->o_LMM,
+                                       platform->comm.mpiComm,
+                                       0) / mesh->volume;
+  }();
+
+  const auto kVolAvg = [&]()
+  {
+    poolDeviceMemory<dfloat> o_k(nrs->fieldOffset);
+    kEnergy(mesh->Nlocal, nrs->fieldOffset, o_Uprime, o_k);
+    return platform->linAlg->innerProd(mesh->Nlocal,
+                                       o_k,
+                                       mesh->o_LMM,
+                                       platform->comm.mpiComm,
+                                       0) / mesh->volume;
+  }();
+
+  const auto epsVolAvg = 2 * nu * magSijSqrVolAvg;
+  const auto A = (epsVolAvg - G*(kVolAvg  - k0) * invTau0) / (2 * kVolAvg);
+
+  Au(mesh->Nlocal,
+     nrs->fieldOffset,
+     A,
+     o_Uprime, 
+     nrs->o_NLT);
+
+  if (platform->comm.mpiRank == 0) {
+    std::cout << "A=" << A 
+              << "  k=" << kVolAvg 
+              << "  k0=" << k0 
+              << "  Re_lambda=" << std::sqrt(45 * A * l*l / nu)
+              << std::endl;
+  }
+}
+
+void UDF_Setup()
+{
+  nrs->userVelocitySource = &linearForcing;
+
+  auto rescaleMesh = [&](dfloat x0, dfloat x1, mesh_t *mesh) 
+  {
+    const auto Nlocal = mesh->Nlocal;
+
+    auto xMin = platform->linAlg->min(Nlocal, mesh->o_x, platform->comm.mpiComm);
+    auto xMax = platform->linAlg->max(Nlocal, mesh->o_x, platform->comm.mpiComm);
+    auto scaleX = (x1 - x0) / (xMax - xMin);
+
+    auto yMin = platform->linAlg->min(Nlocal, mesh->o_y, platform->comm.mpiComm);
+    auto yMax = platform->linAlg->max(Nlocal, mesh->o_y, platform->comm.mpiComm);
+    auto scaleY = (x1 - x0) / (yMax - yMin);
+
+    auto zMin = platform->linAlg->min(Nlocal, mesh->o_z, platform->comm.mpiComm);
+    auto zMax = platform->linAlg->max(Nlocal, mesh->o_z, platform->comm.mpiComm);
+    auto scaleZ = (x1 - x0) / (zMax - zMin);
+
+    for(int i = 0; i < Nlocal; i++) {
+      mesh->x[i] = x0 + scaleX * (mesh->x[i] - xMin);
+      mesh->y[i] = x0 + scaleY * (mesh->y[i] - yMin);
+      mesh->z[i] = x0 + scaleZ * (mesh->z[i] - zMin);
+    }
+  };
+
+  rescaleMesh(-L/2, L/2, nrs->meshV); 
+
+  // set IC
+  if (platform->options.getArgs("RESTART FILE NAME").empty()) {
+    auto mesh = nrs->meshV;
+ 
+    const auto eps = 0.1;
+    const auto kx = 23.0;
+    const auto kz = 13.0;
+    const auto alpha = kx;
+    const auto beta = kz;
+
+    for (int n = 0; n < mesh->Nlocal; n++) {
+      const auto x = mesh->x[n];
+      const auto y = mesh->y[n];
+      const auto z = mesh->z[n];
+
+      nrs->U[n + 0 * nrs->fieldOffset] =  eps * beta  * sin(alpha * x) * cos(beta * z);
+      nrs->U[n + 1 * nrs->fieldOffset] =  eps         * sin(alpha * x) * sin(beta * z);
+      nrs->U[n + 2 * nrs->fieldOffset] = -eps * alpha * cos(alpha * x) * sin(beta * z);
+    }
+  }
+}
+
+void UDF_ExecuteStep(double time, int tstep)
+{
+   if (nrs->isCheckpointStep) {
+     nrs->Qcriterion(nrs->o_U, nrs->cds->o_S);
+   }
+}

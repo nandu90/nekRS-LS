@@ -1,0 +1,43 @@
+[GENERAL]
+#verbose = true
+polynomialOrder = 7
+cubaturePolynomialOrder = 9 
+
+#startFrom = "r.fld"+time=0
+stopAt = endTime
+endTime = 100 
+
+timeStepper = tombo2
+dt = targetCFL=2.0 + max=2e-2
+
+writeControl = simulationTime 
+writeInterval = 10
+
+regularization = hpfrt + nModes=1 + scalingCoeff=10
+
+[PRESSURE]
+residualTol = 1e-04
+
+solver = pfcg 
+smootherType = Jac+Cheby
+
+[VELOCITY]
+boundaryTypeMap = none
+density = 1.0
+
+viscosity = 1/200 
+residualTol = 1e-06
+
+[SCALAR00]
+solver = none
+
+[CASEDATA]
+eps = 1.0
+U0 = 0
+V0 = 0
+W0 = 0 
+
+[BOOMERAMG]
+#smootherType = 18
+iterations = 1
+chebyshevRelaxOrder = 1
