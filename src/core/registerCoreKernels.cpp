@@ -55,6 +55,10 @@ void registerCoreKernels()
   fileName = oklpath + "/core/" + kernelName + ".okl";
   platform->kernelRequests.add(section + kernelName, fileName, meshProps);
 
+  kernelName = "curl" + suffix;
+  fileName = oklpath + "/core/" + kernelName + ".okl";
+  platform->kernelRequests.add(section + kernelName, fileName, meshProps);
+
   kernelName = "filterRT" + suffix;
   fileName = oklpath + "/core/" + kernelName + ".okl";
   platform->kernelRequests.add(section + kernelName, fileName, meshProps);

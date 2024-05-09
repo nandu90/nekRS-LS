@@ -13,6 +13,7 @@ occa::memory divergence(mesh_t *mesh, const occa::memory& o_in, dlong offset);
 occa::memory strongDivergence(mesh_t *mesh, const occa::memory& o_in, dlong offset); 
 occa::memory laplacian(mesh_t *mesh, const occa::memory& o_lambda, const occa::memory& o_in, dlong offset);
 occa::memory strongLaplacian(mesh_t *mesh, const occa::memory& o_lambda, const occa::memory& o_in, dlong offset);
+occa::memory strongCurl(mesh_t *mesh, const occa::memory& o_in, dlong offset);
 
 }
 

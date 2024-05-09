@@ -95,10 +95,6 @@ void registerNrsKernels(occa::properties kernelInfoBC)
       }
     }
 
-    kernelName = "curl" + suffix;
-    fileName = oklpath + "/nrs/" + kernelName + ".okl";
-    platform->kernelRequests.add(section + kernelName, fileName, meshProps);
-
     kernelName = "SijOij" + suffix;
     fileName = oklpath + "/nrs/" + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, meshProps);

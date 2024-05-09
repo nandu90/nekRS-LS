@@ -233,6 +233,7 @@ public:
 
   void Qcriterion(const occa::memory &o_U, occa::memory &o_Q);
   occa::memory Qcriterion(const occa::memory &o_U);
+  occa::memory Qcriterion();
 
   void writeCheckpoint(double t, int step, bool enforceOutXYZ = false, bool enforceFP64 = false, int Nout = 0, bool uniform = false);
 

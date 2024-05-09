@@ -9,7 +9,7 @@ namespace opSEM
 
 occa::memory grad(mesh_t *mesh, const occa::memory &o_in, dlong offset)
 {
-  occa::memory o_out = platform->o_memPool.reserve<dfloat>(mesh->dim * offset);
+  auto o_out = platform->o_memPool.reserve<dfloat>(mesh->dim * offset);
   static occa::kernel kernel;
   if (!kernel.isInitialized()) {
     kernel = platform->kernelRequests.load(section + "wgradientVolume" + suffix);
@@ -21,7 +21,7 @@ occa::memory grad(mesh_t *mesh, const occa::memory &o_in, dlong offset)
 
 occa::memory strongGrad(mesh_t *mesh, const occa::memory &o_in, dlong offset)
 {
-  occa::memory o_out = platform->o_memPool.reserve<dfloat>(mesh->dim * offset);
+  auto o_out = platform->o_memPool.reserve<dfloat>(mesh->dim * offset);
   static occa::kernel kernel;
   if (!kernel.isInitialized()) {
     kernel = platform->kernelRequests.load(section + "gradientVolume" + suffix);
@@ -33,7 +33,7 @@ occa::memory strongGrad(mesh_t *mesh, const occa::memory &o_in, dlong offset)
 
 occa::memory divergence(mesh_t *mesh, const occa::memory &o_in, dlong offset)
 {
-  occa::memory o_out = platform->o_memPool.reserve<dfloat>(offset);
+  auto o_out = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
   static occa::kernel kernel;
   if (!kernel.isInitialized()) {
     kernel = platform->kernelRequests.load(section + "wDivergenceVolume" + suffix);
@@ -45,7 +45,7 @@ occa::memory divergence(mesh_t *mesh, const occa::memory &o_in, dlong offset)
 
 occa::memory strongDivergence(mesh_t *mesh, const occa::memory &o_in, dlong offset)
 {
-  occa::memory o_out = platform->o_memPool.reserve<dfloat>(offset);
+  auto o_out = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
   static occa::kernel kernel;
   if (!kernel.isInitialized()) {
     kernel = platform->kernelRequests.load(section + "divergenceVolume" + suffix);
@@ -57,7 +57,7 @@ occa::memory strongDivergence(mesh_t *mesh, const occa::memory &o_in, dlong offs
 
 occa::memory laplacian(mesh_t *mesh, const occa::memory &o_lambda, const occa::memory &o_in, dlong offset)
 {
-  occa::memory o_out = platform->o_memPool.reserve<dfloat>(offset);
+  auto o_out = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
   static occa::kernel kernel;
   if (!kernel.isInitialized()) {
     kernel = platform->kernelRequests.load(section + "weakLaplacian" + suffix);
@@ -73,6 +73,19 @@ strongLaplacian(mesh_t *mesh, const occa::memory &o_lambda, const occa::memory &
   auto o_tmp = strongGrad(mesh, o_in, offset);
   oogs::startFinish(o_tmp, mesh->dim, offset, ogsDfloat, ogsAdd, mesh->oogs);
   return strongDivergence(mesh, o_tmp, offset);
+}
+
+occa::memory strongCurl(mesh_t *mesh, const occa::memory& o_in, dlong offset)
+{
+  auto o_out = platform->o_memPool.reserve<dfloat>(mesh->dim * offset);
+  static occa::kernel kernel;
+  if (!kernel.isInitialized()) {
+    kernel = platform->kernelRequests.load(section + "curl" + suffix);
+  }
+  const dlong scaleJW = 0;
+  kernel(mesh->Nelements, scaleJW, mesh->o_vgeo, mesh->o_D, offset, o_in, o_out);
+
+  return o_out;
 }
 
 } // namespace opSEM

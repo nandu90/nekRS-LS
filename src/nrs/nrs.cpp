@@ -83,11 +83,11 @@ static void assignKernels(nrs_t *nrs)
       }
     }
 
-    kernelName = "curl" + suffix;
-    nrs->curlKernel = platform->kernelRequests.load(section + kernelName);
-
     kernelName = "SijOij" + suffix;
     nrs->SijOijKernel = platform->kernelRequests.load(section + kernelName);
+
+    kernelName = "curl" + suffix;
+    nrs->curlKernel = platform->kernelRequests.load("core-" + kernelName);
 
     kernelName = "gradientVolume" + suffix;
     nrs->gradientVolumeKernel = platform->kernelRequests.load("core-" + kernelName);

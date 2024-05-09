@@ -33,15 +33,7 @@ void printDiagnostics(nrs_t *nrs, double time, int tstep)
 
   const auto enstrophy = [&] () {
     const dfloat scale = 0.5 / mesh->volume;
-    poolDeviceMemory<dfloat> o_curlU(nrs->NVfields * nrs->fieldOffset);
-    nrs->curlKernel(mesh->Nelements,
-                    0,
-                    mesh->o_vgeo,
-                    mesh->o_D,
-                    nrs->fieldOffset,
-                    nrs->o_U,
-                    o_curlU);
-
+    o_curlU = opSEM::strongCurl(mesh, nrs->o_U, nrs->fieldOffset);
     poolDeviceMemory<dfloat> o_magCurlU(nrs->fieldOffset);
     magSqr(mesh->Nlocal, nrs->fieldOffset, o_curlU, o_magCurlU);
 
