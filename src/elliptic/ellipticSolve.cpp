@@ -40,9 +40,24 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
 
   int maxIter = 999;
   options.getArgs("MAXIMUM ITERATIONS", maxIter);
-  const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
 
-  elliptic->resNormFactor = 1 / mesh->volume;
+  const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+  const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
+
+
+  if (platform->options.compareArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "LEGACY")) { 
+    if (!elliptic->o_residualWeight.isInitialized()) {
+      elliptic->o_residualWeight = platform->device.malloc<dfloat>(mesh->Nlocal);
+    }
+    static auto firstTime = true;
+    if (movingMesh || firstTime) {
+      elliptic->o_residualWeight.copyFrom(elliptic->o_invDegree);
+      platform->linAlg->scale(mesh->Nlocal, 1 / mesh->volume, elliptic->o_residualWeight);
+      firstTime = false;
+    }
+  } else {
+    elliptic->o_residualWeight = mesh->o_invAJwTimesInvDegree;
+  }
 
   std::string timerName = elliptic->name;
   if (timerName.find("scalar") != std::string::npos) {
@@ -113,9 +128,9 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
     return platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                elliptic->Nfields,
                                                elliptic->fieldOffset,
-                                               elliptic->o_invDegree,
+                                               elliptic->o_residualWeight,
                                                o_r,
-                                               platform->comm.mpiComm) * sqrt(elliptic->resNormFactor);
+                                               platform->comm.mpiComm);
   };
 
   if (options.compareArgs("INITIAL GUESS", "PROJECTION") ||

@@ -18,6 +18,7 @@
 * `nek::userchk` is no longer called automatically during setup 
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
 * send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd` (no automatic check every N steps)
+* linear solver's stopping criteria changed resulting in increased iteration counts for a given tolerance 
 
 ## Breaking Changes
 * call `build.sh` instead of `nrsconfig` to build nekRS

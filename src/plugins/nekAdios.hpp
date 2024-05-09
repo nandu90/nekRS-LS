@@ -277,7 +277,7 @@ public:
     if (firstTime || movingMesh) {
       auto putMode = adios2::Mode::Sync;
 
-      if (firstTime) {
+      if (firstTime || movingMesh) {
         auto var_types = defineVariable<uint32_t>("types");
         engine.Put(var_types, VTK_CELL_TYPE, putMode);
 

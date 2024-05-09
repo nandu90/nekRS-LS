@@ -213,6 +213,8 @@ struct mesh_t {
 
   occa::memory& o_Jw = o_LMM;
   occa::memory& o_invAJw = o_invLMM;
+  
+  occa::memory o_invAJwTimesInvDegree;
 
   occa::memory o_U;
   occa::memory o_Ue;

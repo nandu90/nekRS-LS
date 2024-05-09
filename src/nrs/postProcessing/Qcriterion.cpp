@@ -19,3 +19,10 @@ occa::memory nrs_t::Qcriterion(const occa::memory &o_U)
   Qcriterion(o_U, o_Q);
   return o_Q;
 }
+
+occa::memory nrs_t::Qcriterion()
+{
+  auto o_Q = platform->o_memPool.reserve<dfloat>(this->meshV->Nlocal);
+  Qcriterion(this->o_U, o_Q);
+  return o_Q;
+}

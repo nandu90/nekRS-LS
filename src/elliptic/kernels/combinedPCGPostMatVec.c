@@ -2,6 +2,7 @@
 extern "C" void FUNC(combinedPCGPostMatVec)(const dlong &N,
                                             const dlong &fieldOffset,
                                             const dlong &preco,
+                                            const dfloat *__restrict__ resWeight,
                                             const dfloat *__restrict__ weights,
                                             const dfloat *__restrict__ Minv,
                                             const dfloat *__restrict__ v,
@@ -16,6 +17,8 @@ extern "C" void FUNC(combinedPCGPostMatVec)(const dlong &N,
 
   for (int id = 0; id < N; ++id) {
     const dfloat wt = weights[id];
+    const dfloat resWt = resWeight[id];
+
     for (int fld = 0; fld < p_Nfields; ++fld) {
       const dlong n = id + fld * fieldOffset;
       const dfloat M = preco ? Minv[n] : 1.0;
@@ -25,7 +28,7 @@ extern "C" void FUNC(combinedPCGPostMatVec)(const dlong &N,
       const dfloat Mvk = M * vk;
       const dfloat Mrk = M * rk;
 
-      sums[p_gamma] += rk * rk * wt;
+      sums[p_gamma] += rk * rk * resWt;
       sums[p_a] += pk * vk * wt;
       sums[p_b] += rk * vk * wt;
       sums[p_c] += vk * vk * wt;

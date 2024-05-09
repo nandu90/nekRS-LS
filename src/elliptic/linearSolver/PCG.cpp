@@ -61,7 +61,7 @@ dfloat update(elliptic_t *elliptic,
   // dot(r,r)
   elliptic->updatePCGKernel(mesh->Nlocal,
                             elliptic->fieldOffset,
-                            elliptic->o_invDegree,
+                            elliptic->o_residualWeight,
                             o_Ap,
                             alpha,
                             o_r,
@@ -109,6 +109,7 @@ void combinedPCGReductions(elliptic_t *elliptic,
   elliptic->combinedPCGPostMatVecKernel(mesh->Nlocal,
                                         elliptic->fieldOffset,
                                         preco,
+                                        elliptic->o_residualWeight,
                                         elliptic->o_invDegree,
                                         o_Minv,
                                         o_v,
@@ -240,7 +241,7 @@ int standardPCG(elliptic_t *elliptic,
     //  x <= x + alpha*p
     //  r <= r - alpha*A*p
     //  dot(r,r)
-    rdotr = std::sqrt(update(elliptic, o_p, o_Ap, alpha, o_x, o_r) * elliptic->resNormFactor);
+    rdotr = std::sqrt(update(elliptic, o_p, o_Ap, alpha, o_x, o_r));
 #ifdef DEBUG
     printf("rdotr: %.15e\n", rdotr);
 #endif
@@ -351,7 +352,7 @@ int combinedPCG(elliptic_t *elliptic,
 
     // r_{k+1}^T r_{k+1} = (r - alpha v)^T (r - alpha v)
     rdotr = gammak + alphak * (-2. * bk + alphak * ck);
-    rdotr = std::sqrt(std::abs(rdotr) * elliptic->resNormFactor);
+    rdotr = std::sqrt(std::abs(rdotr));
 #ifdef DEBUG
     printf("rdotr: %.15e\n", rdotr);
 #endif

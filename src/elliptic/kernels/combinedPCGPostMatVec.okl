@@ -2,6 +2,7 @@
 @kernel void combinedPCGPostMatVec(const dlong N,
                                   const dlong fieldOffset,
                                   const dlong preco,
+                                  @ restrict const dfloat *resWeight,
                                   @ restrict const dfloat *weights,
                                   @ restrict const dfloat *Minv,
                                   @ restrict const dfloat *v,
@@ -57,8 +58,8 @@
           f += vk*Mvk;
         }
 
+        s_gamma[t] = resWeight[id] * gamma;
         const dfloat wt = weights[id];
-        s_gamma[t] = wt * gamma;
         s_a[t] = wt * a;
         s_b[t] = wt * b;
         s_c[t] = wt * c;

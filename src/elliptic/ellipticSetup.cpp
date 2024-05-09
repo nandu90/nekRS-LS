@@ -187,8 +187,6 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
   mesh_t *mesh = elliptic->mesh;
   const dlong Nlocal = mesh->Np * mesh->Nelements;
 
-  elliptic->resNormFactor = 1 / mesh->volume;
-
   const dlong Nblocks = (Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
   hlong NelementsLocal = mesh->Nelements;

@@ -42,12 +42,11 @@ int _pgmres(elliptic_t *elliptic,
   auto &cs = elliptic->gmresData->cs;
   auto &s = elliptic->gmresData->s;
 
-  auto &o_weight = elliptic->o_invDegree;
+  auto &o_weight = elliptic->o_residualWeight;
 
   o_r0.copyFrom(o_r, elliptic->fieldOffset * elliptic->Nfields);
 
-  dfloat nr = rdotr / sqrt(elliptic->resNormFactor);
-  dfloat error = rdotr;
+  dfloat nr = rdotr;
 
   if (verbose && (platform->comm.mpiRank == 0)) {
     if (flexible) {
@@ -199,11 +198,10 @@ int _pgmres(elliptic_t *elliptic,
       s[i] = cs[i] * s[i];
 
       iter++;
-      error = fabs(s[i + 1]) * sqrt(elliptic->resNormFactor);
-      rdotr = error;
+      rdotr = fabs(s[i + 1]);
 
       if (platform->comm.mpiRank == 0) {
-        nekrsCheck(std::isnan(error),
+        nekrsCheck(std::isnan(rdotr),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
                    "%s\n",
@@ -214,7 +212,7 @@ int _pgmres(elliptic_t *elliptic,
         printf("it %d r norm %.15e\n", iter, rdotr);
       }
 
-      if (error < tol || iter == MAXIT) {
+      if (rdotr < tol || iter == MAXIT) {
         // update approximation
         update(i + 1);
         break;
@@ -222,7 +220,7 @@ int _pgmres(elliptic_t *elliptic,
     }
 
     // exit if tolerance is reached
-    if (error < tol || iter == MAXIT) {
+    if (rdotr < tol || iter == MAXIT) {
       break;
     }
 
@@ -234,7 +232,7 @@ int _pgmres(elliptic_t *elliptic,
     elliptic->fusedResidualAndNormKernel(Nblock,
                                          mesh->Nlocal,
                                          elliptic->fieldOffset,
-                                         elliptic->o_invDegree,
+                                         o_weight,
                                          o_r0,
                                          o_tmp,
                                          o_r,
@@ -258,10 +256,9 @@ int _pgmres(elliptic_t *elliptic,
       platform->flopCounter->add("gmres evaluate residual and norm", flopCount);
     }
 
-    error = nr * sqrt(elliptic->resNormFactor);
-    rdotr = nr * sqrt(elliptic->resNormFactor);
+    rdotr = nr;
 
-    if (error <= tol) {
+    if (rdotr <= tol) {
       return iter;
     }
   }

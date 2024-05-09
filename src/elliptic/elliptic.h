@@ -99,6 +99,8 @@ struct elliptic_t {
   dlong NmaskedLocal;
   dlong NmaskedGlobal;
 
+  occa::memory o_residualWeight;
+
   occa::memory o_maskIds;
   occa::memory o_maskIdsGlobal;
   occa::memory o_maskIdsLocal;
@@ -125,8 +127,6 @@ struct elliptic_t {
   occa::kernel fusedResidualAndNormKernel;
 
   occa::kernel gramSchmidtOrthogonalizationKernel;
-
-  dfloat resNormFactor;
 
   occa::kernel updatePCGKernel;
 
