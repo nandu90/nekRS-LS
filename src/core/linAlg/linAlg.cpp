@@ -235,6 +235,7 @@ void linAlg_t::setup()
     relativeErrorKernel = kernelRequests.load("relativeError");
     magSqrVectorKernel = kernelRequests.load("magSqrVector");
     magSqrSymTensorKernel = kernelRequests.load("magSqrSymTensor");
+    magSqrSymTensorDiagKernel = kernelRequests.load("magSqrSymTensorDiag");
   }
 }
 
@@ -1450,6 +1451,22 @@ void linAlg_t::magSqrSymTensor(const dlong N,
 
   magSqrSymTensorKernel(N, fieldOffset, o_tensor, o_mag);
 }
+
+void linAlg_t::magSqrSymTensorDiag(const dlong N,
+                               const dlong fieldOffset,
+                               const occa::memory &o_tensor,
+                               occa::memory &o_mag)
+{
+  nekrsCheck(o_tensor.length() < 6 * fieldOffset,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_tensor too small to store a symmetric tensor field!\n");
+
+  magSqrSymTensorDiagKernel(N, fieldOffset, o_tensor, o_mag);
+}
+
+
 
 void linAlg_t::linearCombination(const dlong N,
                                  const dlong Nfields,

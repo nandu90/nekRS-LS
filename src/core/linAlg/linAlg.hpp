@@ -190,7 +190,7 @@ public:
   // o_y[n] = alpha*o_x[n]/o_y[n]
   void axdy(const dlong N, const dfloat alpha, const occa::memory &o_x, occa::memory &o_y);
 
-  // o_z[n] = alpha*o_x[n]*o_y[n]
+  // o_z[n] = alpha*o_x[n]/o_y[n]
   void axdyz(const dlong N,
              const dfloat alpha,
              const occa::memory &o_x,
@@ -334,8 +334,9 @@ public:
 
   void magSqrVector(const dlong N, const dlong fieldOffset, const occa::memory &o_u, occa::memory &o_mag);
 
-  void
-  magSqrSymTensor(const dlong N, const dlong fieldOffset, const occa::memory &o_tensor, occa::memory &o_mag);
+  void magSqrSymTensor(const dlong N, const dlong fieldOffset, const occa::memory &o_tensor, occa::memory &o_mag);
+
+  void magSqrSymTensorDiag(const dlong N, const dlong fieldOffset, const occa::memory &o_tensor, occa::memory &o_mag);
 
   // o_y[n] = x_{Nfields} * coeff_{Nfields} + \sum_{i=0}^{Nfields-1} coeff_i * x_i
   void linearCombination(const dlong N,
@@ -411,6 +412,7 @@ public:
   occa::kernel relativeErrorKernel;
   occa::kernel magSqrVectorKernel;
   occa::kernel magSqrSymTensorKernel;
+  occa::kernel magSqrSymTensorDiagKernel;
 };
 
 #endif
