@@ -24,11 +24,14 @@ smootherType = Jac+FourthOptChebyshev
 boundaryTypeMap = none
 density = 1.0
 
-viscosity = 1/200 
+viscosity = 1 / 60  # based on Taylor-scale Re  
 residualTol = 1e-06
 
 [SCALAR00]
 solver = none
+
+[CASEDATA]
+uPrime = 1.0
 
 [BOOMERAMG]
 #smootherType = 18
