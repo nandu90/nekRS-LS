@@ -55,8 +55,11 @@ echo "module load PrgEnv-gnu" >> $SFILE
 echo "module load nvhpc-mixed" >> $SFILE
 echo "module load craype-x86-milan craype-accel-nvidia80" >> $SFILE
 echo "module load spack-pe-base cmake" >> $SFILE
+echo "module load visualization/ascent" >> $SFILE
 echo "module list" >> $SFILE
 
+# Ascent
+echo "export NEKRS_ASCENT_INSTALL_DIR=\"/soft/visualization/ascent/develop/2024-05-03-8baa78c/ascent-develop\"" >> $SFILE
 
 echo "nvidia-smi" >> $SFILE
 echo "ulimit -s unlimited " >>$SFILE

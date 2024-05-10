@@ -51,6 +51,7 @@ echo "module load rocm" >> $SFILE
 echo "module load cmake" >> $SFILE
 echo "module use /sw/frontier/ascent/modulefiles/" >> $SFILE
 echo "module load ascent" >> $SFILE
+echo "module load adios2" >> $SFILE
 echo "module unload cray-libsci" >> $SFILE
 echo "module list" >> $SFILE
 
@@ -62,7 +63,10 @@ echo "squeue -u \$USER" >>$SFILE
 echo "export MPICH_GPU_SUPPORT_ENABLED=1" >>$SFILE
 
 # Ascent
-echo "export NEKRS_ASCENT_INSTALL_DIR=\"/sw/frontier/ascent/install/install/ascent-develop/\"" >> $SFILE
+echo "export NEKRS_ASCENT_INSTALL_DIR=\"$OLCF_ASCENT_ROOT/../../install/ascent-develop/\"" >> $SFILE
+
+# Adios2
+echo "export NEKRS_ADIOS2_INSTALL_DIR=$OLCF_ADIOS2_ROOT" >> $SFILE
 
 ## These must be set before compiling so the executable picks up GTL
 echo "export PE_MPICH_GTL_DIR_amd_gfx90a=\"-L${CRAY_MPICH_ROOTDIR}/gtl/lib\"" >> $SFILE
