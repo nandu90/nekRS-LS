@@ -603,7 +603,7 @@ oogs_t *oogs::setup(ogs_t *ogs,
     if (gs->rank == 0) {
       printf("autotuning gs for wordSize=%d nFields=%d %s\n", (int)Nbytes, nVec, knlOverlapStr);
     }
-    const int Ntests = 10;
+
     double elapsedMin = std::numeric_limits<double>::max();
     oogs_mode fastestMode = OOGS_DEFAULT;
     oogs_modeExchange fastestModeExchange = OOGS_EX_PW;
@@ -659,7 +659,19 @@ oogs_t *oogs::setup(ogs_t *ogs,
           fflush(stdout);
         }
 
+        device.finish();
+        constexpr int Nwarmup = 30;
+        for (int test = 0; test < Nwarmup; ++test) {
+          oogs::start(o_q, nVec, stride, type, ogsAdd, gs);
+          if (callback) {
+            callback();
+          }
+          oogs::finish(o_q, nVec, stride, type, ogsAdd, gs);
+        }
+        device.finish();
+
         // run Ntests measurements and take min to eliminate runtime variations
+        constexpr int Ntests = 100;
         double elapsedTest = std::numeric_limits<double>::max();
         for (int test = 0; test < Ntests; ++test) {
           device.finish();
@@ -678,7 +690,7 @@ oogs_t *oogs::setup(ogs_t *ogs,
         MPI_Allreduce(MPI_IN_PLACE, &elapsedTest, 1, MPI_DOUBLE, MPI_MAX, gs->comm);
 
         if (gs->rank == 0) {
-          printf(" %.2es ", elapsedTest);
+          printf(" %.4es ", elapsedTest);
         }
 
         if (gs->mode == OOGS_LOCAL && !callback) {
