@@ -2007,9 +2007,9 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *ini)
 
   int checkpointPrecision  = 0;
   if (ini->extract("general", "checkpointprecision", checkpointPrecision)) { 
-    if (checkpointPrecision = 64) 
+    if (checkpointPrecision == 64) 
       options.setArgs("CHECKPOINT PRECISION", "FP64");
-    else if (checkpointPrecision = 32) 
+    else if (checkpointPrecision == 32) 
       options.setArgs("CHECKPOINT PRECISION", "FP32");
     else
       append_error("invalid checkpointPrecision");
