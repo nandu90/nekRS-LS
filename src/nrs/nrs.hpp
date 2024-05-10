@@ -223,9 +223,7 @@ public:
 
   AeroForce *aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_ = o_NULL);
 
-  //       ( SO0          )         (     SO8  SO7)
-  // Sij = ( SO3  SO1     )  Oij =  (          SO6)
-  //       ( SO5  SO4  SO2)         (             )
+  // output in row-major order 
   occa::memory strainRotationRate(const occa::memory &o_U, bool smooth = true);
   occa::memory strainRotationRate(bool smooth = true);
   occa::memory strainRate(const occa::memory &o_U, bool smooth = true);

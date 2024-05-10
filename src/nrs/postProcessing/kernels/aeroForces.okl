@@ -58,16 +58,16 @@ s_sumZp[t] += s_sumZ[t + bs];                                                   
               const dfloat n3 = sgeo[sid * p_Nsgeo + p_NZID];
 
               const dfloat s11 = SIJ[idM + 0 * offset];
-              const dfloat s21 = SIJ[idM + 3 * offset];
-              const dfloat s31 = SIJ[idM + 5 * offset];
+              const dfloat s21 = SIJ[idM + 1 * offset];
+              const dfloat s31 = SIJ[idM + 2 * offset];
 
               const dfloat s12 = s21;
-              const dfloat s22 = SIJ[idM + 1 * offset];
+              const dfloat s22 = SIJ[idM + 3 * offset];
               const dfloat s32 = SIJ[idM + 4 * offset];
 
               const dfloat s13 = s31;
               const dfloat s23 = s32;
-              const dfloat s33 = SIJ[idM + 2 * offset];
+              const dfloat s33 = SIJ[idM + 5 * offset];
 
               const dfloat scale = -2 * mue[idM] * sWJ;
 

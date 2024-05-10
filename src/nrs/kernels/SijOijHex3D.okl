@@ -104,16 +104,16 @@
 
 
           SO[id + 0 * offset] = scale * 2 * dudx;
-          SO[id + 1 * offset] = scale * 2 * dvdy;
-          SO[id + 2 * offset] = scale * 2 * dwdz;
-          SO[id + 3 * offset] = scale * (dudy + dvdx);
+          SO[id + 1 * offset] = scale * (dudy + dvdx);
+          SO[id + 2 * offset] = scale * (dudz + dwdx);
+          SO[id + 3 * offset] = scale * 2 * dvdy;
           SO[id + 4 * offset] = scale * (dvdz + dwdy);
-          SO[id + 5 * offset] = scale * (dudz + dwdx);
+          SO[id + 5 * offset] = scale * 2 * dwdz;
 
           if (ifOij) {
-            SO[id + 6 * offset] = scale * (dwdy - dvdz);
+            SO[id + 6 * offset] = scale * (dvdx - dudy);
             SO[id + 7 * offset] = scale * (dudz - dwdx);
-            SO[id + 8 * offset] = scale * (dvdx - dudy);
+            SO[id + 8 * offset] = scale * (dwdy - dvdz);
           }
         }
       }

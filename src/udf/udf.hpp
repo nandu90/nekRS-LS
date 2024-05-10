@@ -5,6 +5,7 @@
 #include "nekInterfaceAdapter.hpp"
 #include "bcMap.hpp"
 #include "fld.hpp"
+#include "opSEM.hpp" 
 
 extern "C" {
 void UDF_Setup0(MPI_Comm comm, setupAide &options);

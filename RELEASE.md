@@ -11,6 +11,7 @@
 * HIP support for BoomerAMG
 * Intel GPU support
 * Aero forces
+* opSEM
 * Various bug fixes
 
 ## Good to know
@@ -18,10 +19,10 @@
 * `nek::userchk` is no longer called automatically during setup 
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
 * send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd` (no automatic check every N steps)
-* linear solver's stopping criteria changed resulting in increased iteration counts for a given tolerance 
+* after fixing a bug in the linear solver residual norm, iteration counts have increased compared to previous versions
 
 ## Breaking Changes
-* call `build.sh` instead of `nrsconfig` to build nekRS
+* call `build.sh` instead of `nrsconfig` to build the code 
 * use `auto foo = platform->o_memPool.reserve<T>(nWords)` instead of preallocated slices of `occa::memory::o_mempool`
 * change count argument of `occa::memory::slice, occa::memory::copyFrom, occa::memory::copyTo` to number of words instead of bytes 
 * pass `const occa::memory&` instead of `const void*` to `writeFld`
