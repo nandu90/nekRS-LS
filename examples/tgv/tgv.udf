@@ -13,7 +13,7 @@ magSqr(const dlong Ntotal, const dlong offset, @ restrict const dfloat *U, @ res
 
 void printDiagnostics(nrs_t *nrs, double time, int tstep)
 {
-  mesh_t *mesh = nrs->meshV;
+  auto mesh = nrs->meshV;
 
   dfloat mue, rho;
   platform->options.getArgs("VISCOSITY", mue);
@@ -33,7 +33,15 @@ void printDiagnostics(nrs_t *nrs, double time, int tstep)
 
   const auto enstrophy = [&] () {
     const dfloat scale = 0.5 / mesh->volume;
-    o_curlU = opSEM::strongCurl(mesh, nrs->o_U, nrs->fieldOffset);
+    auto o_curlU = opSEM::strongCurl(mesh, nrs->fieldOffset, nrs->o_U);
+
+    static poolDeviceMemory<dfloat> o_invJw;
+    if (!o_invJw.isInitialized()) {
+      o_invJw.resize(mesh->Nlocal);
+      platform->linAlg->adyz(mesh->Nlocal, 1.0, mesh->o_Jw, o_invJw); 
+    }
+
+    platform->linAlg->axmyMany(mesh->Nlocal, mesh->dim, nrs->fieldOffset, 0, 1.0, o_invJw, o_curlU); 
     poolDeviceMemory<dfloat> o_magCurlU(nrs->fieldOffset);
     magSqr(mesh->Nlocal, nrs->fieldOffset, o_curlU, o_magCurlU);
 
