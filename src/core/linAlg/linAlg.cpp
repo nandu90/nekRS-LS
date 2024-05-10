@@ -236,52 +236,12 @@ void linAlg_t::setup()
     magSqrVectorKernel = kernelRequests.load("magSqrVector");
     magSqrSymTensorKernel = kernelRequests.load("magSqrSymTensor");
     magSqrSymTensorDiagKernel = kernelRequests.load("magSqrSymTensorDiag");
+    magSqrTensorKernel = kernelRequests.load("magSqrTensor");
   }
 }
 
 linAlg_t::~linAlg_t()
 {
-  fillKernel.free();
-  pfillKernel.free();
-  absKernel.free();
-  addKernel.free();
-  scaleKernel.free();
-  scaleManyKernel.free();
-  axpbyKernel.free();
-  paxpbyKernel.free();
-  axpbyManyKernel.free();
-  paxpbyManyKernel.free();
-  axpbyzKernel.free();
-  axpbyzManyKernel.free();
-  axmyKernel.free();
-  paxmyKernel.free();
-  axmyManyKernel.free();
-  axmyVectorKernel.free();
-  axmyzKernel.free();
-  paxmyzKernel.free();
-  axmyzManyKernel.free();
-  axdyKernel.free();
-  aydxKernel.free();
-  aydxManyKernel.free();
-  adyKernel.free();
-  adyManyKernel.free();
-  padyManyKernel.free();
-  axdyzKernel.free();
-  sumKernel.free();
-  minKernel.free();
-  maxKernel.free();
-  norm2Kernel.free();
-  norm2ManyKernel.free();
-  norm1Kernel.free();
-  norm1ManyKernel.free();
-  weightedNorm1Kernel.free();
-  weightedNorm1ManyKernel.free();
-  weightedNorm2Kernel.free();
-  weightedNorm2ManyKernel.free();
-  innerProdKernel.free();
-  weightedInnerProdKernel.free();
-  weightedInnerProdManyKernel.free();
-  weightedInnerProdMultiKernel.free();
 }
 
 /*********************/
@@ -1437,6 +1397,21 @@ void linAlg_t::magSqrVector(const dlong N,
 
   magSqrVectorKernel(N, fieldOffset, o_u, o_mag);
 }
+
+void linAlg_t::magSqrTensor(const dlong N,
+                            const dlong fieldOffset,
+                            const occa::memory &o_tensor,
+                            occa::memory &o_mag)
+{
+  nekrsCheck(o_tensor.length() < 9 * fieldOffset,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_tensor too small to store a symmetric tensor field!\n");
+
+  magSqrTensorKernel(N, fieldOffset, o_tensor, o_mag);
+}
+
 
 void linAlg_t::magSqrSymTensor(const dlong N,
                                const dlong fieldOffset,

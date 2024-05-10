@@ -66,6 +66,7 @@ void registerLinAlgKernels()
       {"magSqrVector", false},
       {"magSqrSymTensor", false},
       {"magSqrSymTensorDiag", false},
+      {"magSqrTensor", false},
   };
 
   std::string kernelName;

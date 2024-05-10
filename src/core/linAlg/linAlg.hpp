@@ -338,6 +338,8 @@ public:
 
   void magSqrSymTensorDiag(const dlong N, const dlong fieldOffset, const occa::memory &o_tensor, occa::memory &o_mag);
 
+  void magSqrTensor(const dlong N, const dlong fieldOffset, const occa::memory &o_tensor, occa::memory &o_mag);
+
   // o_y[n] = x_{Nfields} * coeff_{Nfields} + \sum_{i=0}^{Nfields-1} coeff_i * x_i
   void linearCombination(const dlong N,
                          const dlong Nfields,
@@ -413,6 +415,8 @@ public:
   occa::kernel magSqrVectorKernel;
   occa::kernel magSqrSymTensorKernel;
   occa::kernel magSqrSymTensorDiagKernel;
+  occa::kernel magSqrTensorKernel;
+
 };
 
 #endif
