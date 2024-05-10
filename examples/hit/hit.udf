@@ -40,15 +40,9 @@ void linearForcing(dfloat time)
 {
   const auto G = 10.0; 
 
-  dfloat mue, rho;
-  platform->options.getArgs("VISCOSITY", mue);
-  platform->options.getArgs("DENSITY", rho);
-  const auto nu = mue / rho;
-
-
-  // mue = 1 / Re_lambda  where Re_lambda = sqrt(15 * u' * l / nu)
+  // Re_l  = u' * l / nu 
   const auto l = 0.19 * L;   // integral length scale (given by method)
-  const auto uPrime = 1. / l;
+  const dfloat uPrime = 1 / l;
   const auto invTau0 = uPrime / l;
   const auto k0 = 1.5 * uPrime * uPrime;
 
@@ -56,34 +50,43 @@ void linearForcing(dfloat time)
 
   auto o_Uprime = [&]() 
   {
+    auto avg = [&](const occa::memory& o_u)
+    { 
+      return platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_u, platform->comm.mpiComm) / mesh->volume;
+    };
+
     poolDeviceMemory<dfloat> o_Uprime(nrs->NVfields * nrs->fieldOffset);
-    poolDeviceMemory<dfloat> o_Uavg(nrs->NVfields * nrs->fieldOffset); 
-
-    auto o_uAvg = o_Uavg + 0 * nrs->fieldOffset;
-    auto o_vAvg = o_Uavg + 1 * nrs->fieldOffset;
-    auto o_wAvg = o_Uavg + 2 * nrs->fieldOffset;
-
-    const auto o_UVW = nrs->o_U;
-    auto avg = platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_UVW + 0*nrs->fieldOffset, platform->comm.mpiComm) / mesh->volume;
-    platform->linAlg->fill(mesh->Nlocal, avg, o_uAvg);
-
-    avg = platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_UVW + 1*nrs->fieldOffset, platform->comm.mpiComm) / mesh->volume;
-    platform->linAlg->fill(mesh->Nlocal, avg, o_vAvg);
-
-    avg = platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_UVW + 2*nrs->fieldOffset, platform->comm.mpiComm) / mesh->volume;
-    platform->linAlg->fill(mesh->Nlocal, avg, o_wAvg);
- 
-    platform->linAlg->axpbyz(nrs->NVfields * nrs->fieldOffset, 1.0, nrs->o_U, -1.0, o_Uavg, o_Uprime); 
+    o_Uprime.copyFrom(nrs->o_U, o_Uprime.size());
+    for(int i = 0; i < mesh->dim; i++) {
+      platform->linAlg->add(mesh->Nlocal, 
+                            -avg(nrs->o_U.slice(i * nrs->fieldOffset)), 
+                            o_Uprime.slice(i * nrs->fieldOffset)); 
+    }
     return o_Uprime; 
   }();
 
-  const auto magSijSqrVolAvg = [&]()
+  const auto epsVolAvg = [&]()
   {
-    auto o_Sij = nrs->strainRate();
-    poolDeviceMemory<dfloat> o_magSijSqr(nrs->fieldOffset);
-    platform->linAlg->magSqrSymTensor(mesh->Nlocal, nrs->fieldOffset, o_Sij, o_magSijSqr); 
+    dfloat mue, rho;
+    platform->options.getArgs("VISCOSITY", mue);
+    platform->options.getArgs("DENSITY", rho);
+    const auto nu = mue / rho;
+
+    auto o_gradU = opSEM::strongGradVec(mesh, nrs->fieldOffset, nrs->o_U);
+
+    static poolDeviceMemory<dfloat> o_invAJwJw;
+    if (!o_invAJwJw.isInitialized()) {
+      o_invAJwJw.resize(mesh->Nlocal);
+      platform->linAlg->axmyz(mesh->Nlocal, 1.0, mesh->o_invAJw, mesh->o_Jw, o_invAJwJw);
+    } 
+    platform->linAlg->axmyMany(mesh->Nlocal, mesh->dim * mesh->dim, nrs->fieldOffset, 0, 1.0, mesh->o_invAJw, o_gradU);
+    nrs->qqt->startFinish("+", o_gradU, nrs->fieldOffset);
+ 
+    poolDeviceMemory<dfloat> o_eps(mesh->Nlocal);
+    platform->linAlg->magSqrTensor(mesh->Nlocal, nrs->fieldOffset, o_gradU, o_eps);
+    platform->linAlg->scale(mesh->Nlocal, nu, o_eps);
     return platform->linAlg->innerProd(mesh->Nlocal,
-                                       o_magSijSqr,
+                                       o_eps,
                                        mesh->o_LMM,
                                        platform->comm.mpiComm,
                                        0) / mesh->volume;
@@ -100,8 +103,7 @@ void linearForcing(dfloat time)
                                        0) / mesh->volume;
   }();
 
-  const auto epsVolAvg = 2 * nu * magSijSqrVolAvg;
-  const auto A = (epsVolAvg - G*(kVolAvg  - k0) * invTau0) / (2 * kVolAvg);
+  const dfloat A = (epsVolAvg - G*(kVolAvg  - k0) * invTau0) / (2 * kVolAvg);
 
   Au(mesh->Nlocal,
      nrs->fieldOffset,
@@ -110,10 +112,12 @@ void linearForcing(dfloat time)
      nrs->o_NLT);
 
   if (platform->comm.mpiRank == 0) {
+    const auto uRms = std::sqrt(2./3 * kVolAvg);
     std::cout << "A=" << A 
               << "  k=" << kVolAvg 
               << "  k0=" << k0 
-              << "  Re_lambda=" << std::sqrt(45 * A * l*l / nu)
+              << "  l= " << std::pow(uRms,3) / epsVolAvg 
+              << "  l0= " << l 
               << std::endl;
   }
 }
