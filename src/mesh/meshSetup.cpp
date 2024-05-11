@@ -312,9 +312,15 @@ mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &k
       sum += tmp[i];
     }
     MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, platform->comm.mpiComm);
+    auto Nglobal = static_cast<hlong>(sum + 0.1);
     if (platform->comm.mpiRank == 0) {
-      printf("unique number of gridpoints: : %lld\n", static_cast<hlong>(sum + 0.1));
+      printf("unique number of gridpoints: : %lld\n", Nglobal);
     }
+    mesh->Nglobal = Nglobal;
+
+    hlong NelementsGlobal = mesh->Nelements;
+    MPI_Allreduce(MPI_IN_PLACE, &NelementsGlobal, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
+    mesh->NelementsGlobal = NelementsGlobal;
   }
 
   {

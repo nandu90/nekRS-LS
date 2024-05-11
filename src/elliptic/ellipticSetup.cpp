@@ -189,11 +189,6 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
 
   const dlong Nblocks = (Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
-  hlong NelementsLocal = mesh->Nelements;
-  hlong NelementsGlobal = 0;
-  MPI_Allreduce(&NelementsLocal, &NelementsGlobal, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
-  elliptic->NelementsGlobal = NelementsGlobal;
-
   elliptic->o_EToB =
       platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * elliptic->Nfields, elliptic->EToB);
 

@@ -103,9 +103,14 @@ struct mesh_t {
   dfloat *EY;
   dfloat *EZ;
 
-  dlong Nelements;
   dlong fieldOffset;
+
+  dlong Nelements;
+  hlong NelementsGlobal;
+
   dlong Nlocal;
+  hlong Nglobal; // global T-vector size 
+
   hlong NboundaryFaces;
   hlong *EToV; // element-to-vertex connectivity
   dlong *EToE; // element-to-element connectivity

@@ -56,7 +56,7 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
      if (!elliptic->o_residualWeight.isInitialized()) {
         elliptic->o_residualWeight = platform->device.malloc<dfloat>(mesh->Nlocal);
       }
-      const auto Nglobal = elliptic->NelementsGlobal * mesh->Np;
+      auto Nglobal = mesh->NelementsGlobal * mesh->Np;
       platform->linAlg->axmyz(mesh->Nlocal, 1. / Nglobal, mesh->o_invAJw, mesh->o_invAJw, elliptic->o_residualWeight);
       platform->linAlg->axmy(mesh->Nlocal, 1.0, elliptic->o_invDegree, elliptic->o_residualWeight);
     } else if(platform->options.compareArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "L2_RESIDUAL")) {

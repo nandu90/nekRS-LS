@@ -130,8 +130,6 @@ struct elliptic_t {
 
   occa::kernel updatePCGKernel;
 
-  hlong NelementsGlobal;
-
   occa::kernel ellipticBlockBuildDiagonalKernel;
   occa::kernel ellipticBlockBuildDiagonalPfloatKernel;
 
