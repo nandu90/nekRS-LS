@@ -76,7 +76,9 @@ fi
 
 setup() {
 
-ulimit -s unlimited 2>/dev/null
+set +e
+ulimit -s unlimited 
+set -e
 
 if [ $2 -gt 0 ]; then
 

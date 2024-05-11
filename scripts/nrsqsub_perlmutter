@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 : ${QUEUE:="regular"} # https://docs.nersc.gov/jobs/policy/#perlmutter-gpu
 

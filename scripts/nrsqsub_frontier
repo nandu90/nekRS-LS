@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 : ${QUEUE:="batch"}
 NEKRS_CACHE_BCAST=1

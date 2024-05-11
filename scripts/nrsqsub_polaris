@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 : ${QUEUE:="prod"} # debug, debug-scaling, prod https://docs.alcf.anl.gov/running-jobs/job-and-queue-scheduling/
 
