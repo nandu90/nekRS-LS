@@ -4,14 +4,16 @@
 
 * FP32 solver mode
 * Interpolation based velocity recycling
-* Ascent in situ visualisation plugin
+* [Ascent](https://ascent.readthedocs.io/en/latest/) in situ visualisation plugin
+* [ADIOS2](https://adios2.readthedocs.io/) field file writer
+* Addtional output options (element filter and interpolation on uniform grid / different polynomial-order)
 * Multi session nek-nek including multi-rate time stepping
 * CHT nek-nek support
 * Improved JIT compilation performance
 * HIP support for BoomerAMG
 * Intel GPU support
 * Aero forces
-* opSEM
+* User friendly opSEM class
 * Various bug fixes
 
 ## Good to know
