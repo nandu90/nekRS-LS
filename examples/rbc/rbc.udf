@@ -36,7 +36,7 @@ void UDF_ExecuteStep(double time, int tstep)
 {
   auto mesh = nrs->_mesh;
 
-  weightedHistogram(0.0, 1.0, mesh->Nlocal, mesh->o_LMM, nrs->cds->o_S, o_hist); 
+  weightedHistogram(0.0, 1.0, mesh->Nlocal, mesh->o_Jw, nrs->cds->o_S, o_hist); 
 
   if (nrs->isCheckpointStep) {
     std::vector<float> hist(o_hist.size());

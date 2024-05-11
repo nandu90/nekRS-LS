@@ -781,8 +781,8 @@ void ciTestDistance(nrs_t *nrs)
   o_refVal.copyFrom(refVal.data(), mesh->Nlocal);
 
   platform->linAlg->axpby(mesh->Nlocal, 1.0, o_refVal, -1.0, o_dist);
-  platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_dist);
-  platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_refVal);
+  platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_Jw, o_dist);
+  platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_Jw, o_refVal);
   auto intErr = platform->linAlg->sum(mesh->Nlocal, o_dist, platform->comm.mpiComm);
   auto intRef = platform->linAlg->sum(mesh->Nlocal, o_refVal, platform->comm.mpiComm);
   auto relErr = std::abs(intErr / intRef);

@@ -26,7 +26,7 @@ void printDiagnostics(nrs_t *nrs, double time, int tstep)
     magSqr(mesh->Nlocal, nrs->fieldOffset, nrs->o_U, o_magSqrU);
     return scale * platform->linAlg->innerProd(mesh->Nlocal,
                        o_magSqrU,
-                       mesh->o_LMM,
+                       mesh->o_Jw,
                        platform->comm.mpiComm,
                        0);
   }();
@@ -47,7 +47,7 @@ void printDiagnostics(nrs_t *nrs, double time, int tstep)
 
     return scale * platform->linAlg->innerProd(mesh->Nlocal,
                        o_magCurlU,
-                       mesh->o_LMM,
+                       mesh->o_Jw,
                        platform->comm.mpiComm,
                        0);
   }();

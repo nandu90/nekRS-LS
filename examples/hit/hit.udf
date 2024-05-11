@@ -44,7 +44,7 @@ void linearForcing(dfloat time)
 
   auto avg = [&](const occa::memory& o_u)
   { 
-    return platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_u, platform->comm.mpiComm) / mesh->volume;
+    return platform->linAlg->innerProd(mesh->Nlocal, mesh->o_Jw, o_u, platform->comm.mpiComm) / mesh->volume;
   };
 
   std::vector<dfloat> Uavg(mesh->dim);

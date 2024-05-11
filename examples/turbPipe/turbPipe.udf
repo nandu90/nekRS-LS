@@ -179,7 +179,7 @@ void UDF_ExecuteStep(double time, int tstep)
   if (nrs->isCheckpointStep) {
     auto o_UZ = nrs->o_U + 2 * nrs->fieldOffset;
     const dfloat ubar =
-        platform->linAlg->innerProd(mesh->Nlocal, o_UZ, mesh->o_LMM, platform->comm.mpiComm) / mesh->volume;
+        platform->linAlg->innerProd(mesh->Nlocal, o_UZ, mesh->o_Jw, platform->comm.mpiComm) / mesh->volume;
     if (platform->comm.mpiRank == 0) {
       printf(" uBulk: %g\n", ubar);
     }

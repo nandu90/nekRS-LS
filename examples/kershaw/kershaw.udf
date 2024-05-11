@@ -25,7 +25,7 @@ void runBenchmarks(nrs_t *nrs)
   o_rhs.copyFrom(rhs, nrs->fieldOffset, 0 * nrs->fieldOffset);
   o_rhs.copyFrom(rhs, nrs->fieldOffset, 1 * nrs->fieldOffset);
   o_rhs.copyFrom(rhs, nrs->fieldOffset, 2 * nrs->fieldOffset);
-  platform->linAlg->axmyMany(mesh->Nlocal, nrs->NVfields, nrs->fieldOffset, 0, 1.0, mesh->o_LMM, o_rhs);
+  platform->linAlg->axmyMany(mesh->Nlocal, nrs->NVfields, nrs->fieldOffset, 0, 1.0, mesh->o_Jw, o_rhs);
 
   deviceMemory<dfloat> o_lambda0(nrs->fieldOffset);
   deviceMemory<dfloat> o_lambda1(nrs->fieldOffset);

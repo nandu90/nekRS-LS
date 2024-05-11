@@ -76,7 +76,7 @@ void ciTestPartitionOfUnity(nrs_t *nrs, double time, int tstep)
   const auto o_partition = nrs->neknek->partitionOfUnity();
   auto o_volume = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
 
-  platform->linAlg->axmyz(mesh->Nlocal, 1.0, o_partition, mesh->o_LMM, o_volume);
+  platform->linAlg->axmyz(mesh->Nlocal, 1.0, o_partition, mesh->o_Jw, o_volume);
 
   const auto globalVolume = platform->linAlg->sum(mesh->Nlocal, o_volume, platform->comm.mpiCommParent);
 
