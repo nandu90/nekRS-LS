@@ -48,7 +48,7 @@ This list provides an overview of the most significant changes in this release, 
 * use `nekrs_registerPtr` instead of common blocks NRSSCPTR / SCNRS in usr file and access them using `nek::ptr` in udf
 * use `deviceKernel`, `deviceKernelProperties`, `deviceMemory`, `poolDeviceMemory` instead of `occa::` (consult examples for more details) 
 * remove `nrs_t` argument from `<plugin>::setup`
-* use pay key `avm highestModalDecay` instead of `avm+hpfResidual`
+* use pay key `avm+highestModalDecay` instead of `avm+hpfResidual`
 * `nrs->isOutputStep` -> `nrs->isCheckpointStep`
 
 ## Known Bugs / Restrictions
