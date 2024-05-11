@@ -60,7 +60,7 @@ This list provides an overview of the most significant changes in this release, 
 
 ## Thanks to our Contributors
 
-@kris-rowe, @MalachiTimothyPhillips, @yslan
+@kris-rowe, @MalachiTimothyPhillips, @yslan, @tcew
 
 We are grateful to all who added new features, filed issues or helped resolve them, 
 asked and answered questions, and were part of inspiring discussions.
