@@ -30,8 +30,8 @@
 
 void ellipticZeroMean(elliptic_t *elliptic, occa::memory &o_q)
 {
-  mesh_t *mesh = elliptic->mesh;
-  const hlong Nglobal = elliptic->NelementsGlobal * mesh->Np;
+  auto mesh = elliptic->mesh;
+  const auto Nglobal = elliptic->NelementsGlobal * mesh->Np;
 
   if (elliptic->blockSolver) {
     nekrsAbort(platform->comm.mpiComm,

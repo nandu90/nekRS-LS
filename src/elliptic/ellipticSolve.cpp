@@ -44,20 +44,34 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
   const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
   const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
 
-
-  if (platform->options.compareArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "LEGACY")) { 
-    if (!elliptic->o_residualWeight.isInitialized()) {
-      elliptic->o_residualWeight = platform->device.malloc<dfloat>(mesh->Nlocal);
-    }
-    static auto firstTime = true;
-    if (movingMesh || firstTime) {
+  auto updateResidualWeight = [&]()
+  {
+    if (platform->options.compareArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "LEGACY")) {
+      if (!elliptic->o_residualWeight.isInitialized()) {
+        elliptic->o_residualWeight = platform->device.malloc<dfloat>(mesh->Nlocal);
+      }
       elliptic->o_residualWeight.copyFrom(elliptic->o_invDegree);
       platform->linAlg->scale(mesh->Nlocal, 1 / mesh->volume, elliptic->o_residualWeight);
-      firstTime = false;
+    } else if(platform->options.compareArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "l2_RESIDUAL")) {
+     if (!elliptic->o_residualWeight.isInitialized()) {
+        elliptic->o_residualWeight = platform->device.malloc<dfloat>(mesh->Nlocal);
+      }
+      const auto Nglobal = elliptic->NelementsGlobal * mesh->Np;
+      platform->linAlg->axmyz(mesh->Nlocal, 1. / Nglobal, mesh->o_invAJw, mesh->o_invAJw, elliptic->o_residualWeight);
+      platform->linAlg->axmy(mesh->Nlocal, 1.0, elliptic->o_invDegree, elliptic->o_residualWeight);
+    } else if(platform->options.compareArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "L2_RESIDUAL")) {
+      elliptic->o_residualWeight = mesh->o_invAJwTimesInvDegree;
+    } else {
+      const auto txt = platform->options.getArgs("LINEAR SOLVER STOPPING CRITERION TYPE");
+      nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "%s <%s>\n", "Invalid LINEAR SOLVER STOPPING CRITERION TYPE", txt.c_str());
     }
-  } else {
-    elliptic->o_residualWeight = mesh->o_invAJwTimesInvDegree;
-  }
+  };
+ 
+  if (!elliptic->o_residualWeight.isInitialized()) {
+    updateResidualWeight();
+  } else if (movingMesh) {
+    updateResidualWeight(); 
+  } 
 
   std::string timerName = elliptic->name;
   if (timerName.find("scalar") != std::string::npos) {

@@ -83,6 +83,8 @@ setupAide *setDefaultSettings(std::string casename)
 
   options->setArgs("ENABLE GS COMM OVERLAP", "TRUE");
 
+  options->setArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "L2_RESIDUAL");
+
   const auto dropTol = 5.0 * std::numeric_limits<pfloat>::epsilon();
   options->setArgs("AMG DROP TOLERANCE", to_string_f(setPrecision(dropTol, 2)));
 
