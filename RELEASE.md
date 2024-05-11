@@ -15,6 +15,7 @@
 * Various bug fixes
 
 ## Good to know
+
 * AmgX is no longer available use HYPRE instead
 * `nek::userchk` is no longer called automatically during setup 
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
@@ -22,6 +23,9 @@
 * after fixing a bug in the linear solver residual norm, iteration counts have increased compared to previous versions
 
 ## Breaking Changes
+
+This list provides an overview of the most significant changes in this release, although it may not encompass all modifications. We acknowledge that this release introduces several breaking changes. These adjustments were essential to enhance the stability of the user interface in future iterations. We apologize for any inconvenience this may cause.
+
 * call `build.sh` instead of `nrsconfig` to build the code 
 * use `auto foo = platform->o_memPool.reserve<T>(nWords)` instead of preallocated slices of `occa::memory::o_mempool`
 * change count argument of `occa::memory::slice, occa::memory::copyFrom, occa::memory::copyTo` to number of words instead of bytes 
@@ -37,15 +41,13 @@
 * `planarAvg(mesh_t*, const std::string&, int, int, int, int, dlong, occa::memory o_avg)` -> `postProcessing::planarAvg(nrs_t*, const std::string&, int, int, int, int, occa::memory)`
 * `nrs->o_NLT` -> `nrs->o_FU`
 * `cds->o_NLT` -> `cds->o_FS`
-* ::postProcessing` functions are now members of `nrs_t` (except planarAvg)
+* `::postProcessing` functions are now members of `nrs_t` (except planarAvg)
 * access `nekrs::nrsPtr` through `nekrs::platform()`
 * use `nekrs_registerPtr` instead of common blocks NRSSCPTR / SCNRS in usr file and access them using `nek::ptr` in udf
 * use `deviceKernel`, `deviceKernelProperties`, `deviceMemory`, `poolDeviceMemory` instead of `occa::` (consult examples for more details) 
 * remove `nrs_t` argument from `<plugin>::setup`
 * use pay key `avm highestModalDecay` instead of `avm+hpfResidual`
 * `nrs->isOutputStep` -> `nrs->isCheckpointStep`
-
-We understand that this release includes several breaking changes. These were necessary steps to improve the stability of the user interface going forward. We apologize for any inconvenience caused.
 
 ## Known Bugs / Restrictions
 
