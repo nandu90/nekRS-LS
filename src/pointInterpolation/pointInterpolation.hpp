@@ -1,9 +1,8 @@
 #if !defined(nekrs_interp_hpp_)
 #define nekrs_interp_hpp_
 
-#include <vector>
-#include <memory>
 #include "nekrsSys.hpp"
+#include "platform.hpp"
 #include "findpts.hpp"
 #include "mesh.h"
 
@@ -35,11 +34,11 @@ public:
 
   void eval(dlong nFields,
             dlong inputFieldOffset,
-            const occa::memory &o_in,
+            const occa::memory& o_in,
             dlong outputFieldOffset,
-            occa::memory &o_out);
+            occa::memory& o_out);
 
-  void eval(dlong nFields, dlong inputFieldOffset, dfloat *in, dlong outputFieldOffset, dfloat *out);
+  void eval(dlong nFields, dlong inputFieldOffset, const std::vector<dfloat>& in, dlong outputFieldOffset, std::vector<dfloat> &out);
 
   auto *ptr()
   {
@@ -59,17 +58,11 @@ public:
   // calls underlying findpts_t::update
   void o_update();
 
-  // add points on device
-  void setPoints(int n, const occa::memory &o_x, const occa::memory &o_y, const occa::memory &o_z);
-  void setPoints(int n,
-                 const occa::memory &o_x,
-                 const occa::memory &o_y,
-                 const occa::memory &o_z,
-                 const occa::memory &o_session);
+  void setPoints(const occa::memory &o_x, const occa::memory &o_y, const occa::memory &o_z);
+  void setPoints(const occa::memory &o_x, const occa::memory &o_y, const occa::memory &o_z, const occa::memory &o_session);
 
-  // add points on host
-  void setPoints(int n, dfloat *x, dfloat *y, dfloat *z);
-  void setPoints(int n, dfloat *x, dfloat *y, dfloat *z, dlong *session);
+  void setPoints(const std::vector<dfloat>& x, const std::vector<dfloat>& y, const std::vector<dfloat>& z);
+  void setPoints(const std::vector<dfloat>& x, const std::vector<dfloat>& y, const std::vector<dfloat>& z, const std::vector<dlong>& session);
 
   // set timer level
   void setTimerLevel(TimerLevel level);

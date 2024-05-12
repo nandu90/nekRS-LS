@@ -101,7 +101,7 @@ void neknek_t::updateInterpPoints()
                                this->o_y_,
                                this->o_z_);
 
-  this->interpolator->setPoints(this->npt_, this->o_x_, this->o_y_, this->o_z_, this->o_session_);
+  this->interpolator->setPoints(this->o_x_, this->o_y_, this->o_z_, this->o_session_);
 
   const auto verboseLevel = pointInterpolation_t::VerbosityLevel::Detailed;
   this->interpolator->find(verboseLevel);
@@ -174,7 +174,7 @@ void neknek_t::findIntPoints()
 
   this->o_pointMap_.copyFrom(pointMap.data());
 
-  this->interpolator->setPoints(numPoints, neknekX.data(), neknekY.data(), neknekZ.data(), session.data());
+  this->interpolator->setPoints(neknekX, neknekY, neknekZ, session);
 
   const auto verboseLevel = pointInterpolation_t::VerbosityLevel::Detailed;
   this->interpolator->find(verboseLevel);
@@ -402,7 +402,7 @@ occa::memory neknek_t::partitionOfUnity()
     std::fill(sessions.begin(), sessions.end(), id);
     o_sess.copyFrom(sessions.data(), mesh->Nlocal);
 
-    pointInterp.setPoints(mesh->Nlocal, mesh->o_x, mesh->o_y, mesh->o_z, o_sess);
+    pointInterp.setPoints(mesh->o_x, mesh->o_y, mesh->o_z, o_sess);
     pointInterp.find(pointInterpolation_t::VerbosityLevel::None, true);
 
     auto &data = pointInterp.data();

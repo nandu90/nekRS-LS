@@ -464,71 +464,89 @@ void ciTestParticles(nrs_t *nrs, lpm_t *particles, occa::kernel exactUVWPKernel,
 // however, pointInterpolation_t itself is not thread-safe, so the two objects cannot be used concurrently.
 void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
 {
-  constexpr int nRandomInterp = 3;
-
-  const double R = 0.25; // max radius of points to distribute
-
   auto mesh = nrs->meshV;
+
   mesh->o_x.copyTo(mesh->x, mesh->Nlocal);
   mesh->o_y.copyTo(mesh->y, mesh->Nlocal);
   mesh->o_z.copyTo(mesh->z, mesh->Nlocal);
 
-  const int rank = platform->comm.mpiRank;
   auto o_Ue = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset);
   auto o_Pe = platform->device.malloc<dfloat>(nrs->fieldOffset);
   exactUVWPKernel(mesh->Nlocal, time, mesh->o_x, mesh->o_y, mesh->o_z, nrs->fieldOffset, o_Pe, o_Ue);
 
   const auto verbosity = pointInterpolation_t::VerbosityLevel::Basic;
+  const auto threshold = (sizeof(dfloat) == sizeof(double)) ? 5e-9 : 1e-5;
+
+  const auto computeRelErrors = [&](dlong n, dlong offset, occa::memory o_Uexact, occa::memory o_Uinterp) {
+    const auto absTol = 1e-6;
+
+    auto o_UinterpX = o_Uinterp.slice(0 * offset, n);
+    auto o_UinterpY = o_Uinterp.slice(1 * offset, n);
+    auto o_UinterpZ = o_Uinterp.slice(2 * offset, n);
+ 
+    auto o_UexactX = o_Uexact.slice(0 * offset, n);
+    auto o_UexactY = o_Uexact.slice(1 * offset, n);
+    auto o_UexactZ = o_Uexact.slice(2 * offset, n);
+
+    const auto LinfUx = 
+      platform->linAlg->maxRelativeError(n, 1, 0, absTol, o_UinterpX, o_UexactX, platform->comm.mpiComm); 
+    const auto LinfUy = 
+      platform->linAlg->maxRelativeError(n, 1, 0, absTol, o_UinterpY, o_UexactY, platform->comm.mpiComm); 
+    const auto LinfUz = 
+      platform->linAlg->maxRelativeError(n, 1, 0, absTol, o_UinterpZ, o_UexactZ, platform->comm.mpiComm); 
+
+    return std::make_tuple(LinfUx, LinfUy, LinfUz);
+  };
 
   // Interpolation 0:
   // Call find/eval on 0 points with a nullptr
   occa::memory o_NULL;
   auto interpNoop = pointInterpolation_t(mesh);
-  interpNoop.setPoints(0, o_NULL, o_NULL, o_NULL);
+  interpNoop.setPoints(o_NULL, o_NULL, o_NULL);
   interpNoop.find(verbosity);
   interpNoop.eval(nrs->NVfields, nrs->fieldOffset, o_Ue, 0, o_NULL);
 
   // Interpolation 1:
   // Interpolate onto points that coincide with the mesh, call findpts
   auto interpFluid = pointInterpolation_t(mesh);
-  interpFluid.setPoints(mesh->Nlocal, mesh->x, mesh->y, mesh->z);
+  interpFluid.setPoints(mesh->o_x, mesh->o_y, mesh->o_z);
   interpFluid.find(verbosity);
 
-  auto o_PintFluid = platform->device.malloc<dfloat>(nrs->fieldOffset);
   auto o_UintFluid = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset);
+  interpFluid.eval(nrs->NVfields, nrs->fieldOffset, o_Ue, nrs->fieldOffset, o_UintFluid);
+
+  {
+    auto [linfErrUx, linfErrUy, linfErrUz] = computeRelErrors(mesh->Nlocal, nrs->fieldOffset, o_Ue, o_UintFluid);
+    CiEvalTest("relLinf point interp (fluid)",  
+               linfErrUx < threshold && linfErrUy < threshold && linfErrUz < threshold,
+               "with rel LinfErr:" + to_string_f(linfErrUx) + ", " + to_string_f(linfErrUy) + ", " + to_string_f(linfErrUz)
+              );
+  }
 
   // Interpolation 2:
   // Interpolate onto a random number of a random set of points inside the unit ball
   // Repeat for nRandomInterp sets of points
-  auto Nlocal = mesh->Nlocal;
+  const double R = 0.75;
 
+  constexpr int nRandomInterp = 3;
   std::array<std::vector<dfloat>, nRandomInterp> pointsX;
   std::array<std::vector<dfloat>, nRandomInterp> pointsY;
   std::array<std::vector<dfloat>, nRandomInterp> pointsZ;
   std::array<std::shared_ptr<pointInterpolation_t>, nRandomInterp> interpRand;
 
-  std::random_device r;
-  std::default_random_engine e1(r());
-  std::uniform_int_distribution<int> uniform_dist(1, 10 * mesh->Nlocal);
   for (int n = 0; n < nRandomInterp; ++n) {
-    auto nPoints = uniform_dist(e1);
-    std::tie(pointsX[n], pointsY[n], pointsZ[n]) = generatePoints(nPoints, R);
+    std::tie(pointsX[n], pointsY[n], pointsZ[n]) = generatePoints(mesh->Nlocal, R);
     interpRand[n] = std::make_shared<pointInterpolation_t>(mesh);
-    interpRand[n]->setPoints(pointsX[n].size(), pointsX[n].data(), pointsY[n].data(), pointsZ[n].data());
+    interpRand[n]->setPoints(pointsX[n], pointsY[n], pointsZ[n]);
     interpRand[n]->find(verbosity);
   }
 
-  // Perform interpolation on first set of points
-  interpFluid.eval(nrs->NVfields, nrs->fieldOffset, o_Ue, nrs->fieldOffset, o_UintFluid);
-
-  // Allocate memory for output of second interpolation object
   std::array<occa::memory, nRandomInterp> o_UintRand;
   for (int n = 0; n < nRandomInterp; ++n) {
     o_UintRand[n] = platform->device.malloc<dfloat>(nrs->NVfields * pointsX[n].size());
     interpRand[n]->eval(nrs->NVfields, nrs->fieldOffset, o_Ue, pointsX[n].size(), o_UintRand[n]);
   }
 
-  // Compute exact solution at interpolation points for comparison
   std::array<occa::memory, nRandomInterp> o_UeRand;
   std::array<occa::memory, nRandomInterp> o_PeRand;
   std::array<occa::memory, nRandomInterp> o_xRand;
@@ -546,55 +564,14 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
     exactUVWPKernel(nPoints, time, o_xRand[n], o_yRand[n], o_zRand[n], nPoints, o_PeRand[n], o_UeRand[n]);
   }
 
-  auto computeRelErrors = [&](dlong n, dlong offset, occa::memory o_Uexact, occa::memory o_Uinterp) {
-    platform->linAlg->axpbyMany(n, nrs->NVfields, offset, 1.0, o_Uexact, -1.0, o_Uinterp);
-    platform->linAlg->aydxMany(n, nrs->NVfields, offset, 1, 1.0, o_Uexact, o_Uinterp);
-
-    auto o_UerrX = o_Uinterp + 0 * offset;
-    auto o_UerrY = o_Uinterp + 1 * offset;
-    auto o_UerrZ = o_Uinterp + 2 * offset;
-
-    platform->linAlg->abs(n, o_UerrX);
-    platform->linAlg->abs(n, o_UerrY);
-    platform->linAlg->abs(n, o_UerrZ);
-
-    const auto LinfUx = platform->linAlg->max(n, o_UerrX, platform->comm.mpiComm);
-    const auto LinfUy = platform->linAlg->max(n, o_UerrY, platform->comm.mpiComm);
-    const auto LinfUz = platform->linAlg->max(n, o_UerrZ, platform->comm.mpiComm);
-    return std::make_tuple(LinfUx, LinfUy, LinfUz);
-  };
-
-  {
-    auto [linfErrUx, linfErrUy, linfErrUz] = computeRelErrors(mesh->Nlocal, nrs->fieldOffset, o_Ue, o_UintFluid);
-    const auto threshold = (sizeof(dfloat) == sizeof(double)) ? 5e-9 : 1e-5;
-    CiEvalTest("relLinf point interp (fluid)",  
-               linfErrUx < threshold && linfErrUy < threshold && linfErrUz && threshold,
-               "with rel LinfErr:" + to_string_f(linfErrUx) + ", " + to_string_f(linfErrUy) + ", " + to_string_f(linfErrUz)
-              );
-  }
-
   for (int n = 0; n < nRandomInterp; ++n) {
     auto [linfErrUxRand, linfErrUyRand, linfErrUzRand] =
       computeRelErrors(pointsX[n].size(), pointsX[n].size(), o_UeRand[n], o_UintRand[n]);
-    const auto threshold = (sizeof(dfloat) == sizeof(double)) ? 5e-9 : 1e-5;
     CiEvalTest("relLinf point interp (random group" + std::to_string(n) + ")", 
                linfErrUxRand < threshold && linfErrUyRand < threshold && linfErrUzRand < threshold,
                "with rel LinfErr:" + to_string_f(linfErrUxRand) + ", " + to_string_f(linfErrUyRand) + ", " + to_string_f(linfErrUzRand)
               );
   }
-
-  for (int n = 0; n < nRandomInterp; ++n) {
-    o_UeRand[n].free();
-    o_PeRand[n].free();
-    o_xRand[n].free();
-    o_yRand[n].free();
-    o_zRand[n].free();
-  }
-
-  o_Ue.free();
-  o_Pe.free();
-  o_PintFluid.free();
-  o_UintFluid.free();
 }
 
 void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)

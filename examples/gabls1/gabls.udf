@@ -127,15 +127,55 @@ void writeStatistics(double time, int tstep, const std::string& fname)
 {
   auto mesh = nrs->meshV;
 
-  const auto np = (platform->comm.mpiRank == 0) ? NUMBER_ELEMENTS_Y * mesh->N : 0;
-  const auto offset = np;
+  auto o_data = [&]()
+  {
+    const auto Nfields = 9;
+    poolDeviceMemory<dfloat> o_work(Nfields * nrs->fieldOffset);
+ 
+    size_t workOffset = 0; 
+    o_work.copyFrom(tavg::o_avg(), 3 * nrs->fieldOffset, workOffset);
+
+    workOffset += 3 * nrs->fieldOffset;
+ 
+    auto o_gradY = o_work.slice(workOffset, 3 * nrs->fieldOffset);
+    workOffset += 3 * nrs->fieldOffset;
+    gradY(mesh->Nelements, 
+          mesh->o_vgeo, 
+          mesh->o_D, 
+          nrs->fieldOffset, 
+          mesh->o_invAJw, 
+          tavg::o_avg(), 
+          o_gradY);
+ 
+    o_work.copyFrom(tavg::o_avg() + 3 * nrs->fieldOffset, 
+                    3 * nrs->fieldOffset,
+                    workOffset);
+ 
+    planarAvg(mesh, 
+              "xz", 
+              NUMBER_ELEMENTS_X, 
+              NUMBER_ELEMENTS_Y, 
+              NUMBER_ELEMENTS_Z, 
+              Nfields,
+              nrs->fieldOffset, 
+              o_work);
+
+    return o_work;
+  }();
+
+  const auto Nfields = o_data.size() / nrs->fieldOffset;
+
+  static std::vector<dfloat> xp;
+  static std::vector<dfloat> yp;
+  static std::vector<dfloat> zp;
 
   static pointInterpolation_t *interpolator = nullptr;
-  static std::vector<dfloat> xp, yp, zp;
-  static deviceMemory<dfloat> o_fields1D;
-  const auto Nfields = 9;
-
   if (!interpolator) {
+    const auto np = (platform->comm.mpiRank == 0) ? NUMBER_ELEMENTS_Y * mesh->N : 0;
+
+    xp.resize(np);
+    yp.resize(np);
+    zp.resize(np);
 
     const auto yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
     const auto yMax = platform->linAlg->max(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
@@ -145,17 +185,15 @@ void writeStatistics(double time, int tstep, const std::string& fname)
       const auto z0 = 0.0;
 
       for (int i = 0; i < np; i++) {
-        xp.push_back(x0);
-        yp.push_back((static_cast<dfloat>(i)/(np-1)) * (yMax-yMin));
-        zp.push_back(z0);
+        xp[i] = x0;
+        yp[i] = static_cast<dfloat>(i)/(np-1) * (yMax-yMin);
+        zp[i] = z0;
       }
-
-      o_fields1D.resize(Nfields * offset);
     }
 
     interpolator = new pointInterpolation_t(mesh);
-    interpolator->setPoints(np, xp.data(), yp.data(), zp.data());
-    interpolator->find();
+    interpolator->setPoints(xp, yp, zp);
+    interpolator->find(pointInterpolation_t::VerbosityLevel::Detailed);
 
     if (platform->comm.mpiRank == 0) { 
       std::ofstream f(fname, std::ios::app);
@@ -164,44 +202,20 @@ void writeStatistics(double time, int tstep, const std::string& fname)
     }
   }
 
-  poolDeviceMemory<dfloat> o_work(Nfields * nrs->fieldOffset);
-
-  size_t workOffset = 0; 
-  o_work.copyFrom(tavg::o_avg(), 3 * nrs->fieldOffset, workOffset);
-  workOffset += 3 * nrs->fieldOffset;
-
-  auto o_gradY = o_work.slice(workOffset, 3 * nrs->fieldOffset);
-  workOffset += 3 * nrs->fieldOffset;
-  gradY(mesh->Nelements, 
-        mesh->o_vgeo, 
-        mesh->o_D, 
-        nrs->fieldOffset, 
-        mesh->o_invAJw, 
-        tavg::o_avg(), 
-        o_gradY);
-
-  o_work.copyFrom(tavg::o_avg() + 3 * nrs->fieldOffset, 
-                  3 * nrs->fieldOffset,
-                  workOffset);
-
-  planarAvg(mesh, 
-            "xz", 
-            NUMBER_ELEMENTS_X, 
-            NUMBER_ELEMENTS_Y, 
-            NUMBER_ELEMENTS_Z, 
-            Nfields,
-            nrs->fieldOffset, 
-            o_work);
+  poolDeviceMemory<dfloat> o_fields1D(Nfields * yp.size());
 
   interpolator->eval(Nfields, 
                      nrs->fieldOffset, 
-                     o_work.ptr(), 
-                     offset, 
-                     o_fields1D.ptr());
+                     o_data, 
+                     yp.size(), 
+                     o_fields1D);
 
   if (platform->comm.mpiRank == 0) {
-    std::vector<dfloat> fields1D(o_fields1D.length());
+    std::vector<dfloat> fields1D(o_fields1D.size());
     o_fields1D.copyTo(fields1D);
+
+    const auto offset = o_fields1D.size() / Nfields;
+    const auto np = offset;
 
     const auto sep = "  ";
     std::ofstream f(fname, std::ios::app);
@@ -251,8 +265,6 @@ void UDF_LoadKernels(deviceKernelProperties& kernelInfo)
   kernelInfo.define("p_T0s")       = T0S;
   kernelInfo.define("p_sCoolRate") = SCOOLRATE;
   kernelInfo.define("p_YLEN")      = YLEN;
-
-  //std::cout << static_cast<occa::properties>(kernelInfo) << std::endl;
 }
 
 void UDF_Setup0(MPI_Comm comm, setupAide &options)
@@ -380,7 +392,7 @@ void UDF_ExecuteStep(double time, int tstep)
   auto restoreDt = [&]() 
   {
     static auto firstTime = true;
-    if (maxDt0 > 0 && time > 100 && !firstTime) {
+    if (maxDt0 > 0 && time > 100 && firstTime) {
       if (platform->comm.mpiRank == 0) {
         printf("restore original MAX DT = %g\n", maxDt0);
       }
@@ -393,7 +405,7 @@ void UDF_ExecuteStep(double time, int tstep)
 
   auto mesh = nrs->meshV;
 
-  if (nrs->timeStepConverged) {
+  if (nrs->timeStepConverged && tstep > 0) {
     tavg::run(time);
   }
 
@@ -421,7 +433,7 @@ void UDF_ExecuteStep(double time, int tstep)
     for (int i = 0; i < mesh->dim; i++) {
       auto o_u = o_avg.slice(0 * nrs->fieldOffset, mesh->Nlocal);
       auto avg = mesh->surfaceAreaMultiplyIntegrate(o_bid.size(), o_bid, o_u);
-      avgUWallValues[i] = std::accumulate(avg.begin(), avg.end(), 0.0); // / surArea;
+      avgUWallValues[i] = std::accumulate(avg.begin(), avg.end(), 0.0) / surArea;
     }
 
     return avgUWallValues;
@@ -497,5 +509,6 @@ void UDF_ExecuteStep(double time, int tstep)
     }
 
     writeStatistics(time, tstep, "profiles.dat");
+    tavg::outfld(false, true);
   }
 }

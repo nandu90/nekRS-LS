@@ -114,10 +114,11 @@ void UDF_Setup()
   // interpolate initial fluid velocity onto particle positions
   std::vector<dfloat> particleU0(nrs->NVfields * nParticles);
   auto interpolator = pointInterpolation_t(mesh);
-  interpolator.setPoints(nParticles, xPart.data(), yPart.data(), zPart.data());
+  interpolator.setPoints(xPart, yPart, zPart);
   interpolator.find();
 
-  interpolator.eval(nrs->NVfields, nrs->fieldOffset, nrs->U, nParticles, particleU0.data());
+  std::vector<dfloat> U(nrs->U, nrs->U + mesh->dim * nrs->fieldOffset);
+  interpolator.eval(nrs->NVfields, nrs->fieldOffset, U, nParticles, particleU0);
 
   // set particle initial positions and velocities
   std::vector<dfloat> y0(particles->nDOFs() * nParticles);
@@ -187,7 +188,7 @@ void addNewParticles(nrs_t *nrs, double time, int tstep)
 
   // interpolate fluid velocity onto new particle positions (set initial velocity as fluid velocity)
   auto interpolator = pointInterpolation_t(nrs->meshV);
-  interpolator.setPoints(nPartAdd, xPart.data(), yPart.data(), zPart.data());
+  interpolator.setPoints(xPart, yPart, zPart);
   interpolator.find();
 
   interpolator.eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, nPartAdd, o_UPart);

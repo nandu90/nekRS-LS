@@ -66,6 +66,8 @@ using dlong = long long int;
 #include <limits>
 #include <stdexcept>
 #include <array>
+#include <tuple>
+#include <regex>
 #include <string>
 #include <vector>
 #include <map>

@@ -214,13 +214,13 @@ void tavg::outfld()
   tavg::outfld(/* outXYZ */ 0, /* FP64 */ 1);
 }
 
-occa::memory tavg::o_avg()
+deviceMemory<dfloat> tavg::o_avg()
 {
   nekrsCheck(!setupCalled || !buildKernelCalled,
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "%s\n",
              "called prior to tavg::setup()!");
-
-  return o_AVG;
+  deviceMemory<dfloat> d_AVG(o_AVG);
+  return d_AVG;
 }

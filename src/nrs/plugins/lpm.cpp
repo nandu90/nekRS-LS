@@ -1,17 +1,14 @@
+#include <inttypes.h>
+
+#include "platform.hpp"
 #include "nekInterfaceAdapter.hpp" // for nek::coeffAB
 #include "lpm.hpp"
 #include "neknek.hpp"
 #include "nrs.hpp"
 #include "pointInterpolation.hpp"
-#include <algorithm>
-#include <cstdlib>
-#include <numeric>
-#include <regex>
-#include <tuple>
 #include "tuple_for_each.hpp"
-#include "gslib.h" // needed for sarray_transfer
 
-#include <inttypes.h>
+#include "gslib.h" // needed for sarray_transfer
 
 lpm_t::lpm_t(dfloat bb_tol_, dfloat newton_tol_)
     : nrs(dynamic_cast<nrs_t *>(platform->solver)), solverOrder(nrs->nEXT), bb_tol(bb_tol_),
@@ -452,7 +449,9 @@ void lpm_t::interpolate(const std::string &interpFieldName)
   const auto Nfields = numFieldsInterp(interpFieldName);
 
   interp->setTimerName(timerName + "integrate::userRHS::interpolate::");
-  interp->eval(Nfields, nrs->fieldOffset, o_fld, fieldOffset_, o_interpFld);
+  deviceMemory<dfloat> d_fld(o_fld);
+  deviceMemory<dfloat> d_interpFld(o_interpFld);
+  interp->eval(Nfields, nrs->fieldOffset, d_fld, fieldOffset_, d_interpFld);
   if (timerLevel != TimerLevel::None) {
     platform->timer.toc(timerName + "integrate::userRHS::interpolate");
   }
@@ -563,11 +562,11 @@ void lpm_t::find(const occa::memory &o_yNew)
 {
   occa::memory o_xCoord, o_yCoord, o_zCoord;
   if (fieldOffset_) {
-    o_xCoord = o_yNew + 0 * fieldOffset_;
-    o_yCoord = o_yNew + 1 * fieldOffset_;
-    o_zCoord = o_yNew + 2 * fieldOffset_;
+    o_xCoord = o_yNew.slice(0 * fieldOffset_, nParticles_);
+    o_yCoord = o_yNew.slice(1 * fieldOffset_, nParticles_);
+    o_zCoord = o_yNew.slice(2 * fieldOffset_, nParticles_);
   }
-  interp->setPoints(numParticles(), o_xCoord, o_yCoord, o_zCoord);
+  interp->setPoints(o_xCoord, o_yCoord, o_zCoord);
   platform->timer.tic(timerName + "integrate::find", 1);
   interp->setTimerName(timerName + "integrate::find::");
   interp->find(verbosityLevel);
@@ -1026,7 +1025,7 @@ void lpm_t::migrate()
     auto o_xcoord = getDOF("x");
     auto o_ycoord = getDOF("y");
     auto o_zcoord = getDOF("z");
-    interp->setPoints(this->numParticles(), o_xcoord, o_ycoord, o_zcoord);
+    interp->setPoints(o_xcoord, o_ycoord, o_zcoord);
   }
 
   // disable findpts kernel timer for this call
@@ -1310,7 +1309,7 @@ void lpm_t::migrate()
     auto o_xcoord = getDOF("x");
     auto o_ycoord = getDOF("y");
     auto o_zcoord = getDOF("z");
-    interp->setPoints(this->numParticles(), o_xcoord, o_ycoord, o_zcoord);
+    interp->setPoints(o_xcoord, o_ycoord, o_zcoord);
   }
 
   // disable findpts kernel timer for this call
@@ -1529,7 +1528,7 @@ void lpm_t::addParticles(int newNParticles,
     auto o_xcoord = getDOF("x");
     auto o_ycoord = getDOF("y");
     auto o_zcoord = getDOF("z");
-    interp->setPoints(this->numParticles(), o_xcoord, o_ycoord, o_zcoord);
+    interp->setPoints(o_xcoord, o_ycoord, o_zcoord);
 
     if (timerLevel != TimerLevel::None) {
       platform->timer.tic(timerName + "addParticles::find", 1);
@@ -1648,7 +1647,7 @@ void lpm_t::deleteParticles()
     auto o_xcoord = getDOF("x");
     auto o_ycoord = getDOF("y");
     auto o_zcoord = getDOF("z");
-    interp->setPoints(this->numParticles(), o_xcoord, o_ycoord, o_zcoord);
+    interp->setPoints(o_xcoord, o_ycoord, o_zcoord);
 
     if (timerLevel != TimerLevel::None) {
       platform->timer.tic(timerName + "deleteParticles::find", 1);
@@ -1693,7 +1692,7 @@ void lpm_t::writeFld()
     auto o_xcoord = getDOF("x");
     auto o_ycoord = getDOF("y");
     auto o_zcoord = getDOF("z");
-    interp->setPoints(this->numParticles(), o_xcoord, o_ycoord, o_zcoord);
+    interp->setPoints(o_xcoord, o_ycoord, o_zcoord);
 
     // disable findpts kernel timer for this call
     auto saveLevel = getTimerLevel();

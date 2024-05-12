@@ -15,19 +15,6 @@ class DeviceMemoryAllocator {
   }
 };
 
-template<typename T>
-class DeviceMemoryPoolAllocator {
-  using size_type = std::size_t;
- public:
-  static occa::memory malloc(size_type count) {
-    if (std::is_same<T, std::byte>::value) {
-      return platform->o_memPool.reserve(count);
-    } else {
-      return platform->o_memPool.reserve<T>(count);
-    }
-  }
-};
-
 template<typename T = std::byte, class Allocator = DeviceMemoryAllocator<T>>
 class deviceMemory {
  using size_type = std::size_t;
@@ -43,7 +30,7 @@ class deviceMemory {
 
   explicit deviceMemory(const occa::memory& occa_memory) 
       : occa_memory_{occa_memory} { 
-    nekrsCheck(occa_memory_.dtype() != occa::dtype::get<T>(), MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "data type does not match" );
+    if (occa_memory_.dtype() != occa::dtype::get<T>()) throw std::runtime_error("data type does not match");
   }
 
   explicit deviceMemory(occa::memory&& occa_memory) noexcept
@@ -51,7 +38,7 @@ class deviceMemory {
 
   deviceMemory(const deviceMemory& other) 
       : occa_memory_{other.occa_memory_} {
-    nekrsCheck(occa_memory_.dtype() != other.occa_memory_.dtype(), MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "data type does not match" );
+    if (occa_memory_.dtype() != occa::dtype::get<T>()) throw std::runtime_error("data type does not match");
   }
 
   deviceMemory(deviceMemory&& other) noexcept
@@ -175,6 +162,31 @@ class deviceMemory {
 };
 
 template<typename T>
-using poolDeviceMemory = deviceMemory<T, DeviceMemoryPoolAllocator<T>>;
+class DeviceMemoryPoolAllocator {
+  using size_type = std::size_t;
+ public:
+  static occa::memory malloc(size_type count) {
+    if (std::is_same<T, std::byte>::value) {
+      return platform->o_memPool.reserve(count);
+    } else {
+      return platform->o_memPool.reserve<T>(count);
+    }
+  }
+};
+
+template<typename T = std::byte, class Allocator = DeviceMemoryPoolAllocator<T>>
+class poolDeviceMemory : public deviceMemory<T> {
+ using size_type = std::size_t;
+
+ public:
+  // Inherit base class constructors
+  using deviceMemory<T>::deviceMemory;
+
+  operator const deviceMemory<T>&() const {return deviceMemory<T>(occa_memory_);}
+  operator deviceMemory<T>&() {return deviceMemory<T>(occa_memory_);}
+
+ private:
+  occa::memory occa_memory_;
+};
 
 #endif

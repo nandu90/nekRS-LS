@@ -95,7 +95,9 @@ void velRecycling::copy()
 
   if (interp) {
     const dlong offset = o_Uint.length() / nrs->NVfields;
-    interp->eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, offset, o_Uint);
+    deviceMemory<dfloat> d_U(nrs->o_U);
+    deviceMemory<dfloat> d_Uint(o_Uint);
+    interp->eval(nrs->NVfields, nrs->fieldOffset, d_U, offset, d_Uint);
     maskCopyKernel(interp->numPoints(), offset, nrs->fieldOffset, o_maskIds, o_Uint, o_wrk);
   } else {
     o_wrk.copyFrom(nrs->o_U, nrs->NVfields * nrs->fieldOffset);
@@ -213,7 +215,7 @@ void velRecycling::setup(occa::memory o_wrk_,
   auto o_yBid = platform->device.malloc<dfloat>(nPoints, yBid.data());
   auto o_zBid = platform->device.malloc<dfloat>(nPoints, zBid.data());
 
-  interp->setPoints(nPoints, o_xBid, o_yBid, o_zBid);
+  interp->setPoints(o_xBid, o_yBid, o_zBid);
   const auto verbosity = pointInterpolation_t::VerbosityLevel::Basic;
   interp->find(verbosity);
 }

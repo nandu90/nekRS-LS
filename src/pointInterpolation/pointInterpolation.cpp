@@ -185,7 +185,7 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
 
 void pointInterpolation_t::eval(dlong nFields,
                                 dlong inputFieldOffset,
-                                const occa::memory &o_in,
+                                const occa::memory& o_in,
                                 dlong outputFieldOffset,
                                 occa::memory &o_out)
 {
@@ -229,9 +229,9 @@ void pointInterpolation_t::eval(dlong nFields,
 
 void pointInterpolation_t::eval(dlong nFields,
                                 dlong inputFieldOffset,
-                                dfloat *in,
+                                const std::vector<dfloat>& in,
                                 dlong outputFieldOffset,
-                                dfloat *out)
+                                std::vector<dfloat>& out)
 {
   nekrsCheck(!findCalled,
              platform->comm.mpiComm,
@@ -250,52 +250,48 @@ void pointInterpolation_t::eval(dlong nFields,
              inputFieldOffset,
              mesh->Nlocal);
 
-  findpts_->eval(nPoints, nFields, inputFieldOffset, outputFieldOffset, in, &data_, out);
+  findpts_->eval(nPoints, nFields, inputFieldOffset, outputFieldOffset, const_cast<dfloat*>(in.data()), &data_, out.data());
 
   if (timerLevel != TimerLevel::None) {
     platform->timer.toc("pointInterpolation_t::eval");
   }
 }
 
-void pointInterpolation_t::setPoints(int n, dfloat *x, dfloat *y, dfloat *z)
+void pointInterpolation_t::setPoints(const std::vector<dfloat>& x, const std::vector<dfloat>& y, const std::vector<dfloat>& z)
 {
-  this->setPoints(n, x, y, z, nullptr);
+  std::vector<dlong> session;
+  this->setPoints(x, y, z, session);
 }
 
-void pointInterpolation_t::setPoints(int n, dfloat *x, dfloat *y, dfloat *z, dlong *session)
+void pointInterpolation_t::setPoints(const std::vector<dfloat>& x, const std::vector<dfloat>& y, const std::vector<dfloat>& z, const std::vector<dlong>& session)
 {
+  auto o_x = platform->device.malloc<dfloat>(x.size());
+  o_x.copyFrom(x.data());
+  auto o_y = platform->device.malloc<dfloat>(y.size());
+  o_y.copyFrom(y.data());
+  auto o_z = platform->device.malloc<dfloat>(z.size());
+  o_z.copyFrom(z.data());
 
-  pointsAdded = true;
-  useHostPoints = true;
-  useDevicePoints = false;
-
-  if (n > nPoints) {
-    data_ = findpts::data_t(n);
-  }
-
-  nPoints = n;
-
-  _x = x;
-  _y = y;
-  _z = z;
-  _session = session;
+  occa::memory o_session;
+  if (session.size()) {
+    o_session = platform->device.malloc<dlong>(session.size());
+  } 
+  this->setPoints(o_x, o_y, o_z, o_session);
 }
 
-void pointInterpolation_t::setPoints(int n,
-                                     const occa::memory &o_x,
+void pointInterpolation_t::setPoints(const occa::memory &o_x,
                                      const occa::memory &o_y,
                                      const occa::memory &o_z)
 {
-  occa::memory o_null;
-  this->setPoints(n, o_x, o_y, o_z, o_null);
+  this->setPoints(o_x, o_y, o_z, o_NULL);
 }
 
-void pointInterpolation_t::setPoints(int n,
-                                     const occa::memory &o_x,
+void pointInterpolation_t::setPoints(const occa::memory &o_x,
                                      const occa::memory &o_y,
                                      const occa::memory &o_z,
                                      const occa::memory &o_session)
 {
+  const int n = o_x.size();
 
   pointsAdded = true;
   useHostPoints = false;

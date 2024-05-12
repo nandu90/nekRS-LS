@@ -125,7 +125,7 @@ void ciTestPointInterp(nrs_t *nrs, double time, int tstep)
   exactUVW(n, n, time, o_xinterp, o_yinterp, o_zinterp, o_UouterExact);
 
   auto interp = pointInterpolation_t(nrs->meshV);
-  interp.setPoints(n, o_xinterp, o_yinterp, o_zinterp);
+  interp.setPoints(o_xinterp, o_yinterp, o_zinterp);
   interp.find(pointInterpolation_t::VerbosityLevel::Detailed);
   interp.eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, n, o_Uouter);
 
@@ -180,8 +180,6 @@ void vizNekNekField(nrs_t *nrs)
   auto mesh = nrs->meshV;
   auto neknek = nrs->neknek;
 
-  occa::memory o_null;
-
   const auto neknekFieldOffset = neknek->fieldOffset();
 
   std::vector<dfloat> Uviz(nrs->NVfields * nrs->fieldOffset, 0.0);
@@ -208,7 +206,12 @@ void vizNekNekField(nrs_t *nrs)
   }
 
   auto o_Uviz = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset, Uviz.data());
-  fld::write("viz", 0.0, 0, 1, 1, o_Uviz, o_null, o_null, 0);
+  std::vector<occa::memory> o_U;
+  o_U.push_back(o_Uviz.slice(0 * nrs->fieldOffset, nrs->fieldOffset));
+  o_U.push_back(o_Uviz.slice(1 * nrs->fieldOffset, nrs->fieldOffset));
+  o_U.push_back(o_Uviz.slice(2 * nrs->fieldOffset, nrs->fieldOffset));
+
+  fld::write("neknek", 0.0, 0, o_U);
 }
 
 void ciTestInitialStep(nrs_t *nrs, double time, int tstep)

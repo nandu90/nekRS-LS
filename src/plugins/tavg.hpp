@@ -20,7 +20,7 @@ void setup(dlong fieldOffset, const std::vector< std::vector<deviceMemory<dfloat
 void outfld();
 void outfld(int outXYZ, int FP64);
 void reset();
-occa::memory o_avg();
+deviceMemory<dfloat> o_avg();
 }
 
 #endif

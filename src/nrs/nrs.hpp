@@ -35,7 +35,7 @@ public:
 
   bool multiSession = false;
 
-  int elementType;
+  int elementType = HEXAHEDRA;
 
   mesh_t *_mesh = nullptr;
   mesh_t *meshV = nullptr;
@@ -66,10 +66,10 @@ public:
   dlong fieldOffset;
   dlong cubatureOffset;
 
-  int timeStepConverged;
+  int timeStepConverged = 1;
 
   dfloat dt[3] = {0.0, 0.0, 0.0};
-  dfloat g0;
+  dfloat g0 = 0;
 
   double timePrevious;
 
@@ -78,14 +78,14 @@ public:
 
   dfloat alpha0Ref = 1;
 
-  int nEXT;
-  int nBDF;
+  int nEXT = 3;
+  int nBDF = 3;
 
-  int tstep;
-  int lastStep;
-  int outerCorrector;
-  int isCheckpointStep;
-  int outputForceStep;
+  int tstep = 0;
+  int lastStep = 0;
+  int outerCorrector = 1;
+  int isCheckpointStep = 0;
+  int outputForceStep = 0;
 
   int Nsubsteps = 0;
 
@@ -123,7 +123,7 @@ public:
   occa::memory o_relUrst;
   occa::memory o_Urst;
 
-  dfloat filterS;
+  dfloat filterS = 0;
   occa::memory o_filterRT;
 
   occa::kernel filterRTKernel;

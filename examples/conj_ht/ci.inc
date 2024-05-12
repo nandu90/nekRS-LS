@@ -59,7 +59,7 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, int tstep)
   std::vector<dfloat> z = {0.5, 0.5, 0.5};
 
   int nPoints = x.size();
-  interp.setPoints(nPoints, x.data(), y.data(), z.data());
+  interp.setPoints(x, y, z);
   const auto verbosity = pointInterpolation_t::VerbosityLevel::Basic;
   interp.find(verbosity);
 
