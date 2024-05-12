@@ -5,13 +5,13 @@ cubaturePolynomialOrder = 9
 #startFrom = "r.fld"
 
 stopAt = endTime
-endTime = 2600
+endTime = 2600 # 9h
 
 dt = targetCFL=2 + max=2e-2
 timeStepper = tombo2
 
-checkpointControl = simulationTime 
-checkpointInterval = 100 
+#checkpointControl = simulationTime 
+checkpointInterval = 500
 
 regularization = hpfrt + nModes=3 + scalingCoeff=10
 
@@ -70,3 +70,5 @@ betam = 4.8
 betah = 7.8
 kappa = 0.4
 zwall = 0.01 # 1.0/lref
+
+startTimeStatistics = 0.1 # 2300 # 8h 

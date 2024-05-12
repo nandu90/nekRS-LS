@@ -8,6 +8,8 @@ static dfloat NLAT;
 /* geostrophic wind speed [m/s] */
 static dfloat UREF;
 
+static double tREF;
+
 static dfloat LREF;
 /* potential temperature */
 static dfloat TREF;
@@ -36,6 +38,8 @@ static dfloat BETAM;
 static dfloat BETAH;
 static dfloat KAPPA;
 static dfloat ZWALL;
+
+static double startTimeStatistics;
 
 static dfloat maxDt0 = -1;
 
@@ -66,11 +70,11 @@ void findUThetaTau(dfloat uWall, dfloat tempWall, dfloat &uTau, dfloat &thetaTau
     uTau = UmN * (1 - BETAM * RiBulk);
     thetaTau = ThN * (1 - BETAM * RiBulk);
   } else { // find roots of utau1 and utau2
-    const auto Det = sqrt(1 + 4 * RiBulk * (BETAH - BETAM));
-    nekrsCheck(Det < 0, platform->comm.mpiComm, EXIT_FAILURE, "%s\b", "findUThetaTau: Det < 0!");
-
-    const auto utau1 = (0.5 * (2 * brat - 1) * UmN / (brat - 1)) * (1 - Det / (2 * brat - 1));
-    const auto utau2 = (0.5 * (2 * brat - 1) * UmN / (brat - 1)) * (1 + Det / (2 * brat - 1));
+    const auto Det = 1 + 4 * RiBulk * (BETAH - BETAM);
+    nekrsCheck(Det < 0, MPI_COMM_SELF, EXIT_FAILURE, "%s\b", "findUThetaTau: Det < 0!");
+  
+    const auto utau1 = (0.5 * (2 * brat - 1) * UmN / (brat - 1)) * (1 - std::sqrt(Det) / (2 * brat - 1));
+    const auto utau2 = (0.5 * (2 * brat - 1) * UmN / (brat - 1)) * (1 + std::sqrt(Det) / (2 * brat - 1));
     auto thetau1 = 0.0;
     if (RiBulk > tol) {
       const auto scale = 1 / BETAM / KAPPA / GACC / ZWALL;
@@ -123,8 +127,9 @@ void userq(double time)
   platform->linAlg->axpby(mesh->Nlocal, -1.0, o_divTauY, 1.0, nrs->cds->o_NLT, 0, 0);
 }
 
-void writeStatistics(double time, int tstep, const std::string& fname)
+void writeProfiles(double time, int tstep)
 {
+  const std::string fname = "profiles.dat";
   auto mesh = nrs->meshV;
 
   auto o_data = [&]()
@@ -255,7 +260,8 @@ void UDF_LoadKernels(deviceKernelProperties& kernelInfo)
 
   GACC = LREF * g / (UREF * UREF);
   T0S = TS0 / TREF;
-  SCOOLRATE = SCR * LREF / TREF / UREF / 3600;
+  tREF = LREF / UREF;
+  SCOOLRATE = SCR * tREF / TREF / 3600;
   
   kernelInfo.define("p_fcor")      = 2 * omega * LREF / UREF * sin(NLAT * M_PI / 180);
   kernelInfo.define("p_bcor")      = 2 * omega * LREF / UREF * cos(NLAT * M_PI / 180);
@@ -290,6 +296,8 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
   platform->par->extract("casedata", "betah", BETAH);
   platform->par->extract("casedata", "kappa", KAPPA);
   platform->par->extract("casedata", "zwall", ZWALL);
+
+  platform->par->extract("casedata", "startTimeStatistics", startTimeStatistics);
 }
 
 void UDF_Setup()
@@ -405,7 +413,7 @@ void UDF_ExecuteStep(double time, int tstep)
 
   auto mesh = nrs->meshV;
 
-  if (nrs->timeStepConverged && tstep > 0) {
+  if (nrs->timeStepConverged && time >= startTimeStatistics) {
     tavg::run(time);
   }
 
@@ -507,8 +515,7 @@ void UDF_ExecuteStep(double time, int tstep)
              wallData[wall::thetaTau],
              rLength);
     }
-
-    writeStatistics(time, tstep, "profiles.dat");
-    tavg::outfld(false, true);
   }
+
+  if (nrs->lastStep) writeProfiles(time, tstep);
 }
