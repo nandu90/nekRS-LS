@@ -481,7 +481,7 @@ void UDF_ExecuteStep(double time, int tstep)
   poolDeviceMemory<dfloat> o_visMF(nrs->fieldOffset);
   visMF(mesh->Nlocal, 
         nrs->fieldOffset, 
-        scale, 
+        static_cast<dfloat>(scale), 
         o_ddyAvg, 
         o_visMF);
 
