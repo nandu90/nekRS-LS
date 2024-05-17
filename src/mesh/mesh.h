@@ -258,9 +258,6 @@ struct mesh_t {
 
   occa::kernel haloExtractKernel;
 
-  occa::kernel maskKernel;
-  occa::kernel maskPfloatKernel;
-
   std::array<occa::kernel, maxNqIntp> intpKernel;
 
   occa::kernel geometricFactorsKernel;

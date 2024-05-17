@@ -67,6 +67,8 @@ void registerLinAlgKernels()
       {"magSqrSymTensor", false},
       {"magSqrSymTensorDiag", false},
       {"magSqrTensor", false},
+      {"mask", false},
+      {"pmask", false},
   };
 
   std::string kernelName;
@@ -76,15 +78,16 @@ void registerLinAlgKernels()
     const std::string extension = (serial && nativeSerialImplementation) ? ".c" : ".okl";
     const bool pfloatKernel = (kernelName.front() == 'p') ? true : false;
     const std::string prefix = ""; // "linAlg::"
+
+    if (pfloatKernel && (sizeof(dfloat) == sizeof(pfloat))) continue; 
+
+    std::string fileName = kernelName;
+    occa::properties props = kernelInfo;
     if (pfloatKernel) {
-      occa::properties props = kernelInfo;
       props["defines/dfloat"] = pfloatString;
-      std::string fileName = kernelName;
       fileName.erase(0, 1);
-      platform->kernelRequests.add(prefix + kernelName, oklDir + fileName + extension, props);
     }
-    else {
-      platform->kernelRequests.add(prefix + kernelName, oklDir + kernelName + extension, kernelInfo);
-    }
+
+    platform->kernelRequests.add(prefix + kernelName, oklDir + fileName + extension, props);
   }
 }

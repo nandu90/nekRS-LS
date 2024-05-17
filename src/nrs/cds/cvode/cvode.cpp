@@ -170,7 +170,6 @@ cvode_t::cvode_t(cds_t *_cds)
   this->errorWeightKernel = platform->kernelRequests.load("cvode_t::errorWeight");
   this->fusedAddRhoDivKernel = platform->kernelRequests.load("cvode_t::rhoDiv");
 
-  this->maskKernel = platform->kernelRequests.load("cvode_t::mask");
   this->extrapolateKernel = platform->kernelRequests.load("cvode_t::extrapolate");
 
   const std::string suffix = "Hex3D";
@@ -1099,7 +1098,7 @@ void cvode_t::defaultRHS(double time, double t0, const LVector_t<dfloat> &o_y, L
   }
   if (this->Nmasked > 0) {
     auto o_FS = cds->o_NLT + cds->fieldOffsetScan[minCvodeScalarId];
-    this->maskKernel(this->Nmasked, this->o_maskIds, o_FS);
+    platform->linAlg->mask(this->Nmasked, this->o_maskIds, o_FS);
   }
   if (detailedTimersEnabled) {
     platform->timer.toc(timerScope + "::maskDirichlet");

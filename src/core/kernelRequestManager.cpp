@@ -165,7 +165,6 @@ void kernelRequestManager_t::compile()
       const auto fileName = (requestMap.find(req.requestName)->second).fileName;
       const auto props = (requestMap.find(req.requestName)->second).props;
       const auto hash = SHA1::from_string(fileName + props.hash().getFullString());
-      std::cout << hash << std::endl;
       auto [iter, inserted] = map.insert({hash, req});
       const std::string txt = 
         "request collision between <" + req.requestName + "> and <" + (iter->second).requestName + ">!"; 

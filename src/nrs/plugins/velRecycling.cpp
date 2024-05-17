@@ -95,9 +95,7 @@ void velRecycling::copy()
 
   if (interp) {
     const dlong offset = o_Uint.length() / nrs->NVfields;
-    deviceMemory<dfloat> d_U(nrs->o_U);
-    deviceMemory<dfloat> d_Uint(o_Uint);
-    interp->eval(nrs->NVfields, nrs->fieldOffset, d_U, offset, d_Uint);
+    interp->eval(nrs->NVfields, nrs->fieldOffset, nrs->o_U, offset, o_Uint);
     maskCopyKernel(interp->numPoints(), offset, nrs->fieldOffset, o_maskIds, o_Uint, o_wrk);
   } else {
     o_wrk.copyFrom(nrs->o_U, nrs->NVfields * nrs->fieldOffset);

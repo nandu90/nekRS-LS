@@ -84,17 +84,13 @@ void registerJacobiKernels(const std::string &section, int N, int poissonEquatio
   const std::string optionsPrefix = createOptionsPrefix(section);
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/elliptic/");
 
-  std::string kernelName = "axmyzManyPfloat";
-  std::string fileName = oklpath + kernelName + extension;
-  platform->kernelRequests.add(kernelName, fileName, platform->kernelInfo);
-
   {
     auto props = platform->kernelInfo + meshKernelProperties(N);
     if (poissonEquation) {
       props["defines/p_poisson"] = 1;
     }
-    kernelName = "ellipticBlockBuildDiagonal" + suffix;
-    fileName = oklpath + kernelName + ".okl";
+    auto kernelName = "ellipticBlockBuildDiagonal" + suffix;
+    auto fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(poissonPrefix + kernelName, fileName, props);
   }
 }
@@ -139,21 +135,7 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
 
   {
     std::string fileName;
-    std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/");
-
-    if (N != M) { 
-      fileName = oklpath + "mask.okl";
-      kernelName = "mask";
-      platform->kernelRequests.add(kernelName + orderSuffix, fileName, kernelInfo, orderSuffix);
- 
-      fileName = oklpath + "mask.okl";
-      platform->kernelRequests.add(kernelName + orderSuffix + "pfloat",
-                            fileName,
-                            pfloatKernelInfo,
-                            orderSuffix + "pfloat");
-    }
-  
-
+    std::string oklpath;
     oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/elliptic/");
 
     kernelName = "updateChebyshev";
@@ -164,24 +146,18 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(kernelName + orderSuffix, fileName, kernelInfo, orderSuffix);
 
+    kernelName = "ellipticBlockBuildDiagonalHex3D";
+    fileName = oklpath + kernelName + ".okl";
     occa::properties buildDiagInfo = kernelInfo;
     const std::string poissonPrefix = poissonEquation ? "poisson-" : "";
     if (poissonEquation)
       buildDiagInfo["defines/p_poisson"] = 1;
 
-    kernelName = "ellipticBlockBuildDiagonalHex3D";
+    occa::properties props = buildDiagInfo;
+    props["defines/dfloat"] = pfloatString;
     fileName = oklpath + kernelName + ".okl";
-
-    if (N != M) { 
-      platform->kernelRequests.add(poissonPrefix + kernelName + orderSuffix, fileName, buildDiagInfo, orderSuffix);
-    }
-
-    {
-      occa::properties props = buildDiagInfo;
-      props["defines/dfloat"] = pfloatString;
-      kernelName = "ellipticBlockBuildDiagonalPfloatHex3D";
-      platform->kernelRequests.add(poissonPrefix + kernelName + orderSuffix, fileName, props, orderSuffix);
-    }
+    kernelName = "ellipticBlockBuildDiagonalPfloatHex3D";
+    platform->kernelRequests.add(poissonPrefix + kernelName + orderSuffix, fileName, props, orderSuffix);
   }
 }
 

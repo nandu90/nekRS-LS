@@ -30,7 +30,7 @@ class deviceMemory {
 
   explicit deviceMemory(const occa::memory& occa_memory) 
       : occa_memory_{occa_memory} { 
-    if (occa_memory_.dtype() != occa::dtype::get<T>()) throw std::runtime_error("data type does not match");
+    if (occa_memory_.byte_size() && occa_memory_.dtype() != occa::dtype::get<T>()) throw std::runtime_error("data type does not match");
   }
 
   explicit deviceMemory(occa::memory&& occa_memory) noexcept
@@ -38,7 +38,7 @@ class deviceMemory {
 
   deviceMemory(const deviceMemory& other) 
       : occa_memory_{other.occa_memory_} {
-    if (occa_memory_.dtype() != occa::dtype::get<T>()) throw std::runtime_error("data type does not match");
+    if (occa_memory_.byte_size() && occa_memory_.dtype() != occa::dtype::get<T>()) throw std::runtime_error("data type does not match");
   }
 
   deviceMemory(deviceMemory&& other) noexcept

@@ -99,7 +99,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
       prop["defines/p_ndot"] = 1;
       kernelName = "surfaceAreaNormalMultiplyIntegrateHex3D-ndot";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, prop);
- 
+
       kernelName = "setBIDHex3D";
       fileName = oklpath + "/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, kernelInfo);

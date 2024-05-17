@@ -8,6 +8,7 @@
 * [ADIOS2](https://adios2.readthedocs.io/) field file writer
 * Addtional output options (element filter and interpolation on uniform grid / different polynomial-order)
 * Multi session nek-nek including multi-rate time stepping
+* Combined CG for improved performance
 * CHT nek-nek support
 * Improved JIT compilation performance
 * HIP support for BoomerAMG

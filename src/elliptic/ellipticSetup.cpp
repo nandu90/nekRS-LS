@@ -215,10 +215,6 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
         platform->kernelRequests.load(sectionIdentifier + "combinedPCGUpdateConvergedSolution");
   }
 
-  mesh->maskKernel = platform->kernelRequests.load("mask");
-  mesh->maskPfloatKernel = platform->kernelRequests.load("maskPfloat");
-
-
   int Nreductions = 1;
   if (options.compareArgs("SOLVER", "PCG+COMBINED")) {
     Nreductions = CombinedPCGId::nReduction;

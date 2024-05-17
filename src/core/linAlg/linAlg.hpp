@@ -65,6 +65,9 @@ public:
   /* vector operations */
   /*********************/
 
+  void mask(const dlong N, const occa::memory& o_maskIds, occa::memory &o_a);
+  void pmask(const dlong N, const occa::memory& o_maskIds, occa::memory &o_a);
+
   // o_a[n] = alpha
   void fill(const dlong N, const dfloat alpha, occa::memory &o_a);
   void pfill(const dlong N, const pfloat alpha, occa::memory &o_a);
@@ -358,7 +361,6 @@ public:
 
   occa::kernel fillKernel;
   occa::kernel pfillKernel;
-
   occa::kernel absKernel;
   occa::kernel addKernel;
   occa::kernel scaleKernel;
@@ -416,7 +418,8 @@ public:
   occa::kernel magSqrSymTensorKernel;
   occa::kernel magSqrSymTensorDiagKernel;
   occa::kernel magSqrTensorKernel;
-
+  occa::kernel maskKernel;
+  occa::kernel pmaskKernel;
 };
 
 #endif

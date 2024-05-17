@@ -8,7 +8,7 @@ set(ELLIPTIC_SOURCES
         ${ELLIPTIC_SOURCE_DIR}/amgSolver/amgx/AMGX.cpp
         ${ELLIPTIC_SOURCE_DIR}/ellipticApplyMask.cpp
         ${ELLIPTIC_SOURCE_DIR}/ellipticUpdateJacobi.cpp
-        ${ELLIPTIC_SOURCE_DIR}/ellipticBuildPreconditionerKernels.cpp
+        ${ELLIPTIC_SOURCE_DIR}/ellipticBuildMultigridLevelKernels.cpp
         ${ELLIPTIC_SOURCE_DIR}/MG/ellipticBuildMultigridLevelFine.cpp
         ${ELLIPTIC_SOURCE_DIR}/MG/ellipticBuildMultigridLevel.cpp
         ${ELLIPTIC_SOURCE_DIR}/MG/ellipticMultiGridUpdateLambda.cpp

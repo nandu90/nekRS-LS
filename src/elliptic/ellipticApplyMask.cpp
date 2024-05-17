@@ -3,7 +3,7 @@
 
 void ellipticApplyMask(elliptic_t *solver, occa::memory &o_x, std::string precision)
 {
-  mesh_t *mesh = solver->mesh;
+  auto mesh = solver->mesh;
   ellipticApplyMask(solver,
                     mesh->Nelements,
                     solver->Nmasked,
@@ -21,8 +21,7 @@ void ellipticApplyMask(elliptic_t *solver,
                        occa::memory &o_x,
                        std::string precision)
 {
-  mesh_t *mesh = solver->mesh;
-  occa::kernel &maskKernel = (precision != dfloatString) ? mesh->maskPfloatKernel : mesh->maskKernel;
+  auto mesh = solver->mesh;
 
   if (solver->applyZeroNormalMask) {
     nekrsCheck(precision != dfloatString,
@@ -32,7 +31,10 @@ void ellipticApplyMask(elliptic_t *solver,
                precision.c_str());
     solver->applyZeroNormalMask(Nelements, o_elementList, o_x);
   }
-  if (Nmasked) {
-    maskKernel(Nmasked, o_maskIds, o_x);
+
+  if (precision != dfloatString) {
+    platform->linAlg->pmask(Nmasked, o_maskIds, o_x);
+  } else {
+    platform->linAlg->mask(Nmasked, o_maskIds, o_x);
   }
 }

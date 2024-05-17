@@ -29,12 +29,11 @@
 #include "platform.hpp"
 #include "linAlg.hpp"
 
-void ellipticBuildPreconditionerKernels(elliptic_t *elliptic)
+void ellipticBuildMultigridLevelKernels(elliptic_t *elliptic)
 {
-  mesh_t *mesh = elliptic->mesh;
+  auto mesh = elliptic->mesh;
 
   std::string prefix = "Hex3D";
-  std::string kernelName;
 
   int M;
   platform->options.getArgs("POLYNOMIAL DEGREE", M);
@@ -42,30 +41,16 @@ void ellipticBuildPreconditionerKernels(elliptic_t *elliptic)
   const std::string orderSuffix = std::string("_") + std::to_string(mesh->N);
   const std::string poissonPrefix = elliptic->poisson ? "poisson-" : "";
 
-  {
-    kernelName = "mask";
-    if (mesh->N != M) { 
-      mesh->maskKernel = platform->kernelRequests.load(kernelName + orderSuffix);
-      mesh->maskPfloatKernel = platform->kernelRequests.load(kernelName + orderSuffix + "pfloat");
-    } else {
-      mesh->maskKernel = platform->kernelRequests.load(kernelName);
-      mesh->maskPfloatKernel = platform->kernelRequests.load(kernelName + "Pfloat");
-    }
+  std::string kernelName;
 
-    kernelName = "updateChebyshev";
-    elliptic->updateChebyshevKernel = platform->kernelRequests.load(kernelName + orderSuffix);
+  kernelName = "updateChebyshev";
+  elliptic->updateChebyshevKernel = platform->kernelRequests.load(kernelName + orderSuffix);
 
-    kernelName = "updateFourthKindChebyshev";
-    elliptic->updateFourthKindChebyshevKernel = platform->kernelRequests.load(kernelName + orderSuffix);
+  kernelName = "updateFourthKindChebyshev";
+  elliptic->updateFourthKindChebyshevKernel = platform->kernelRequests.load(kernelName + orderSuffix);
 
-    if (mesh->N != M) { 
-      kernelName = "ellipticBlockBuildDiagonalHex3D";
-      elliptic->ellipticBlockBuildDiagonalKernel =
-        platform->kernelRequests.load(poissonPrefix + kernelName + orderSuffix);
-    }
-
-    kernelName = "ellipticBlockBuildDiagonalPfloatHex3D";
-    elliptic->ellipticBlockBuildDiagonalPfloatKernel =
-        platform->kernelRequests.load(poissonPrefix + kernelName + orderSuffix);
-  }
+   kernelName = "ellipticBlockBuildDiagonalPfloatHex3D";
+   elliptic->ellipticBlockBuildDiagonalPfloatKernel =
+     platform->kernelRequests.load(poissonPrefix + kernelName + orderSuffix);
+   elliptic->ellipticBlockBuildDiagonalKernel = nullptr; 
 }

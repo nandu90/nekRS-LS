@@ -80,10 +80,6 @@ void registerEllipticKernels(std::string section, int poissonEquation)
   kernelInfo["include_paths"].asArray();
   kernelInfo += meshKernelProperties(N);
 
-  if (poissonEquation) {
-    kernelInfo["defines/p_poisson"] = 1;
-  }
-
   const bool blockSolver = [&section]() {
     if (section == "velocity" && 
         platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE"))
@@ -97,7 +93,6 @@ void registerEllipticKernels(std::string section, int poissonEquation)
 
     return false;
   }();
-
   const int Nfields = (blockSolver) ? 3 : 1;
 
   const bool stressForm = [&section]() {
@@ -109,10 +104,9 @@ void registerEllipticKernels(std::string section, int poissonEquation)
   }();
 
   const bool serial = platform->serial;
-
   const std::string fileNameExtension = (serial) ? ".c" : ".okl";
-
   const std::string sectionIdentifier = std::to_string(Nfields) + "-";
+  const std::string suffix = "Hex3D";
 
   if (platform->options.compareArgs(optionsPrefix + "SOLVER", "PGMRES")) {
     registerGMRESKernels(section, Nfields);
@@ -129,7 +123,16 @@ void registerEllipticKernels(std::string section, int poissonEquation)
     {
       const std::string extension = ".okl";
       occa::properties properties = platform->kernelInfo;
+
+      kernelName = "fusedCopyDfloatToPfloat";
+      fileName = oklpath + kernelName + extension;
+      platform->kernelRequests.add(kernelName, fileName, properties);
+
       properties["defines/p_Nfields"] = Nfields;
+
+      kernelName = "ellipticBlockUpdatePCG";
+      fileName = oklpath + "ellipticBlockUpdatePCG" + extension;
+      platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, properties);
 
       kernelName = "multiScaledAddwOffset";
       fileName = oklpath + kernelName + extension;
@@ -137,39 +140,8 @@ void registerEllipticKernels(std::string section, int poissonEquation)
       kernelName = "accumulate";
       fileName = oklpath + kernelName + extension;
       platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, properties);
-
-      kernelName = "fusedCopyDfloatToPfloat";
-      fileName = oklpath + kernelName + extension;
-      platform->kernelRequests.add(kernelName, fileName, properties);
     }
   }
-
-  {
-    const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/");
-    std::string fileName;
-
-    fileName = oklpath + "mask.okl";
-    platform->kernelRequests.add("mask", fileName, kernelInfo);
-
-    occa::properties pfloatKernelInfo = kernelInfo;
-    pfloatKernelInfo["defines/dfloat"] = pfloatString;
-    platform->kernelRequests.add("maskPfloat", fileName, pfloatKernelInfo);
-  }
-
-  kernelInfo["defines/p_Nfields"] = Nfields;
-
-  occa::properties dfloatKernelInfo = kernelInfo;
-  dfloatKernelInfo["defines/dfloat"] = dfloatString;
-  dfloatKernelInfo["defines/pfloat"] = pfloatString;
-
-  occa::properties floatKernelInfo = kernelInfo;
-  floatKernelInfo["defines/pfloat"] = pfloatString;
-  floatKernelInfo["defines/dfloat"] = pfloatString;
-
-  const std::string suffix = "Hex3D";
-  const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/elliptic/");
-  std::string fileName;
-  std::string kernelName;
 
   int nelgt, nelgv;
   const std::string meshFile = platform->options.getArgs("MESH FILE");
@@ -205,7 +177,7 @@ void registerEllipticKernels(std::string section, int poissonEquation)
       if (blockSolver)
         kernelNamePrefix += (stressForm) ? "Stress" : "Block";
  
-      kernelName = "AxCoeff";
+      std::string kernelName = "AxCoeff";
       if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR"))
         kernelName += "Trilinear";
       kernelName += suffix;
@@ -213,8 +185,4 @@ void registerEllipticKernels(std::string section, int poissonEquation)
       platform->kernelRequests.add(kernelNamePrefix + "Partial" + kernelName, axKernel);
     }
   }
-
-  // PCG update
-  fileName = oklpath + "ellipticBlockUpdatePCG" + fileNameExtension;
-  platform->kernelRequests.add(sectionIdentifier + "ellipticBlockUpdatePCG", fileName, kernelInfo);
 }

@@ -242,10 +242,6 @@ void registerNrsKernels(occa::properties kernelInfoBC)
     fileName = oklpath + "/core/" + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, kernelInfo);
 
-    kernelName = "mask";
-    fileName = oklpath + "/core/" + kernelName + ".okl";
-    platform->kernelRequests.add(section + kernelName, fileName, kernelInfo);
-
     {
       int N;
       platform->options.getArgs("POLYNOMIAL DEGREE", N);

@@ -180,30 +180,34 @@ void linAlg_t::setup()
   MPI_Barrier(platform->comm.mpiComm);
   double tStartLoadKernel = MPI_Wtime();
   {
+    std::string prefix = "";
+    if (sizeof(dfloat) != sizeof(float)) prefix = "p"; 
+    pfillKernel = kernelRequests.load(prefix + "fill");
+    paxmyzManyKernel = kernelRequests.load(prefix + "axmyzMany");
+    padyManyKernel = kernelRequests.load(prefix + "adyMany");
+    paxpbyManyKernel = kernelRequests.load(prefix + "axpbyMany");
+    paxmyKernel = kernelRequests.load(prefix + "axmy");
+    paxpbyKernel = kernelRequests.load(prefix + "axpby");
+    paxmyzKernel = kernelRequests.load(prefix + "axmyz");
+    pmaskKernel = kernelRequests.load(prefix + "mask");
+
     fillKernel = kernelRequests.load("fill");
-    pfillKernel = kernelRequests.load("pfill");
     absKernel = kernelRequests.load("vabs");
     addKernel = kernelRequests.load("add");
     scaleKernel = kernelRequests.load("scale");
     scaleManyKernel = kernelRequests.load("scaleMany");
     axpbyKernel = kernelRequests.load("axpby");
-    paxpbyKernel = kernelRequests.load("paxpby");
     axpbyManyKernel = kernelRequests.load("axpbyMany");
-    paxpbyManyKernel = kernelRequests.load("paxpbyMany");
     axpbyzKernel = kernelRequests.load("axpbyz");
     axpbyzManyKernel = kernelRequests.load("axpbyzMany");
     axmyKernel = kernelRequests.load("axmy");
-    paxmyKernel = kernelRequests.load("paxmy");
     axmyManyKernel = kernelRequests.load("axmyMany");
     axmyVectorKernel = kernelRequests.load("axmyVector");
     axmyzKernel = kernelRequests.load("axmyz");
-    paxmyzKernel = kernelRequests.load("paxmyz");
     axmyzManyKernel = kernelRequests.load("axmyzMany");
-    paxmyzManyKernel = kernelRequests.load("paxmyzMany");
     adyKernel = kernelRequests.load("ady");
     adyzKernel = kernelRequests.load("adyz");
     adyManyKernel = kernelRequests.load("adyMany");
-    padyManyKernel = kernelRequests.load("padyMany");
     axdyKernel = kernelRequests.load("axdy");
     aydxKernel = kernelRequests.load("aydx");
     aydxManyKernel = kernelRequests.load("aydxMany");
@@ -237,6 +241,8 @@ void linAlg_t::setup()
     magSqrSymTensorKernel = kernelRequests.load("magSqrSymTensor");
     magSqrSymTensorDiagKernel = kernelRequests.load("magSqrSymTensorDiag");
     magSqrTensorKernel = kernelRequests.load("magSqrTensor");
+    maskKernel = kernelRequests.load("mask");
+
   }
 }
 
@@ -247,6 +253,16 @@ linAlg_t::~linAlg_t()
 /*********************/
 /* vector operations */
 /*********************/
+
+void linAlg_t::mask(const dlong N, const occa::memory& o_maskIds, occa::memory &o_a)
+{
+  if(N) maskKernel(N, o_maskIds, o_a);
+}
+
+void linAlg_t::pmask(const dlong N, const occa::memory& o_maskIds, occa::memory &o_a)
+{
+  if(N) pmaskKernel(N, o_maskIds, o_a);
+}
 
 // o_a[n] = alpha
 void linAlg_t::fill(const dlong N, const dfloat alpha, occa::memory &o_a)

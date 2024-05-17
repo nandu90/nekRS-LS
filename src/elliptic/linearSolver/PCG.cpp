@@ -367,9 +367,19 @@ int combinedPCG(elliptic_t *elliptic,
       printf("it %d r norm %.15e\n", iter, rdotr);
     }
 
+
     // converged, update solution prior to exit
     if (rdotr <= tol) {
       const dlong singleVectorUpdate = iter % 2 == 1;
+      if (platform->comm.mpiRank == 0) {
+        nekrsCheck(!singleVectorUpdate && betakm1 == 0,
+                   MPI_COMM_SELF,
+                   EXIT_FAILURE,
+                   "%s\n",
+                   "Cannot update solution as beta == 0!");
+      }
+      const dfloat alphaInvBeta = (!singleVectorUpdate) ? alphakm1 / betakm1 : 0;
+
       elliptic->combinedPCGUpdateConvergedSolutionKernel(mesh->Nlocal,
                                                          singleVectorUpdate,
                                                          preco,
@@ -377,8 +387,7 @@ int combinedPCG(elliptic_t *elliptic,
                                                          alphak,
                                                          alphakm1,
                                                          betakm1,
-                                                         (!singleVectorUpdate) ? alphakm1 / betakm1
-                                                                               : static_cast<dfloat>(0),
+                                                         alphaInvBeta,
                                                          o_Minv,
                                                          o_p,
                                                          o_r,
@@ -386,13 +395,14 @@ int combinedPCG(elliptic_t *elliptic,
     }
 
     betakm2 = betakm1;
-    betakm1 = std::abs(dk + alphak * (-2. * ek + alphak * fk)) / dk;
+    betakm1 = std::abs(1 + alphak * (-2. * ek + alphak * fk) / dk);
 
-    alphakm2 = alphakm1;
-    alphakm1 = alphak;
 #ifdef DEBUG
     printf("beta: %.15e\n", betakm1);
 #endif
+
+    alphakm2 = alphakm1;
+    alphakm1 = alphak;
 
   } while (rdotr > tol && iter < MAXIT);
 

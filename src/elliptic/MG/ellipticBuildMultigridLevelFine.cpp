@@ -52,7 +52,7 @@ elliptic_t *ellipticBuildMultigridLevelFine(elliptic_t *baseElliptic)
 
   elliptic->mgLevel = true;
 
-  ellipticBuildPreconditionerKernels(elliptic);
+  ellipticBuildMultigridLevelKernels(elliptic);
 
   elliptic->o_lambda0 = platform->device.malloc<pfloat>(mesh->Nlocal);
   if (elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {

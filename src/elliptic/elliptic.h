@@ -166,7 +166,7 @@ elliptic_t *ellipticBuildMultigridLevel(elliptic_t *baseElliptic, int Nc, int Nf
 
 void ellipticPreconditioner(elliptic_t *elliptic, const occa::memory &o_r, occa::memory &o_z);
 void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs);
-void ellipticBuildPreconditionerKernels(elliptic_t *elliptic);
+void ellipticBuildMultigridLevelKernels(elliptic_t *elliptic);
 
 void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const occa::memory &o_lambda1, const occa::memory &o_r, occa::memory o_x);
 

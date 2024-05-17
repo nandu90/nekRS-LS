@@ -36,10 +36,6 @@ void registerCvodeKernels()
   fileName = oklpath + "/core/" + kernelName + ".okl";
   platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);
 
-  kernelName = "mask";
-  fileName = oklpath + "/core/" + kernelName + ".okl";
-  platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);
- 
   kernelName = "errorWeight";
   fileName = oklpath + "/nrs/cds/cvode/" + kernelName + ".okl";
   platform->kernelRequests.add(prefix + kernelName, fileName, platform->kernelInfo);

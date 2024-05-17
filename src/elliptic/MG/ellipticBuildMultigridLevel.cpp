@@ -110,7 +110,7 @@ elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf
   MPI_Barrier(platform->comm.mpiComm);
   double tStartLoadKernel = MPI_Wtime();
 
-  ellipticBuildPreconditionerKernels(elliptic);
+  ellipticBuildMultigridLevelKernels(elliptic);
 
   const std::string poissonPrefix = elliptic->poisson ? "poisson-" : "";
 

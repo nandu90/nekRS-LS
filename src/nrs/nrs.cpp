@@ -167,9 +167,6 @@ static void assignKernels(nrs_t *nrs)
     kernelName = "maskCopy2";
     nrs->maskCopy2Kernel = platform->kernelRequests.load(section + kernelName);
 
-    kernelName = "mask";
-    nrs->maskKernel = platform->kernelRequests.load(section + kernelName);
-
     kernelName = "cfl" + suffix;
     nrs->cflKernel = platform->kernelRequests.load(section + kernelName);
 
