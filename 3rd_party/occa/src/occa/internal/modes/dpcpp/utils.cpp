@@ -187,7 +187,7 @@ namespace occa
       }
       if (std::string::npos == compiler_flags.find("-ftarget-register-alloc-mode")) {
         if (std::string::npos != arch_string.find("pvc")) {
-          compiler_flags += " -ftarget-register-alloc-mode=pvc:auto";
+          compiler_flags += " -Xsycl-target-backend '-options -ze-intel-enable-auto-large-GRF-mode'";
         }
       }
     }
