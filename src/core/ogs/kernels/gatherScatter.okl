@@ -1,44 +1,25 @@
-
-typedef struct{dlong v[1];} dl1;
-typedef struct{dlong v[2];} dl2;
-typedef struct{dlong v[3];} dl3;
-typedef struct{dlong v[4];} dl4;
-typedef struct{dlong v[5];} dl5;
-typedef struct{dlong v[6];} dl6;
-typedef struct{dlong v[7];} dl7;
-typedef struct{dlong v[8];} dl8;
-// typedef struct{dlong v[9];} dl9;
-
-#define nodeGather(Ng, gids, OP)					                    \
-{									                                            \
-  const dl##Ng ids = *((dl##Ng *)(gids));				              \
-  for (dlong n = 0;n<Ng;++n){OGS_DO_##OP(gq,q[ids.v[n]]);}		\
-  for (dlong n = 0;n<Ng;++n){q[ids.v[n]]=gq;}				          \
-}
-
-// vector loads
-// TODO: Add fallback case
-#define GENERATE(TN, T, OP)						                                \
-@kernel void gatherScatter_##TN##_##OP(const dlong Ngather,		        \
-				 @restrict const dlong* gatherStarts,                         \
-				 @restrict const dlong* gatherIds,                            \
-				 @restrict T* q)                                              \
-{		                                                                  \
-  @tile(p_blockSize, @outer, @inner)                                  \
-  for (dlong g = 0; g < Ngather; ++g) {	                              \
-    const dlong start = gatherStarts[g];				                      \
-    const dlong Ng = gatherStarts[g+1] - start;                       \
-    const dlong * const gids = gatherIds+start;			                  \
-    T gq = init_##TN##_##OP;						                              \
-    if(Ng==1) nodeGather(1, gids, OP);				                        \
-    if(Ng==2) nodeGather(2, gids, OP);				                        \
-    if(Ng==3) nodeGather(3, gids, OP);				                        \
-    if(Ng==4) nodeGather(4, gids, OP);				                        \
-    if(Ng==5) nodeGather(5, gids, OP);				                        \
-    if(Ng==6) nodeGather(6, gids, OP);				                        \
-    if(Ng==7) nodeGather(7, gids, OP);				                        \
-    if(Ng==8) nodeGather(8, gids, OP);				                        \
-  }									                                                  \
+#define GENERATE(TN, T, OP)                                                                                  \
+@kernel void gatherScatter_##TN##_##OP(const dlong Ngather,                                                  \
+                                      @ restrict const dlong *gatherStarts,                                  \
+                                      @ restrict const dlong *gatherIds,                                     \
+                                      @ restrict T *q)                                                       \
+{                                                                                                            \
+for (dlong g = 0; g < Ngather; ++g; @tile(p_blockSize, @outer, @inner)) {                                    \
+  const dlong start = gatherStarts[g];                                                                       \
+  const dlong end = gatherStarts[g + 1];                                                                     \
+  if ((start + 1) != end) {                                                                                  \
+      T gq = init_##TN##_##OP;                                                                               \
+      for (dlong n = start; n < end; ++n) {                                                                  \
+        const dlong id = gatherIds[n];                                                                       \
+        OGS_DO_##OP(gq,q[id]);                                                                               \
+      }                                                                                                      \
+                                                                                                             \
+      for (dlong n = start; n < end; ++n) {                                                                  \
+        const dlong id = gatherIds[n];                                                                       \
+        q[id] = gq;                                                                                          \
+      }                                                                                                      \
+    }                                                                                                        \
+  }                                                                                                          \
 }
 
 GENERATE(float,float,add)
