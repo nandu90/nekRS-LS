@@ -176,6 +176,14 @@ void UDF_ExecuteStep(double time, int tstep)
     tavg::run(time);
   }
 
+  auto computeQ = nrs->isCheckpointStep;
+#ifdef NEKRS_ASCENT_ENABLED
+  if (tstep % renderStep == 0) computeQ = 1;
+#endif
+  if (computeQ) {
+    nrs->Qcriterion(nrs->o_U, o_qcriterion);
+  }
+
   if (nrs->isCheckpointStep) {
     auto o_UZ = nrs->o_U + 2 * nrs->fieldOffset;
     const dfloat ubar =
@@ -183,8 +191,6 @@ void UDF_ExecuteStep(double time, int tstep)
     if (platform->comm.mpiRank == 0) {
       printf(" uBulk: %g\n", ubar);
     }
-
-    nrs->Qcriterion(nrs->o_U, o_qcriterion);
 
 #ifdef NEKRS_ADIOS_ENABLED 
     {

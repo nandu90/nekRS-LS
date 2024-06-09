@@ -32,7 +32,7 @@ namespace
 {
 conduit::Node mesh_data;
 
-using field = std::tuple<std::string, occa::memory, mesh_t *>;
+using field = std::tuple<std::string, occa::memory, mesh_t *, dlong>;
 std::vector<field> userFieldList;
 occa::memory o_connectivity;
 
@@ -111,10 +111,12 @@ static void updateFieldData(occa::memory& o_fields)
       auto fieldName = std::get<0>(entry);
       auto o_fld = std::get<1>(entry);
       auto mesh_fld = std::get<2>(entry);
+      auto& offset_fld = std::get<3>(entry);
+      const auto dim_fld = (offset_fld) ? o_fld.size() / offset_fld : 1;
  
       offsetScan[ifld] =
           offsetScan[ifld - 1] +
-          alignStride<dfloat>(mesh_vis->Np * (mesh_fld->Nelements + mesh_fld->totalHaloPairs));
+          alignStride<dfloat>(mesh_vis->Np * (mesh_fld->Nelements + mesh_fld->totalHaloPairs)) * dim_fld;
  
       ifld++;
     }
@@ -141,25 +143,64 @@ static void updateFieldData(occa::memory& o_fields)
   }
 
   int ifld = 0;
+  const std::string str_uvw = "uvw";
+  const std::string str_xyz = "xyz";
   for (auto &entry : userFieldList) {
     auto fieldName = std::get<0>(entry);
     auto o_fldIn = std::get<1>(entry);
     auto mesh_fld = std::get<2>(entry);
+    auto& offset_fldIn = std::get<3>(entry);
+
+    const auto dim_fld = (offset_fldIn) ? o_fldIn.size() / offset_fldIn : 1;
+    const dlong offset_fld = (interpolate) ? fieldOffsetScan[ifld] / dim_fld : 0;
     const dlong fieldLength = mesh_fld->Nelements * mesh_vis->Np;
 
     auto o_fld = (interpolate) ? o_fields.slice(fieldOffsetScan[ifld]) : o_fldIn;
 
-    if (interpolate) {
-      if (uniform) {
-        mesh_fld->map2Uniform(mesh_vis, o_fldIn, o_fld);
-      } else {
-        mesh_fld->interpolate(mesh_vis, o_fldIn, o_fld);
+    if (dim_fld==1) { // scalar field
+      if (interpolate) {
+        if (uniform) {
+          mesh_fld->map2Uniform(mesh_vis, o_fldIn, o_fld);
+        } else {
+          mesh_fld->interpolate(mesh_vis, o_fldIn, o_fld);
+        }
+      }
+      mesh_data["fields/" + fieldName + "/association"] = "vertex";
+      mesh_data["fields/" + fieldName + "/topology"] = "mesh";
+      mesh_data["fields/" + fieldName + "/values"].set_external((dfloat *)o_fld.ptr(), fieldLength);
+
+    } else if (dim_fld==2 || dim_fld==3) { // vector field
+
+      for (int idim=0;idim<dim_fld;idim++) {
+        auto o_fldInComp = o_fldIn.slice(idim*offset_fldIn);
+        auto o_fldComp = (interpolate) ? o_fld.slice(idim*offset_fld) : o_fldInComp;
+
+        if (interpolate) {
+          if (uniform) {
+            mesh_fld->map2Uniform(mesh_vis, o_fldInComp, o_fldComp);
+          } else {
+            mesh_fld->interpolate(mesh_vis, o_fldInComp, o_fldComp);
+          }
+        }
+
+        // scalar field
+        std::string fieldNameXYZ = fieldName + "_" + str_xyz.at(idim);
+        mesh_data["fields/" + fieldNameXYZ + "/association"] = "vertex";
+        mesh_data["fields/" + fieldNameXYZ + "/topology"] = "mesh";
+        mesh_data["fields/" + fieldNameXYZ + "/values"].set_external((dfloat *)o_fldComp.ptr(), fieldLength);
+
+        // vector component
+        if (idim==0) {
+          mesh_data["fields/" + fieldName + "/association"] = "vertex";
+          mesh_data["fields/" + fieldName + "/topology"] = "mesh";
+        }
+        mesh_data["fields/" + fieldName + "/values/" + str_uvw.at(idim)].set_external((dfloat *)o_fldComp.ptr(), fieldLength);
+      }
+    } else {
+      if (platform->comm.mpiRank == 0) {
+        nekrsCheck(0, MPI_COMM_SELF, EXIT_FAILURE, "Unsupported vector dim: %d\n", dim_fld);
       }
     }
-
-    mesh_data["fields/" + fieldName + "/association"] = "vertex";
-    mesh_data["fields/" + fieldName + "/topology"] = "mesh";
-    mesh_data["fields/" + fieldName + "/values"].set_external((dfloat *)o_fld.ptr(), fieldLength);
 
     ifld++;
   }
@@ -169,14 +210,12 @@ static void updateFieldData(occa::memory& o_fields)
 
 void nekAscent::addScalarField(const std::string& name, occa::memory o_fld, mesh_t *mesh_fld)
 {
-  userFieldList.push_back(std::tuple{name, o_fld.slice(0, mesh_fld->Nlocal), mesh_fld});
+  userFieldList.push_back(std::tuple{name, o_fld.slice(0, mesh_fld->Nlocal), mesh_fld, 0});
 }
 
 void nekAscent::addVectorField(const std::string& name, occa::memory o_fld, mesh_t *mesh_fld, dlong offset)
 {
-  userFieldList.push_back(std::tuple{name + "_x", o_fld.slice(0 * offset, mesh_fld->Nlocal), mesh_fld});
-  userFieldList.push_back(std::tuple{name + "_y", o_fld.slice(1 * offset, mesh_fld->Nlocal), mesh_fld});
-  userFieldList.push_back(std::tuple{name + "_z", o_fld.slice(2 * offset, mesh_fld->Nlocal), mesh_fld});
+  userFieldList.push_back(std::tuple{name, o_fld.slice(0, mesh_fld->dim * offset), mesh_fld, offset});
 }
 
 void nekAscent::clearData()
@@ -291,6 +330,7 @@ void nekAscent::setup(mesh_t *mesh_,
 void nekAscent::run(const double time, const int tstep)
 {
   nekrsCheck(!setupCalled, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "called prior to nekAscent::setup()!");
+  const auto verbose = platform->options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
 
   platform->timer.tic("nekAscent::run");
   if (platform->comm.mpiRank == 0) {
@@ -301,8 +341,13 @@ void nekAscent::run(const double time, const int tstep)
   mesh_data["state/time"] = time;
 
   occa::memory o_work;
-  updateFieldData(o_work); 
+  updateFieldData(o_work);
 
+  if (platform->comm.mpiRank == 0 && verbose) {
+    std::cout << "---------------- Ascent mesh_data ----------------" << std::endl;
+    mesh_data.print();
+    fflush(stdout);
+  }
   mAscent.publish(mesh_data);
 
   conduit::Node triggers;
