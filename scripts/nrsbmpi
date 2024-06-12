@@ -2,8 +2,10 @@
 set -e
 source $NEKRS_HOME/bin/nrsqsub_utils
 
+set +e
 rm -f logfile
 mv $1.log.$2 $1.log1.$2 2>/dev/null
+set -e
 
 if [ $# -eq 0 ] || [ $# -lt 2 ] || [ "$1" == "-h" ] || [ "$1" == "-help" ]; then
   echo "usage: ${0##*/} casename #tasks [args]"
