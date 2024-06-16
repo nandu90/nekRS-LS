@@ -154,7 +154,6 @@ int main(int argc, char **argv)
                 Ntests,
                 true);
   } else {
-    const double targetTime = 10.0;
     benchmarkAx(Nelements,
                 Nq,
                 Ng,
@@ -165,7 +164,7 @@ int main(int argc, char **argv)
                 Ndim,
                 stressForm,
                 verbosity,
-                targetTime,
+                targetTimeBenchmark,
                 true);
   }
   MPI_Finalize();

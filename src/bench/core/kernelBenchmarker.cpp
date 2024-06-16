@@ -3,6 +3,9 @@
 
 namespace
 {
+constexpr int Nbaseline{100};
+constexpr int Nwarmup{10};
+
 double run(int Nsamples, std::function<void(occa::kernel &)> kernelRunner, occa::kernel &kernel)
 {
   platform->device.finish();
@@ -39,9 +42,9 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
 
     if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
       // warmup
-      double elapsed = run(1, kernelRunner, candidateKernel);
-
+      run(Nwarmup, kernelRunner, candidateKernel);
       double candidateKernelTiming = run(Ntests, kernelRunner, candidateKernel);
+      
       double tMax;
       double tMin;
       MPI_Allreduce(&candidateKernelTiming, &tMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
@@ -91,14 +94,15 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
 
     if (check) {
 
-      // warmup
-      double elapsed = run(1, kernelRunner, candidateKernel);
-
       // evaluation
+      double elapsed = run(Nbaseline, kernelRunner, candidateKernel);
       int Ntests = std::max(1, static_cast<int>(targetTime / elapsed));
       MPI_Allreduce(MPI_IN_PLACE, &Ntests, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
 
+      // warmup
+      run(Nwarmup, kernelRunner, candidateKernel);
       double candidateKernelTiming = run(Ntests, kernelRunner, candidateKernel);
+
       double tMax;
       double tMin;
       MPI_Allreduce(&candidateKernelTiming, &tMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
