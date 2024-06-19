@@ -177,7 +177,7 @@ occa::kernel benchmarkFDM(int Nelements,
       auto result = dumpResult();
 
       const auto err = maxRelErr<FPType>(referenceResult, result, platform->comm.mpiComm);
-      if (err > 100. * std::numeric_limits<FPType>::epsilon()) {
+      if (err > 100. * std::numeric_limits<FPType>::epsilon() || std::isnan(err)) {
         if (platform->comm.mpiRank == 0 && verbosity > 1) {
           std::cout << "fdm: Ignore version " << kernelVariant
                     << " as correctness check failed with " << err << std::endl;

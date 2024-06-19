@@ -296,7 +296,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
     o_NU.copyTo(results.data());
 
     const auto err = maxRelErr<dfloat>(referenceResults, results, platform->comm.mpiComm);
-    if (err > 500 * std::numeric_limits<dfloat>::epsilon()) {
+    if (err > 500 * std::numeric_limits<dfloat>::epsilon() || std::isnan(err)) {
       if (platform->comm.mpiRank == 0 && verbosity > 1) {
         std::cout << "advSub: Ignore version " << kernelVariant << " as correctness check failed with " << err
                   << std::endl;
