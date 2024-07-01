@@ -384,7 +384,7 @@ void nrs_t::initInnerStep(double time, dfloat _dt, int tstep)
                              cds->o_S,
                              o_Usubcycling,
                              cds->o_NLT,
-                             cds->o_BF);
+                             cds->o_JwF);
 
         dfloat scalarSumMakef = (3 * this->nEXT + 3);
         scalarSumMakef += (this->Nsubsteps) ? 1 : 3 * this->nBDF;
@@ -395,7 +395,7 @@ void nrs_t::initInnerStep(double time, dfloat _dt, int tstep)
                                                                        1,
                                                                        isOffset,
                                                                        mesh->ogs->o_invDegree,
-                                                                       cds->o_BF + cds->fieldOffsetScan[is],
+                                                                       cds->o_JwF + cds->fieldOffsetScan[is],
                                                                        platform->comm.mpiComm);
           if (platform->comm.mpiRank == 0) {
             printf("BF scalar=%d norm: %.15e\n", is, debugNorm);
@@ -433,7 +433,7 @@ void nrs_t::initInnerStep(double time, dfloat _dt, int tstep)
                          this->o_U,
                          o_Usubcycling,
                          this->o_NLT,
-                         this->o_BF);
+                         this->o_JwF);
  
     dfloat sumMakefFlops = (this->Nsubsteps) ? (6 + 6 * this->nEXT) : (6 * this->nEXT + 12 * this->nBDF);
     platform->flopCounter->add("sumMakef", sumMakefFlops * static_cast<double>(mesh->Nlocal));
@@ -443,7 +443,7 @@ void nrs_t::initInnerStep(double time, dfloat _dt, int tstep)
                                                                    this->NVfields,
                                                                    this->fieldOffset,
                                                                    mesh->ogs->o_invDegree,
-                                                                   this->o_BF,
+                                                                   this->o_JwF,
                                                                    platform->comm.mpiComm);
       if (platform->comm.mpiRank == 0) {
         printf("BF velocity norm: %.15e\n", debugNorm);

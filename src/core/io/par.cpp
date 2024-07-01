@@ -225,7 +225,7 @@ static std::vector<std::string> cvodeKeys = {
     {"jtvrecycleproperties"},
     {"sharedrho"},
     {"dealiasing"},
-    {"jtvmixedprecision"},
+    {"regularization"},
     {"solver"},
 };
 

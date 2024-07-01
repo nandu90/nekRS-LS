@@ -199,7 +199,7 @@ cds_t::cds_t(cdsConfig_t &cfg)
 
   if (this->anyEllipticSolver) {
     this->o_Se = platform->device.malloc<dfloat>(this->fieldOffsetSum);
-    this->o_BF = platform->device.malloc<dfloat>(this->fieldOffsetSum);
+    this->o_JwF = platform->device.malloc<dfloat>(this->fieldOffsetSum);
   }
 
   bool scalarFilteringEnabled = false;
@@ -331,7 +331,7 @@ void cds_t::makeNLT(double time, int tstep, occa::memory &o_Usubcycling)
       this->filterRTKernel(this->meshV->Nelements,
                            is,
                            1,
-                           fieldOffset,
+                           this->o_fieldOffsetScan,
                            this->o_applyFilterRT,
                            this->o_filterRT,
                            this->o_filterS,

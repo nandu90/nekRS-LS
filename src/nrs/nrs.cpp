@@ -720,7 +720,7 @@ void nrs_t::init()
   this->P = (dfloat *)calloc(this->fieldOffset, sizeof(dfloat));
   this->o_P = platform->device.malloc<dfloat>(this->fieldOffset, this->P);
 
-  this->o_BF = platform->device.malloc<dfloat>(this->NVfields * this->fieldOffset);
+  this->o_JwF = platform->device.malloc<dfloat>(this->NVfields * this->fieldOffset);
   this->o_NLT = platform->device.malloc<dfloat>(this->NVfields * this->nEXT * this->fieldOffset);
 
   int nProperties = 2;

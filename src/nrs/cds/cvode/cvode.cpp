@@ -612,6 +612,13 @@ void cvode_t::initialize()
     platform->options.setArgs("CVODE MAX TIMESTEPPER ORDER", "3");
   }
 
+  if (!platform->options.getArgs("CVODE MAX STEP SIZE").empty()) {
+    dfloat hmax;
+    platform->options.getArgs("CVODE MAX STEP SIZE", hmax);
+    retval = CVodeSetMaxStep(this->cvodeMem, hmax);
+    check_retval(&retval, "CVodeSetMaxStep", 1);
+  }
+
   int maxOrder;
   platform->options.getArgs("CVODE MAX TIMESTEPPER ORDER", maxOrder);
   retval = CVodeSetMaxOrd(this->cvodeMem, maxOrder);
@@ -1169,7 +1176,7 @@ void cvode_t::makeq(double time)
       cds->filterRTKernel(cds->meshV->Nelements,
                           scalarStart,
                           Nscalar,
-                          fieldOffset,
+                          cds->o_fieldOffsetScan,
                           cds->o_applyFilterRT,
                           cds->o_filterRT,
                           cds->o_filterS,
