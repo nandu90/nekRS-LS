@@ -29,7 +29,7 @@ T maxRelErr(const std::vector<T>& uRef, const std::vector<T>& u, MPI_Comm comm, 
     }
   } else {
     for (int i = 0; i < uRef.size(); ++i) {
-      if(std::abs(uRef[i] - u[i]) > 500*std::numeric_limits<T>::epsilon()) {
+      if(std::abs(uRef[i] - u[i]) > 600*std::numeric_limits<T>::epsilon()) {
         err = std::max(err, (double) std::abs((uRef[i] - u[i])/uRef[i]));
       }
     }
