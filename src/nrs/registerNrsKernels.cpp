@@ -210,7 +210,7 @@ void registerNrsKernels(occa::properties kernelInfoBC)
 
       if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE") && Nsubsteps) {
         auto subCycleKernel =
-            benchmarkAdvsub(3,
+            benchmarkAdvsub(NVfields,
                             NelemBenchmark,
                             Nq,
                             cubNq,

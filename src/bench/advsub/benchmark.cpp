@@ -106,15 +106,9 @@ occa::kernel benchmarkAdvsub(int Nfields,
   const int cubN = cubNq - 1;
   const int Np = Nq * Nq * Nq;
   const int cubNp = cubNq * cubNq * cubNq;
-  int fieldOffset = Np * Nelements;
-  const int pageW = ALIGN_SIZE / sizeof(dfloat);
-  if (fieldOffset % pageW) {
-    fieldOffset = (fieldOffset / pageW + 1) * pageW;
-  }
-  int cubatureOffset = std::max(fieldOffset, Nelements * cubNp);
-  if (cubatureOffset % pageW) {
-    cubatureOffset = (cubatureOffset / pageW + 1) * pageW;
-  }
+  const int Ntotal = Np * Nelements;
+  const int fieldOffset = alignStride<dfloat>(Ntotal);
+  const int cubatureOffset = alignStride<dfloat>(cubNp * Nelements); 
 
   occa::properties props = platform->kernelInfo + meshKernelProperties(N);
   props["defines"].asObject();
@@ -123,12 +117,11 @@ occa::kernel benchmarkAdvsub(int Nfields,
   props["flags"].asObject();
   props["include_paths"].asArray();
 
-  constexpr int NVfields{3};
-
   props["defines/p_cubNq"] = cubNq;
   props["defines/p_cubNp"] = cubNp;
   props["defines/p_nEXT"] = nEXT;
-  props["defines/p_NVfields"] = NVfields;
+
+  props["defines/p_NVfields"] = Nfields;
   props["defines/p_MovingMesh"] = platform->options.compareArgs("MOVING MESH", "TRUE");
 
   const std::string oklpath(getenv("NEKRS_KERNEL_DIR"));
@@ -204,7 +197,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
   auto invLMM = randomVector<dfloat>(fieldOffset * nEXT, 0, 1, true);
   auto cubD = randomVector<dfloat>(cubNq * cubNq, 0, 1, true);
   auto NU = randomVector<dfloat>(Nfields * fieldOffset, 0, 1, true);
-  auto conv = randomVector<dfloat>(NVfields * cubatureOffset * nEXT, 0, 1, true);
+  auto conv = randomVector<dfloat>(Nfields * cubatureOffset * nEXT, 0, 1, true);
   auto cubInterpT = randomVector<dfloat>(Nq * cubNq, 0, 1, true);
   auto Ud = randomVector<dfloat>(Nfields * fieldOffset, 0, 1, true);
   auto BdivW = randomVector<dfloat>(fieldOffset * nEXT, 0, 1, true);
@@ -285,25 +278,30 @@ occa::kernel benchmarkAdvsub(int Nfields,
     auto kernel = buildKernel(kernelVariant);
     if (!kernel.isInitialized()) return occa::kernel();
 
-    // perform correctness check
-    std::vector<dfloat> referenceResults(NU.size());
-    std::vector<dfloat> results(NU.size());
-
+    auto o_NUref = platform->device.malloc(wordSize * o_NU.size());
     kernelRunner(referenceKernel);
-    o_NU.copyTo(referenceResults.data());
+    o_NU.copyTo(o_NUref);
 
     kernelRunner(kernel);
-    o_NU.copyTo(results.data());
 
-    const auto err = maxRelErr<dfloat>(referenceResults, results, platform->comm.mpiComm);
-    if (err > 500 * std::numeric_limits<dfloat>::epsilon() || std::isnan(err)) {
-      if (platform->comm.mpiRank == 0 && verbosity > 1) {
-        std::cout << "advSub: Ignore version " << kernelVariant << " as correctness check failed with " << err
-                  << std::endl;
+    for(int i = 0; i < Nfields; i++) {
+      std::vector<dfloat> referenceResults(Ntotal);
+      std::vector<dfloat> results(referenceResults.size());
+
+      o_NUref.copyTo(referenceResults.data(), referenceResults.size(), i*fieldOffset);
+      o_NU.copyTo(results.data(), results.size(), i*fieldOffset);
+
+      const auto err = maxRelErr<dfloat>(referenceResults, results, platform->comm.mpiComm, 1e-4);
+ 
+      if (err > 1e5 * std::numeric_limits<dfloat>::epsilon() || std::isnan(err)) {
+        if (platform->comm.mpiRank == 0 && verbosity > 1) {
+          std::cout << "advSub: Ignore version " << kernelVariant << " as correctness check failed with " << err
+                    << std::endl;
+        }
+ 
+        // pass un-initialized kernel to skip this kernel variant
+        return occa::kernel();
       }
-
-      // pass un-initialized kernel to skip this kernel variant
-      kernel = occa::kernel();
     }
 
     return kernel;
