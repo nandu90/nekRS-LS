@@ -103,12 +103,15 @@ occa::kernel benchmarkAdvsub(int Nfields,
   }
 
   const int N = Nq - 1;
-  const int cubN = cubNq - 1;
   const int Np = Nq * Nq * Nq;
-  const int cubNp = cubNq * cubNq * cubNq;
   const int Ntotal = Np * Nelements;
   const int fieldOffset = alignStride<dfloat>(Ntotal);
+
+  const int cubN = cubNq - 1;
+  const int cubNp = cubNq * cubNq * cubNq;
   const int cubatureOffset = alignStride<dfloat>(cubNp * Nelements); 
+
+  const int NVfields = 3;
 
   occa::properties props = platform->kernelInfo + meshKernelProperties(N);
   props["defines"].asObject();
@@ -197,7 +200,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
   auto invLMM = randomVector<dfloat>(fieldOffset * nEXT, 0, 1, true);
   auto cubD = randomVector<dfloat>(cubNq * cubNq, 0, 1, true);
   auto NU = randomVector<dfloat>(Nfields * fieldOffset, 0, 1, true);
-  auto conv = randomVector<dfloat>(Nfields * cubatureOffset * nEXT, 0, 1, true);
+  auto conv = randomVector<dfloat>(NVfields * cubatureOffset * nEXT, 0, 1, true);
   auto cubInterpT = randomVector<dfloat>(Nq * cubNq, 0, 1, true);
   auto Ud = randomVector<dfloat>(Nfields * fieldOffset, 0, 1, true);
   auto BdivW = randomVector<dfloat>(fieldOffset * nEXT, 0, 1, true);
@@ -241,6 +244,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
     const auto c0 = 0.1;
     const auto c1 = 0.2;
     const auto c2 = 0.3;
+
     if (!dealias) {
       subcyclingKernel(Nelements,
                        o_elementList,
