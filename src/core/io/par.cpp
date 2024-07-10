@@ -2228,8 +2228,10 @@ void parseProblemTypeSection(const int rank, setupAide &options, inipp::Ini *ini
       }
 
       options.setArgs("ADVECTION", "TRUE");
-      if (eqn == "stokes") {
+      if (eqn.find("stokes") != std::string::npos) {
         options.setArgs("ADVECTION", "FALSE");
+        options.removeArgs("ADVECTION TYPE");
+
       }
     }
   }
