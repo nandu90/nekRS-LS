@@ -100,6 +100,10 @@ void registerMeshKernels(occa::properties kernelInfoBC)
       kernelName = "surfaceAreaNormalMultiplyIntegrateHex3D-ndot";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, prop);
 
+      kernelName = "surfaceAreaMultiplyHex3D";
+      fileName = oklpath + "/mesh/" + kernelName + ".okl";
+      platform->kernelRequests.add(meshPrefix + kernelName, fileName, kernelInfo);
+
       kernelName = "setBIDHex3D";
       fileName = oklpath + "/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, kernelInfo);
