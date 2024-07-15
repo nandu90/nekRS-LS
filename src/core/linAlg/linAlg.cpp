@@ -515,7 +515,7 @@ void linAlg_t::axdyz(const dlong N,
 }
 
 // \sum o_a
-dfloat linAlg_t::sum(const dlong N, occa::memory &o_a, MPI_Comm _comm, const dlong offset)
+dfloat linAlg_t::sum(const dlong N, const occa::memory &o_a, MPI_Comm _comm, const dlong offset)
 {
   int Nblock = (N + blocksize - 1) / blocksize;
   const size_t Nbytes = Nblock * sizeof(dfloat);
@@ -545,7 +545,7 @@ dfloat linAlg_t::sum(const dlong N, occa::memory &o_a, MPI_Comm _comm, const dlo
 dfloat linAlg_t::sumMany(const dlong N,
                          const dlong Nfields,
                          const dlong fieldOffset,
-                         occa::memory &o_a,
+                         const occa::memory &o_a,
                          MPI_Comm _comm)
 {
   int Nblock = (N + blocksize - 1) / blocksize;
