@@ -13,7 +13,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("SOLUTION OUTPUT INTERVAL", "0");
   options.setArgs("VISCOSITY", std::string("0.05"));
   options.setArgs("DENSITY", std::string("1"));
-  options.setArgs("END TIME", std::string("3e-3"));
+  options.setArgs("END TIME", std::string("5e-3"));
   options.setArgs("DT", std::string("1e-4"));
   options.setArgs("SUBCYCLING STEPS", std::string("0"));
   options.setArgs("PRESSURE INITIAL GUESS", "PREVIOUS");
@@ -21,17 +21,15 @@ void ciSetup(MPI_Comm comm, setupAide &options)
 
   options.setArgs("BDF ORDER", "3");
   if (ciMode == 1 || ciMode == 3) {
-    options.setArgs("NEKNEK CORRECTOR STEPS", "1");
     options.setArgs("NEKNEK BOUNDARY EXT ORDER", "3");
+    if (ciMode == 3) options.setArgs("VELOCITY SOLVER", "NONE");
   } else if (ciMode == 2) {
-    options.setArgs("NEKNEK CORRECTOR STEPS", "0");
     options.setArgs("NEKNEK BOUNDARY EXT ORDER", "1");
   }
   if (ciMode == 4) { // multi-rate
-    options.setArgs("NEKNEK CORRECTOR STEPS", "0");
     options.setArgs("NEKNEK BOUNDARY EXT ORDER", "2");
-    options.setArgs("MULTIRATE TIMESTEPPER", "TRUE");
-    options.setArgs("MULTIRATE CORRECTOR STEPS", "1");
+    options.setArgs("NEKNEK MULTIRATE TIMESTEPPER", "TRUE");
+    options.setArgs("NEKNEK MULTIRATE CORRECTOR STEPS", "1");
     std::string casename = platform->options.getArgs("CASENAME");
     if(casename == "inside" || casename == "insidemv"){
       options.setArgs("DT", std::string("5e-5"));
@@ -41,21 +39,13 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("SCALAR00 SOLVER TOLERANCE", std::string("1e-12"));
   options.setArgs("PRESSURE SOLVER TOLERANCE", std::string("1e-08"));
 
-  if (ciMode == 2) {
-    std::string casename = platform->options.getArgs("CASENAME");
-    int fail = 0;
-    if (casename == "inside") {
-      fail = 1;
-      if (platform->comm.mpiRank == 0) {
-        std::cout << "Unexpected input file for CI mode" << std::endl;
-      }
-    }
+#if 0
+  const std::string casename = platform->options.getArgs("CASENAME");
+  nekrsCheck(ciMode == 2 && (casename != "insidemv" && casename != "outside"), 
+             platform->comm.mpiComm, EXIT_FAILURE, 
+             "%s\n", "Unexpected input file for current CI mode!");
+#endif
 
-    MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
-    if (fail) {
-      CiFailTest();
-    }
-  }
 }
 
 void ciTestPartitionOfUnity(nrs_t *nrs, double time, int tstep)
@@ -254,107 +244,77 @@ void ciTestInitialStep(nrs_t *nrs, double time, int tstep)
 
 void ciTestErrors(nrs_t *nrs, double time, int tstep)
 {
-  if (tstep == 0) {
+  if (tstep == 0 && ciMode != 3) {
     ciTestInitialStep(nrs, time, tstep);
     ciTestPointInterp(nrs, time, tstep);
     ciTestPartitionOfUnity(nrs, time, tstep);
   }
 
-  const int rank = platform->comm.mpiRank;
-
+  const auto rank = platform->comm.mpiRank;
+ 
   if (!nrs->lastStep) {
     return;
   }
-  
+
   int innerSteps = 1;
-  platform->options.getArgs("MULTIRATE STEPS", innerSteps);
-  bool earlyReturn = nrs->neknek->multirate();
-  earlyReturn &= tstep % innerSteps != 0;
+  platform->options.getArgs("NEKNEK MULTIRATE STEPS", innerSteps);
+
+  int earlyReturn = 0;
+  if(nrs->neknek->multirate() && (tstep % innerSteps) != 0) earlyReturn = 1;
   if(earlyReturn) return;
 
-  // bail if outer convergence has not been achieved for multirate timestepper
-  static int pass = -1;
-  pass++;
-  int numCorrectorSteps = 0;
-  platform->options.getArgs("MULTIRATE CORRECTOR STEPS", numCorrectorSteps);
-  if(ciMode == 4 && pass < numCorrectorSteps){
+  // continue only when last correcter step has been reached 
+  int NcorrectorSteps = 0;
+  platform->options.getArgs("NEKNEK MULTIRATE CORRECTOR STEPS", NcorrectorSteps);
+
+  static int correctorSteps = -1;
+  correctorSteps++;
+  if(nrs->neknek->multirate() &&  correctorSteps < NcorrectorSteps){
     return;
   }
 
-  auto *mesh = nrs->meshV;
+  auto mesh = nrs->meshV;
 
-  auto o_Uexact = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
-  auto o_Sexact = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+  auto o_Uexact = platform->o_memPool.reserve<dfloat>(mesh->dim * nrs->fieldOffset);
   exactUVW(mesh->Nlocal, nrs->fieldOffset, time, mesh->o_x, mesh->o_y, mesh->o_z, o_Uexact);
+
+  auto uErr = platform->linAlg->maxRelativeError(
+                mesh->Nlocal, mesh->dim, nrs->fieldOffset, 1e-8,
+                nrs->o_U, o_Uexact, platform->comm.mpiCommParent);
+
+  auto o_Sexact = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
   o_Sexact.copyFrom(o_Uexact, nrs->fieldOffset);
 
-  platform->linAlg->axpbyMany(mesh->Nlocal, nrs->NVfields, nrs->fieldOffset, 1.0, nrs->o_U, -1.0, o_Uexact);
-  platform->linAlg->axpby(mesh->Nlocal, 1.0, nrs->cds->o_S, -1.0, o_Sexact);
+  auto o_s00 = nrs->cds->o_S.slice(nrs->cds->fieldOffsetScan[0], mesh->Nlocal);
+  auto s00Err = platform->linAlg->maxRelativeError(
+                mesh->Nlocal, 1, nrs->fieldOffset, 1e-8,
+                o_s00, o_Sexact, platform->comm.mpiCommParent);
 
-  auto o_UerrX = o_Uexact + 0 * nrs->fieldOffset;
-  auto o_UerrY = o_Uexact + 1 * nrs->fieldOffset;
-  auto o_UerrZ = o_Uexact + 2 * nrs->fieldOffset;
-
-  platform->linAlg->abs(mesh->Nlocal, o_UerrX);
-  platform->linAlg->abs(mesh->Nlocal, o_UerrY);
-  platform->linAlg->abs(mesh->Nlocal, o_UerrZ);
-  platform->linAlg->abs(mesh->Nlocal, o_Sexact);
-
-  const auto errVxGlobal = platform->linAlg->max(mesh->Nlocal, o_UerrX, platform->comm.mpiCommParent);
-  const auto errVyGlobal = platform->linAlg->max(mesh->Nlocal, o_UerrY, platform->comm.mpiCommParent);
-  const auto errVzGlobal = platform->linAlg->max(mesh->Nlocal, o_UerrZ, platform->comm.mpiCommParent);
-  const auto errSGlobal = platform->linAlg->max(mesh->Nlocal, o_Sexact, platform->comm.mpiCommParent);
-
-  o_Uexact.free();
-  o_Sexact.free();
-
-  // scheme is first-order accurate
-  dfloat expectedErrVx = 0.0;
-  dfloat expectedErrVy = 0.0;
-  dfloat expectedErrVz = 0.0;
-  dfloat expectedErrS = 0.0;
-
-  if (ciMode == 1 || ciMode == 3) {
-    expectedErrVx = 5E-07;
-    expectedErrVy = 5E-07;
-    expectedErrVz = 3E-08;
-    expectedErrS = 5E-07;
-  } else if (ciMode == 2) {
-    expectedErrVx = 0.008;
-    expectedErrVy = 0.007;
-    expectedErrVz = 8E-05;
-    expectedErrS = 0.008;
-  } else if (ciMode == 4) {
-    expectedErrVx = 3E-06;
-    expectedErrVy = 3E-06;
-    expectedErrVz = 3E-06;
-    expectedErrS = 3E-06;
+  if(platform->comm.mpiRank == 0) {
+    std::cout << "uErr: " << uErr 
+              << "  " 
+              << "s00Err: " << s00Err << 
+              std::endl;
   }
 
-  bool passed = true;
-  passed &= errVxGlobal < 1.1 * expectedErrVx;
-  passed &= errVyGlobal < 1.1 * expectedErrVy;
-  passed &= errVzGlobal < 1.1 * expectedErrVz;
-  passed &= errSGlobal < 1.1 * expectedErrS;
+  switch(ciMode) {
+    case 1:
+      CiEvalTest("velocity", uErr < 2e-5, "with LinfErr: " + to_string_f(uErr));
+      CiEvalTest("scalar00", s00Err < 8e-8, "with LinfErr: " + to_string_f(s00Err));
+      break;
 
-  int flag = passed;
-  MPI_Allreduce(MPI_IN_PLACE, &flag, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
+    case 2:
+      CiEvalTest("velocity", uErr < 6e-3, "with LinfErr: " + to_string_f(uErr));
+      CiEvalTest("scalar00", s00Err < 5e-6, "with LinfErr: " + to_string_f(s00Err));
+      break;
 
-  if (flag) {
-    (CiPassTest());
-  } else {
-    if (platform->comm.mpiRank == 0) {
-      printf("errVxGlobal = %g, expectedErrVx = %g, errVyGlobal = %g, expectedErrVy = %g, errVzGlobal = %g, "
-             "expectedErrVz = %g, errSGlobal = %g, expectedErrS = %g\n",
-             errVxGlobal,
-             expectedErrVx,
-             errVyGlobal,
-             expectedErrVy,
-             errVzGlobal,
-             expectedErrVz,
-             errSGlobal,
-             expectedErrS);
-    }
-    (CiFailTest());
+    case 3:
+      CiEvalTest("scalar00", s00Err < 4e-4, "with LinfErr: " + to_string_f(s00Err));
+      break;
+
+    case 4:
+      CiEvalTest("velocity", uErr < 2e-5, "with LinfErr: " + to_string_f(uErr));
+      CiEvalTest("scalar00", s00Err < 8e-8, "with LinfErr: " + to_string_f(s00Err));
+      break;
   }
 }

@@ -230,8 +230,7 @@ void UDF_Setup()
 
 void UDF_ExecuteStep(double time, int tstep)
 {
-
-  auto *mesh = nrs->meshV;
+  auto mesh = nrs->meshV;
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     userMeshVelocity(mesh->Nlocal, nrs->fieldOffset, mesh->o_x, mesh->o_y, mesh->o_z, mesh->o_U);
   }
@@ -242,6 +241,7 @@ void UDF_ExecuteStep(double time, int tstep)
     nrs->cds->o_S.copyFrom(nrs->o_U, nrs->fieldOffset);
   }
 
+#if 0
   poolDeviceMemory<dfloat> o_Uexact(nrs->NVfields * nrs->fieldOffset);
   poolDeviceMemory<dfloat> o_Sexact(nrs->fieldOffset);
   exactUVW(mesh->Nlocal, nrs->fieldOffset, time, mesh->o_x, mesh->o_y, mesh->o_z, o_Uexact);
@@ -269,7 +269,7 @@ void UDF_ExecuteStep(double time, int tstep)
   }
 
   int innerSteps = 1;
-  platform->options.getArgs("MULTIRATE STEPS", innerSteps);
+  platform->options.getArgs("NEKNEK MULTIRATE STEPS", innerSteps);
   if(!nrs->neknek->multirate() || tstep % innerSteps == 0)
   {
     const auto LinfUxGlob = platform->linAlg->max(mesh->Nlocal, o_UerrX, platform->comm.mpiCommParent);
@@ -280,7 +280,8 @@ void UDF_ExecuteStep(double time, int tstep)
       printf("LinfUxGlob = %g, LinfUyGlob = %g, LinfUzGlob = %g, LinfSGlob = %g\n", LinfUxGlob, LinfUyGlob, LinfUzGlob, LinfSGlob);
     }
   }
-  
+#endif 
+ 
   if (ciMode) {
     ciTestErrors(nrs, time, tstep);
   }

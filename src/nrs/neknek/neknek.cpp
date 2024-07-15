@@ -221,8 +221,7 @@ void neknek_t::setup()
   MPI_Allreduce(MPI_IN_PLACE, &movingMesh, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
   this->globalMovingMesh = movingMesh;
 
-  this->fields = [&]()
-  {
+  this->fields = [&]() {
     std::vector<std::string> list;
     for (auto &&field : nrsFieldsToSolve(platform->options)) {
       int intFound = 0;
@@ -236,7 +235,7 @@ void neknek_t::setup()
       MPI_Allreduce(MPI_IN_PLACE, &intFound, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
       if (intFound) {
         list.push_back(field);
-      } 
+      }
     }
 
     return list;
@@ -330,7 +329,7 @@ neknek_t::neknek_t(nrs_t *nrs_, dlong nsessions, dlong sessionID)
   // set boundary ext order to report to user, if not specified
   platform->options.setArgs("NEKNEK BOUNDARY EXT ORDER", std::to_string(this->nEXT_));
 
-  this->multirate_ = platform->options.compareArgs("MULTIRATE TIMESTEPPER", "TRUE");
+  this->multirate_ = platform->options.compareArgs("NEKNEK MULTIRATE TIMESTEPPER", "TRUE");
 
   this->coeffEXT.resize(this->nEXT_);
   this->o_coeffEXT = platform->device.malloc<dfloat>(this->nEXT_);
@@ -557,8 +556,8 @@ double neknek_t::adjustDt(double dt)
     double maxDt = dt;
     MPI_Allreduce(MPI_IN_PLACE, &maxDt, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent);
 
-    const auto relErr = std::abs(maxDt - minDt)/maxDt;
-    nekrsCheck(relErr > 100*std::numeric_limits<double>::epsilon(),
+    const auto relErr = std::abs(maxDt - minDt) / maxDt;
+    nekrsCheck(relErr > 100 * std::numeric_limits<double>::epsilon(),
                platform->comm.mpiComm,
                EXIT_FAILURE,
                "Time step size needs to be the same across all sessions.\n"
@@ -589,6 +588,6 @@ double neknek_t::adjustDt(double dt)
 
   // rescale dt to be an _exact_ integer multiple of minDt
   dt = maxDt / timeStepRatio;
-  platform->options.setArgs("MULTIRATE STEPS", std::to_string(timeStepRatio));
+  platform->options.setArgs("NEKNEK MULTIRATE STEPS", std::to_string(timeStepRatio));
   return dt;
 }

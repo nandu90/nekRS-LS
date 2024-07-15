@@ -1,4 +1,3 @@
-
 #include <cstdio>
 #include <cstdlib>
 #include <mpi.h>
@@ -102,7 +101,7 @@ pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
                                                   globalHashSize,
                                                   npt_max,
                                                   newton_tol,
-                                                  sessionID,
+                                                  sessionID+1,
                                                   dist.data());
 }
 
