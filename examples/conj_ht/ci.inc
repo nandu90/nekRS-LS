@@ -52,7 +52,7 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, int tstep)
     return;
   }
 
-  auto interp = pointInterpolation_t(nrs->cds->mesh[0]);
+  auto interp = pointInterpolation_t(nrs->cds->mesh[0], platform->comm.mpiComm);
 
   std::vector<dfloat> x = {4, 4, 4};
   std::vector<dfloat> y = {-0.25, 0.25, 1.0};

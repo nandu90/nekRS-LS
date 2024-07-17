@@ -501,14 +501,14 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   // Interpolation 0:
   // Call find/eval on 0 points with a nullptr
   occa::memory o_NULL;
-  auto interpNoop = pointInterpolation_t(mesh);
+  auto interpNoop = pointInterpolation_t(mesh, platform->comm.mpiComm);
   interpNoop.setPoints(o_NULL, o_NULL, o_NULL);
   interpNoop.find(verbosity);
   interpNoop.eval(nrs->NVfields, nrs->fieldOffset, o_Ue, 0, o_NULL);
 
   // Interpolation 1:
   // Interpolate onto points that coincide with the mesh, call findpts
-  auto interpFluid = pointInterpolation_t(mesh);
+  auto interpFluid = pointInterpolation_t(mesh, platform->comm.mpiComm);
   interpFluid.setPoints(mesh->o_x, mesh->o_y, mesh->o_z);
   interpFluid.find(verbosity);
 

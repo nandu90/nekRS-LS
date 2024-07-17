@@ -196,7 +196,7 @@ void writeProfiles(double time, int tstep)
       }
     }
 
-    interpolator = new pointInterpolation_t(mesh);
+    interpolator = new pointInterpolation_t(mesh, platform->comm.mpiComm);
     interpolator->setPoints(xp, yp, zp);
     interpolator->find(pointInterpolation_t::VerbosityLevel::Detailed);
 
