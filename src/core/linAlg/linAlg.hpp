@@ -359,6 +359,14 @@ public:
                           const occa::memory &o_uRef,
                           MPI_Comm comm);
 
+  dfloat maxAbsoluteError(const dlong N,
+                          const dlong Nfields,
+                          const dlong fieldOffset,
+                          const dfloat absTol,
+                          const occa::memory &o_u,
+                          const occa::memory &o_uRef,
+                          MPI_Comm comm);
+
   occa::kernel fillKernel;
   occa::kernel pfillKernel;
   occa::kernel absKernel;
@@ -414,6 +422,7 @@ public:
   occa::kernel entrywiseMagKernel;
   occa::kernel linearCombinationKernel;
   occa::kernel relativeErrorKernel;
+  occa::kernel absoluteErrorKernel;
   occa::kernel magSqrVectorKernel;
   occa::kernel magSqrSymTensorKernel;
   occa::kernel magSqrSymTensorDiagKernel;

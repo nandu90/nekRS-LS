@@ -304,7 +304,7 @@ occa::kernel benchmarkAx(int Nelements,
       kernelRunner(kernel);
       o_Aq.copyTo(results.data(), results.size() * sizeof(FPType));
 
-      const auto err = maxRelErr<FPType>(refResults, results, platform->comm.mpiComm);
+      const auto err = maxAbsErr<FPType>(refResults, results, platform->comm.mpiComm);
       if (err > 600 * std::numeric_limits<FPType>::epsilon() || std::isnan(err)) {
         if (platform->comm.mpiRank == 0 && verbosity > 1) {
           std::cout << "Ax: Ignore version " << kernelVariant
