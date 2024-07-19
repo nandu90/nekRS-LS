@@ -536,7 +536,7 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
 
   for (int n = 0; n < nRandomInterp; ++n) {
     std::tie(pointsX[n], pointsY[n], pointsZ[n]) = generatePoints(mesh->Nlocal, R);
-    interpRand[n] = std::make_shared<pointInterpolation_t>(mesh);
+    interpRand[n] = std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiComm);
     interpRand[n]->setPoints(pointsX[n], pointsY[n], pointsZ[n]);
     interpRand[n]->find(verbosity);
   }
