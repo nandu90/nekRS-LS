@@ -277,8 +277,8 @@ namespace occa {
             /* NC: hipcc doesn't seem to like linking a library in */
               //<< " -L"        << env::OCCA_INSTALL_DIR << "lib -locca";
       }
-      command << ' '    << sourceFilename
-              << " -o " << binaryFilename
+      command << " -o " << binaryFilename
+              << ' '    << sourceFilename
               << " 2>&1";
 
       const std::string &sCommand = command.str();
