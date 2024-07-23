@@ -15,6 +15,8 @@
 * Intel GPU support
 * Aero forces
 * opSEM class
+* Mesh surface ops
+* Linear implicit velocity source term
 * Combined CG for improved performance
 * Various bug fixes
 
