@@ -453,9 +453,8 @@ void ciTestParticles(nrs_t *nrs, lpm_t *particles, occa::kernel exactUVWPKernel,
   LinfErrY = LinfErrs[1];
   LinfErrZ = LinfErrs[2];
 
-  CiEvalTest("Particle integration",
-             LinfErrX < relTol && LinfErrY < relTol && LinfErrZ < relTol,
-             "with LinfErr:" + to_string_f(LinfErrX) + ", " + to_string_f(LinfErrY) + ", " + to_string_f(LinfErrZ)
+  CiEvalTest("Particle integration (LinfErr: " + to_string_f(LinfErrX) + ", " + to_string_f(LinfErrY) + ", " + to_string_f(LinfErrZ) + ")",
+             LinfErrX < relTol && LinfErrY < relTol && LinfErrZ < relTol
             );
 }
 
@@ -517,9 +516,8 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
 
   {
     auto [linfErrUx, linfErrUy, linfErrUz] = computeRelErrors(mesh->Nlocal, nrs->fieldOffset, o_Ue, o_UintFluid);
-    CiEvalTest("relLinf point interp (fluid)",  
-               linfErrUx < threshold && linfErrUy < threshold && linfErrUz < threshold,
-               "with rel LinfErr:" + to_string_f(linfErrUx) + ", " + to_string_f(linfErrUy) + ", " + to_string_f(linfErrUz)
+    CiEvalTest("point interp (fluid) (RelLinfErr: " + to_string_f(linfErrUx) + ", " + to_string_f(linfErrUy) + ", " + to_string_f(linfErrUz) + ")",
+               linfErrUx < threshold && linfErrUy < threshold && linfErrUz < threshold
               );
   }
 
@@ -567,9 +565,9 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   for (int n = 0; n < nRandomInterp; ++n) {
     auto [linfErrUxRand, linfErrUyRand, linfErrUzRand] =
       computeRelErrors(pointsX[n].size(), pointsX[n].size(), o_UeRand[n], o_UintRand[n]);
-    CiEvalTest("relLinf point interp (random group" + std::to_string(n) + ")", 
-               linfErrUxRand < threshold && linfErrUyRand < threshold && linfErrUzRand < threshold,
-               "with rel LinfErr:" + to_string_f(linfErrUxRand) + ", " + to_string_f(linfErrUyRand) + ", " + to_string_f(linfErrUzRand)
+    CiEvalTest("point interp (random group" + std::to_string(n) + ") (RelLinfErr: " +
+               to_string_f(linfErrUxRand) + ", " + to_string_f(linfErrUyRand) + ", " + to_string_f(linfErrUzRand) + ")",
+               linfErrUxRand < threshold && linfErrUyRand < threshold && linfErrUzRand < threshold
               );
   }
 }
@@ -968,7 +966,7 @@ void ciTestErrors(nrs_t *nrs,
 
     if (nrs->outerCorrector == 2) {
       const int pIterErr = abs(NiterP - expectedNiterP);
-      CiEvalTest("pressure iter step=1", pIterErr <= 1, "with pIterErr: " + to_string_f(pIterErr));
+      CiEvalTest("pressure iter step=1 (pIterErr: " + to_string_f(pIterErr) + ")", pIterErr <= 1);
       nekrsCheck(pIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
 
@@ -980,13 +978,13 @@ void ciTestErrors(nrs_t *nrs,
 
     if (ciMode != 12 && nrs->outerCorrector == 2) {
       int sIterErr = abs(nrs->cds->solver[0]->Niter() - expectedNiterS);
-      CiEvalTest("scalar00 iter step=1", sIterErr <= 1, "with sIterErr: " + to_string_f(sIterErr));
+      CiEvalTest("scalar00 iter step=1 (sIterErr: " + to_string_f(sIterErr) + ")", sIterErr <= 1);
       nekrsCheck(sIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
 
     if (nrs->outerCorrector == 2){
       auto sIterErr = abs(nrs->cds->solver[1]->Niter() - expectedNiterS);
-      CiEvalTest("scalar01 iter step=1", sIterErr <= 1, "with sIterErr: " + to_string_f(sIterErr));
+      CiEvalTest("scalar01 iter step=1 (sIterErr: " + to_string_f(sIterErr) + ")", sIterErr <= 1);
       nekrsCheck(sIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
   }
@@ -1279,7 +1277,7 @@ void ciTestErrors(nrs_t *nrs,
     int errSteps = abs(expectedSteps - tstep);
 
     MPI_Allreduce(MPI_IN_PLACE, &errSteps, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-    CiEvalTest("variable dt", errSteps < 1, "with stepErr: " + std::to_string(errSteps));
+    CiEvalTest("variable dt (stepErr: " + std::to_string(errSteps) + ")", errSteps < 1);
   }
 
   if (ciMode == 5 || ciMode == 6) {
@@ -1294,14 +1292,14 @@ void ciTestErrors(nrs_t *nrs,
 
   if (nrs->outerCorrector == 2) {
     if (ciMode != 13 ) {
-      CiEvalTest("velocity", vxErr < EPS, "with LinfErr: " + to_string_f(vxErr));
-      CiEvalTest("velocity iter", velIterErr <= 1, "with iterErr: " + to_string_f(velIterErr));
+      CiEvalTest("velocity (LinfErr: " + to_string_f(vxErr) + ")", vxErr < EPS);
+      CiEvalTest("velocity iter (iterErr: " + to_string_f(velIterErr) + ")", velIterErr <= 1);
  
-      CiEvalTest("pressure", prErr < EPS, "with LinfErr: " + to_string_f(prErr));
-      CiEvalTest("pressure iter", pIterErr <= 1, "with iterErr: " + to_string_f(pIterErr));
+      CiEvalTest("pressure (LinfErr: " + to_string_f(prErr) + ")", prErr < EPS);
+      CiEvalTest("pressure iteri (iterErr: " + to_string_f(pIterErr) + ")", pIterErr <= 1);
     }
  
-    if (ciMode != 12) CiEvalTest("scalar01", s1Err < EPS, "with LinfErr: " + to_string_f(s1Err));
-    CiEvalTest("scalar02", s2Err < EPS, "with LinfErr: " + to_string_f(s2Err));
+    if (ciMode != 12) CiEvalTest("scalar01 (LinfErr: " + to_string_f(s1Err) +")", s1Err < EPS);
+    CiEvalTest("scalar02 (LinfErr: " + to_string_f(s2Err) + ")", s2Err < EPS);
   }
 }

@@ -208,7 +208,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
 
   const auto rank = platform->comm.mpiRank;
  
-  if (!nrs->lastStep) {
+  if (!nrs->lastStep || !nrs->timeStepConverged) {
     return;
   }
 
@@ -248,22 +248,22 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
 
   switch(ciMode) {
     case 1:
-      CiEvalTest("velocity", uErr < 2e-5, "with LinfErr: " + to_string_f(uErr));
-      CiEvalTest("scalar00", s00Err < 8e-8, "with LinfErr: " + to_string_f(s00Err));
+      CiEvalTest("velocity (LinfErr: " + to_string_f(uErr) + ")", uErr < 2e-5);
+      CiEvalTest("scalar00 (LinfErr: " + to_string_f(uErr) + ")", s00Err < 8e-8);
       break;
 
     case 2:
-      CiEvalTest("velocity", uErr < 2e-2, "with LinfErr: " + to_string_f(uErr));
-      CiEvalTest("scalar00", s00Err < 5e-6, "with LinfErr: " + to_string_f(s00Err));
+      CiEvalTest("velocity (LinfErr: " + to_string_f(uErr) + ")", uErr < 2e-2);
+      CiEvalTest("scalar00 (LinfErr: " + to_string_f(uErr) + ")", s00Err < 5e-6);
       break;
 
     case 3:
-      CiEvalTest("scalar00", s00Err < 4e-4, "with LinfErr: " + to_string_f(s00Err));
+      CiEvalTest("scalar00 (LinfErr: " + to_string_f(uErr) + ")", s00Err < 4e-4);
       break;
 
     case 4:
-      CiEvalTest("velocity", uErr < 2e-5, "with LinfErr: " + to_string_f(uErr));
-      CiEvalTest("scalar00", s00Err < 8e-8, "with LinfErr: " + to_string_f(s00Err));
+      CiEvalTest("velocity (LinfErr: " + to_string_f(uErr) + ")", uErr < 2e-5);
+      CiEvalTest("scalar00 (LinfErr: " + to_string_f(uErr) + ")", s00Err < 8e-8);
       break;
   }
 }

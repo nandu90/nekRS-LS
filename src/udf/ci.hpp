@@ -11,10 +11,10 @@ static void CiPassTest(const std::string& txt)
     if(!failCnt) platform->exitValue = 0;
 }
 
-static void CiFailTest(const std::string& txt, const std::string suffix = "")
+static void CiFailTest(const std::string& txt)
 {
   if (platform->comm.mpiRank == 0)
-    printf("CI test <%s> failed %s\n", txt.c_str(), suffix.c_str());
+    printf("CI test <%s> failed\n", txt.c_str());
     failCnt++;
     if(failCnt) platform->exitValue = 1;
 }
@@ -29,7 +29,7 @@ static void CiEvalTest(const std::string& txt, bool passed, std::string suffix =
   if (passed) 
     CiPassTest(txt);
   else
-    CiFailTest(txt, suffix);
+    CiFailTest(txt);
 }
 
 static void CiAddTest(const std::string& txt, bool passed)
@@ -42,7 +42,7 @@ static void CiFinalize()
   if (platform->comm.mpiRank == 0) {
     std::cout << "CI test summary:\n"; 
     for(auto &entry : ciTestList) {
-      std::cout << std::get<0>(entry) << ":" << std::get<0>(entry) << std::endl; 
+      std::cout << std::get<0>(entry) << ":" << std::get<1>(entry) << std::endl; 
     }
 
     std::cout << std::endl;
