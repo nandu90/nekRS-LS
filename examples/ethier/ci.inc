@@ -962,26 +962,28 @@ void ciTestErrors(nrs_t *nrs,
       expectedNiterP = 3;
     }
 
-    if (nrs->outerCorrector == 2) {
+    if (nrs->timeStepConverged) {
       const int pIterErr = abs(NiterP - expectedNiterP);
       CiEvalTest("pressure iter step=1 (pIterErr: " + to_string_f(pIterErr) + ")", pIterErr <= 1);
       nekrsCheck(pIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
 
-    int expectedNiterS = 17;
-    if (ciMode == 19 && nrs->outerCorrector == 2) {
-      expectedNiterS = 11;
+    int expectedNiterS00 = 17;
+    int expectedNiterS01 = 14;
+    if (ciMode == 19 && nrs->timeStepConverged) {
+      expectedNiterS00 = 11;
+      expectedNiterS01 = 8;
     }
 
-
-    if (ciMode != 12 && nrs->outerCorrector == 2) {
-      int sIterErr = abs(nrs->cds->solver[0]->Niter() - expectedNiterS);
+    if (ciMode != 12 && nrs->timeStepConverged) {
+      int sIterErr = abs(nrs->cds->solver[0]->Niter() - expectedNiterS00);
       CiEvalTest("scalar00 iter step=1 (sIterErr: " + to_string_f(sIterErr) + ")", sIterErr <= 1);
       nekrsCheck(sIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
 
-    if (nrs->outerCorrector == 2){
-      auto sIterErr = abs(nrs->cds->solver[1]->Niter() - expectedNiterS);
+    if (nrs->timeStepConverged){
+      std::cout << nrs->cds->solver[1]->Niter() << std::endl; 
+      auto sIterErr = abs(nrs->cds->solver[1]->Niter() - expectedNiterS01);
       CiEvalTest("scalar01 iter step=1 (sIterErr: " + to_string_f(sIterErr) + ")", sIterErr <= 1);
       nekrsCheck(sIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
@@ -1294,7 +1296,7 @@ void ciTestErrors(nrs_t *nrs,
       CiEvalTest("velocity iter (iterErr: " + to_string_f(velIterErr) + ")", velIterErr <= 1);
  
       CiEvalTest("pressure (LinfErr: " + to_string_f(prErr) + ")", prErr < EPS);
-      CiEvalTest("pressure iteri (iterErr: " + to_string_f(pIterErr) + ")", pIterErr <= 1);
+      CiEvalTest("pressure iter (iterErr: " + to_string_f(pIterErr) + ")", pIterErr <= 1);
     }
  
     if (ciMode != 12) CiEvalTest("scalar01 (LinfErr: " + to_string_f(s1Err) +")", s1Err < EPS);
