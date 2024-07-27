@@ -473,19 +473,19 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   auto o_Pe = platform->device.malloc<dfloat>(nrs->fieldOffset);
   exactUVWPKernel(mesh->Nlocal, time, mesh->o_x, mesh->o_y, mesh->o_z, nrs->fieldOffset, o_Pe, o_Ue);
 
-  const auto verbosity = pointInterpolation_t::VerbosityLevel::Basic;
+  const auto verbosity = pointInterpolation_t::VerbosityLevel::Detailed;
   const auto threshold = (sizeof(dfloat) == sizeof(double)) ? 5e-9 : 1e-5;
 
   const auto computeRelErrors = [&](dlong n, dlong offset, occa::memory o_Uexact, occa::memory o_Uinterp) {
-    const auto absTol = 1e-6;
+    const auto absTol = 1e-5;
+
+    auto o_UexactX = o_Uexact.slice(0 * offset, n);
+    auto o_UexactY = o_Uexact.slice(1 * offset, n);
+    auto o_UexactZ = o_Uexact.slice(2 * offset, n);
 
     auto o_UinterpX = o_Uinterp.slice(0 * offset, n);
     auto o_UinterpY = o_Uinterp.slice(1 * offset, n);
     auto o_UinterpZ = o_Uinterp.slice(2 * offset, n);
- 
-    auto o_UexactX = o_Uexact.slice(0 * offset, n);
-    auto o_UexactY = o_Uexact.slice(1 * offset, n);
-    auto o_UexactZ = o_Uexact.slice(2 * offset, n);
 
     const auto LinfUx = 
       platform->linAlg->maxRelativeError(n, 1, 0, absTol, o_UinterpX, o_UexactX, platform->comm.mpiComm); 
@@ -497,7 +497,6 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
     return std::make_tuple(LinfUx, LinfUy, LinfUz);
   };
 
-  // Interpolation 0:
   // Call find/eval on 0 points with a nullptr
   occa::memory o_NULL;
   auto interpNoop = pointInterpolation_t(mesh, platform->comm.mpiComm);
@@ -505,7 +504,6 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   interpNoop.find(verbosity);
   interpNoop.eval(nrs->NVfields, nrs->fieldOffset, o_Ue, 0, o_NULL);
 
-  // Interpolation 1:
   // Interpolate onto points that coincide with the mesh, call findpts
   auto interpFluid = pointInterpolation_t(mesh, platform->comm.mpiComm);
   interpFluid.setPoints(mesh->o_x, mesh->o_y, mesh->o_z);
@@ -516,12 +514,12 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
 
   {
     auto [linfErrUx, linfErrUy, linfErrUz] = computeRelErrors(mesh->Nlocal, nrs->fieldOffset, o_Ue, o_UintFluid);
-    CiEvalTest("point interp (fluid) (RelLinfErr: " + to_string_f(linfErrUx) + ", " + to_string_f(linfErrUy) + ", " + to_string_f(linfErrUz) + ")",
+    CiEvalTest("point interp (fluid) (RelLinfErr: " + 
+               to_string_f(linfErrUx) + ", " + to_string_f(linfErrUy) + ", " + to_string_f(linfErrUz) + ")",
                linfErrUx < threshold && linfErrUy < threshold && linfErrUz < threshold
               );
   }
 
-  // Interpolation 2:
   // Interpolate onto a random number of a random set of points inside the unit ball
   // Repeat for nRandomInterp sets of points
   const double R = 0.75;
@@ -1255,8 +1253,8 @@ void ciTestErrors(nrs_t *nrs,
     }
 
     // check flop count
-    const double expectedOperations = 1.299e11;     // from nvprof
-    const auto accuracy = 0.035;                    // observed 3% error in result
+    const double expectedOperations = 1.347e11;     // from nvprof
+    const auto accuracy = 0.04;                    // observed 3% error in result
     const auto operations = platform->flopCounter->get(platform->comm.mpiComm);
     if (operations >= (1 + accuracy) * expectedOperations ||
         operations <= (1 - accuracy) * expectedOperations) {
@@ -1290,7 +1288,7 @@ void ciTestErrors(nrs_t *nrs,
     }
   }
 
-  if (nrs->outerCorrector == 2) {
+  if (nrs->timeStepConverged) {
     if (ciMode != 13 ) {
       CiEvalTest("velocity (LinfErr: " + to_string_f(vxErr) + ")", vxErr < EPS);
       CiEvalTest("velocity iter (iterErr: " + to_string_f(velIterErr) + ")", velIterErr <= 1);

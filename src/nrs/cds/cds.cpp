@@ -42,7 +42,6 @@ occa::memory cds_t::advectionSubcyling(int nEXT, double time, int scalarIdx)
 
   auto o_U = this->o_S.slice(this->fieldOffsetScan[scalarIdx], fieldOffset);
 
-  auto o_Urst = (movingMesh) ? this->o_relUrst : this->o_Urst;
   auto kernel = (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE"))
                       ? this->subCycleStrongCubatureVolumeKernel
                       : this->subCycleStrongVolumeKernel;
@@ -61,7 +60,7 @@ occa::memory cds_t::advectionSubcyling(int nEXT, double time, int scalarIdx)
                                fieldOffset,
                                this->vCubatureOffset,
                                fieldOffsetSum,
-                               o_Urst,
+                               (movingMesh) ? this->o_relUrst : this->o_Urst,
                                o_U);
 }
 

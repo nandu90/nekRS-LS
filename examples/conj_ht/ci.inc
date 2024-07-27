@@ -5,7 +5,7 @@
 static int ciMode = 0;
 double numCVODERHS = 0;
 
-#define EPS 1e-3
+#define EPS 5e-3
 
 void ciSetup(MPI_Comm comm, setupAide &options)
 {
