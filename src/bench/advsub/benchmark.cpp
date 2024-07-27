@@ -124,7 +124,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
   props["defines/p_cubNp"] = cubNp;
   props["defines/p_nEXT"] = nEXT;
 
-  props["defines/p_NVfields"] = Nfields;
+  props["defines/p_NVfields"] = NVfields;
   props["defines/p_MovingMesh"] = platform->options.compareArgs("MOVING MESH", "TRUE");
 
   const std::string oklpath(getenv("NEKRS_KERNEL_DIR"));
