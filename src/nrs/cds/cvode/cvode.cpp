@@ -796,6 +796,7 @@ void cvode_t::applyDirichlet(double time)
                              o_rho_i,
                              0 /* neknekFieldOffset */,
                              o_NULL,
+                             0,
                              o_NULL,
                              o_NULL,
                              o_NULL,
