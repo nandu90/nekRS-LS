@@ -1266,7 +1266,7 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
     }
 
     if (parScope == "pressure") {
-      options.setArgs(parSectionName + "SOLVER", "PGMRES+FLEXIBLE");
+      options.setArgs(parSectionName + "SOLVER", "PGMRES");
       options.setArgs(parSectionName + "PGMRES RESTART", "15");
     }
     if (parScope == "mesh") {
