@@ -1451,7 +1451,6 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           {"avm"},
           {"c0"},
           {"highestmodaldecay"},
-          {"hpfresidual"},
           {"nmodes"},
           {"cutoffratio"},
           {"scalingcoeff"},
@@ -1494,11 +1493,6 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         options.setArgs(parPrefix + "REGULARIZATION MDH THRESHOLD", to_string_f(-4.0));
         options.setArgs(parPrefix + "REGULARIZATION AVM C0", "FALSE");
         options.setArgs(parPrefix + "REGULARIZATION HPF MODES", "1");
-
-        if (regularization.find("hpfresidual") != std::string::npos) {
-          options.setArgs(parPrefix + "REGULARIZATION METHOD", "AVM_RESIDUAL");
-          options.setArgs(parPrefix + "REGULARIZATION SCALING COEFF", "1.0");
-        }
 
         for (std::string s : list) {
 
