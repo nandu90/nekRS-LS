@@ -201,7 +201,7 @@ void RANSktau::updateSourceTerms()
                 o_FS);
 }
 
-void RANSktau::setup(dfloat mueIn, dfloat rhoIn, int ifld)
+void RANSktau::setup(int ifld)
 {
   static bool isInitialized = false;
   if (isInitialized) {
@@ -210,8 +210,12 @@ void RANSktau::setup(dfloat mueIn, dfloat rhoIn, int ifld)
   isInitialized = true;
 
   nrs = dynamic_cast<nrs_t *>(platform->solver);
-  mueLam = mueIn;
-  rho = rhoIn;
+
+  dfloat mueIn;
+  platform->options.getArgs("VISCOSITY", mueIn);
+  dfloat rhoIn;
+  platform->options.getArgs("DENSITY", rhoIn);
+
   kFieldIndex = ifld; // tauFieldIndex is assumed to be kFieldIndex+1
 
   cds_t *cds = nrs->cds;
