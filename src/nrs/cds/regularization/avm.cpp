@@ -24,23 +24,22 @@ static occa::memory o_t;
 static std::vector<occa::memory> o_diff0;
 static std::vector<occa::memory> o_filterRT;
 
-static double cachedDt = -1.0;
-static bool recomputeUrst = false;
+cds_t *cds = nullptr;
 
 namespace
 {
 
 }
 
-void setup(cds_t *cds)
+void setup(cds_t *cds_)
 {
-  mesh_t *mesh = cds->mesh[0];
+  cds = cds_;
+  auto mesh = cds->mesh[0];
 
   for (int is = 0; is < cds->NSfields; is++) {
     std::string sid = scalarDigitStr(is);
 
-    if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_RESIDUAL") ||
-        platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_HIGHEST_MODAL_DECAY")) {
+    if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_HIGHEST_MODAL_DECAY")) {
 
       nekrsCheck(cds->mesh[is]->N < 5,
                  platform->comm.mpiComm,
@@ -81,24 +80,18 @@ void setup(cds_t *cds)
   interpolateP1Kernel = platform->kernelRequests.load(kernelName);
 }
 
-occa::memory computeEps(cds_t *cds, const double time, const dlong scalarIndex, occa::memory o_S)
+occa::memory viscosity(const dlong scalarIndex, occa::memory o_S)
 {
-  if (std::abs(time - cachedDt) / time > 10 * std::numeric_limits<dfloat>::epsilon()) {
-    recomputeUrst = true;
-  }
-
-  cachedDt = time;
-
-  mesh_t *mesh = cds->mesh[scalarIndex];
+  auto mesh = cds->mesh[scalarIndex];
 
   occa::memory o_logRelativeMassHighestMode =
       platform->o_memPool.reserve<dfloat>(cds->fieldOffset[scalarIndex]);
   occa::memory o_filteredField = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[scalarIndex]);
   occa::memory o_hpfResidual = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[scalarIndex]);
-  occa::memory o_epsilon = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[scalarIndex]);
+  occa::memory o_eps = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[scalarIndex]);
 
   // artificial viscosity magnitude
-  platform->linAlg->fill(cds->fieldOffset[scalarIndex], 0.0, o_epsilon);
+  platform->linAlg->fill(cds->fieldOffset[scalarIndex], 0.0, o_eps);
 
   relativeMassHighestModeKernel(mesh->Nelements,
                                 scalarIndex,
@@ -110,8 +103,6 @@ occa::memory computeEps(cds_t *cds, const double time, const dlong scalarIndex, 
                                 o_logRelativeMassHighestMode);
 
   std::string sid = scalarDigitStr(scalarIndex);
-
-  dfloat Uinf = 1.0;
 
   dfloat coeff = 0.5;
   platform->options.getArgs("SCALAR" + sid + " REGULARIZATION VISMAX COEFF", coeff);
@@ -125,7 +116,7 @@ occa::memory computeEps(cds_t *cds, const double time, const dlong scalarIndex, 
   dfloat scalingCoeff = 1.0;
   platform->options.getArgs("SCALAR" + sid + " REGULARIZATION SCALING COEFF", scalingCoeff);
 
-  const dfloat logReferenceSensor = threshold * log10(mesh->N);
+  const dfloat logReferenceSensor = threshold * std::log10(mesh->N);
 
   computeMaxViscKernel(mesh->Nelements,
                        cds->vFieldOffset,
@@ -133,15 +124,13 @@ occa::memory computeEps(cds_t *cds, const double time, const dlong scalarIndex, 
                        rampParameter,
                        coeff,
                        scalingCoeff,
-                       Uinf,
-                       0 /* useHPFResidual */,
                        mesh->o_x,
                        mesh->o_y,
                        mesh->o_z,
                        cds->o_U,
                        o_hpfResidual,
                        o_logRelativeMassHighestMode,
-                       o_epsilon // max(|df/du|) <- max visc
+                       o_eps // max(|df/du|) <- max visc
   );
 
   const bool makeCont = platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION AVM C0", "TRUE");
@@ -152,26 +141,30 @@ occa::memory computeEps(cds_t *cds, const double time, const dlong scalarIndex, 
     } else {
       gsh = cds->gshT;
     }
-    oogs::startFinish(o_epsilon, 1, cds->fieldOffset[scalarIndex], ogsDfloat, ogsMax, gsh);
-    interpolateP1Kernel(mesh->Nelements, o_vertexIds, o_r, o_s, o_t, o_epsilon);
+    oogs::startFinish(o_eps, 1, cds->fieldOffset[scalarIndex], ogsDfloat, ogsMax, gsh);
+    interpolateP1Kernel(mesh->Nelements, o_vertexIds, o_r, o_s, o_t, o_eps);
   }
 
-  return o_epsilon;
+  return o_eps;
 }
 
-void apply(cds_t *cds, const double time, const dlong scalarIndex, occa::memory o_S)
+void apply(const dlong scalarIndex, occa::memory o_S)
 {
   const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
   mesh_t *mesh = cds->mesh[scalarIndex];
 
+  const std::string sid = scalarDigitStr(scalarIndex);
+  nekrsCheck(!platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_HIGHEST_MODAL_DECAY"),
+             MPI_COMM_SELF, EXIT_FAILURE, "invalid reguarlization method for scalar %d\n", scalarIndex);
+
   // restore inital viscosity
-  if (cds->userProperties == nullptr) {
+  if (!cds->userProperties) {
     cds->o_diff.copyFrom(o_diff0[scalarIndex],
                          cds->fieldOffset[scalarIndex],
                          cds->fieldOffsetScan[scalarIndex]);
   }
 
-  occa::memory o_eps = computeEps(cds, time, scalarIndex, o_S);
+  auto o_eps = viscosity(scalarIndex, o_S);
 
   if (verbose) {
     const dfloat maxEps = platform->linAlg->max(mesh->Nlocal, o_eps, platform->comm.mpiComm);

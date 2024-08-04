@@ -137,8 +137,6 @@ inline dfloat nu_k(const dfloat s, const dfloat logReferenceSensor, const dfloat
                             const dfloat rampParameter,
                             const dfloat visCoeff,
                             const dfloat scalingCoeff,
-                            const dfloat Uinf,
-                            const int useHPFResidual,
                             @ restrict const dfloat *x,
                             @ restrict const dfloat *y,
                             @ restrict const dfloat *z,
@@ -174,12 +172,6 @@ inline dfloat nu_k(const dfloat s, const dfloat logReferenceSensor, const dfloat
           const dfloat he = computeMinGLLGridSpacing(i, j, k, e, x, y, z);
           const dfloat Umag = sqrt(Ux * Ux + Uy * Uy + Uz * Uz);
           dfloat visc_max = visCoeff * he * Umag;
-
-          if (useHPFResidual) {
-            const dfloat errorTerm = scalingCoeff * he * he * fabs(hpfResidual[id]) * Uinf;
-            visc_max = (visc_max < errorTerm) ? visc_max : errorTerm;
-          }
-
           s_maxdFdS[tid] = (s_maxdFdS[tid] > visc_max) ? s_maxdFdS[tid] : visc_max;
         }
       }
@@ -281,19 +273,15 @@ inline dfloat nu_k(const dfloat s, const dfloat logReferenceSensor, const dfloat
         if (t < 1) {
           const dfloat maxVisc = (s_maxdFdS[0] > s_maxdFdS[1]) ? s_maxdFdS[0] : s_maxdFdS[1];
           dfloat avm = 0.0;
-          if (useHPFResidual) {
-            avm = maxVisc;
-          }
-          else {
-            const dfloat multiplier = nu_k(logSensor, logReferenceSensor, rampParameter);
-            if (multiplier > 0.0) {
-              avm = multiplier * maxVisc;
-            }
+          const dfloat multiplier = nu_k(logSensor, logReferenceSensor, rampParameter);
+          if (multiplier > 0.0) {
+            avm = multiplier * maxVisc;
           }
 
 #pragma unroll
-          for (int point = 0; point < p_Np; ++point)
+          for (int point = 0; point < p_Np; ++point) {
             epsilons[e * p_Np + point] = avm;
+          }
         }
       }
     }

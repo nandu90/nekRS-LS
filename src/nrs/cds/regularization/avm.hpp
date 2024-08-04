@@ -4,7 +4,8 @@
 #include "cds.hpp"
 namespace avm{
 void setup(cds_t* cds);
-void apply(cds_t* cds, const double time, const dlong scalarIndex, occa::memory o_S);
+occa::memory viscosity(const dlong scalarIndex, occa::memory o_S);
+void apply(const dlong scalarIndex, occa::memory o_S);
 }
 
 #endif
