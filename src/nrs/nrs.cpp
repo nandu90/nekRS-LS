@@ -1461,7 +1461,7 @@ void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforce
   }
   std::vector<occa::memory> o_Ulist;
   for (int i = 0; i < meshV->dim; i++) {
-    auto o_Ui = o_U.slice(i * fieldOffset, meshV->Nlocal);
+    auto o_Ui = o_U.slice(i * fieldOffset, fieldOffset);
     o_Ulist.push_back(o_Ui);
   }
   fld::write(suffix, t, step, o_Ulist, o_P, o_Slist, outXYZ, FP64, Nout, uniform);

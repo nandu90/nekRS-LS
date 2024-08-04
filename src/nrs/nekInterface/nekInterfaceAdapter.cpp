@@ -103,48 +103,48 @@ void outfld(const char *filename,
   const auto mesh = nrs->_mesh; // use always t-mesh for output
   const auto Nlocal = mesh->Nelements * mesh->Np;
 
-  if (coords) {
+  auto copyField = [&](occa::memory o_fldIn, double* fldOut, std::string tag)
+  {
+    nekrsCheck(o_fldIn.size() < Nlocal,
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "%s%s%s\n",
+               "outfld: ",tag.c_str()," is too short on T-mesh!");
     auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
+    platform->copyDfloatToDoubleKernel(Nlocal, o_fldIn, o_tmpDouble);
+    o_tmpDouble.copyTo(fldOut, Nlocal);
+  };
 
-    platform->copyDfloatToDoubleKernel(Nlocal, mesh->o_x, o_tmpDouble);
-    o_tmpDouble.copyTo(nekData.xm1, o_tmpDouble.size());
-
-    platform->copyDfloatToDoubleKernel(Nlocal, mesh->o_y, o_tmpDouble);
-    o_tmpDouble.copyTo(nekData.ym1, o_tmpDouble.size());
-
-    platform->copyDfloatToDoubleKernel(Nlocal, mesh->o_z, o_tmpDouble);
-    o_tmpDouble.copyTo(nekData.zm1, o_tmpDouble.size());
+  if (coords) {
+    copyField(mesh->o_x, nekData.xm1, "meshx");
+    copyField(mesh->o_y, nekData.ym1, "meshy");
+    copyField(mesh->o_z, nekData.zm1, "meshz");
   }
 
   std::vector<double> vx;
   std::vector<double> vy;
   std::vector<double> vz;
   if (o_u.size()) {
-    auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
+    nekrsCheck(o_u.size() < 3,
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "%s\n",
+               "Velocity must have 3 components");
 
-    auto o_vx = o_u[0];
-    platform->copyDfloatToDoubleKernel(o_vx.size(), o_vx, o_tmpDouble);
     vx.resize(Nlocal, 0);
-    o_tmpDouble.copyTo(vx.data(), o_tmpDouble.size());
+    copyField(o_u[0], vx.data(), "vx");
 
-    auto o_vy = o_u[1];
-    platform->copyDfloatToDoubleKernel(o_vy.size(), o_vy, o_tmpDouble);
     vy.resize(Nlocal, 0);
-    o_tmpDouble.copyTo(vy.data(), o_tmpDouble.size());
+    copyField(o_u[1], vy.data(), "vy");
 
-    auto o_vz = o_u[2];
-    platform->copyDfloatToDoubleKernel(o_vz.size(), o_vz, o_tmpDouble);
     vz.resize(Nlocal, 0);
-    o_tmpDouble.copyTo(vz.data(), o_tmpDouble.size());
+    copyField(o_u[2], vz.data(), "vz");
   }
 
   std::vector<double> pr;
   if (o_p.isInitialized()) {
-    auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
-
-    platform->copyDfloatToDoubleKernel(Nlocal, o_p, o_tmpDouble);
     pr.resize(Nlocal, 0);
-    o_tmpDouble.copyTo(pr.data(), o_tmpDouble.size());
+    copyField(o_p, pr.data(), "pr");
   }
 
   int nps = 0;
@@ -154,17 +154,16 @@ void outfld(const char *filename,
     const dlong nekFieldOffset = nekData.lelt * mesh->Np;
 
     ps.resize(o_s.size() * nekFieldOffset, 0);
-    auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
 
     for (int is = 0; is < o_s.size(); is++) {
+      std::string sid = "S" + scalarDigitStr(is);
       occa::memory o_Si = o_s[is];
-      platform->copyDfloatToDoubleKernel(o_Si.size(), o_Si, o_tmpDouble);
 
       if (is == 0 && platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE")) {
         temp.resize(Nlocal, 0);
-        o_tmpDouble.copyTo(temp.data(), o_tmpDouble.size());
+        copyField(o_Si, temp.data(), sid);
       } else {
-        o_tmpDouble.copyTo(ps.data() + nps*nekFieldOffset, o_tmpDouble.size());
+        copyField(o_Si, ps.data() + nps*nekFieldOffset, sid);
         nps++;
       }
     }

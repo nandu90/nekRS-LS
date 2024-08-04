@@ -200,7 +200,8 @@ void tavg::outfld(int _outXYZ, int FP64)
   if (userFieldList.size()) {
     std::vector<occa::memory> o_s;
     for(int i = 0; i < userFieldList.size(); i++) {
-      o_s.push_back(o_AVG + i*fieldOffset);
+      auto o_avg = o_AVG.slice(i * fieldOffset, fieldOffset);
+      o_s.push_back(o_avg);
     }   
     fld::write("tavg", atime, outfldCounter, o_s, outXYZ, FP64);
   }
