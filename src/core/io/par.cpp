@@ -148,7 +148,7 @@ static std::vector<std::string> generalKeys = {
 
 static std::vector<std::string> neknekKeys = {
     {"boundaryextorder"},
-    {"multirate"},
+    {"multiratetimestepping"},
 };
 
 static std::vector<std::string> problemTypeKeys = {
@@ -2240,7 +2240,7 @@ void parseNekNekSection(const int rank, setupAide &options, inipp::Ini *par)
   }
 
   std::string multirateStr;
-  if (par->extract("neknek", "multirate", multirateStr)) {
+  if (par->extract("neknek", "multiratetimestepping", multirateStr)) {
     const std::vector<std::string> validValues = {
         {"yes"},
         {"true"},

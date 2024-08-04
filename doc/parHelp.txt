@@ -5,11 +5,11 @@ userSections                <string>                                   user defi
 
 [OCCA]
 
-backend                     SERIAL, CUDA, HIP, DPCPP, OPENCL           default defined in $NEKRS_HOME/nekrs.conf
+backend                     SERIAL (CPU), CUDA, HIP, DPCPP             default defined in $NEKRS_HOME/nekrs.conf
 
 deviceNumber                <int>, LOCAL-RANK [D]
 
-platformNumber              <int>                                      only used by OPENCL and DPCPP
+platformNumber              <int>                                      only used by DPCPP
                             0 [D]
 
 [GENERAL]
@@ -78,11 +78,13 @@ nScalars                    <int>                                      number of
 ----------------------------------------------------------------------------------------------------------------------
 [NEKNEK]
 boundaryEXTOrder            <int>                                      boundary extrapolation order
-                            1 [D]                                      order unity extrapolation is unconditionally stable
-                                                                       higher orders, however, may require additional corrector steps
-multirate                   true, false [D]                            use multirate time stepping
-                              +correctorSteps=<int>                    multirate corrector steps
+                            1 [D]                                      >1 may require additional inner (Schwarz iterations) 
+                                                                       corrector steps
+
+multirateTimeStepping       true, false [D] 
+                              +correctorSteps=<int>                    outer corrector steps
                               0 [D]                                    NOTE: boundaryEXTOrder > 1 requires correctorSteps > 0
+                                                                             for stability
 ----------------------------------------------------------------------------------------------------------------------
 [PROBLEMTYPE]
 equation                    stokes
@@ -141,9 +143,9 @@ smootherType                Jacobi
                               +minEigenvalueBoundFactor=<float>        only for 1st Kind Chebyshev required
                               +maxEigenvalueBoundFactor=<float> 
 
-boundaryTypeMap             <...>, <...>, ...                          boundary type for each boundary ID
+boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary type for each boundary ID
 
-                            none                                       not used or internal 
+                            none                                       no-op (internal) 
                             zeroValue                                  zero Dirichlet (w, wall)
                             codedFixedValue                            user specified Dirichlet (v, t, inlet)
                             interpolation                              neknek boundary (int)
