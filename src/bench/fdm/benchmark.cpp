@@ -55,6 +55,7 @@ occa::kernel benchmarkFDM(int Nelements,
   }
 
   const auto Nq = Nq_e - 2;
+  const auto Np = std::pow(Nq, 3);
   const auto N_e = Nq_e - 1;
   const auto N = Nq - 1;
   const auto Np_e = Nq_e * Nq_e * Nq_e;
@@ -116,26 +117,28 @@ occa::kernel benchmarkFDM(int Nelements,
       return std::make_pair(referenceKernel, -1.0);
     }
 
-    auto Sx = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0, 1e-4, true);
-    auto Sy = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0, 1e-4, true);
-    auto Sz = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0, 1e-4, true);
+    auto Sx = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0.1, 0.2, true);
+    auto Sy = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0.2, 0.3, true);
+    auto Sz = randomVector<FPType>(Nelements * Nq_e * Nq_e, 0.3, 0.4, true);
     auto invL = randomVector<FPType>(Nelements * Np_e, 0, 1, true);
-    auto Su = randomVector<FPType>(Nelements * Np_e, 0, 1, true);
+    auto Su = std::vector<FPType>(Nelements * ((useRAS) ? Np : Np_e), 0);
     auto u = randomVector<FPType>(Nelements * Np_e, 0, 1, true);
-    auto invDegree = randomVector<dfloat>(Nelements * Np_e, 0, 1, true);
+    auto invDegree = randomVector<FPType>(Nelements * Np_e, 0, 1, true);
 
     // elementList[e] = e
     std::vector<int> elementList(Nelements);
     std::iota(elementList.begin(), elementList.end(), 0);
     auto o_elementList = platform->device.malloc(Nelements * sizeof(int), elementList.data());
 
-    auto o_Sx = platform->device.malloc(Nelements * Nq_e * Nq_e * wordSize, Sx.data());
-    auto o_Sy = platform->device.malloc(Nelements * Nq_e * Nq_e * wordSize, Sy.data());
-    auto o_Sz = platform->device.malloc(Nelements * Nq_e * Nq_e * wordSize, Sz.data());
-    auto o_invL = platform->device.malloc(Nelements * Np_e * wordSize, invL.data());
-    auto o_Su = platform->device.malloc(Nelements * Np_e * wordSize, Su.data());
-    auto o_u = platform->device.malloc(Nelements * Np_e * wordSize, u.data());
-    auto o_invDegree = platform->device.malloc(Nelements * Np_e * sizeof(dfloat), invDegree.data());
+    auto o_Sx = platform->device.malloc(Sx.size() * wordSize, Sx.data());
+    auto o_Sy = platform->device.malloc(Sy.size() * wordSize, Sy.data());
+    auto o_Sz = platform->device.malloc(Sz.size() * wordSize, Sz.data());
+    auto o_invL = platform->device.malloc(invL.size() * wordSize, invL.data());
+    auto o_Su = platform->device.malloc(Su.size() * wordSize);
+    o_Su.copyFrom(Su.data());
+    auto o_u = platform->device.malloc(u.size() * wordSize);
+    o_u.copyFrom(u.data());
+    auto o_invDegree = platform->device.malloc(invDegree.size() * wordSize, invDegree.data());
 
     auto kernelRunner = [&](occa::kernel &kernel) {
       if (useRAS)
@@ -149,23 +152,21 @@ occa::kernel benchmarkFDM(int Nelements,
       if (!kernel.isInitialized()) return occa::kernel();
 
       auto dumpResult = [&]() {
-        std::vector<FPType> result;
+        std::vector<FPType> res;
         if (useRAS) {
-          const auto Nq = Nq_e - 2;
-          const auto Np = Nq * Nq * Nq;
-          result.resize(Nelements * Np);
+          res.resize(Nelements * Np);
         }
         else {
-          result.resize(Nelements * Np_e);
+          res.resize(Nelements * Np_e);
         }
+        o_Su.copyTo(res.data());
 
-        o_Su.copyTo(result.data(), result.size() * sizeof(FPType));
-        return result;
+        return res;
       };
 
       auto resetFields = [&]() {
-        o_Su.copyFrom(Su.data(), Nelements * Np_e * wordSize);
-        o_u.copyFrom(u.data(), Nelements * Np_e * wordSize);
+        o_Su.copyFrom(Su.data());
+        o_u.copyFrom(u.data());
       };
 
       resetFields();
@@ -176,8 +177,10 @@ occa::kernel benchmarkFDM(int Nelements,
       kernelRunner(kernel);
       auto result = dumpResult();
 
-      const auto err = maxAbsErr<FPType>(referenceResult, result, platform->comm.mpiComm);
-      if (err > 100. * std::numeric_limits<FPType>::epsilon() || std::isnan(err)) {
+      const auto absTol = 1e-3;
+      const auto err = maxRelErr<FPType>(referenceResult, result, platform->comm.mpiComm, absTol);
+
+      if (err > 10 * std::numeric_limits<FPType>::epsilon()/absTol || std::isnan(err)) {
         if (platform->comm.mpiRank == 0 && verbosity > 1) {
           std::cout << "fdm: Ignore version " << kernelVariant
                     << " as correctness check failed with " << err << std::endl;
@@ -245,16 +248,7 @@ occa::kernel benchmarkFDM(int Nelements,
         printPerformanceInfo(bestKernelVariant, kernelAndTime.second, 0, false);
       }
     }
-
-    free(o_Sx);
-    free(o_Sy);
-    free(o_Sz);
-    free(o_invL);
-    free(o_Su);
-    free(o_u);
-    free(o_invDegree);
-    free(o_elementList);
-
+ 
     return kernelAndTime;
   };
 

@@ -277,7 +277,7 @@ int main(int argc, char** argv)
         int outerCorrector = 1;
         bool converged = false;
         do {
-          converged = nekrs::runStep(outerCorrector++); // runs outer (sub) stepping if needed
+          converged = nekrs::runStep(outerCorrector++); // run inner sub-stepping if needed
         } while (!converged);
  
         tStep = nekrs::timeStep();
