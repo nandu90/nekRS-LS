@@ -306,9 +306,11 @@ occa::kernel benchmarkAx(int Nelements,
       kernelRunner(kernel);
       o_Aq.copyTo(results.data());
 
-      const auto absTol = 1e-3;
+      const auto absTol = 1e-2;
       const auto err = maxRelErr<FPType>(refResults, results, platform->comm.mpiComm, absTol);
-      if (err > 10 * std::numeric_limits<FPType>::epsilon()/absTol || std::isnan(err)) {
+      const auto scale = 10 * range<FPType>(refResults, absTol);
+
+      if (err > scale * std::numeric_limits<FPType>::epsilon() || std::isnan(err)) {
         if (platform->comm.mpiRank == 0 && verbosity > 1) {
           std::cout << "Ax: Ignore version " << kernelVariant
                     << " as correctness check failed with " << err << std::endl;
