@@ -33,11 +33,7 @@ conductivity = -43500.
 [SCALAR01] # k
 boundaryTypeMap = inlet, insulated 
 residualTol = 1e-08
-rho = 1.0
-diffusivity = -43500. 
 
 [SCALAR02] # tau
 boundaryTypeMap = inlet, insulated 
 residualTol = 1e-06
-rho = 1.0
-diffusivity = -43500. 
