@@ -72,11 +72,11 @@ struct mesh_t {
                                                    const occa::memory &o_bID, 
                                                    const occa::memory &o_fld);
 
-  std::vector<dfloat> surfaceAreaNormalMultiplyIntegrate(int Nfields,
-                                                         dlong fieldOffset,
-                                                         int nbID,
-                                                         const occa::memory &o_bID,
-                                                         const occa::memory &o_fld);
+  std::vector<dfloat> surfaceAreaMultiplyIntegrate(int Nfields,
+                                                   dlong fieldOffset,
+                                                   int nbID,
+                                                   const occa::memory &o_bID,
+                                                   const occa::memory &o_fld);
 
   std::vector<dfloat> surfaceAreaNormalMultiplyIntegrate(dlong fieldOffset,
                                                          int nbID,
