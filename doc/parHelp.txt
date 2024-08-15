@@ -31,7 +31,6 @@ startFrom                   "<string>"
                               + u                                      read velocity 
                               + t
                               + s1 s2 s3 ...
-                              + int                                    interpolate restart data onto current mesh
 
 timeStepper                 tombo1, tombo2 [D], tombo3
 
@@ -157,9 +156,9 @@ boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary 
                             zeroYValue/codedFixedGradient              traction y-normal plane (tractiony, shly)
                             zeroZValue/codedFixedGradient              traction z-normal plane (tractionz, shlz)
                             zeroNValue/codedFixedGradient              unaligned traction (traction, shl)
-                            zeroXYValue/fixedGradient                  (onx) 
-                            zeroYZValue/fixedGradient                  (ony)
-                            zeroXZValue/fixedGradient                  (onz)
+                            zeroYZValue/fixedGradient                  (onx) 
+                            zeroXZValue/fixedGradient                  (ony)
+                            zeroXYValue/fixedGradient                  (onz)
                             zeroGradient                               (I, insulated, O, outlet, outflow) 
                             fixedGradient                              (f, flux, o, outlet, outflow)
 
