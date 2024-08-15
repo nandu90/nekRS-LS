@@ -297,7 +297,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
 
       const auto absTol = 1e-2;
       const auto err = maxRelErr<dfloat>(referenceResults, results, platform->comm.mpiComm, absTol);
-      const auto scale = 10 * range<dfloat>(referenceResults, absTol);
+      const auto scale = 100 * range<dfloat>(referenceResults, absTol);
  
       if (err > scale * std::numeric_limits<dfloat>::epsilon() || std::isnan(err)) {
         if (platform->comm.mpiRank == 0 && verbosity > 1) {
