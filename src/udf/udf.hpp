@@ -4,7 +4,7 @@
 #include "platform.hpp"
 #include "nekInterfaceAdapter.hpp"
 #include "bcMap.hpp"
-#include "fld.hpp"
+#include "iofld.hpp"
 #include "opSEM.hpp" 
 
 extern "C" {

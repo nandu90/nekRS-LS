@@ -11,6 +11,7 @@
 #include "platform.hpp"
 #include "ascent.hpp"
 #include "vtkh/vtkh.hpp"
+#include "mesh.h"
 
 namespace nekAscent
 {

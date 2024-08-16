@@ -106,14 +106,27 @@ void buildNekInterface(const char *casename, int nFields, int N, int np, setupAi
 
 namespace nek {
 
-void outfld(const char *filename,
+void openfld(const std::string& filename,
+             double& time,
+             double& p0th);
+
+void readfld(std::vector<occa::memory>& o_x,
+             std::vector<occa::memory>& o_u,
+             occa::memory &o_p,
+             occa::memory &o_t,
+             std::vector<occa::memory>& o_s);
+
+void outfld(const std::string& filename,
             double t,
             int step,
-            bool coords,
+            double p0th,
             bool FP64,
+            const std::vector<occa::memory>& o_x,
             const std::vector<occa::memory>& o_u,
             const occa::memory& o_p,
+            const occa::memory& o_t,
             const std::vector<occa::memory>& o_s,
+            const std::vector<int>& elementMask,
             int Nro = 0,
             bool uniform = false);
 void uic(int ifield);

@@ -155,8 +155,6 @@ void vizNekNekField(nrs_t *nrs)
   o_U.push_back(o_Uviz.slice(0 * nrs->fieldOffset, nrs->fieldOffset));
   o_U.push_back(o_Uviz.slice(1 * nrs->fieldOffset, nrs->fieldOffset));
   o_U.push_back(o_Uviz.slice(2 * nrs->fieldOffset, nrs->fieldOffset));
-
-  fld::write("neknek", 0.0, 0, o_U);
 }
 
 void ciTestInitialStep(nrs_t *nrs, double time, int tstep)

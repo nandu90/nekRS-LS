@@ -9,7 +9,7 @@
 #include "cds.hpp"
 #include "advectionSubCycling.hpp"
 #include "elliptic.hpp"
-#include "fld.hpp"
+#include "iofld.hpp"
 
 static void computeDivUErr(nrs_t *nrs, dfloat &divUErrVolAvg, dfloat &divUErrL2)
 {
@@ -870,33 +870,137 @@ void nrs_t::init()
 void nrs_t::setIC()
 {
   if (!platform->options.getArgs("RESTART FILE NAME").empty()) {
-    auto fileName = platform->options.getArgs("RESTART FILE NAME");
-    nek::restartFromFile(fileName);
+    auto options = serializeString(platform->options.getArgs("RESTART FILE NAME"), '+');
+    const auto fileName = options[0];
+    options.erase(options.begin());
 
-    double startTime;
-    nek::copyFromNek(startTime);
-    platform->options.setArgs("START TIME", to_string_f(startTime));
+    if (platform->comm.mpiRank == 0) {
+      if (options.size()) std::cout << "restart options: "; 
+      for (const auto& element : options) std::cout << element << "  "; 
+      std::cout << std::endl;
+    }
+
+    iofld fld(iofld::read, fileName);
+    fld.close();
+
+    auto requestedTime = [&]()
+    {
+      auto it = std::find_if(options.begin(), options.end(), 
+        [](const std::string& s) 
+        {
+          return s.find("time") != std::string::npos;
+        }
+      );
+
+      std::string val;
+      if (it != options.end()) { 
+        val = serializeString(*it, '=').at(1);
+        options.erase(it);
+      }
+      return val;
+    }();
+
+    const auto requestedFields = [&]()
+    { 
+      std::vector<std::string> flds;
+      for (const auto& entry : {"x", "u", "p", "t", "s"}) {
+        auto it = std::find_if(options.begin(), options.end(), 
+          [entry](const std::string& s) 
+          {
+            std::string ss = s;
+            lowerCase(ss);
+            return ss.find(entry) != std::string::npos;
+          }
+        );
+        if (it != options.end()) {
+          std::string s = *it;
+          lowerCase(s);
+          std::cout << "requested field: " << s << std::endl; 
+          flds.push_back(s);
+        }
+      }
+      return flds;
+    }();
+
+    for(auto& name : fld.variableNames()) {
+      auto checkOption = [&](const std::string& name)
+      {
+        if (requestedFields.size() == 0) return true; // nothing specfied -> assign all
+        if (std::find(requestedFields.begin(), requestedFields.end(), name) != requestedFields.end()) {
+          return true; 
+        }
+        return false;
+      }; 
+
+      if (name == "time") {
+        platform->options.setArgs("START TIME", (requestedTime.size()) ? requestedTime : to_string_f(fld.inquireVariable<double>(name)));
+      }
+
+      if (name == "p0th") {
+        p0th[0] = fld.inquireVariable<double>(name);
+      }
+
+      if (name == "mesh" && checkOption("x")) {
+        auto o_data = fld.inquireVariable(name);
+        o_data.at(0).copyTo(_mesh->x);
+        o_data.at(1).copyTo(_mesh->y);
+        o_data.at(2).copyTo(_mesh->z);
+      }
+
+      if (name == "velocity" && checkOption("u")) {
+        auto o_data = fld.inquireVariable(name);
+        o_data.at(0).copyTo(U + 0*fieldOffset);
+        o_data.at(1).copyTo(U + 1*fieldOffset);
+        o_data.at(2).copyTo(U + 2*fieldOffset);
+      }
+
+      if (name == "pressure" && checkOption("p")) {
+        auto o_data = fld.inquireVariable(name);
+        o_data.at(0).copyTo(P);
+      }
+
+      if (Nscalar) {
+        if (name == "temperature" && checkOption("t")) {
+          auto o_data = fld.inquireVariable(name);
+          o_data.at(0).copyTo(cds->S);
+        }
+ 
+        if (name == "scalars") {
+          auto o_data = fld.inquireVariable(name);
+
+          const auto scalarStart = [&]()
+          {
+            if (std::find(fld.variableNames().begin(), fld.variableNames().end(), "temperature") != fld.variableNames().end()) {
+              return 1;
+            } 
+            return 0;
+          }();
+
+          for (int is = 0; is < std::min(Nscalar, static_cast<int>(o_data.size())); is++) {
+            if(checkOption("s" + std::to_string(is))) {
+              o_data.at(is).copyTo(cds->S + cds->fieldOffsetScan[is + scalarStart]);
+            }
+          }
+        }
+      }
+    }
   } else {
     nek::getIC();
   }
 
   if (platform->comm.mpiRank == 0) {
-    printf("calling UDF_Setup ... \n");
+    std::cout << "calling UDF_Setup ... \n" << std::flush;
   }
-  fflush(stdout);
   udf.setup();
   if (platform->comm.mpiRank == 0) {
-    printf("done\n");
+    std::cout << "done\n" << std::flush;
   }
-  fflush(stdout);
 
-  this->_mesh->o_x.copyFrom(this->_mesh->x);
-  this->_mesh->o_y.copyFrom(this->_mesh->y);
-  this->_mesh->o_z.copyFrom(this->_mesh->z);
-  if (this->meshV != this->_mesh) {
-    this->meshV->update();
-  }
-  this->_mesh->update();
+  _mesh->o_x.copyFrom(_mesh->x);
+  _mesh->o_y.copyFrom(_mesh->y);
+  _mesh->o_z.copyFrom(_mesh->z);
+  if (meshV != _mesh) meshV->update(); 
+  _mesh->update();
 
   auto projC0 = [&](oogs_t *gsh, mesh_t *mesh, int nFields, dlong fieldOffset, occa::memory &o_in) {
     platform->linAlg->axmyMany(mesh->Nlocal, nFields, fieldOffset, 0, 1.0, mesh->o_LMM, o_in);
@@ -904,22 +1008,22 @@ void nrs_t::setIC()
     platform->linAlg->axmyMany(mesh->Nlocal, nFields, fieldOffset, 0, 1.0, mesh->o_invLMM, o_in);
   };
 
-  this->o_U.copyFrom(this->U);
-  projC0(this->gsh, this->meshV, this->NVfields, this->fieldOffset, this->o_U);
+  o_U.copyFrom(U);
+  projC0(gsh, meshV, NVfields, fieldOffset, o_U);
 
-  this->o_P.copyFrom(this->P);
-  projC0(this->gsh, this->meshV, 1, this->fieldOffset, this->o_P);
+  o_P.copyFrom(P);
+  projC0(gsh, meshV, 1, fieldOffset, o_P);
 
-  if (this->Nscalar) {
-    this->cds->o_S.copyFrom(this->cds->S);
-    for (int s = 0; s < this->Nscalar; ++s) {
+  if (Nscalar) {
+    cds->o_S.copyFrom(cds->S);
+    for (int s = 0; s < Nscalar; ++s) {
       const std::string sid = scalarDigitStr(s);
       if (platform->options.compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
         continue;
       }
-      auto gsh = (s == 0) ? this->cds->gshT : this->cds->gsh;
-      auto o_Si = this->cds->o_S + this->cds->fieldOffsetScan[s];
-      projC0(gsh, this->cds->mesh[s], 1, this->cds->fieldOffset[s], o_Si);
+      auto gsh = (s == 0) ? cds->gshT : cds->gsh;
+      auto o_Si = cds->o_S + cds->fieldOffsetScan[s];
+      projC0(gsh, cds->mesh[s], 1, cds->fieldOffset[s], o_Si);
     }
   }
 
@@ -1433,10 +1537,8 @@ void nrs_t::printInfo(double time, int tstep, bool printStepInfo, bool printVerb
              "Unreasonable CFL!");
 }
 
-void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforceFP64, int Nout, bool uniform)
+void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforceFP64, int N_, bool uniform)
 {
-  const std::string suffix = "";
-
   std::string outputMeshSave;
   static bool firstTime = true;
   if (firstTime) {
@@ -1454,17 +1556,57 @@ void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforce
     outXYZ = true;
   }
 
-  std::vector<occa::memory> o_Slist;
-  for (int i = 0; i < Nscalar; i++) {
-    auto o_Si = cds->o_S.slice(cds->fieldOffsetScan[i], cds->fieldOffset[i]);
-    o_Slist.push_back(o_Si);
+  std::vector<occa::memory> o_X;
+  if (outXYZ) {
+    o_X.push_back(_mesh->o_x);
+    o_X.push_back(_mesh->o_y);
+    o_X.push_back(_mesh->o_z);
   }
-  std::vector<occa::memory> o_Ulist;
+
+  std::vector<occa::memory> o_V;
   for (int i = 0; i < meshV->dim; i++) {
     auto o_Ui = o_U.slice(i * fieldOffset, fieldOffset);
-    o_Ulist.push_back(o_Ui);
+    o_V.push_back(o_Ui);
   }
-  fld::write(suffix, t, step, o_Ulist, o_P, o_Slist, outXYZ, FP64, Nout, uniform);
+
+  std::vector<occa::memory> o_t;
+  std::vector<occa::memory> o_S;
+  for (int i = 0; i < Nscalar; i++) {
+    auto o_Si = cds->o_S.slice(cds->fieldOffsetScan[i], cds->fieldOffset[i]);
+    if (i == 0 && platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE")) {
+      o_t.push_back(o_Si);
+    } else {
+      o_S.push_back(o_Si);
+    }
+  }
+
+  iofld fld(iofld::write);
+
+  fld.defineVariable<double>("time", t);
+  fld.defineVariable<double>("p0th", p0th[0]);
+
+  if (o_X.size()) fld.defineVariable("mesh", o_X);
+
+  fld.defineVariable("velocity", o_V);
+
+  auto o_p = std::vector<occa::memory>{o_P};
+  fld.defineVariable("pressure", o_p);
+  if (o_t.size()) fld.defineVariable("temperature", o_t);
+  if (o_S.size()) fld.defineVariable("scalars", o_S);
+
+  fld.writeAttribute("precision", (FP64) ? "64" : "32");
+  fld.writeAttribute("uniform", (uniform) ? "true" : "false");
+
+  auto Nout = [&] () 
+  {
+    int N;
+    platform->options.getArgs("POLYNOMIAL DEGREE", N);
+    return (N_) ? N_ : N;  
+  }();
+ 
+  fld.writeAttribute("polynomialOrder", std::to_string(Nout));
+
+  fld.close();
 
   if (firstTime) {
     platform->options.setArgs("CHECKPOINT OUTPUT MESH", outputMeshSave);

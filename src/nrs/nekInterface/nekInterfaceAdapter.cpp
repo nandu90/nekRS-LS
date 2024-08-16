@@ -6,9 +6,7 @@
 #include "fileUtils.hpp"
 #include "re2Reader.hpp"
 #include "fileUtils.hpp"
-#include "fld.hpp"
 #include "nekInterfaceAdapter.hpp"
-
 
 nekdata_private nekData;
 static int rank;
@@ -26,8 +24,9 @@ static void (*userbc_ptr)(void);
 static void (*useric_ptr)(void);
 static void (*userqtl_ptr)(void);
 static void (*usrsetvert_ptr)(void);
-
-static void (*nek_outfld_ptr)(char *, double*, int*, int *, int *, double*, double*, double*, double*, double*, double*, int*, int);
+static void (*nek_outfld_ptr)(char *, double*, int*, int *, int *, double*, double*, double*, double*, double*, double*, double*, double*, double*, int*, int);
+static void (*nek_openfld_ptr)(char *, double *, double *, int);
+static void (*nek_readfld_ptr)(double *, double *, double *, double *, double *, double *, double *, double *, double *);
 static void (*nek_uic_ptr)(int *);
 static void (*nek_end_ptr)(void);
 static void (*nek_restart_ptr)(char *, int *);
@@ -87,19 +86,113 @@ static void map_m_to_n(double *a, int na, double *b, int nb)
 namespace nek
 {
 
-void outfld(const char *filename,
+void openfld(const std::string& filename, double& time_, double& p0th_)
+{
+  auto fname = const_cast<char*>(filename.c_str());
+  (*nek_openfld_ptr) (fname, &time_, &p0th_, static_cast<int>(filename.size())); 
+}
+
+void readfld(std::vector<occa::memory>& o_x,
+             std::vector<occa::memory>& o_u,
+             occa::memory &o_p,
+             occa::memory &o_t,
+             std::vector<occa::memory>& o_ps)
+{
+  const auto mesh = nrs->_mesh; // use always t-mesh
+  const auto Nlocal = mesh->Nelements * mesh->Np;
+ 
+  occa::memory xm, ym, zm;
+  if (*ptr<int>("getxr")) {
+    xm = platform->memPool.reserve<double>(Nlocal);
+    ym = platform->memPool.reserve<double>(Nlocal);
+    zm = platform->memPool.reserve<double>(Nlocal);
+  }
+
+  occa::memory vx, vy, vz;
+  if (*ptr<int>("getur")) {
+    vx = platform->memPool.reserve<double>(Nlocal);
+    vy = platform->memPool.reserve<double>(Nlocal);
+    vz = platform->memPool.reserve<double>(Nlocal);
+  }
+
+  occa::memory pr;
+  if (*ptr<int>("getpr")) pr = platform->memPool.reserve<double>(Nlocal); 
+
+  occa::memory t;
+  if (*ptr<int>("gettr")) t = platform->memPool.reserve<double>(Nlocal); 
+
+  occa::memory ps;
+  const auto npsr = *ptr<int>("npsr");
+  if (npsr) {
+    const size_t nekFieldOffset = nekData.lelt * mesh->Np;
+    ps = platform->memPool.reserve<double>(nekFieldOffset * npsr);
+  }
+
+  (*nek_readfld_ptr) 
+  (
+    static_cast<double*>(xm.ptr()), static_cast<double*>(ym.ptr()), static_cast<double*>(zm.ptr()),
+    static_cast<double*>(vx.ptr()), static_cast<double*>(vy.ptr()), static_cast<double*>(vz.ptr()),
+    static_cast<double*>(pr.ptr()), 
+    static_cast<double*>(t.ptr()),
+    static_cast<double*>(ps.ptr()) 
+  );
+
+  auto copy = [&](const std::vector<occa::memory>& fields)
+  {
+
+    std::vector<occa::memory> o_u(fields.size());
+    auto o_tmpDouble = platform->device.malloc<double>(Nlocal);
+
+    for (int i = 0; i < fields.size(); i++) {
+      o_tmpDouble.copyFrom(fields[i]);
+      o_u[i] = platform->o_memPool.reserve<dfloat>(Nlocal);
+      platform->copyDoubleToDfloatKernel(Nlocal, o_tmpDouble, o_u[i]);
+    }
+    return o_u;
+  };
+
+  if (xm.isInitialized()) {
+    std::vector<occa::memory> fields{xm, ym, zm};
+    o_x = copy(fields);
+  }
+
+  if (vx.isInitialized()) {
+    std::vector<occa::memory> fields{vx, vy, vz};
+    o_u = copy(fields);
+  }
+
+  if (pr.isInitialized()) {
+    std::vector<occa::memory> fields{pr};
+    o_p = copy(fields)[0];
+  }
+
+  if (t.isInitialized()) {
+    std::vector<occa::memory> fields{t};
+    o_t = copy(fields)[0];
+  }
+
+  std::vector<occa::memory> psFields;
+  const auto nekFieldOffset = static_cast<size_t>(nekData.lelt) * mesh->Np;
+  for(int i = 0; i < npsr; i++) {
+    psFields.push_back(ps.slice(i*nekFieldOffset, Nlocal)); 
+  }
+  o_ps = copy(psFields);
+}
+
+void outfld(const std::string& filename,
             double time,
             int step,
-            bool coords,
+            double p0th,
             bool FP64,
+            const std::vector<occa::memory>& o_x,
             const std::vector<occa::memory>& o_u,
             const occa::memory &o_p,
+            const occa::memory &o_t,
             const std::vector<occa::memory>& o_s,
+            const std::vector<int>& elementMask,
             int Nout, 
             bool uniform)
 {
-  platform->timer.tic("checkpointing", 1);
-
   const auto mesh = nrs->_mesh; // use always t-mesh for output
   const auto Nlocal = mesh->Nelements * mesh->Np;
 
@@ -115,10 +208,24 @@ void outfld(const char *filename,
     o_tmpDouble.copyTo(fldOut, Nlocal);
   };
 
-  if (coords) {
-    copyField(mesh->o_x, nekData.xm1, "meshx");
-    copyField(mesh->o_y, nekData.ym1, "meshy");
-    copyField(mesh->o_z, nekData.zm1, "meshz");
+  std::vector<double> xm; 
+  std::vector<double> ym;
+  std::vector<double> zm;
+  if (o_x.size()) {
+    nekrsCheck(o_x.size() < 3,
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "%s\n",
+               "Mesh coordinates must have 3 components");
+
+    xm.resize(Nlocal, 0);
+    copyField(o_x[0], xm.data(), "o_x[0]");
+
+    ym.resize(Nlocal, 0);
+    copyField(o_x[1], ym.data(), "o_x[1]");
+
+    zm.resize(Nlocal, 0);
+    copyField(o_x[2], zm.data(), "o_x[2]");
   }
 
   std::vector<double> vx;
@@ -132,40 +239,37 @@ void outfld(const char *filename,
                "Velocity must have 3 components");
 
     vx.resize(Nlocal, 0);
-    copyField(o_u[0], vx.data(), "vx");
+    copyField(o_u[0], vx.data(), "o_u[0]");
 
     vy.resize(Nlocal, 0);
-    copyField(o_u[1], vy.data(), "vy");
+    copyField(o_u[1], vy.data(), "o_u[1]");
 
     vz.resize(Nlocal, 0);
-    copyField(o_u[2], vz.data(), "vz");
+    copyField(o_u[2], vz.data(), "o_u[2]");
   }
 
   std::vector<double> pr;
   if (o_p.isInitialized()) {
     pr.resize(Nlocal, 0);
-    copyField(o_p, pr.data(), "pr");
+    copyField(o_p, pr.data(), "o_p");
+  }
+
+  std::vector<double> temp;
+  if (o_t.isInitialized()) {
+    temp.resize(Nlocal, 0);
+    copyField(o_t, temp.data(), "o_t");
   }
 
   int nps = 0;
-  std::vector<double> temp;
   std::vector<double> ps;
   if (o_s.size()) {
-    const dlong nekFieldOffset = nekData.lelt * mesh->Np;
-
+    const auto nekFieldOffset = static_cast<size_t>(nekData.lelt) * mesh->Np;
     ps.resize(o_s.size() * nekFieldOffset, 0);
-
     for (int is = 0; is < o_s.size(); is++) {
       std::string sid = "S" + scalarDigitStr(is);
       occa::memory o_Si = o_s[is];
-
-      if (is == 0 && platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE")) {
-        temp.resize(Nlocal, 0);
-        copyField(o_Si, temp.data(), sid);
-      } else {
-        copyField(o_Si, ps.data() + nps*nekFieldOffset, sid);
-        nps++;
-      }
+      copyField(o_Si, ps.data() + nps*nekFieldOffset, "o_S[" + std::to_string(is) + "]");
+      nps++;
     }
   }
 
@@ -174,10 +278,10 @@ void outfld(const char *filename,
     *(nekData.istep) = step;
 
     const auto p0th_s = *(nekData.p0th);
-    *(nekData.p0th) = nrs->p0th[0];
+    *(nekData.p0th) = p0th;
 
     std::vector<int> outFld;
-    outFld.push_back(coords ? 1 : 0);
+    outFld.push_back(xm.size()  ? 1 : 0);
     outFld.push_back(vx.size() ? 1 : 0);
     outFld.push_back(pr.size() ? 1 : 0);
     outFld.push_back(temp.size() ? 1 : 0);
@@ -193,20 +297,23 @@ void outfld(const char *filename,
     for(int i = 0; i < nekData.lelt; i++) nek_out_mask[i] = 1; 
 
     // filter elements
-    int filterEnabled = fld::elementFilter.mask().size() ? 1 : 0;
+    int filterEnabled = elementMask.size() ? 1 : 0;
     MPI_Allreduce(MPI_IN_PLACE, &filterEnabled, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
     if(filterEnabled) {
       for(int i = 0; i < nekData.lelt; i++) nek_out_mask[i] = 0; 
-      for(auto& entry : fld::elementFilter.mask()) {
+      for(auto& entry : elementMask) {
         nek_out_mask[entry] = 1;
       }
     }
 
-    (*nek_outfld_ptr)((char *)filename,
+    (*nek_outfld_ptr)(const_cast<char*>(filename.c_str()),
                       &time,
                       outFld.data(), 
                       &nxo,
-                      &ifreg,           
+                      &ifreg,          
+                      xm.data(), 
+                      ym.data(), 
+                      zm.data(), 
                       vx.data(), 
                       vy.data(), 
                       vz.data(), 
@@ -214,7 +321,7 @@ void outfld(const char *filename,
                       temp.data(), 
                       ps.data(), 
                       &nps, 
-                      strlen(filename));
+                      filename.size());
 
     // filter reset
     for(int i = 0; i < nekData.lelt; i++) {
@@ -225,8 +332,6 @@ void outfld(const char *filename,
     *(nekData.istep) = step_s;
     p63 = p63_s;
   }
-
-  platform->timer.toc("checkpointing");
 }
 
 void uic(int ifield)
@@ -394,8 +499,13 @@ void set_usr_handles(const char *session_in, int verbose)
   check_error(dlerror());
   nek_end_ptr = (void (*)(void))dlsym(handle, fname("nekf_end"));
   check_error(dlerror());
-  nek_outfld_ptr = (void (*)(char *, double *, int *, int *, int *, double*, double*, double*, double*, double*, double*, int*, int))dlsym(handle, fname("nekf_outfld"));
+  nek_outfld_ptr = (void (*)(char *, double *, int *, int *, int *, double*, double*, double*, double*, double*, double*, double*, double*, double*, int*, int))dlsym(handle, fname("nekf_outfld"));
   check_error(dlerror());
+  nek_openfld_ptr = (void (*)(char *, double *, double *, int))dlsym(handle, fname("nekf_openfld"));
+  check_error(dlerror());
+  nek_readfld_ptr = (void (*)(double *, double *, double *, double *, double *, double *, double *, double *, double *))dlsym(handle, fname("nekf_readfld"));
+  check_error(dlerror());
+
   nek_restart_ptr = (void (*)(char *, int *))dlsym(handle, fname("nekf_restart"));
   check_error(dlerror());
   nek_lglel_ptr = (int (*)(int *))dlsym(handle, fname("nekf_lglel"));

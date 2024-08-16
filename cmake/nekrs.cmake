@@ -31,7 +31,7 @@ set(OGS_SOURCES
 
 set(NRS_SRC 
     src/lib/nekrs.cpp
-    src/core/io/writeFld.cpp
+    src/core/io/iofld.cpp
     src/utils/fileUtils.cpp
     src/utils/sha1.cpp
     src/utils/inipp.cpp

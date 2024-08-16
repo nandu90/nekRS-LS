@@ -1,8 +1,7 @@
-#include "nekInterfaceAdapter.hpp"
-#include "tavg.hpp"
 #include "platform.hpp"
-#include "linAlg.hpp"
-#include "fld.hpp"
+#include "tavg.hpp"
+#include "nekInterfaceAdapter.hpp"
+#include "iofld.hpp"
 
 // private members
 namespace
@@ -19,9 +18,9 @@ occa::memory o_Savg, o_Srms;
 std::vector< std::vector<deviceMemory<dfloat>> > userFieldList;
 occa::memory o_AVG;
 
-occa::kernel EXKernel;
-occa::kernel EXYKernel;
-occa::kernel EXYZKernel;
+occa::kernel E1Kernel;
+occa::kernel E2Kernel;
+occa::kernel E3Kernel;
 occa::kernel E4Kernel;
 
 bool buildKernelCalled = false;
@@ -35,32 +34,32 @@ double timel;
 int outfldCounter = 0;
 } // namespace
 
-static void EX(dlong N, dfloat a, dfloat b, int nflds, occa::memory o_x, occa::memory o_EX)
+static void E1(dlong N, dfloat a, dfloat b, int nflds, occa::memory o_x, occa::memory o_EX)
 {
-  EXKernel(N, fieldOffset, nflds, a, b, o_x, o_EX);
+  E1Kernel(N, fieldOffset, nflds, a, b, o_x, o_EX);
 }
 
-static void EX(dlong N, dlong fieldOffset, dfloat a, dfloat b, int nflds, occa::memory o_x, occa::memory o_EX)
+static void E1(dlong N, dlong fieldOffset, dfloat a, dfloat b, int nflds, occa::memory o_x, occa::memory o_EX)
 {
-  EXKernel(N, fieldOffset, nflds, a, b, o_x, o_EX);
+  E1Kernel(N, fieldOffset, nflds, a, b, o_x, o_EX);
 }
 
 static void
-EXY(dlong N, dfloat a, dfloat b, int nflds, occa::memory o_x, occa::memory o_y, occa::memory o_EXY)
+E2(dlong N, dfloat a, dfloat b, int nflds, occa::memory o_x, occa::memory o_y, occa::memory o_EXY)
 {
-  EXYKernel(N, fieldOffset, nflds, a, b, o_x, o_y, o_EXY);
+  E2Kernel(N, fieldOffset, nflds, a, b, o_x, o_y, o_EXY);
 }
 
-static void EXYZ(dlong N,
-                 dfloat a,
-                 dfloat b,
-                 int nflds,
-                 occa::memory o_x,
-                 occa::memory o_y,
-                 occa::memory o_z,
-                 occa::memory &o_EXYZ)
+static void E3(dlong N,
+               dfloat a,
+               dfloat b,
+               int nflds,
+               occa::memory o_x,
+               occa::memory o_y,
+               occa::memory o_z,
+               occa::memory &o_EXYZ)
 {
-  EXYZKernel(N, fieldOffset, nflds, a, b, o_x, o_y, o_z, o_EXYZ);
+  E3Kernel(N, fieldOffset, nflds, a, b, o_x, o_y, o_z, o_EXYZ);
 }
 
 static void E4(dlong N,
@@ -92,9 +91,9 @@ void tavg::buildKernel(occa::properties kernelInfo)
     }
   };
 
-  EXKernel = buildKernel("EX");
-  EXYKernel = buildKernel("EXY");
-  EXYZKernel = buildKernel("EXYZ");
+  E1Kernel = buildKernel("E1");
+  E2Kernel = buildKernel("E2");
+  E3Kernel = buildKernel("E3");
   E4Kernel = buildKernel("E4");
 }
 
@@ -135,11 +134,11 @@ void tavg::run(double time)
       const auto N = fieldOffset;
 
       if (entry.size() == 1) {
-        EX(N, a, b, 1, entry.at(0), o_avg);
+        E1(N, a, b, 1, entry.at(0), o_avg);
       } else if (entry.size() == 2) {
-        EXY(N, a, b, 1, entry.at(0), entry.at(1), o_avg);
+        E2(N, a, b, 1, entry.at(0), entry.at(1), o_avg);
       } else if (entry.size() == 3) {
-        EXYZ(N, a, b, 1, entry.at(0), entry.at(1), entry.at(2), o_avg);
+        E3(N, a, b, 1, entry.at(0), entry.at(1), entry.at(2), o_avg);
       } else if (entry.size() == 4) {
         E4(N, a, b, 1, entry.at(0), entry.at(1), entry.at(2), entry.at(3), o_avg);
       }
@@ -184,7 +183,7 @@ void tavg::setup(dlong _fieldOffset, const std::vector< std::vector<deviceMemory
   setupCalled = true;
 }
 
-void tavg::outfld(int _outXYZ, int FP64)
+void tavg::outfld(mesh_t *mesh)
 {
   nekrsCheck(!setupCalled || !buildKernelCalled,
              MPI_COMM_SELF,
@@ -192,36 +191,42 @@ void tavg::outfld(int _outXYZ, int FP64)
              "%s\n",
              "called prior to tavg::setup()!");
 
-  int outXYZ = _outXYZ;
-  if (!outfldCounter) {
-    outXYZ = 1;
-  }
+  const bool outXYZ = mesh && outfldCounter == 0; 
 
   if (userFieldList.size()) {
     std::vector<occa::memory> o_s;
     for(int i = 0; i < userFieldList.size(); i++) {
       auto o_avg = o_AVG.slice(i * fieldOffset, fieldOffset);
       o_s.push_back(o_avg);
-    }   
-    fld::write("tavg", atime, outfldCounter, o_s, outXYZ, FP64);
+    }  
+
+    iofld fld(iofld::write, "tavg");
+    fld.defineVariable<double>("time", atime);
+    if (outXYZ) {
+      std::vector<occa::memory> o_x;
+      o_x.push_back(mesh->o_x);
+      o_x.push_back(mesh->o_y);
+      o_x.push_back(mesh->o_z);
+      fld.defineVariable("mesh", o_x);
+    }
+    fld.defineVariable("scalars", o_s);
+
+    fld.writeAttribute("precision", "64");
+
+    fld.close(); 
   }
 
   atime = 0; // reset
   outfldCounter++;
 }
 
-void tavg::outfld()
-{
-  tavg::outfld(/* outXYZ */ 0, /* FP64 */ 1);
-}
-
-deviceMemory<dfloat> tavg::o_avg()
+deviceMemory<double> tavg::o_avg()
 {
   nekrsCheck(!setupCalled || !buildKernelCalled,
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "%s\n",
              "called prior to tavg::setup()!");
-  deviceMemory<dfloat> d_AVG(o_AVG);
+  deviceMemory<double> d_AVG(o_AVG);
   return d_AVG;
 }

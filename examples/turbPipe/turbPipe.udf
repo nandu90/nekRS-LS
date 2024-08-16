@@ -6,7 +6,9 @@
 static int NSLABS;
 static int NELSLAB;
 static int renderStep;
+
 deviceMemory<dfloat> o_qcriterion;
+std::vector<int> elementFilter;
 
 #ifdef NEKRS_ADIOS_ENABLED
 NekAdios *nekAdios;
@@ -88,18 +90,11 @@ void UDF_Setup()
   velRecycling::setup(nrs->o_usrwrk, 0.0, 0.0, zRecycLayer, bID, uBulk);
 #endif
 
-  // remove recycling section from field output
-  const auto subMeshElements = [&] ()
-  {
-    std::vector<int> elements;
-    for(int e = 0; e < mesh->Nelements; e++) {
-       auto zmaxLocal = std::numeric_limits<dfloat>::lowest();
-       for(int i = 0; i < mesh->Np; i++) zmaxLocal = std::max(mesh->z[i + e * mesh->Np], zmaxLocal);
-       if (zmaxLocal > zRecycLayer) elements.push_back(e);
-    }
-    return elements;
-  }();
-  fld::elementFilter.set(subMeshElements);
+  for(int e = 0; e < mesh->Nelements; e++) {
+     auto zmaxLocal = std::numeric_limits<dfloat>::lowest();
+     for(int i = 0; i < mesh->Np; i++) zmaxLocal = std::max(mesh->z[i + e * mesh->Np], zmaxLocal);
+     if (zmaxLocal > zRecycLayer) elementFilter.push_back(e);
+  }
 
   {
     std::vector< std::vector<deviceMemory<dfloat>> > tavgFields;
@@ -199,14 +194,36 @@ void UDF_ExecuteStep(double time, int tstep)
     }
 #endif
 
-    tavg::outfld();
+    tavg::outfld(mesh);
   }
+
+
 
 #ifdef NEKRS_ASCENT_ENABLED 
   if (tstep % renderStep == 0) {
-    //std::vector<occa::memory> o_fldList;
-    //o_fldList.push_back(o_qcriterion);
-    //fld::write("qcrit", time, tstep, o_fldList, true, false, mesh->N, true);
+#if 1
+    iofld fld(iofld::write, "qcrit");
+
+    fld.writeAttribute("uniform", "true");
+    fld.writeAttribute("polynomialOrder", std::to_string(mesh->N + 2));
+
+    // remove recycling section from output mesh
+    fld.writeElementFilter(elementFilter);
+
+    fld.defineVariable<double>("time", time);
+
+    std::vector<occa::memory> o_X;
+    o_X.push_back(mesh->o_x);
+    o_X.push_back(mesh->o_y);
+    o_X.push_back(mesh->o_z);
+    fld.defineVariable("mesh", o_X);
+
+    std::vector<occa::memory> o_S;
+    o_S.push_back(o_qcriterion);
+    fld.defineVariable("scalars", o_S);
+
+    fld.close();
+#endif
     nekAscent::run(time, tstep);
   }
 #endif

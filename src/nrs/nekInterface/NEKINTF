@@ -4,5 +4,5 @@
       common /c_is1/  glo_num((2**ldim)*lelt)
       integer*8       glo_num
 
-      common /INTNRS/ getu, getp, gett, getps, llelt, lldimt
-      integer         getu, getp, gett, getps, llelt, lldimt
+      common /INTNRS/ getxr, getur, getpr, gettr, gtpsr(ldimt-1)
+      integer         getxr, getur, getpr, gettr, gtpsr

@@ -10,6 +10,7 @@ c-----------------------------------------------------------------------
       include 'SIZE'
       include 'TOTAL'
       include 'DOMAIN'
+      include 'RESTART'
       include 'NEKINTF'
 
       integer comm_in
@@ -94,10 +95,14 @@ c-----------------------------------------------------------------------
       call nekrs_registerPtr('vmult', vmult)
       call nekrs_registerPtr('tmult', tmult)
 
-      call nekrs_registerPtr('ifgetu', ifgetu)
-      call nekrs_registerPtr('ifgetp', ifgetp)
-      call nekrs_registerPtr('ifgett', ifgett)
-      call nekrs_registerPtr('ifgets', ifgets)
+      ! integer variants for (non-portable) booleans
+      call nekrs_registerPtr('getxr', getxr)
+      call nekrs_registerPtr('getur', getur)
+      call nekrs_registerPtr('getpr', getpr)
+      call nekrs_registerPtr('gettr', gettr)
+      call nekrs_registerPtr('gtpsr', gtpsr(1))
+
+      call nekrs_registerPtr('npsr', npsr)
 
       call nekrs_registerPtr('out_mask', out_mask)
 
@@ -270,8 +275,9 @@ c-----------------------------------------------------------------------
       return
       end
 c-----------------------------------------------------------------------
-      subroutine nekf_outfld(prefix, time_in, out_fld, 
+      subroutine nekf_outfld(fname, time_in, out_fld, 
      &                       nxo_in, rego_in,
+     $                       xm_in, ym_in, zm_in,
      $                       vx_in, vy_in, vz_in,
      $                       pm1_in, t_in, ps_in, nps_in)
 
@@ -280,13 +286,14 @@ c-----------------------------------------------------------------------
       include 'RESTART'
       include 'NEKINTF'
 
-      character prefix*(*)
+      character fname*(*)
       real time_in
       integer out_fld(*)
 
       integer rego_in
       integer nxo_int
 
+      real xm_in(*), ym_in(*), zm_in(*)
       real vx_in(*), vy_in(*), vz_in(*)
       real pm1_in(*)
       real t_in(*)
@@ -323,28 +330,18 @@ c-----------------------------------------------------------------------
         nxo = lxo
       endif
 
-      if(nio.eq.0) then
-        if(rego) then
-          WRITE(6,1001) istep,time,nxo-1
- 1001     FORMAT(/,i9,1pe12.4,
-     $    ' Writing checkpoint to uniform grid N=', i2)
-        else
-          WRITE(6,1002) istep,time,nxo-1
- 1002     FORMAT(/,i9,1pe12.4,' Writing checkpoint N=', i2)
-        endif
-      endif
-
-      tiostart=dnekclock_sync()
-
       call io_init
 
       nout = nelt ! dump all fields based on the t-mesh to avoid different topologies in the post-processor
       nyo  = nxo 
       nzo  = nxo 
 
+      ! open file
       ierr=0
       if (nid.eq.pid0) then
-         call mfo_open_files(prefix,ierr)
+        !call mfo_open_files(prefix,ierr)
+        !if(nio.eq.0)    write(6,*) '      FILE:',fname
+        call byte_open_mpi(fname,ifh_mbyte,.false.,ierr)
       endif
       call err_chk(ierr,'Error opening file in mfo_open_files. $')
 
@@ -396,9 +393,9 @@ c-----------------------------------------------------------------------
       if (out_fld(1).ne.0) then
          offs = offs0 + ldim*strideB
          call byte_set_view(offs,ifh_mbyte)
-         call interp_fld_n(ur1,nxo,xm1,rego)
-         call interp_fld_n(ur2,nxo,ym1,rego)
-         call interp_fld_n(ur3,nxo,zm1,rego)
+         call interp_fld_n(ur1,nxo,xm_in,rego)
+         call interp_fld_n(ur2,nxo,ym_in,rego)
+         call interp_fld_n(ur3,nxo,zm_in,rego)
          call mfo_outv(ur1,ur2,ur3,nout,nxo,nyo,nzo)
          ioflds = ioflds + ldim
       endif
@@ -491,19 +488,6 @@ c-----------------------------------------------------------------------
       endif
       call err_chk(ierr,'Error closing file in mfo_outfld. Abort. $')
 
-      tio = dnekclock_sync()-tiostart
-      if (tio.le.0) tio=1.
-
-      dnbyte = glsum(dnbyte,1)
-      dnbyte = dnbyte + iHeaderSize + 4. + isize*cntg
-      dnbyte = dnbyte/1e9
-      if(nio.eq.0) write(6,7) istep,time,dnbyte,dnbyte/tio,
-     &             nfileo
-    7 format(/,i9,1pe12.4,' done ::',/,
-     &       30X,'file size = ',3pG12.2,'GB',/,
-     &       30X,'avg data-throughput = ',0pf7.1,'GB/s',/,
-     &       30X,'io-nodes = ',i5,/)
-
       time = time_s
 
       return
@@ -516,6 +500,7 @@ c-----------------------------------------------------------------------
       include 'SIZE'
       include 'RESTART'
       include 'INPUT'
+      include 'NEKINTF'
 
       logical  iffort(  ldimt1,0:lpert)
      $       , ifrest(0:ldimt1,0:lpert)
@@ -527,17 +512,27 @@ c-----------------------------------------------------------------------
       call slogic (iffort,ifrest,ifprsl,nfiles)
 
       call nekgsync()
-      call restart(nfiles) !  Check restart files
+      call restart(nfiles)
       call nekgsync()
 
-      getu = 1
-      getp = 1
-      gett = 1
- 
-      if (.not. ifgetu) getu = 0 
-      if (.not. ifgetp) getp = 0
-      if (.not. ifgett) gett = 0
+      ! what fields exist in file
+      getxr = 1
+      if (.not. ifgetur) getxr = 0 
 
+      getur = 1
+      if (.not. ifgetur) getur = 0 
+
+      getpr = 1
+      if (.not. ifgetpr) getpr = 0
+
+      gettr = 1
+      if (.not. ifgettr) gettr = 0
+
+      do i = 1,ldimt-1
+        gtpsr(i) = 1
+        if (.not. ifgtpsr(i)) gtpsr(i) = 0
+      enddo
+ 
       return
       end
 c-----------------------------------------------------------------------
@@ -609,13 +604,6 @@ c-----------------------------------------------------------------------
       include 'NEKINTF'
 
       call setics()
-      getu = 1
-      getp = 1
-      gett = 1
- 
-      if (.not. ifgetu) getu = 0 
-      if (.not. ifgetp) getp = 0
-      if (.not. ifgett) gett = 0
 
       return
       end
@@ -1237,4 +1225,155 @@ c     Interpolate xm(m,m,m,...) to xn(n,n,n,...) (GLL-->GLL)
 
       return
       end
+
 c-----------------------------------------------------------------------
+      subroutine nekf_openfld(fname_in, time_, p0th_)
+      include 'mpif.h'
+      include 'SIZE'
+      include 'TOTAL'
+      include 'RESTART'
+      include 'NEKINTF'
+
+      character*(*) fname_in 
+      real time_
+      real p0th_
+
+      integer nps_
+
+      character*132  fname
+      character*1    fnam1(132)
+      equivalence   (fnam1,fname)
+
+      character*1    frontc
+
+      ifile = 1 ! single file only
+      lenf = len(fname_in)
+
+      ! add full path if required
+      call blank(fname,132)
+      call chcopy(frontc, fname_in, 1)
+
+      if (frontc .ne. '/') then
+        lenp = 0 !ltrunc(path,132)
+        call chcopy(fnam1(1),path,lenp)
+        call chcopy(fnam1(lenp+1),fname_in,lenf)
+      else
+        call chcopy(fnam1(1),fname_in,lenf)     
+      endif
+
+      call mfi_prepare(fname)       ! determine reader nodes +
+                                    ! read hdr + element mapping 
+
+      time_ = timer
+      p0th_ = p0thr
+
+      ! what fields exist in file
+      getxr = 1
+      if (.not. ifgetur) getxr = 0 
+
+      getur = 1
+      if (.not. ifgetur) getur = 0 
+
+      getpr = 1
+      if (.not. ifgetpr) getpr = 0
+
+      gettr = 1
+      if (.not. ifgettr) gettr = 0
+
+      do i = 1,ldimt-1
+        gtpsr(i) = 1
+        if (.not. ifgtpsr(i)) gtpsr(i) = 0
+      enddo
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_readfld(xm1_,ym1_,zm1_,vx_,vy_,vz_,pm1_,t_,ps_)
+
+      include 'mpif.h'
+      include 'SIZE'
+      include 'TOTAL'
+      include 'RESTART'
+
+      real xm1_(lx1,ly1,lz1,*), ym1_(lx1,ly1,lz1,*), zm1_(lx1,ly1,lz1,*)
+      real vx_ (lx1,ly1,lz1,*), vy_ (lx1,ly1,lz1,*), vz_ (lx1,ly1,lz1,*)
+      real pm1_(lx1,ly1,lz1,*)
+      real t_  (lx1,ly1,lz1,*)
+      real ps_ (lx1,ly1,lz1,lelt,*)
+
+      parameter (lwk = 7*lx1*ly1*lz1*lelt)
+      common /scrns/ wk(lwk)
+
+      integer*8 offs0,offs,nbyte,stride,strideB,nxyzr8
+
+      common /nekmpi/ nid_,np_,nekcomm,nekgroup,nekreal
+
+      integer   disp_unit
+      integer*8 win_size
+
+#ifdef MPI
+      disp_unit = 4 
+      win_size  = int(disp_unit,8)*size(wk)
+      if (commrs .eq. MPI_COMM_NULL) then
+        call mpi_comm_dup(nekcomm,commrs,ierr)
+        call MPI_Win_create(wk,
+     $                      win_size,
+     $                      disp_unit,
+     $                      MPI_INFO_NULL,
+     $                      commrs,rsH,ierr)
+
+        if (ierr .ne. 0 ) call exitti('MPI_Win_allocate failed!$',0)
+      endif
+#endif
+
+      offs0   = iHeadersize + 4 + isize*nelgr
+      nxyzr8  = nxr*nyr*nzr
+      strideB = nelBr* nxyzr8*wdsizr
+      stride  = nelgr* nxyzr8*wdsizr
+
+      iofldsr = 0
+      if (ifgetxr) then
+         offs = offs0 + ldim*strideB
+         call byte_set_view(offs,ifh_mbyte)
+         call mfi_getv(xm1_,ym1_,zm1_,wk,lwk,.false.) 
+         iofldsr = iofldsr + ldim
+      endif
+
+      if (ifgetur) then
+         offs = offs0 + iofldsr*stride + ldim*strideB
+         call byte_set_view(offs,ifh_mbyte)
+         call mfi_getv(vx_,vy_,vz_,wk,lwk,.false.)
+         iofldsr = iofldsr + ldim
+      endif
+
+      if (ifgetpr) then
+         offs = offs0 + iofldsr*stride + strideB
+         call byte_set_view(offs,ifh_mbyte)
+         call mfi_gets(pm1_,wk,lwk,.false.)
+         iofldsr = iofldsr + 1
+      endif
+
+      if (ifgettr) then
+         offs = offs0 + iofldsr*stride + strideB
+         call byte_set_view(offs,ifh_mbyte)
+         call mfi_gets(t_,wk,lwk,.false.)
+         iofldsr = iofldsr + 1
+      endif
+
+      ierr = 0
+      do k=1,npsr
+          offs = offs0 + iofldsr*stride + strideB
+          call byte_set_view(offs,ifh_mbyte)
+          call mfi_gets(ps_(1,1,1,1,k),wk,lwk,.false.)
+          iofldsr = iofldsr + 1
+      enddo
+
+      if(ifmpiio) then
+        if(nid.eq.pid0r) call byte_close_mpi(ifh_mbyte,ierr)
+      else
+        if(nid.eq.pid0r) call byte_close(ierr)
+      endif
+      call err_chk(ierr,'Error closing restart file, in mfi.$')
+
+      return
+      end

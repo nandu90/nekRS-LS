@@ -3,7 +3,7 @@
 polynomialOrder = 9
 #startFrom = "restart.fld"
 stopAt = numSteps
-numSteps = 10
+numSteps = 1000
 dt = 2e-03
 timeStepper = tombo3
 checkpointControl = simulationTime 

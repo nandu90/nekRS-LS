@@ -55,6 +55,7 @@ This list provides an overview of the most significant changes in this release, 
 * use pay key `avm+highestModalDecay` instead of `avm+hpfResidual`
 * `nrs->isOutputStep` -> `nrs->isCheckpointStep`
 * `pointInterpolation_t::setPoints` now takes std::vector<T> instead of raw pointers and number points are determined on the vector size 
+* use `iofld` instead of `writeFld`
 
 ## Known Bugs / Restrictions
 
