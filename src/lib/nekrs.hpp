@@ -5,6 +5,10 @@
 #include <functional> 
 #include <string>
 
+/*
+  Basic high-level API
+*/
+
 namespace nekrs
 {
 void setup(MPI_Comm commg_in,
@@ -45,9 +49,6 @@ void printInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo
 void verboseInfo(bool enabled);
 void updateTimer(const std::string &key, double time);
 void resetTimer(const std::string &key);
-
-void* platformPtr(void);
-const auto& platform = platformPtr;
 
 void initStep(double time, double dt, int tstep);
 bool runStep(std::function<bool(int)> convergenceCheck, int corrector);

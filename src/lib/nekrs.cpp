@@ -513,11 +513,6 @@ int lastStep(double timeNew, int tstep, double elapsedTime)
   return nrs->lastStep;
 }
 
-void *platformPtr(void)
-{
-  return platform;
-}
-
 int runTimeStatFreq()
 {
   int freq = 500;
