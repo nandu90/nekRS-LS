@@ -709,7 +709,7 @@ void ciTestSurfaceIntegral(nrs_t *nrs)
   bID[0] = 1;
   occa::memory o_bID = platform->device.malloc<int>(nbID, bID);
 
-  std::vector<dfloat> results = mesh->surfaceAreaNormalMultiplyIntegrate(N, nrs->fieldOffset, nbID, o_bID, o_fld);
+  std::vector<dfloat> results = mesh->surfaceAreaMultiplyIntegrate(N, nrs->fieldOffset, nbID, o_bID, o_fld);
 
   // surface area of unit sphere
   const auto SAref = 4. * M_PI;
