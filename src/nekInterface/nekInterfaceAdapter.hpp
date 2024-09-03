@@ -1,7 +1,7 @@
 #if !defined(nek_interface_)
 #define nek_interface_
 
-#include "nekrssys.hpp"
+#include "nekrsSys.hpp"
 #include <dlfcn.h>
 
 #define DECLARE_USER_FUNC(a) void nek_##a(void);

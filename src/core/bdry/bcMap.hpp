@@ -2,7 +2,7 @@
 #define nekrs_bcmap_hpp_
 
 #include <utility>
-#include "nekrssys.hpp"
+#include "nekrsSys.hpp"
 #include "mesh.h"
 
 namespace bcMap
