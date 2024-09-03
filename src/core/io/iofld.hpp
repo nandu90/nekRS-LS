@@ -85,7 +85,7 @@ public:
       precision = stoi(val);
       nekrsCheck(precision != 64 && precision != 32,
                  MPI_COMM_SELF, EXIT_FAILURE, "invalid precision value %d\n", precision);
-    } else if (key == "uniform") {
+    } else if (key == "uniform" || key == "equidistant") {
       uniform = (val == "true") ? true : false;
     } else if (key == "outputmesh") {
       outputMesh = (val == "true") ? true : false;
