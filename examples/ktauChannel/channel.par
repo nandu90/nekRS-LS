@@ -23,7 +23,7 @@ residualTol = 1e-06
 density = 1.0
 viscosity = -43500. 
 
-[TEMPERATURE]
+[SCALAR00]
 #solver = none
 boundaryTypeMap = inlet, insulated 
 residualTol = 1e-06

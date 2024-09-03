@@ -30,11 +30,11 @@ residualTol = 1e-06
 density = 1.0
 viscosity = 1/50e6
 
-[TEMPERATURE]
+[SCALAR00]
 boundaryTypeMap = flux, flux 
 residualTol = 1e-06
-rhoCp = 1.0
-conductivity = 1/50e6
+rho = 1.0
+diffusivity = 1/50e6
 
 [BOOMERAMG]
 iterations = 1

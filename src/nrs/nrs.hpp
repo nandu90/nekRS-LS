@@ -8,6 +8,7 @@
 #include "neknek.hpp"
 #include "randomVector.hpp"
 #include "aeroForce.hpp"
+#include "iofldFactory.hpp"
 
 class nrs_t : public solver_t
 {
@@ -65,6 +66,8 @@ public:
 
   dlong fieldOffset;
   dlong cubatureOffset;
+
+  std::unique_ptr<iofld> checkpointWriter;
 
   int timeStepConverged = 1;
 
@@ -238,6 +241,13 @@ public:
   void finalize();
   int setLastStep(double timeNew, int tstep, double elapsedTime);
   int lastStepLocalSession(double timeNew, int tstep, double elapsedTime);
+
+  void copyToNek(double time, int tstep);
+  void ocopyToNek();
+  void ocopyToNek(double time, int tstep);
+  void copyToNek(double time);
+  void copyFromNek(double &time);
+  void ocopyFromNek(double &time);
 
 private:
   void initInnerStep(double time, dfloat dt, int tstep);

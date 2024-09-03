@@ -1007,7 +1007,7 @@ void ciTestErrors(nrs_t *nrs,
   }
 
 
-  nek::ocopyToNek(time, tstep);
+  nrs->ocopyToNek(time, tstep);
   nek::userchk();
 
   auto err = nek::ptr<double>("errors");

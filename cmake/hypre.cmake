@@ -1,3 +1,5 @@
+function(add_hypre)
+
 set(HYPRE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/hypre)
 
 set(HYPRE_FLAGS_EXTRA "-fPIC")
@@ -122,13 +124,4 @@ else()
   target_link_libraries(nekrs-hypre-device PUBLIC libocca MPI::MPI_C) 
 endif()
 
-unset(HYPRE_DEVICE_COMPILER)
-unset(HYPRE_BUILD_DIR)
-unset(HYPRE_SOURCE_DIR)
-unset(HYPRE_CONFIGURE_FLAGS) 
-unset(HYPRE_INSTALL_DIR)
-unset(HYPRE_FLAGS_EXTRA)
-unset(HYPRE_COMPILER_C_FLAGS)
-unset(HYPRE_COMPILER_CXX_FLAGS)
-unset(HYPRE_DEVICE_COMPILER_FLAGS)
-unset(HYPRE_DEP)
+endfunction()

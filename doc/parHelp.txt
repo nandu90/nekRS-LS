@@ -29,8 +29,8 @@ startFrom                   "<string>"
                               + time=<float>                           reset to specified time 
                               + x                                      read mesh coordinates 
                               + u                                      read velocity 
-                              + t
-                              + s1 s2 s3 ...
+                              + t                                      read temperature
+                              + s00 s01 s02 ...                        read scalars 
 
 timeStepper                 tombo1, tombo2 [D], tombo3
 
@@ -49,6 +49,10 @@ dt                          <float> [D]
 
 subCyclingSteps             <int>, auto                                number of OIFS sub-steps for advection
                             0 [D]                             
+
+
+checkpointEngine            <string>
+                            nek [D], adios
 
 checkpointPrecision         <int>
                             32[D], 64 

@@ -21,6 +21,7 @@ static int pressureDirichletConditions = 0;
 static int scalarDirichletConditions = 0;
 static int scalarNeumannConditions = 0;
 
+static void *libudfHandle = nullptr;
 static std::string udfFile;
 
 static void verifyOudf()
@@ -530,8 +531,7 @@ void udfBuild(setupAide &options)
 
 void *udfLoadFunction(const char *fname, int errchk)
 {
-  static void *h = nullptr;
-  if (!h) {
+  if (!libudfHandle) {
     std::string cache_dir(getenv("NEKRS_CACHE_DIR"));
     if (platform->cacheBcast) {
       cache_dir = fs::path(platform->tmpDir);
@@ -543,16 +543,21 @@ void *udfLoadFunction(const char *fname, int errchk)
       std::cout << "loading " << udfLib << std::endl;
     }
 
-    h = dlopen(udfLib.c_str(), RTLD_NOW | RTLD_GLOBAL);
-    nekrsCheck(!h, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", dlerror());
+    libudfHandle = dlopen(udfLib.c_str(), RTLD_NOW | RTLD_GLOBAL);
+    nekrsCheck(!libudfHandle, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", dlerror());
   }
 
-  void *fptr = dlsym(h, fname);
+  void *fptr = dlsym(libudfHandle, fname);
   nekrsCheck(!fptr && errchk, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", dlerror());
 
   dlerror();
 
   return fptr;
+}
+
+void udfUnload()
+{
+  dlclose(libudfHandle);
 }
 
 void udfLoad()

@@ -412,6 +412,8 @@ void matrixRightSolve(int NrowsA, int NcolsA, dfloat *A, int NrowsB, int NcolsB,
 void matrixEig(int N, dfloat *A, dfloat *VR, dfloat *WR, dfloat *WI);
 void matrixTranspose(const int M, const int N, const dfloat *A, const int LDA, dfloat *AT, const int LDAT);
 
+void meshLoadKernels(mesh_t *mesh);
+
 // 1D mesh basis functions
 void Nodes1D(int _N, dfloat *_r);
 void EquispacedNodes1D(int _N, dfloat *_r);

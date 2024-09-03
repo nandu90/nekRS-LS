@@ -130,8 +130,9 @@ static std::vector<std::string> generalKeys = {
     {"timestepper"},
     {"subCyclingSteps"},
     {"subCycling"},
-    {"redirectoutputto"},
+    {"redirectOutputTo"},
     {"writeControl"},
+    {"checkpointEngine"},
     {"checkpointControl"},
     {"writeInterval"},
     {"checkpointInterval"},
@@ -1998,6 +1999,21 @@ void parseGeneralSection(const int rank, setupAide &options, inipp::Ini *ini)
     std::ostringstream error;
     error << "Could not parse general::stopAt = " << stopAt;
     append_error(error.str());
+  }
+
+  options.setArgs("CHECKPOINT ENGINE", "NEK");
+  std::string checkpointEngine;
+  if (ini->extract("general", "checkpointengine", checkpointEngine)) {
+    if (checkpointEngine == "nek") {
+      options.setArgs("CHECKPOINT ENGINE", "NEK");
+    } else if (checkpointEngine == "adios") {
+      options.setArgs("CHECKPOINT ENGINE", "ADIOS");
+#ifndef NEKRS_ENABLE_ADIOS
+      append_error("ADIOS engine was requested but is not enabled!\n");
+#endif
+    } else {
+      append_error("invalid checkpointEngine");
+    }
   }
 
   int checkpointPrecision = 0;

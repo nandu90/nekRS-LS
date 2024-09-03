@@ -291,7 +291,7 @@ public:
         auto var_connectivity = defineVariable<uint64_t>("connectivity",
             {static_cast<size_t>(NumOfCells), static_cast<size_t>(mesh_vis->Nverts + 1)});
 
-        const auto etov = [&] ()
+        const auto etov = [&] (uint64_t NumOfCells)
         {
           std::vector<uint64_t> etov(NumOfCells * (mesh_vis->Nverts + 1));
           const auto Nq = mesh_vis->Nq;

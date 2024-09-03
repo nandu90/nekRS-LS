@@ -257,7 +257,6 @@ void scalarNeumannConditions(bcData *bc)
 
 void userq(double time)
 {
-  auto nrs = dynamic_cast<nrs_t*>(platform->solver);
   mesh_t *mesh = nrs->meshV;
   cds_t *cds = nrs->cds;
   const dlong Nlocal = nrs->meshV->Nelements * nrs->meshV->Np;
@@ -289,7 +288,6 @@ void UDF_LoadKernels(deviceKernelProperties& kernelInfo)
 
 void UDF_Setup0(MPI_Comm comm, setupAide &options)
 {
-  auto nrs = dynamic_cast<nrs_t*>(platform->solver);
 
   options.getArgs("CI-MODE", ciMode);
   if (ciMode) {
@@ -339,8 +337,6 @@ int timeStepConverged(int stage)
 
 void UDF_Setup()
 {
-  auto nrs = dynamic_cast<nrs_t*>(platform->solver);
-
   // only ciMode 1 exercises the particles
   if (ciMode == 1) {
 
@@ -479,7 +475,6 @@ void overwriteParticleSolution(nrs_t *nrs, double time)
 
 void UDF_ExecuteStep(double time, int tstep)
 {
-  auto nrs = dynamic_cast<nrs_t*>(platform->solver);
   mesh_t *mesh = nrs->meshV;
   cds_t *cds = nrs->cds;
 
@@ -508,7 +503,7 @@ void UDF_ExecuteStep(double time, int tstep)
   }
 
   if (nrs->isCheckpointStep) {
-    nek::ocopyToNek(time, tstep);
+    nrs->ocopyToNek(time, tstep);
     nek::userchk();
 
     if (ciMode == 1) {

@@ -18,6 +18,7 @@ void run(double time);
 void setup(dlong fieldOffset, const std::vector< std::vector<deviceMemory<dfloat>> >& fields);
 void outfld(mesh_t *mesh);
 void reset();
+void free();
 deviceMemory<double> o_avg();
 }
 

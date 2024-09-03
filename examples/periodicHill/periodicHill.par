@@ -23,6 +23,3 @@ boundaryTypeMap = wall
 viscosity = 1/6000.0
 density = 1.0
 residualTol = 1.0e-06
-
-[TEMPERATURE]
-solver = none

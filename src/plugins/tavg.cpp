@@ -1,7 +1,7 @@
 #include "platform.hpp"
 #include "tavg.hpp"
 #include "nekInterfaceAdapter.hpp"
-#include "iofld.hpp"
+#include "iofldFactory.hpp"
 
 // private members
 namespace
@@ -10,11 +10,6 @@ ogs_t *ogs;
 
 dlong fieldOffset;
 
-occa::memory o_Uavg, o_Urms;
-occa::memory o_Urm2;
-occa::memory o_Pavg, o_Prms;
-occa::memory o_Savg, o_Srms;
-
 std::vector< std::vector<deviceMemory<dfloat>> > userFieldList;
 occa::memory o_AVG;
 
@@ -22,6 +17,8 @@ occa::kernel E1Kernel;
 occa::kernel E2Kernel;
 occa::kernel E3Kernel;
 occa::kernel E4Kernel;
+
+std::unique_ptr<iofld> fldWriter;
 
 bool buildKernelCalled = false;
 bool setupCalled = false;
@@ -178,7 +175,7 @@ void tavg::setup(dlong _fieldOffset, const std::vector< std::vector<deviceMemory
   }
 
   fieldOffset = _fieldOffset;
-  o_AVG = platform->device.malloc<dfloat>(userFieldList.size() * fieldOffset);
+  o_AVG = platform->device.malloc<double>(userFieldList.size() * fieldOffset);
 
   setupCalled = true;
 }
@@ -191,30 +188,26 @@ void tavg::outfld(mesh_t *mesh)
              "%s\n",
              "called prior to tavg::setup()!");
 
+  if (userFieldList.size() == 0) return;
+
   const bool outXYZ = mesh && outfldCounter == 0; 
 
-  if (userFieldList.size()) {
-    std::vector<occa::memory> o_s;
+  fldWriter = iofldFactory::create();
+
+  if (!fldWriter->isInitialized()) {
+    fldWriter->open(mesh, iofld::mode::write, "tavg");
+
+    fldWriter->writeAttribute("precision", "64");
+ 
+    fldWriter->addVariable("time", atime);
+ 
     for(int i = 0; i < userFieldList.size(); i++) {
-      auto o_avg = o_AVG.slice(i * fieldOffset, fieldOffset);
-      o_s.push_back(o_avg);
+      fldWriter->addVariable("scalar" + scalarDigitStr(i), std::vector<occa::memory>{o_AVG.slice(i * fieldOffset, mesh->Nlocal)});
     }  
-
-    iofld fld(iofld::write, "tavg");
-    fld.defineVariable<double>("time", atime);
-    if (outXYZ) {
-      std::vector<occa::memory> o_x;
-      o_x.push_back(mesh->o_x);
-      o_x.push_back(mesh->o_y);
-      o_x.push_back(mesh->o_z);
-      fld.defineVariable("mesh", o_x);
-    }
-    fld.defineVariable("scalars", o_s);
-
-    fld.writeAttribute("precision", "64");
-
-    fld.close(); 
   }
+
+  fldWriter->writeAttribute("outputmesh", (outXYZ) ? "true" : "false");
+  fldWriter->process(); 
 
   atime = 0; // reset
   outfldCounter++;
@@ -229,4 +222,11 @@ deviceMemory<double> tavg::o_avg()
              "called prior to tavg::setup()!");
   deviceMemory<double> d_AVG(o_AVG);
   return d_AVG;
+}
+
+void tavg::free()
+{
+  userFieldList.clear();
+  o_AVG.free();
+  fldWriter.reset();
 }

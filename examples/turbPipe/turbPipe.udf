@@ -1,18 +1,14 @@
 #include "velRecycling.hpp"
 #include "tavg.hpp"
 //#include "nekAscent.hpp"
-//#include "nekAdios.hpp"
 
 static int NSLABS;
 static int NELSLAB;
 static int renderStep;
 
 deviceMemory<dfloat> o_qcriterion;
-std::vector<int> elementFilter;
 
-#ifdef NEKRS_ADIOS_ENABLED
-NekAdios *nekAdios;
-#endif
+std::unique_ptr<iofld> iofld;
 
 #ifdef __okl__
 
@@ -29,12 +25,36 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 
 void UDF_Setup()
 {
-  auto nrs = dynamic_cast<nrs_t*>(platform->solver);
   auto mesh = nrs->meshV;
   const auto zLen = abs( 
               platform->linAlg->max(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm) - 
               platform->linAlg->min(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm)
             ); 
+
+  o_qcriterion.resize(mesh->Nlocal);
+
+#if 0
+  iofld = iofldFactory::create();
+  iofld->open(mesh, iofld::mode::write, "qcrit");
+  iofld->writeAttribute("uniform", "true");
+  iofld->writeAttribute("polynomialOrder", std::to_string(mesh->N + 2));
+
+#if 0
+  auto elementFilter = [&]() 
+  {
+    std::vector<int> elementFilter;
+    for(int e = 0; e < mesh->Nelements; e++) {
+       auto zmaxLocal = std::numeric_limits<dfloat>::lowest();
+       for(int i = 0; i < mesh->Np; i++) zmaxLocal = std::max(mesh->z[i + e * mesh->Np], zmaxLocal);
+       if (zmaxLocal > zRecycLayer) elementFilter.push_back(e);
+    }
+    return elementFilter;
+  }();
+  iofld->writeElementFilter(elementFilter);
+#endif
+
+  iofld->addVariable("scalar00", std::vector<occa::memory>{mesh->o_x});
+#endif
 
   // set IC
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
@@ -90,12 +110,6 @@ void UDF_Setup()
   velRecycling::setup(nrs->o_usrwrk, 0.0, 0.0, zRecycLayer, bID, uBulk);
 #endif
 
-  for(int e = 0; e < mesh->Nelements; e++) {
-     auto zmaxLocal = std::numeric_limits<dfloat>::lowest();
-     for(int i = 0; i < mesh->Np; i++) zmaxLocal = std::max(mesh->z[i + e * mesh->Np], zmaxLocal);
-     if (zmaxLocal > zRecycLayer) elementFilter.push_back(e);
-  }
-
   {
     std::vector< std::vector<deviceMemory<dfloat>> > tavgFields;
 
@@ -122,8 +136,6 @@ void UDF_Setup()
     tavg::setup(nrs->fieldOffset, tavgFields);
   }
 
-  o_qcriterion.resize(nrs->meshV->Nlocal);
-
 #ifdef NEKRS_ASCENT_ENABLED 
   {
     auto cds = nrs->cds;
@@ -140,26 +152,10 @@ void UDF_Setup()
   }
 #endif
 
-#ifdef NEKRS_ADIOS_ENABLED
-  {
-    const int Nviz = 1.5 * mesh->N;
-    const auto uniform = true;
-    nekAdios = new NekAdios(nrs->_mesh, "simdata"); // Nviz, uniform);
-
-    auto meshV = nrs->meshV;
-    auto meshT = (nrs->cds) ? nrs->cds->mesh[0] : meshV;
-    auto cds = nrs->cds;
-
-    nekAdios->addVectorField("velocity", nrs->o_U, meshV, nrs->fieldOffset);
-    nekAdios->addScalarField("scalar00", cds->o_S.slice(cds->fieldOffsetScan[0]), meshT);
-    nekAdios->addScalarField("Qcriterion", o_qcriterion, meshV);
-  }
-#endif
 }
 
 void UDF_ExecuteStep(double time, int tstep)
 {
-  auto nrs = dynamic_cast<nrs_t*>(platform->solver);
   mesh_t *mesh = nrs->meshV;
 
   if (tstep == 0) {
@@ -187,43 +183,17 @@ void UDF_ExecuteStep(double time, int tstep)
       printf(" uBulk: %g\n", ubar);
     }
 
-#ifdef NEKRS_ADIOS_ENABLED 
-    {
-      nekAdios->write<float>(time, tstep);
-      if (nrs->lastStep) nekAdios->close();
-    }
-#endif
-
     tavg::outfld(mesh);
   }
 
-
+#if 0
+  iofld->addVariable("time", time);
+  iofld->process();
+  if (nrs->lastStep) iofld->close();
+#endif
 
 #ifdef NEKRS_ASCENT_ENABLED 
   if (tstep % renderStep == 0) {
-#if 1
-    iofld fld(iofld::write, "qcrit");
-
-    fld.writeAttribute("uniform", "true");
-    fld.writeAttribute("polynomialOrder", std::to_string(mesh->N + 2));
-
-    // remove recycling section from output mesh
-    fld.writeElementFilter(elementFilter);
-
-    fld.defineVariable<double>("time", time);
-
-    std::vector<occa::memory> o_X;
-    o_X.push_back(mesh->o_x);
-    o_X.push_back(mesh->o_y);
-    o_X.push_back(mesh->o_z);
-    fld.defineVariable("mesh", o_X);
-
-    std::vector<occa::memory> o_S;
-    o_S.push_back(o_qcriterion);
-    fld.defineVariable("scalars", o_S);
-
-    fld.close();
-#endif
     nekAscent::run(time, tstep);
   }
 #endif

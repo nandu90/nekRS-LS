@@ -14,6 +14,7 @@
 #include "hypreWrapper.hpp"
 #include "hypreWrapperDevice.hpp"
 #include "compileKernels.hpp"
+#include "tavg.hpp"
 
 // define extern variable from nekrsSys.hpp
 platform_t *platform;
@@ -337,9 +338,10 @@ void setup(MPI_Comm commg_in,
   const double setupTime = platform->timer.query("setup", "DEVICE:MAX");
   if (rank == 0) {
     std::cout << "\noptions:\n"
-              << platform->options << std::endl
-              << "occa memory usage: " << platform->device.memoryUsage() / 1e9 << " GB" << std::endl;
+              << platform->options << std::endl;
   }
+
+  platform->device.printMemoryUsage(platform->comm.mpiComm);
 
   platform->flopCounter->clear();
 
@@ -359,7 +361,7 @@ void setup(MPI_Comm commg_in,
 
 void copyFromNek(double time, int tstep)
 {
-  nek::ocopyToNek(time, tstep);
+  nrs->ocopyToNek(time, tstep);
 }
 
 void udfExecuteStep(double time, int tstep, int isCheckpointStep)
@@ -695,6 +697,8 @@ int finalize()
   if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
     nrs->finalize();
 
+    tavg::free();
+
     hypreWrapper::finalize();
     hypreWrapperDevice::finalize();
     AMGXfinalize();
@@ -703,7 +707,7 @@ int finalize()
 
   MPI_Allreduce(MPI_IN_PLACE, &exitValue, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
   if (platform->comm.mpiRank == 0) {
-    std::cout << "finished with exit code " << exitValue << std::endl;
+    std::cout << std::endl << "finished with exit code " << exitValue << std::endl;
   }
 
   return exitValue;
