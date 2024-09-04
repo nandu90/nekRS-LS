@@ -67,6 +67,7 @@ public:
   dlong fieldOffset;
   dlong cubatureOffset;
 
+  std::vector<std::pair<std::string, std::vector<occa::memory>>> userCheckpointFields;
   std::unique_ptr<iofld> checkpointWriter;
 
   int timeStepConverged = 1;

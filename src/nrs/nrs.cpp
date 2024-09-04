@@ -1660,6 +1660,10 @@ void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforce
 
   checkpointWriter->addVariable("time", t);
 
+  for (const auto& entry : userCheckpointFields) {
+    checkpointWriter->addVariable(entry.first, entry.second);
+  }
+
   checkpointWriter->process();
 
   if (firstTime) {
