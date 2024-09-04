@@ -69,11 +69,10 @@ static std::map<std::string, int> vBcTextToID = {
     {"zeroyvalue/codedfixedgradient", bcMap::bcTypeSHLY},
     {"zerozvalue/codedfixedgradient", bcMap::bcTypeSHLZ},
     {"zeronvalue/codedfixedgradient", bcMap::bcTypeSHL},
-    {"zeroyzvalue/fixedgradient", bcMap::bcTypeONX},
-    {"zeroxzvalue/fixedgradient", bcMap::bcTypeONY},
-    {"zeroxyvalue/fixedgradient", bcMap::bcTypeONZ},
-    // {"zeroTValue/fixedgradient", bcMap::bcTypeON},
-    {"fixedgradient", bcMap::bcTypeO},
+    {"zeroyzvalue/zerogradient", bcMap::bcTypeONX},
+    {"zeroxzvalue/zerogradient", bcMap::bcTypeONY},
+    {"zeroxyvalue/zerogradient", bcMap::bcTypeONZ},
+    // {"zeroTValue/zerogradient", bcMap::bcTypeON},
     {"zerogradient", bcMap::bcTypeO},
     {"none", bcMap::bcTypeNone}};
 
@@ -90,11 +89,11 @@ static std::map<int, std::string> vBcIDToText = {
     {bcMap::bcTypeSHLY, "zeroYValue/codedFixedGradient"},
     {bcMap::bcTypeSHLZ, "zeroZValue/codedFixedGradient"},
     {bcMap::bcTypeSHL, "zeroNValue/codedFixedGradient"},
-    {bcMap::bcTypeONX, "zeroYZValue/fixedGradient"},
-    {bcMap::bcTypeONY, "zeroXZValue/fixedGradient"},
-    {bcMap::bcTypeONZ, "zeroXYValue/fixedGradient"},
-    // {bcMap::bcTypeON, "zeroTValue/fixedGradient"},
-    {bcMap::bcTypeO, "fixedGradient"},
+    {bcMap::bcTypeONX, "zeroYZValue/zeroGradient"},
+    {bcMap::bcTypeONY, "zeroXZValue/zeroGradient"},
+    {bcMap::bcTypeONZ, "zeroXYValue/zeroGradient"},
+    // {bcMap::bcTypeON, "zeroTValue/zeroGradient"},
+    {bcMap::bcTypeO, "zeroGradient"},
     {bcMap::bcTypeNone, "none"}};
 
 static std::map<std::string, int> sBcTextToID = {
@@ -191,31 +190,31 @@ static void velocitySetup(std::string field, std::vector<std::string> slist)
     }
 
     if (key.compare("outlet") == 0) {
-      key = "fixedgradient";
+      key = "zerogradient";
     }
     if (key.compare("outflow") == 0) {
-      key = "fixedgradient";
+      key = "zerogradient";
     }
     if (key.compare("o") == 0) {
-      key = "fixedgradient";
+      key = "zerogradient";
     }
 
     if (key.compare("onx") == 0) {
-      key = "zeroyzvalue/fixedgradient";
+      key = "zeroyzvalue/zerogradient";
       foundAligned++;
     }
     if (key.compare("ony") == 0) {
-      key = "zeroxzvalue/fixedgradient";
+      key = "zeroxzvalue/zerogradient";
       foundAligned++;
     }
     if (key.compare("onz") == 0) {
-      key = "zeroxyvalue/fixedgradient";
+      key = "zeroxyvalue/zerogradient";
       foundAligned++;
     }
 // not supported yet
 #if 0
     if (key.compare("on") == 0) {
-      key = "zerotvalue/fixedgradient";
+      key = "zerotvalue/zerogradient";
       foundUnaligned++;
     }
 #endif

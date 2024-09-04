@@ -149,22 +149,33 @@ smootherType                Jacobi
 boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary type for each boundary ID
 
                             none                                       no-op (internal) 
-                            zeroValue                                  zero Dirichlet (w, wall)
-                            codedFixedValue                            user specified Dirichlet (v, t, inlet)
                             interpolation                              neknek boundary (int)
+
+                            zeroValue                                  velocity only (w, wall)
+                            codedFixedValue                            user specified Dirichlet (v, t, inlet)
+                                                                       specify okl function codedFixedValueVelocity 
+                                                                       or codedFixedValueScalar in udf
+
+                            zeroGradient                               (I, o, O, insulated, outlet, outflow) 
+                            fixedGradient                              user specified scalar Neumann (f, flux)
+                                                                       specify okl function codedFixedGradientScalar in udf 
+
                             zeroXValue/zeroGradient                    symmetry x-normal plane (slipx, symx)
                             zeroYValue/zeroGradient                    symmetry y-normal plane (slipy, symy)
                             zeroZValue/zeroGradient                    symmetry z-normal plane (slipz, symz)
                             zeroNValue/zeroGradient                    unaligned symmetry (slip, sym)
+                            zeroYZValue/zeroGradient                   (onx) 
+                            zeroXZValue/zeroGradient                   (ony)
+                            zeroXYValue/zeroGradient                   (onz)
+
                             zeroXValue/codedFixedGradient              traction x-normal plane (tractionx, shlx)
+                                                                       specify okl function codedFixedGradientVelocity in udf 
                             zeroYValue/codedFixedGradient              traction y-normal plane (tractiony, shly)
+                                                                       specify okl function codedFixedGradientVelocity in udf 
                             zeroZValue/codedFixedGradient              traction z-normal plane (tractionz, shlz)
+                                                                       specify okl function codedFixedGradientVelocity in udf 
                             zeroNValue/codedFixedGradient              unaligned traction (traction, shl)
-                            zeroYZValue/fixedGradient                  (onx) 
-                            zeroXZValue/fixedGradient                  (ony)
-                            zeroXYValue/fixedGradient                  (onz)
-                            zeroGradient                               (I, insulated, O, outlet, outflow) 
-                            fixedGradient                              (f, flux, o, outlet, outflow)
+                                                                       specify okl function codedFixedGradientVelocity in udf 
 
 regularization                                                         
                             hpfrt                                      HPF stabilization

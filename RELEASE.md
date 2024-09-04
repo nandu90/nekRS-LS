@@ -34,6 +34,8 @@ This list provides an overview of the most significant changes in this release, 
 
 * call `build.sh` instead of `nrsconfig` to build the code
 * change par section `TEMPERATURE` to `SCALAR00` in case it does not represent a physical temperature
+* use `codedFixedValueScalar` instead of `scalarDirichletConditions` (same for velocity)
+* use `codedFixedGradientScalar` instead of `scalarNeumannConditions` (same for velocity)
 * use `nrs->copyToNek` instead of ``nek::copyToNek` (same for all other variants) 
 * use `auto foo = platform->o_memPool.reserve<T>(nWords)` instead of preallocated slices of `occa::memory::o_mempool`
 * change count argument of `occa::memory::slice, occa::memory::copyFrom, occa::memory::copyTo` to number of words instead of bytes 

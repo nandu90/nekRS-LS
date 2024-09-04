@@ -1,6 +1,6 @@
 #ifdef __okl__
 
-void velocityDirichletConditions(bcData *bc)
+void codedFixedValueVelocity(bcData *bc)
 {
   // U = omega x r
   bc->u = -bc->y;
