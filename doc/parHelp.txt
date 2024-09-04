@@ -148,7 +148,7 @@ smootherType                Jacobi
 
 boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary type for each boundary ID
 
-                            none                                       no-op (internal) 
+                            none                                       no-op (internal or periodic) 
                             interpolation                              neknek boundary (int)
 
                             zeroValue                                  velocity only (w, wall)
