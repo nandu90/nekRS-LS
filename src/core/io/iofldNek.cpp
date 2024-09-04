@@ -38,7 +38,7 @@ std::string iofldNek::fileSuffix()
   }
 
   if (step > 0 && engineMode == iofld::mode::read) {
-    oss << ".0f" << std::setw(5) << std::setfill('0') << step;
+    oss << "0.f" << std::setw(5) << std::setfill('0') << step;
     return oss.str();
   }
 
@@ -48,11 +48,12 @@ std::string iofldNek::fileSuffix()
 void iofldNek::openEngine()
 {
   if (engineMode == iofld::mode::read) {
+    const auto fileName = fileNameBase + fileSuffix();
     if (platform->comm.mpiRank == 0) {
-      const auto fileName = fileNameBase + fileSuffix();
-      std::cout << " fileName: " << fileNameBase << std::endl << std::flush;
+      std::cout << "reading checkpoint ..." << std::endl;
+      std::cout << " fileName: " << fileName << std::endl << std::flush;
     }
-    fldData = nek::openFld(fileNameBase, _availableVariables);
+    fldData = nek::openFld(fileName, _availableVariables);
   }
 }
 

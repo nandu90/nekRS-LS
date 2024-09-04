@@ -98,9 +98,9 @@ public:
     const auto tStart = MPI_Wtime();
  
     if (platform->comm.mpiRank == 0) {
-      if (engineMode == iofld::mode::read) std::cout << "reading";
-      if (engineMode == iofld::mode::write) std::cout << "writing";
-      std::cout << " checkpoint ..." << std::endl << std::flush;
+      if (engineMode == iofld::mode::write) { 
+        std::cout << "writing checkpoint ..." << std::endl << std::flush;
+      }
     }
 
     nekrsCheck(!initialized, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "illegal to call prior to iofld::open()!");

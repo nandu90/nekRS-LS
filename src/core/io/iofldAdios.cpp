@@ -28,6 +28,7 @@ void iofldAdios::openEngine()
     adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::Write);
   } else {
     if (platform->comm.mpiRank == 0) {
+      std::cout << "reading checkpoint ..." << std::endl; 
       std::cout << " fileName: " << fileNameBase + ext << std::endl << std::flush;
     }
     adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::ReadRandomAccess);
