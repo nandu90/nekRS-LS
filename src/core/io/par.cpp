@@ -171,6 +171,7 @@ static std::vector<std::string> commonKeys = {
     {"boundaryTypeMap"},
     {"maxIterations"},
     {"regularization"},
+    {"checkpointing"},
 
     // deprecated filter params
     {"filtering"},
@@ -1431,6 +1432,24 @@ void parseInitialGuess(const int rank, setupAide &options, inipp::Ini *ini, std:
   }
 }
 
+void parseCheckpointing(const int rank, setupAide &options, inipp::Ini *ini, std::string parSection)
+{
+  std::string val = "true";
+  if (ini->extract(parSection, "checkpointing", val)) {
+     if (val == "true") {
+       val = "true"; 
+     } else {
+       val = "false";
+     }
+  }
+  upperCase(val);
+
+  std::string parPrefix = parPrefixFromParSection(parSection);
+  upperCase(parPrefix);
+
+  options.setArgs(parPrefix + "CHECKPOINTING", val);
+}
+
 void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, std::string parSection)
 {
   int N;
@@ -2143,6 +2162,8 @@ void parsePressureSection(const int rank, setupAide &options, inipp::Ini *ini)
 {
   options.setArgs("PRESSURE ELLIPTIC COEFF FIELD", "FALSE");
 
+  parseCheckpointing(rank, options, ini, "pressure");
+
   parseSolverTolerance(rank, options, ini, "pressure");
 
   parseInitialGuess(rank, options, ini, "pressure");
@@ -2173,6 +2194,8 @@ void parseVelocitySection(const int rank, setupAide &options, inipp::Ini *ini)
   if (options.getArgs("VELOCITY STRESSFORMULATION").empty()) {
     options.setArgs("VELOCITY STRESSFORMULATION", "FALSE");
   }
+
+  parseCheckpointing(rank, options, ini, "velocity");
 
   parseInitialGuess(rank, options, ini, "velocity");
 
@@ -2317,9 +2340,8 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
     nscal++;
     isStart++;
 
-    {
-      parseRegularization(rank, options, ini, "temperature");
-    }
+    parseCheckpointing(rank, options, ini, "temperature");
+    parseRegularization(rank, options, ini, "temperature");
 
     options.setArgs("SCALAR" + sid + " IS TEMPERATURE", "TRUE");
 
@@ -2458,9 +2480,8 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
       sidPar = "scalar";
     }
 
-    {
-      parseRegularization(rank, options, ini, parScope);
-    }
+    parseCheckpointing(rank, options, ini, parScope);
+    parseRegularization(rank, options, ini, parScope);
 
     std::string solver;
     ini->extract(parScope, "solver", solver);

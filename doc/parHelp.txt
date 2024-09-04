@@ -177,6 +177,8 @@ boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary 
                             zeroNValue/codedFixedGradient              unaligned traction (traction, shl)
                                                                        specify okl function codedFixedGradientVelocity in udf 
 
+checkpointing               true [D], false
+
 regularization                                                         
                             hpfrt                                      HPF stabilization
                               +nModes=<int>                            number of modes                                 

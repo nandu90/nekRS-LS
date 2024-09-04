@@ -1622,24 +1622,30 @@ void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforce
 
     if (platform->options.compareArgs("LOWMACH", "TRUE"))
       checkpointWriter->addVariable("p0th", p0th[0]);
- 
-    std::vector<occa::memory> o_V;
-    for (int i = 0; i < meshV->dim; i++) {
-      o_V.push_back(o_U.slice(i * fieldOffset, visMesh->Nlocal));
+
+    if (platform->options.compareArgs("VELOCITY CHECKPOINTING", "TRUE")) {
+      std::vector<occa::memory> o_V;
+      for (int i = 0; i < meshV->dim; i++) {
+        o_V.push_back(o_U.slice(i * fieldOffset, visMesh->Nlocal));
+      }
+      checkpointWriter->addVariable("velocity", o_V);
     }
-    checkpointWriter->addVariable("velocity", o_V);
  
-    auto o_p = std::vector<occa::memory>{o_P.slice(0, visMesh->Nlocal)};
-    checkpointWriter->addVariable("pressure", o_p);
+    if (platform->options.compareArgs("PRESSURE CHECKPOINTING", "TRUE")) {
+      auto o_p = std::vector<occa::memory>{o_P.slice(0, visMesh->Nlocal)};
+      checkpointWriter->addVariable("pressure", o_p);
+    }
 
     for (int i = 0; i < Nscalar; i++) {
-      const auto temperatureExists = platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE");
-      std::vector<occa::memory> o_Si = {cds->o_S.slice(cds->fieldOffsetScan[i], visMesh->Nlocal)};
-      if (i == 0 && temperatureExists) {
-        checkpointWriter->addVariable("temperature", o_Si);
-      } else {
-        const auto is = (temperatureExists) ? i - 1 : i;
-        checkpointWriter->addVariable("scalar" + scalarDigitStr(is), o_Si);
+      if (platform->options.compareArgs("SCALAR" + scalarDigitStr(i) + " CHECKPOINTING", "TRUE")) {
+        const auto temperatureExists = platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE");
+        std::vector<occa::memory> o_Si = {cds->o_S.slice(cds->fieldOffsetScan[i], visMesh->Nlocal)};
+        if (i == 0 && temperatureExists) {
+          checkpointWriter->addVariable("temperature", o_Si);
+        } else {
+          const auto is = (temperatureExists) ? i - 1 : i;
+          checkpointWriter->addVariable("scalar" + scalarDigitStr(is), o_Si);
+        }
       }
     }
   }
