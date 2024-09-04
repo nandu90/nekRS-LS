@@ -7,19 +7,21 @@
 class iofldNek : public iofld
 {
 public:
-~iofldNek(){ close(); };
+  ~iofldNek()
+  {
+    close();
+  };
 
-void validateUserFields(const std::string& name) override; 
-void validateUserSingleValues(const std::string& name) override; 
-void openEngine() override;
-size_t write() override;
-size_t read() override;
-void close() override;
+  void validateUserFields(const std::string &name) override;
+  void validateUserSingleValues(const std::string &name) override;
+  void openEngine() override;
+  size_t write() override;
+  size_t read() override;
+  void close() override;
 
 private:
   nek::fldData fldData;
   std::string fileSuffix();
-
 };
 
 #endif

@@ -19,7 +19,8 @@ set(HYPRE_BUILD_DIR ${HYPRE_INSTALL_DIR}/src/HYPRE_BUILD)
 ExternalProject_Add(
    HYPRE_BUILD
    URL "${HYPRE_SOURCE_DIR}" 
-   CONFIGURE_COMMAND cd ${HYPRE_BUILD_DIR}/src && ./configure 
+   CONFIGURE_COMMAND cd ${HYPRE_BUILD_DIR}/src && ./configure
+     CUCC=""
      --prefix=${HYPRE_INSTALL_DIR}
      --with-extra-CFLAGS=${HYPRE_FLAGS_EXTRA}
      --with-extra-CXXFLAGS=${HYPRE_FLAGS_EXTRA}
