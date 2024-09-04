@@ -149,9 +149,9 @@ void iofldAdios::putVariableConvert(const std::vector<occa::memory> &o_fld, occa
 
       auto o_tmp = platform->o_memPool.reserve<dfloat>(mesh_vis->Nlocal);
       if (uniform) {
-        mesh->map2Uniform(mesh_vis, o_fld[dim_i], o_tmp);
+        mesh->map2Uniform(o_fld[dim_i], mesh_vis, o_tmp);
       } else {
-        mesh->interpolate(mesh_vis, o_fld[dim_i], o_tmp);
+        mesh->interpolate(o_fld[dim_i], mesh_vis, o_tmp);
       }
 
       o_map.copyFrom(o_tmp);
@@ -435,7 +435,7 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
 
   for (int dim = 0; dim < o_convDistributedData.size(); dim++) {
     if (mesh_vis != mesh) {
-      mesh_vis->interpolate(mesh, o_convDistributedData[dim], o_userBuf[dim]);
+      mesh_vis->interpolate(o_convDistributedData[dim], mesh, o_userBuf[dim]);
     } else {
       o_userBuf[dim].copyFrom(o_convDistributedData[dim]);
     }
