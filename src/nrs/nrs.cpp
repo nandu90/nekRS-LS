@@ -993,8 +993,10 @@ void nrs_t::setIC()
     }
  
     double time = -1;
-    iofld->addVariable("time", time); 
-    iofld->addVariable("p0th", p0th[0]); 
+    iofld->addVariable("time", time);
+    if (platform->options.compareArgs("LOWMACH", "TRUE")) {
+      iofld->addVariable("p0th", p0th[0]);
+    } 
 
     auto checkOption = [&](const std::string& name)
     {

@@ -94,7 +94,7 @@ private:
 
   std::map<std::string, variable> variables;
 
-  template <class T> void getVariable(bool registerOnly, const std::string &name, int step = -1);
+  template <class T> int getVariable(bool registerOnly, const std::string &name, size_t step);
 
   template <typename Tin, typename Tout> std::vector<occa::memory> getDataConvert(const std::string &name);
 

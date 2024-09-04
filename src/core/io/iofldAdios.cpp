@@ -2,6 +2,17 @@
 
 #include "iofldAdios.hpp"
 
+static bool isLittleEndian() {
+    uint32_t value = 0x01020304;
+    uint8_t bytes[4];
+
+    // Use memcpy to safely copy the bytes of the integer into the byte array
+    std::memcpy(bytes, &value, sizeof(value));
+
+    // Check the first byte. If it's 0x04, we are little-endian.
+    return bytes[0] == 0x04;
+}
+
 void iofldAdios::validateUserSingleValues(const std::string &name) {}
 
 void iofldAdios::validateUserFields(const std::string &name) {}
@@ -58,7 +69,7 @@ void iofldAdios::openEngine()
 std::string iofldAdios::vtkSchema()
 {
   std::string schema = R"(
-  <VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">
+  <VTKFile type="UnstructuredGrid" version="0.1" byte_order="ENDIANTYPE">
       <UnstructuredGrid>
           <Piece NumberOfPoints="numOfPoints" NumberOfCells="numOfCells">
               <Points>
@@ -70,6 +81,14 @@ std::string iofldAdios::vtkSchema()
               </Cells>
               <PointData>
   )";
+
+  std::string endianTag = isLittleEndian() ? "LittleEndian" : "BigEndian"; 
+
+  std::string placeholder = "ENDIANTYPE";
+  auto pos = schema.find(placeholder);
+  if (pos != std::string::npos) {
+      schema.replace(pos, placeholder.length(), endianTag);
+  }
 
   for (auto &entry : userFields) {
     schema += " <DataArray Name=\"" + std::get<0>(entry) + "\"/>\n";
@@ -120,14 +139,6 @@ void iofldAdios::generateConnectivity(occa::memory etov)
 template <typename InputType, typename OutputType>
 void iofldAdios::putVariableConvert(const std::vector<occa::memory> &o_fld, occa::memory &o_putVariable)
 {
-#if 0
-  nekrsCheck(o_putVariable.mode() != "Serial",
-             MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "%s\n",
-             "put variable has an non-host address!");
-#endif
-
   const auto dim_fld = o_fld.size();
   nekrsCheck(dim_fld != 1 && dim_fld != 3,
              MPI_COMM_SELF,
@@ -336,11 +347,12 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
   }();
 
   const size_t winFieldOffset = maxRemoteSizes.second;
-#if 0
-  auto o_win = platform->o_memPool.reserve<T>(maxRemoteSizes.first * winFieldOffset);
+#if 1
+  auto o_win = platform->memPool.reserve<T>(maxRemoteSizes.first * winFieldOffset);
 #else
-  auto o_win = platform->device.malloc<T>(maxRemoteSizes.first * winFieldOffset);
+  auto o_win = platform->device.mallocHost<T>(maxRemoteSizes.first * winFieldOffset);
 #endif
+
 
   int typeSize;
   MPI_Datatype mpiType;
@@ -358,25 +370,27 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
 
   MPI_Win_lock_all(MPI_MODE_NOCHECK, win);
   if (o_inEntrySize) {
-    const int Np = o_inEntrySize / targetInfo.size();
-    for (int e = 0; e < targetInfo.size(); e++) {
-      const auto targetRank = targetInfo[e].first;
-      const auto localElementIndex = targetInfo[e].second;
+    for (int dim = 0; dim < o_in.size(); dim++) {
+      const int Np = o_inEntrySize / targetInfo.size();
+      for (int e = 0; e < targetInfo.size(); e++) {
+        const auto targetRank = targetInfo[e].first;
+        const auto localElementIndex = targetInfo[e].second;
 
-      for (int dim = 0; dim < o_in.size(); dim++) {
         const MPI_Aint winOffset = Np * localElementIndex + dim * winFieldOffset;
-        const auto o_buf = o_in.at(dim).slice(e * Np, Np);
-        MPI_Put(o_buf.ptr(), Np, mpiType, targetRank, winOffset, Np, mpiType, win);
+        const auto o_inSlice = o_in.at(dim).slice(e * Np, Np);
+       
+        MPI_Put(o_inSlice.ptr(), Np, mpiType, targetRank, winOffset, Np, mpiType, win);
       }
     }
   }
   MPI_Win_unlock_all(win);
-  MPI_Win_free(&win); // after this point data is visible remotely
+  MPI_Win_free(&win); // after this point data is visible remotely in o_win
 
   std::vector<occa::memory> o_out;
   const auto o_outSize = maxRemoteSizes.first;
   for (int dim = 0; dim < o_outSize; dim++) {
-    o_out.push_back(o_win.slice(dim * winFieldOffset));
+    o_out.push_back(platform->o_memPool.reserve<T>(winFieldOffset));
+    o_out[dim].copyFrom(o_win.slice(dim * winFieldOffset));
   }
 
   return o_out;
@@ -393,28 +407,20 @@ std::vector<occa::memory> iofldAdios::getDataConvert(const std::string &name)
     return o_out;
   }
 
-#if 0
-  nekrsCheck(in.mode() != "Serial",
-             MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "variable %s has an non-host address!\n",
-             name.c_str());
-#endif
-
   auto inPtr = static_cast<Tadios *>(in.ptr());
   const auto nDim = var.dim;
   const size_t Nlocal = in.size() / nDim;
 
-  auto out = platform->memPool.reserve<Tout>(in.size());
-  auto outPtr = static_cast<Tout *>(out.ptr());
 
   for (int dim = 0; dim < nDim; dim++) {
+    auto out = platform->memPool.reserve<Tout>(Nlocal);
+    const auto outPtr = static_cast<Tout *>(out.ptr());
+
     // AOS -> SOA
     for (int i = 0; i < Nlocal; i++) {
-      outPtr[i + dim * Nlocal] = static_cast<Tout>(inPtr[dim + i * nDim]);
+      outPtr[i] = static_cast<Tout>(inPtr[dim + i * nDim]);
     }
-    o_out.push_back(platform->o_memPool.reserve<Tout>(Nlocal));
-    o_out.at(dim).copyFrom(outPtr + dim * Nlocal);
+    o_out.push_back(out);
   }
 
   return o_out;
@@ -445,6 +451,23 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
 
 template <typename Tadios> void iofldAdios::getData(const std::string &name, variantType &variant)
 {
+#define HANDLE_TYPE(TYPE, MPI_TYPE) \
+    if (std::holds_alternative<std::reference_wrapper<TYPE>>(variant)) { \
+        auto &value = std::get<std::reference_wrapper<TYPE>>(variant).get(); \
+        if (platform->comm.mpiRank == 0) { \
+            value = *(variables[name].data.ptr<Tadios>()); \
+        } \
+        MPI_Bcast(&value, 1, MPI_TYPE, 0, platform->comm.mpiComm); \
+    }
+
+    HANDLE_TYPE(int, MPI_INT)
+    HANDLE_TYPE(long long int, MPI_LONG_LONG_INT)
+    HANDLE_TYPE(float, MPI_FLOAT)
+    HANDLE_TYPE(double, MPI_DOUBLE)
+
+#undef HANDLE_TYPE
+
+#if 0
   if (std::holds_alternative<std::reference_wrapper<int>>(variant)) {
     auto &value = std::get<std::reference_wrapper<int>>(variant).get();
     if (platform->comm.mpiRank == 0) {
@@ -470,16 +493,13 @@ template <typename Tadios> void iofldAdios::getData(const std::string &name, var
     }
     MPI_Bcast(&value, 1, MPI_DOUBLE, 0, platform->comm.mpiComm);
   }
+#endif
 }
 
-template <class T> void iofldAdios::getVariable(bool allocateOnly, const std::string &name, int _step)
+template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::string &name, size_t varStep)
 {
   auto adiosVariable = adiosIO.InquireVariable<T>(name);
-  nekrsCheck(!static_cast<bool>(adiosVariable),
-             MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "variable %s not found!\n",
-             name.c_str());
+  if (!static_cast<bool>(adiosVariable)) return 1;
 
   if (!allocateOnly) {
     nekrsCheck(variables.count(name) == 0,
@@ -490,7 +510,7 @@ template <class T> void iofldAdios::getVariable(bool allocateOnly, const std::st
 
     auto var = variables[name];
     if (!var.data.isInitialized()) {
-      return;
+      return 0;
     }
 
     adiosVariable.SetStepSelection(adios2::Box<std::size_t>(var.step, 1)); // single step only
@@ -509,10 +529,9 @@ template <class T> void iofldAdios::getVariable(bool allocateOnly, const std::st
         adiosEngine.Get(name, var.data.ptr<T>(), getMode);
       }
     }
-    return;
+    return 0;
   }
 
-  const size_t varStep = (_step > -1) ? _step : step;
   adiosVariable.SetStepSelection(adios2::Box<std::size_t>(varStep, 1));
 
   const auto &globalBlocks = adiosEngine.BlocksInfo(adiosVariable, varStep);
@@ -574,6 +593,8 @@ template <class T> void iofldAdios::getVariable(bool allocateOnly, const std::st
   }
 
   variables.insert_or_assign(name, var);
+
+  return 0;
 }
 
 size_t iofldAdios::read()
@@ -592,28 +613,36 @@ size_t iofldAdios::read()
   // first allocate then get variable to ensure deferred pointer to memPool remains valid
   for (int pass = 0; pass < 2; pass++) {
     const auto allocateOnly = (pass == 0) ? true : false;
+
     getVariable<uint32_t>(allocateOnly, "polynomialOrder", 0);
     getVariable<uint64_t>(allocateOnly, "globalElementIds", 0);
 
     for (const auto &name : userVariables) {
-      if (std::find(_availableVariables.begin(), _availableVariables.end(), name) ==
-          _availableVariables.end()) {
-        continue; // skip if not available!
-      }
-
       const auto &type = adiosIO.VariableType(name);
 
-      if (type == adios2::GetType<double>()) {
-        getVariable<double>(allocateOnly, name);
-      } else if (type == adios2::GetType<float>()) {
-        getVariable<float>(allocateOnly, name);
-      } else if (type == adios2::GetType<int>()) {
-        getVariable<int>(allocateOnly, name);
-      } else if (type == adios2::GetType<long long int>()) {
-        getVariable<long long int>(allocateOnly, name);
-      } else {
-        nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "ADIOS variable type %s is not supported!\n", type.c_str());
+      int err = 0;
+      auto typeFound = false;
+#define HANDLE_TYPE(TYPE, STEP) \
+      if (type == adios2::GetType<TYPE>()) { \
+        err = getVariable<TYPE>(allocateOnly, name, STEP); \
+        typeFound = true; \
       }
+      HANDLE_TYPE(double, step)
+      HANDLE_TYPE(float, step)
+      HANDLE_TYPE(int, step)
+      HANDLE_TYPE(long long int, step)
+
+ 
+      // fallback for mesh 
+      if (err && name == "mesh") {
+        HANDLE_TYPE(double, 0)
+        HANDLE_TYPE(float, 0)
+      }
+#undef HANDLE_TYPE
+      nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, 
+                 "requested variable %s not found in file!\n", name.c_str());
+      nekrsCheck(!typeFound, platform->comm.mpiComm, EXIT_FAILURE, 
+                 "ADIOS variable %s has unsupported type %s!\n", name.c_str(), type.c_str());
     }
   }
 
@@ -624,10 +653,10 @@ size_t iofldAdios::read()
     const auto &name = entry.first;
     auto &variant = entry.second;
 
-    if (std::find(_availableVariables.begin(), _availableVariables.end(), name) ==
-        _availableVariables.end()) {
-      continue;
-    }
+    const auto available = std::find(_availableVariables.begin(), _availableVariables.end(), name) !=
+                           _availableVariables.end();
+    nekrsCheck(!available, platform->comm.mpiComm, EXIT_FAILURE, 
+               "requested variable %s not found in file!\n", name.c_str());
 
     const auto &adiosType = variables[name].type;
 
