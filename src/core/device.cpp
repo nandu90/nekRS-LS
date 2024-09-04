@@ -400,8 +400,12 @@ void device_t::printMemoryUsage(MPI_Comm comm) const
   MPI_Comm_rank(comm, &rank);
 
   if (rank == 0) {
-    std::cout << "occa max memory usage:  " << std::get<0>(maxMemSizes) << " bytes" << std::endl
-              << "  o_mempool:            " << std::get<1>(maxMemSizes) << " bytes" << std::endl
-              << "  mempool:              " << std::get<2>(maxMemSizes) << " bytes" << std::endl << std::flush;
+    int width = 12;
+    std::cout << "occa max memory usage: " << std::setw(width) << std::right 
+              << std::get<0>(maxMemSizes)  << " bytes" << std::endl;
+    std::cout << "  o_mempool:           " << std::setw(width) << std::right 
+              << std::get<1>(maxMemSizes)  << " bytes" << std::endl;
+    std::cout << "  mempool:             " << std::setw(width) << std::right 
+              << std::get<2>(maxMemSizes)  << " bytes" << std::endl << std::flush;
   }
 } 
