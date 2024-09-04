@@ -20,15 +20,16 @@ void iofldAdios::openEngine()
     adiosIO.SetParameters({{"verbose", "4"}});
   }
 
-  if (platform->comm.mpiRank == 0) {
-    std::cout << " fileName: " << fileNameBase << std::endl << std::flush;
-  }
+  const std::string ext = ".bp";
 
   if (engineMode == iofld::mode::write) {
-    fileNameBase += ".bp";
+    fileNameBase += ext;
     adiosIO.DefineAttribute<uint32_t>("dimension", static_cast<uint32_t>(mesh_vis->dim));
     adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::Write);
   } else {
+    if (platform->comm.mpiRank == 0) {
+      std::cout << " fileName: " << fileNameBase + ext << std::endl << std::flush;
+    }
     adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::ReadRandomAccess);
     if (step < 0) {
       step = adiosEngine.Steps() - 1; // last
@@ -118,11 +119,13 @@ void iofldAdios::generateConnectivity(occa::memory etov)
 template <typename InputType, typename OutputType>
 void iofldAdios::putVariableConvert(const std::vector<occa::memory> &o_fld, occa::memory &o_putVariable)
 {
+#if 0
   nekrsCheck(o_putVariable.mode() != "Serial",
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "%s\n",
-             "put variable %s has an non-host address!");
+             "put variable has an non-host address!");
+#endif
 
   const auto dim_fld = o_fld.size();
   nekrsCheck(dim_fld != 1 && dim_fld != 3,
@@ -133,7 +136,7 @@ void iofldAdios::putVariableConvert(const std::vector<occa::memory> &o_fld, occa
              dim_fld);
 
   auto map = [&](const int dim_i) {
-    auto o_map = platform->device.malloc<InputType>(mesh_vis->Nlocal);
+    auto o_map = platform->device.mallocHost<InputType>(mesh_vis->Nlocal);
 
     if (!uniform && (mesh_vis->N == mesh->N)) {
       o_map.copyFrom(o_fld[dim_i]);
@@ -227,6 +230,7 @@ template <typename OutputType> size_t iofldAdios::write_()
     writtenBytes += o_connectivity.size() * sizeof(uint64_t);
 
     auto o_coordVertices = platform->memPool.reserve<OutputType>(mesh_vis->dim * mesh_vis->Nlocal);
+
     std::vector<occa::memory> o_xyz;
     o_xyz.push_back(mesh->o_x);
     o_xyz.push_back(mesh->o_y);
@@ -388,11 +392,13 @@ std::vector<occa::memory> iofldAdios::getDataConvert(const std::string &name)
     return o_out;
   }
 
+#if 0
   nekrsCheck(in.mode() != "Serial",
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "variable %s has an non-host address!\n",
              name.c_str());
+#endif
 
   auto inPtr = static_cast<Tadios *>(in.ptr());
   const auto nDim = var.dim;

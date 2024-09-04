@@ -45,14 +45,6 @@ public:
     nekrsCheck(engineMode != iofld::mode::read && engineMode != iofld::mode::write,
                MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "invalid iofld::mode!");
  
-    tStart = MPI_Wtime();
- 
-    if (platform->comm.mpiRank == 0) {
-      if (engineMode == iofld::mode::read) std::cout << "reading";
-      if (engineMode == iofld::mode::write) std::cout << "writing";
-      std::cout << " checkpoint ..." << std::endl << std::flush;
-    }
-
     openEngine(); 
  
     initialized = true;
@@ -103,6 +95,14 @@ public:
 
   void process()
   {
+    const auto tStart = MPI_Wtime();
+ 
+    if (platform->comm.mpiRank == 0) {
+      if (engineMode == iofld::mode::read) std::cout << "reading";
+      if (engineMode == iofld::mode::write) std::cout << "writing";
+      std::cout << " checkpoint ..." << std::endl << std::flush;
+    }
+
     nekrsCheck(!initialized, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "illegal to call prior to iofld::open()!");
 
     if (platform->comm.mpiRank == 0 && platform->verbose) {
@@ -181,8 +181,6 @@ public:
   mode engineMode;
 
   std::string fileNameBase;
-
-  double tStart = 0;
 
   int step = 0;
 

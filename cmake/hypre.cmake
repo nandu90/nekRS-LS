@@ -20,7 +20,6 @@ ExternalProject_Add(
    HYPRE_BUILD
    URL "${HYPRE_SOURCE_DIR}" 
    CONFIGURE_COMMAND cd ${HYPRE_BUILD_DIR}/src && ./configure
-     CUCC=""
      --prefix=${HYPRE_INSTALL_DIR}
      --with-extra-CFLAGS=${HYPRE_FLAGS_EXTRA}
      --with-extra-CXXFLAGS=${HYPRE_FLAGS_EXTRA}
@@ -58,7 +57,7 @@ if(OCCA_CUDA_ENABLED)
   set(HYPRE_BACKEND "--with-cuda" "--with-cuda-home=${CUDAToolkit_LIBRARY_ROOT}")
 
   if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "12.0.0")
-    set(HYPRE_DEVICE_ARCH "HYPRE_CUDA_SM=80 90")
+    set(HYPRE_DEVICE_ARCH "HYPRE_CUDA_SM=70 80 90")
     #disable for now as it might not play well with all MPI implementations
     #set(HYPRE_CONFIGURE_FLAGS "--enable-device-malloc-async")
   else()
