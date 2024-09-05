@@ -3,14 +3,11 @@
 #include "iofldAdios.hpp"
 
 static bool isLittleEndian() {
-    uint32_t value = 0x01020304;
-    uint8_t bytes[4];
+  const uint32_t value = 0x01020304;
+  uint8_t bytes[4];
 
-    // Use memcpy to safely copy the bytes of the integer into the byte array
-    std::memcpy(bytes, &value, sizeof(value));
-
-    // Check the first byte. If it's 0x04, we are little-endian.
-    return bytes[0] == 0x04;
+  std::memcpy(bytes, &value, sizeof(value));
+  return bytes[0] == 0x04;
 }
 
 void iofldAdios::validateUserSingleValues(const std::string &name) {}
@@ -40,7 +37,7 @@ void iofldAdios::openEngine()
   } else {
     if (platform->comm.mpiRank == 0) {
       std::cout << "reading checkpoint ..." << std::endl; 
-      std::cout << " fileName: " << fileNameBase + ext << std::endl << std::flush;
+      std::cout << " fileName: " << fileNameBase << std::endl << std::flush;
     }
     adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::ReadRandomAccess);
     if (step < 0) {
@@ -396,6 +393,7 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
   return o_out;
 }
 
+//  convert to target datatype and map vector from AOS to SOA
 template <typename Tadios, typename Tout>
 std::vector<occa::memory> iofldAdios::getDataConvert(const std::string &name)
 {
@@ -407,16 +405,19 @@ std::vector<occa::memory> iofldAdios::getDataConvert(const std::string &name)
     return o_out;
   }
 
-  auto inPtr = static_cast<Tadios *>(in.ptr());
+  //nekrsCheck(var.type != adios2::GetType<Tadios>, MPI_COMM_SELF, EXIT_FAILURE,
+  //           "ADIOS variable type does not match Tadios!\n");  
+
   const auto nDim = var.dim;
   const size_t Nlocal = in.size() / nDim;
 
-
   for (int dim = 0; dim < nDim; dim++) {
     auto out = platform->memPool.reserve<Tout>(Nlocal);
-    const auto outPtr = static_cast<Tout *>(out.ptr());
 
-    // AOS -> SOA
+    // get latest pointer just in case a previous reserve has caused a resize
+    auto inPtr = static_cast<Tadios *>(in.ptr());
+    auto outPtr = static_cast<Tout *>(out.ptr());
+
     for (int i = 0; i < Nlocal; i++) {
       outPtr[i] = static_cast<Tout>(inPtr[dim + i * nDim]);
     }
@@ -429,7 +430,6 @@ std::vector<occa::memory> iofldAdios::getDataConvert(const std::string &name)
 template <typename Tadios>
 void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_userBuf)
 {
-  //  convert to target datatype and map vector from AOS to SOA
   std::vector<occa::memory> o_convDistributedData;
   if (o_userBuf.at(0).dtype() == occa::dtype::get<double>()) {
     auto o_convData = getDataConvert<Tadios, double>(name);
@@ -464,90 +464,60 @@ template <typename Tadios> void iofldAdios::getData(const std::string &name, var
     HANDLE_TYPE(long long int, MPI_LONG_LONG_INT)
     HANDLE_TYPE(float, MPI_FLOAT)
     HANDLE_TYPE(double, MPI_DOUBLE)
-
 #undef HANDLE_TYPE
-
-#if 0
-  if (std::holds_alternative<std::reference_wrapper<int>>(variant)) {
-    auto &value = std::get<std::reference_wrapper<int>>(variant).get();
-    if (platform->comm.mpiRank == 0) {
-      value = *(variables[name].data.ptr<Tadios>());
-    }
-    MPI_Bcast(&value, 1, MPI_INT, 0, platform->comm.mpiComm);
-  } else if (std::holds_alternative<std::reference_wrapper<long long int>>(variant)) {
-    auto &value = std::get<std::reference_wrapper<long long int>>(variant).get();
-    if (platform->comm.mpiRank == 0) {
-      value = *(variables[name].data.ptr<Tadios>());
-    }
-    MPI_Bcast(&value, 1, MPI_LONG_LONG_INT, 0, platform->comm.mpiComm);
-  } else if (std::holds_alternative<std::reference_wrapper<float>>(variant)) {
-    auto &value = std::get<std::reference_wrapper<float>>(variant).get();
-    if (platform->comm.mpiRank == 0) {
-      value = *(variables[name].data.ptr<Tadios>());
-    }
-    MPI_Bcast(&value, 1, MPI_FLOAT, 0, platform->comm.mpiComm);
-  } else if (std::holds_alternative<std::reference_wrapper<double>>(variant)) {
-    auto &value = std::get<std::reference_wrapper<double>>(variant).get();
-    if (platform->comm.mpiRank == 0) {
-      value = *(variables[name].data.ptr<Tadios>());
-    }
-    MPI_Bcast(&value, 1, MPI_DOUBLE, 0, platform->comm.mpiComm);
-  }
-#endif
 }
 
 template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::string &name, size_t varStep)
 {
   auto adiosVariable = adiosIO.InquireVariable<T>(name);
-  if (!static_cast<bool>(adiosVariable)) return 1;
+  if (!static_cast<bool>(adiosVariable)) return 1; // variable not found
+
+  adiosVariable.SetStepSelection(adios2::Box<std::size_t>(varStep, 1));
 
   if (!allocateOnly) {
     nekrsCheck(variables.count(name) == 0,
                MPI_COMM_SELF,
                EXIT_FAILURE,
-               "variable %s was not allocated yet!\n",
+               "variable %s not found!\n",
                name.c_str());
 
     auto var = variables[name];
-    if (!var.data.isInitialized()) {
-      return 0;
+
+    nekrsCheck(var.step != varStep,
+               MPI_COMM_SELF,
+               EXIT_FAILURE,
+               "step for variable %s not found!\n",
+               name.c_str());
+
+    if (var.data.isInitialized()) {
+      const auto getMode = adios2::Mode::Deferred;
+      auto varDataPtr = var.data.ptr<T>();
+      if (var.dim > 0) {
+        size_t offset = 0;
+        for (size_t b = 0; b < var.blocks.size(); b++) {
+          adiosVariable.SetBlockSelection(var.blocks.at(b).first);
+          adiosEngine.Get(name, varDataPtr + offset, getMode);
+          offset += var.blocks.at(b).second;
+        }
+      } else {
+        if (platform->comm.mpiRank == 0) {
+          adiosEngine.Get(name, varDataPtr, getMode);
+        }
+      }
     }
 
-    adiosVariable.SetStepSelection(adios2::Box<std::size_t>(var.step, 1)); // single step only
-
-    const auto getMode = adios2::Mode::Deferred;
-
-    if (var.dim > 0) {
-      size_t offset = 0;
-      for (size_t b = 0; b < var.blocks.size(); b++) {
-        adiosVariable.SetBlockSelection(var.blocks.at(b).first);
-        adiosEngine.Get(name, var.data.ptr<T>() + offset, getMode);
-        offset += var.blocks.at(b).second;
-      }
-    } else {
-      if (platform->comm.mpiRank == 0) {
-        adiosEngine.Get(name, var.data.ptr<T>(), getMode);
-      }
-    }
     return 0;
   }
 
-  adiosVariable.SetStepSelection(adios2::Box<std::size_t>(varStep, 1));
-
-  const auto &globalBlocks = adiosEngine.BlocksInfo(adiosVariable, varStep);
-  nekrsCheck(globalBlocks.size() == 0,
-             MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "required step %d for variable %s not found!\n",
-             varStep,
-             name.c_str());
+  const auto &blocks = adiosEngine.BlocksInfo(adiosVariable, varStep);
+  if (blocks.size() == 0) return 1; // step not found 
 
   variable var;
   var.type = adios2::GetType<T>();
   var.step = varStep;
-  var.blocks = std::vector<std::pair<size_t, size_t>>();
 
-  for (auto &block : globalBlocks) {
+  var.blocks = std::vector<std::pair<size_t, size_t>>();
+  for (auto &block : blocks) {
     if ((block.BlockID % static_cast<size_t>(platform->comm.mpiCommSize)) ==
         static_cast<size_t>(platform->comm.mpiRank)) {
       size_t NlocalBlock = 0;
@@ -566,7 +536,7 @@ template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::str
   }
 
   if (var.blocks.size() == 0) {
-    var.data = o_NULL; // no data on this proc
+    var.data = o_NULL;
   } else if (var.dim == 0) {
     var.data = platform->memPool.reserve<T>(1);
   } else {
@@ -584,7 +554,7 @@ template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::str
     std::cout << " " << name << " on rank " << platform->comm.mpiRank << " is of type " << var.type;
 
     if (var.dim) {
-      std::cout << " has " << var.blocks.size() << " out of " << globalBlocks.size() << " blocks in step "
+      std::cout << " has " << var.blocks.size() << " out of " << blocks.size() << " blocks in step "
                 << varStep << " with total entries " << var.data.size() << " and dim " << var.dim
                 << std::endl;
     } else {
@@ -631,9 +601,8 @@ size_t iofldAdios::read()
       HANDLE_TYPE(float, step)
       HANDLE_TYPE(int, step)
       HANDLE_TYPE(long long int, step)
-
  
-      // fallback for mesh 
+      // fallback if mesh was not found 
       if (err && name == "mesh") {
         HANDLE_TYPE(double, 0)
         HANDLE_TYPE(float, 0)
