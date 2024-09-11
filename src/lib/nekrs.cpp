@@ -461,7 +461,10 @@ int checkpointStep(double time, int tStep)
     if (lastCheckpointTime == 0 && val > 0) {
       lastCheckpointTime = val;
     }
-    outputStep = ((time - lastCheckpointTime) + 1e-10) > nekrs::writeInterval();
+
+    static auto cnt = 1;
+    outputStep = time > cnt*nekrs::writeInterval();
+    if (outputStep) cnt++;
   } else {
     if (writeInterval() > 0) {
       outputStep = (tStep % (int)writeInterval() == 0);
