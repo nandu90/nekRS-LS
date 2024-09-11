@@ -1470,13 +1470,11 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           {"none"},
           {"avm"},
           {"c0"},
-          {"highestmodaldecay"},
           {"nmodes"},
           {"cutoffratio"},
           {"scalingcoeff"},
-          {"vismaxcoeff"},
           {"activationwidth"},
-          {"threshold"},
+          {"decaythreshold"},
       };
       const std::vector<std::string> list = serializeString(regularization, '+');
       for (const std::string s : list) {
@@ -1507,39 +1505,21 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
       }
 
       if (usesAVM) {
-        options.setArgs(parPrefix + "REGULARIZATION METHOD", "AVM_HIGHEST_MODAL_DECAY");
-        options.setArgs(parPrefix + "REGULARIZATION VISMAX COEFF", "0.5");
-        options.setArgs(parPrefix + "REGULARIZATION MDH ACTIVATION WIDTH", to_string_f(1.0));
-        options.setArgs(parPrefix + "REGULARIZATION MDH THRESHOLD", to_string_f(-4.0));
+        options.setArgs(parPrefix + "REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY");
+        options.setArgs(parPrefix + "REGULARIZATION AVM ACTIVATION WIDTH", to_string_f(1.0));
+        options.setArgs(parPrefix + "REGULARIZATION AVM DECAY THRESHOLD", to_string_f(2.0));
         options.setArgs(parPrefix + "REGULARIZATION AVM C0", "FALSE");
-        options.setArgs(parPrefix + "REGULARIZATION HPF MODES", "1");
 
         for (std::string s : list) {
 
           const auto nmodeStr = parseValueForKey(s, "nmodes");
           if (!nmodeStr.empty()) {
-            if (regularization.find("highestmodaldecay") != std::string::npos) {
-              append_error("nmodes qualifier is invalid for avm highestmodaldecay!\n");
-            }
-
-            double value = std::stod(nmodeStr);
-            value = round(value);
-            options.setArgs(parPrefix + "REGULARIZATION HPF MODES", to_string_f(value));
-          }
-
-          const auto vismaxcoeffStr = parseValueForKey(s, "vismaxcoeff");
-          if (!vismaxcoeffStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION VISMAX COEFF", vismaxcoeffStr);
+            append_error("nmodes qualifier is invalid for avm highestmodaldecay!\n");
           }
 
           const auto scalingcoeffStr = parseValueForKey(s, "scalingcoeff");
           if (!scalingcoeffStr.empty()) {
-            if (regularization.find("highestmodaldecay") != std::string::npos) {
-              // in this context, the scaling coefficient can only be vismax
-              options.setArgs(parPrefix + "REGULARIZATION VISMAX COEFF", scalingcoeffStr);
-            } else {
-              options.setArgs(parPrefix + "REGULARIZATION SCALING COEFF", scalingcoeffStr);
-            }
+            options.setArgs(parPrefix + "REGULARIZATION AVM SCALING COEFF", scalingcoeffStr);
           }
 
           if (s.find("c0") != std::string::npos) {
@@ -1548,11 +1528,11 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
 
           const auto rampConstantStr = parseValueForKey(s, "activationwidth");
           if (!rampConstantStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION MDH ACTIVATION WIDTH", rampConstantStr);
+            options.setArgs(parPrefix + "REGULARIZATION AVM ACTIVATION WIDTH", rampConstantStr);
           }
-          const auto thresholdStr = parseValueForKey(s, "threshold");
+          const auto thresholdStr = parseValueForKey(s, "decaythreshold");
           if (!thresholdStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION MDH THRESHOLD", thresholdStr);
+            options.setArgs(parPrefix + "REGULARIZATION AVM DECAY THRESHOLD", thresholdStr);
           }
         }
       }

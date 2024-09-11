@@ -184,11 +184,11 @@ regularization
                               +nModes=<int>                            number of modes                                 
                               +scalingCoeff=<float>                    filter strength
                             avm                                        artificial viscosity method
-                              +c0                                      make viscosity C0 continous across elements
-                              +scalingCoeff=<float>                    strength of artifical viscosity
-                              +highestModalDecay                       use Persson's highest modal decay model 
-                                +threshold=<float>
-                                +activationWidth=<float>
+                                                                       (has to be applied manually in case user user props)
+                              +c0                                      make viscosity C0
+                              +scalingCoeff=<float>
+                              +decaythreshold=<float>                  decay exponent threshold
+                              +activationWidth=<float>                 half-width of activation function
 ----------------------------------------------------------------------------------------------------------------------
 [MESH]
 

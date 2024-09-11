@@ -26,7 +26,7 @@
 
 #define Nverts (8)
 
-inline dfloat interp(const dfloat rn, const dfloat sn, const dfloat tn, const dfloat* vertexValues)
+inline dfloat interp(const dfloat rn, const dfloat sn, const dfloat tn, const dfloat *vertexValues)
 {
   const dfloat v1 = vertexValues[0];
   const dfloat v2 = vertexValues[1];

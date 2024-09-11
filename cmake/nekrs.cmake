@@ -45,7 +45,7 @@ set(NRS_SRC
     src/core/setupAide.cpp
     src/core/printHeader.cpp
     src/core/lowPassFilter.cpp
-    src/nrs/cds/regularization/avm.cpp
+    src/core/avm.cpp
     src/core/bdry/bcMap.cpp
     src/core/bdry/alignment.cpp
     src/nrs/neknek/registerNekNekKernels.cpp

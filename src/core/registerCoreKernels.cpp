@@ -70,6 +70,22 @@ void registerCoreKernels()
   fileName = oklpath + "/core/" + kernelName + ".okl";
   platform->kernelRequests.add(section + kernelName, fileName, meshProps);
 
+  kernelName = "relativeMassHighestMode";
+  fileName = oklpath + "/core/" + kernelName + ".okl";
+  platform->kernelRequests.add(kernelName, fileName, meshProps);
+
+  kernelName = "relativeMassAveragedMode";
+  fileName = oklpath + "/core/" + kernelName + ".okl";
+  platform->kernelRequests.add(kernelName, fileName, meshProps);
+
+  kernelName = "computeMaxVisc";
+  fileName = oklpath + "/core/" + kernelName + ".okl";
+  platform->kernelRequests.add(kernelName, fileName, meshProps);
+
+  kernelName = "interpolateP1";
+  fileName = oklpath + "/core/" + kernelName + ".okl";
+  platform->kernelRequests.add(kernelName, fileName, meshProps);
+
   {
     auto prop = meshProps;
     prop["includes"].asArray();

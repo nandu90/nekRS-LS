@@ -53,6 +53,8 @@ public:
   void saveSolutionState();
   void restoreSolutionState();
 
+  void applyAVM();
+
   userSource_t userSource = nullptr;
   userProperties_t userProperties = nullptr;
   userImplicitLinearTerm_t userImplicitLinearTerm = nullptr;

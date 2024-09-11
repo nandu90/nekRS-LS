@@ -116,44 +116,41 @@ inline dfloat computeMinGLLGridSpacing(const dlong i,
   return sqrt(he);
 }
 
-inline dfloat nu_k(const dfloat s, const dfloat logReferenceSensor, const dfloat ramp)
+inline dfloat nu_k(const dfloat s, const dfloat s0, const dfloat ramp)
 {
   dfloat multiplier = 0.0;
-  if (s < (logReferenceSensor - ramp)) {
-    multiplier = 0.0;
-  }
-  else if (s > (logReferenceSensor + ramp)) {
+  if (s < (s0 - ramp)) {
     multiplier = 1.0;
-  }
-  else {
-    multiplier = 0.5 * (1.0 + sin((M_PI * (s - logReferenceSensor)) / (2.0 * ramp)));
+  } else if (s > (s0 + ramp)) {
+    multiplier = 0.0;
+  } else {
+    multiplier = 1.0 - 0.5 * (1.0 + sin((M_PI * (s - s0)) / (2.0 * ramp)));
   }
   return multiplier;
 }
 
 @kernel void computeMaxVisc(const dlong Nelements,
                             const dlong fieldOffset,
-                            const dfloat logReferenceSensor,
-                            const dfloat rampParameter,
+                            const dfloat logS0,
+                            const dfloat kappa,
                             const dfloat visCoeff,
                             const dfloat scalingCoeff,
                             @ restrict const dfloat *x,
                             @ restrict const dfloat *y,
                             @ restrict const dfloat *z,
                             @ restrict const dfloat *U,
-                            @ restrict const dfloat *hpfResidual,
-                            @ restrict const dfloat *logRelativeMassHighestMode,
-                            @ restrict dfloat *epsilons)
+                            @ restrict const dfloat *logSk,
+                            @ restrict dfloat *nu)
 {
   for (dlong e = 0; e < Nelements; ++e; @outer(0)) { // for all elements
 
-    @exclusive dfloat logSensor;
-
+    @exclusive dfloat r_logSk;
     @shared dfloat s_maxdFdS[p_blockSize];
+    @shared dfloat s_nu[p_blockSize];
 
     for (int j = 0; j < p_Nq; ++j; @inner(1)) {
       for (int i = 0; i < p_Nq; ++i; @inner(0)) {
-        logSensor = logRelativeMassHighestMode[e];
+        r_logSk = logSk[e];
         for (int k = j * p_Nq + i; k < p_blockSize; k += p_Nq * p_Nq) {
           s_maxdFdS[k] = -1e8;
         }
@@ -169,9 +166,9 @@ inline dfloat nu_k(const dfloat s, const dfloat logReferenceSensor, const dfloat
           const dfloat Ux = U[id + 0 * fieldOffset];
           const dfloat Uy = U[id + 1 * fieldOffset];
           const dfloat Uz = U[id + 2 * fieldOffset];
-          const dfloat he = computeMinGLLGridSpacing(i, j, k, e, x, y, z);
+          const dfloat dx = computeMinGLLGridSpacing(i, j, k, e, x, y, z);
           const dfloat Umag = sqrt(Ux * Ux + Uy * Uy + Uz * Uz);
-          dfloat visc_max = visCoeff * he * Umag;
+          dfloat visc_max = visCoeff * dx * Umag;
           s_maxdFdS[tid] = (s_maxdFdS[tid] > visc_max) ? s_maxdFdS[tid] : visc_max;
         }
       }
@@ -272,16 +269,18 @@ inline dfloat nu_k(const dfloat s, const dfloat logReferenceSensor, const dfloat
         const int t = j * p_Nq + i;
         if (t < 1) {
           const dfloat maxVisc = (s_maxdFdS[0] > s_maxdFdS[1]) ? s_maxdFdS[0] : s_maxdFdS[1];
-          dfloat avm = 0.0;
-          const dfloat multiplier = nu_k(logSensor, logReferenceSensor, rampParameter);
-          if (multiplier > 0.0) {
-            avm = multiplier * maxVisc;
-          }
+          s_nu[0] = scalingCoeff * maxVisc * nu_k(r_logSk, logS0, kappa);
+        }
+      }
+    }
+    @barrier();
 
-#pragma unroll
-          for (int point = 0; point < p_Np; ++point) {
-            epsilons[e * p_Np + point] = avm;
-          }
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+        const dfloat _nu = s_nu[0];
+        for (int k = 0; k < p_Nq; ++k) {
+           const dlong id = j * p_Nq * p_Nq + i * p_Nq + k + e * p_Np;
+           nu[id] = _nu;
         }
       }
     }
