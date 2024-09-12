@@ -18,13 +18,13 @@ regularization = hpfrt + nModes=2 + scalingCoeff=20
 residualTol = 1e-04
 
 [VELOCITY]
-boundaryTypeMap = inlet, outlet, wall, wall
-density = 1.0
-viscosity = -5000.0
+boundaryTypeMap = codedFixedValue, zeroGradient, zeroValue, zeroValue 
+rho = 1.0
+viscosity = 1/5000.0
 residualTol = 1e-06
 
 [SCALAR00]
-boundaryTypeMap = inlet, outlet, insulated, flux 
+boundaryTypeMap = codedFixedValue, zeroGradient, zeroGradient, codedFixedGradient
 residualTol = 1e-06
 rho = 1.0
-diffusivity = -5000
+diffusivity = 1/5000.0

@@ -157,7 +157,7 @@ boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary 
                                                                        or codedFixedValueScalar in udf
 
                             zeroGradient                               (I, o, O, insulated, outlet, outflow) 
-                            fixedGradient                              user specified scalar Neumann (f, flux)
+                            codedFixedGradient                         user specified scalar Neumann (f, flux)
                                                                        specify okl function codedFixedGradientScalar in udf 
 
                             zeroXValue/zeroGradient                    symmetry x-normal plane (slipx, symx)
