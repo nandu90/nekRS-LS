@@ -23,6 +23,3 @@ boundaryTypeMap = codedFixedValue, zeroValue, none, none
 viscosity = 1/2500.0 # Re = U0 * d / nu
 rho = 1.0
 residualTol = 1e-06
-
-[SCALAR00] # Q-criterion
-solver = none

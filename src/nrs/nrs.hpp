@@ -240,6 +240,7 @@ public:
   occa::memory strainRate(const occa::memory &o_U, bool smooth = true);
   occa::memory strainRate(bool smooth = true);
 
+  void Qcriterion(occa::memory &o_Q);
   void Qcriterion(const occa::memory &o_U, occa::memory &o_Q);
   occa::memory Qcriterion(const occa::memory &o_U);
   occa::memory Qcriterion();

@@ -39,6 +39,8 @@
 | predictor-corrector iter |     |     |     |     |     |     |  x  |     |     |
 | usrchk postprocessing    |     |     |  x  |     |     |     |     |     |     |
 | opSEM                    |     |     |  x  |     |     |     |     |     |  x  |
+| Q-criterion              |     |     |  x  |     |     |     |     |     |  x  |
+| user checkpoint variable |     |     |  x  |     |     |     |     |     |  x  |
 
 
 ### Ledgend
