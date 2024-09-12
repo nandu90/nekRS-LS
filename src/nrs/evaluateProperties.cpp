@@ -18,7 +18,7 @@ void nrs_t::evaluateProperties(const double timeNew)
   if (this->userProperties) {
     this->userProperties(timeNew);
   } else {
-    cds->applyAVM();
+    if (Nscalar) cds->applyAVM();
   } 
 
 
