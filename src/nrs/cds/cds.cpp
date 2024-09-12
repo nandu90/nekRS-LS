@@ -306,19 +306,8 @@ cds_t::cds_t(cdsConfig_t &cfg)
   }
 }
 
-void cds_t::makeNLT(double time, int tstep, occa::memory &o_Usubcycling)
+void cds_t::makeNLT(int is, double time, int tstep, occa::memory &o_Usubcycling)
 {
-  if (this->userSource) {
-    platform->timer.tic("udfSEqnSource", 1);
-    this->userSource(time);
-    platform->timer.toc("udfSEqnSource");
-  }
-
-  for (int is = 0; is < this->NSfields; is++) {
-    if (!this->compute[is] || this->cvodeSolve[is]) {
-      continue;
-    }
-
     const std::string sid = scalarDigitStr(is);
 
     auto mesh = (is) ? this->meshV : this->mesh[0];
@@ -396,7 +385,6 @@ void cds_t::makeNLT(double time, int tstep, occa::memory &o_Usubcycling)
         advectionFlops(this->mesh[0], 1);
       }
     }
-  }
 }
 
 void cds_t::saveSolutionState()

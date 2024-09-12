@@ -359,9 +359,13 @@ void nrs_t::initInnerStep(double time, dfloat _dt, int tstep)
     if (cds->anyEllipticSolver) {
       platform->timer.tic("makeq", 1);
 
-      occa::memory o_Usubcycling;
       platform->linAlg->fill(cds->fieldOffsetSum, 0.0, cds->o_NLT);
-      cds->makeNLT(time, tstep, o_Usubcycling);
+
+      if (this->userScalarSource) {
+        platform->timer.tic("udfSEqnSource", 1);
+        this->userScalarSource(time);
+        platform->timer.toc("udfSEqnSource");
+      }
 
       for (int is = 0; is < this->Nscalar; is++) {
         if (!cds->compute[is] || cds->cvodeSolve[is]) {
@@ -372,6 +376,9 @@ void nrs_t::initInnerStep(double time, dfloat _dt, int tstep)
 
         auto mesh = (is) ? cds->meshV : cds->mesh[0];
         const dlong isOffset = cds->fieldOffsetScan[is];
+
+        occa::memory o_Usubcycling;
+        cds->makeNLT(is, time, tstep, o_Usubcycling);
 
         this->sumMakefKernel(mesh->Nlocal,
                              0,
@@ -417,8 +424,15 @@ void nrs_t::initInnerStep(double time, dfloat _dt, int tstep)
   if (this->flow) {
     platform->timer.tic("makef", 1);
 
+     platform->linAlg->fill(this->fieldOffset * this->NVfields, 0.0, this->o_NLT);
+
+    if (this->userVelocitySource) {
+      platform->timer.tic("udfUEqnSource", 1);
+      this->userVelocitySource(time);
+      platform->timer.toc("udfUEqnSource");
+    }
+
     occa::memory o_Usubcycling;
-    platform->linAlg->fill(this->fieldOffset * this->NVfields, 0.0, this->o_NLT);
     this->makeNLT(time, tstep, o_Usubcycling);
 
     auto mesh = this->meshV;

@@ -1417,12 +1417,6 @@ void nrs_t::makeNLT(double time, int tstep, occa::memory &o_Usubcycling)
   const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
   const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
 
-  if (this->userVelocitySource) {
-    platform->timer.tic("udfUEqnSource", 1);
-    this->userVelocitySource(time);
-    platform->timer.toc("udfUEqnSource");
-  }
-
   if (platform->options.compareArgs("VELOCITY REGULARIZATION METHOD", "HPFRT")) {
     this->filterRTKernel(mesh->Nelements,
                          this->o_filterRT,
