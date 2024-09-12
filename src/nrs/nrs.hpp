@@ -34,6 +34,14 @@ public:
   userVelocityImplicitLinearTerm_t userVelocityImplicitLinearTerm = nullptr;
   userScalarImplicitLinearTerm_t userScalarImplicitLinearTerm = nullptr;
 
+  void addUserCheckpointField(const std::string& name, const std::vector<deviceMemory<dfloat>>& o_fld)
+  {
+    std::vector<occa::memory> o_fld_;
+    for (const auto& entry : o_fld) o_fld_.push_back(entry);
+
+    userCheckpointFields.push_back( {name, o_fld_} );
+  };
+
   bool multiSession = false;
 
   int elementType = HEXAHEDRA;
@@ -67,7 +75,6 @@ public:
   dlong fieldOffset;
   dlong cubatureOffset;
 
-  std::vector<std::pair<std::string, std::vector<occa::memory>>> userCheckpointFields;
   std::unique_ptr<iofld> checkpointWriter;
 
   int timeStepConverged = 1;
@@ -275,6 +282,8 @@ private:
   occa::memory o_zsave;
 
   void setIC();
+
+  std::vector<std::pair<std::string, std::vector<occa::memory>>> userCheckpointFields;
 
 };
 

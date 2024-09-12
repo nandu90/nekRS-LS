@@ -417,7 +417,7 @@ void cds_t::applyAVM()
   static auto initialized = false;
   if (!initialized) {
     for (int is = 0; is < NSfields; is++) {
-      std::string sid = scalarDigitStr(is);
+      const auto sid = scalarDigitStr(is);
 
       if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
         nekrsCheck(mesh->N < 5,
@@ -431,9 +431,6 @@ void cds_t::applyAVM()
       }
     }
     initialized = true;
-    o_nuAVM.push_back(platform->o_memPool.reserve<dfloat>(mesh->Nlocal));
-    const auto nrs = dynamic_cast<nrs_t*>(platform->solver);
-    nrs->userCheckpointFields.push_back({"scalar01", o_nuAVM});
   }
 
   for (int scalarIndex = 0; scalarIndex < NSfields; scalarIndex++) {
@@ -460,7 +457,6 @@ void cds_t::applyAVM()
  
     auto o_Si = o_S.slice(fieldOffsetScan[scalarIndex], mesh->Nlocal);
     auto o_eps = avm::viscosity(vFieldOffset, o_U, o_Si, scalingCoeff, logS0, kappa, makeCont);
-    o_nuAVM[0].copyFrom(o_eps);
  
     if (verbose) {
       const dfloat maxEps = platform->linAlg->max(mesh->Nlocal, o_eps, platform->comm.mpiComm);
