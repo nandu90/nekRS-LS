@@ -140,7 +140,13 @@ occa::kernel benchmarkFDM(int Nelements,
     o_u.copyFrom(u.data());
     auto o_invDegree = platform->device.malloc(invDegree.size() * wordSize, invDegree.data());
 
+    auto resetFields = [&]() {
+      o_u.copyFrom(u.data()); // kernel reads and writes o_u 
+    };
+
     auto kernelRunner = [&](occa::kernel &kernel) {
+      // resetFields(); // disabling otherwise it would be included in the timer
+
       if (useRAS)
         kernel(Nelements, o_elementList, o_Su, o_Sx, o_Sy, o_Sz, o_invL, o_invDegree, o_u);
       else
@@ -162,11 +168,6 @@ occa::kernel benchmarkFDM(int Nelements,
         o_Su.copyTo(res.data());
 
         return res;
-      };
-
-      auto resetFields = [&]() {
-        o_Su.copyFrom(Su.data());
-        o_u.copyFrom(u.data());
       };
 
       resetFields();
