@@ -538,15 +538,23 @@ c-----------------------------------------------------------------------
 c-----------------------------------------------------------------------
       subroutine nekf_end()
 
+      include 'mpif.h'
       include 'SIZE'
       include 'DPROCMAP'
+      include 'RESTART'
+
 
 #ifdef DPROCMAP
 #ifdef MPI
       call MPI_Win_free(dProcmapH, ierr)
 #endif
 #endif 
-      !call nek_end()
+
+#ifdef MPI
+      if (commrs .ne. MPI_COMM_NULL) then
+        call MPI_Win_free(rsH, ierr)
+      endif
+#endif
 
       return
       end
