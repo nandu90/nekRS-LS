@@ -211,12 +211,12 @@ void readFld(fldData& data)
   }
 }
 
-void outFld(const std::string& filename,
-            const fldData& data,
-            bool FP64,
-            const std::vector<int>& elementMask,
-            int Nout, 
-            bool uniform)
+void writeFld(const std::string& filename,
+              const fldData& data,
+              bool FP64,
+              const std::vector<int>& elementMask,
+              int Nout, 
+              bool uniform)
 {
   int step = 0;
   const auto nxyz = nekData.nx1 * nekData.nx1 * nekData.nx1;
@@ -239,8 +239,12 @@ void outFld(const std::string& filename,
                "%s%s%s\n",
                "outfld: ",tag.c_str()," is too short on T-mesh!");
     auto o_tmpDouble = platform->o_memPool.reserve<double>(Nlocal);
-    platform->copyDfloatToDoubleKernel(Nlocal, o_fldIn, o_tmpDouble);
-    o_tmpDouble.copyTo(fldOut, Nlocal);
+    if (o_fldIn.dtype() == occa::dtype::get<dfloat>()) {
+      platform->copyDfloatToDoubleKernel(Nlocal, o_fldIn, o_tmpDouble);
+      o_tmpDouble.copyTo(fldOut, Nlocal);
+    } else {
+      o_fldIn.copyTo(fldOut, Nlocal);
+    }
   };
 
   std::vector<double> xm; 

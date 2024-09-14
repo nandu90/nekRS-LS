@@ -113,12 +113,12 @@ struct fldData {
 
 fldData openFld(const std::string& filename, std::vector<std::string>& _availableVariables);
 void readFld(fldData& data);
-void outFld(const std::string& filename,
-            const fldData& data,
-            bool FP64 = false,
-            const std::vector<int>& elementMask = {},
-            int Nout = 0,
-            bool uniform = false);
+void writeFld(const std::string& filename,
+              const fldData& data,
+              bool FP64 = false,
+              const std::vector<int>& elementMask = {},
+              int Nout = 0,
+              bool uniform = false);
 
 void uic(int ifield);
 void finalize(void);

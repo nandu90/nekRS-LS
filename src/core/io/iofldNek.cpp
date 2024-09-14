@@ -119,7 +119,7 @@ size_t iofldNek::write()
     return data;
   }();
 
-  nek::outFld(fileName, data, (precision == 64) ? true : false, elementMask, (N > 0) ? N : mesh->N, uniform);
+  nek::writeFld(fileName, data, (precision == 64) ? true : false, elementMask, (N > 0) ? N : mesh->N, uniform);
 
   // metadata file
   if (platform->comm.mpiRank == 0) {
