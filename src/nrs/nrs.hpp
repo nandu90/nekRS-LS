@@ -215,7 +215,7 @@ public:
 
   void printMinMax();
   void printRunStat(int step);
-  void printInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo);
+  void printStepInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo);
 
   void makeNLT(double time, int tstep, occa::memory &o_Usubcycling);
   dfloat computeCFL();

@@ -525,7 +525,7 @@ int runTimeStatFreq()
   return freq;
 }
 
-int printInfoFreq()
+int printStepInfoFreq()
 {
   int freq = 1;
   platform->options.getArgs("PRINT INFO FREQUENCY", freq);
@@ -619,12 +619,12 @@ void processUpdFile()
   }
 }
 
-void printInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo)
+void printStepInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo)
 {
-  nrs->printInfo(time, tstep, printStepInfo, printVerboseInfo);
+  nrs->printStepInfo(time, tstep, printStepInfo, printVerboseInfo);
 }
 
-void verboseInfo(bool enabled)
+void verboseStepInfo(bool enabled)
 {
   platform->options.setArgs("VERBOSE SOLVER INFO", "FALSE");
   if (enabled) {

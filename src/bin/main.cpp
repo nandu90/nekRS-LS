@@ -247,6 +247,7 @@ int main(int argc, char** argv)
     if (rank == 0) std::cout << std::endl;
 
     // outer time stepping loop 
+    // all sessions run the same number of global steps but some may do sub-stepping
     fflush(stdout);
     MPI_Pcontrol(1);
     while (!isLastStep) {
@@ -271,16 +272,24 @@ int main(int argc, char** argv)
       if (nekrs::writeInterval() < 0) checkpointStep = 0;
       nekrs::checkpointStep(checkpointStep);
 
-     { 
-        nekrs::initStep(time, dtInnerStep, tStep);
+      // run global step
+      {
+        auto tStep_ = tStep; // initialize local step counter 
+        nekrs::initStep(time, dtInnerStep, tStep_);
 
-        int outerCorrector = 1;
-        bool converged = false;
-        do {
-          converged = nekrs::runStep(outerCorrector++); // run inner sub-stepping if needed
-        } while (!converged);
- 
-        tStep = nekrs::timeStep();
+        // run corrector loop for a given global step
+        { 
+          int outerCorrector = 1;
+          bool stepConverged = false;
+          do {
+            stepConverged = nekrs::runStep(outerCorrector++); // run sub-stepping if needed
+            if (nekrs::printStepInfoFreq() && !stepConverged) {
+              nekrs::printStepInfo(time, tStep, true, true);
+            }
+          } while (!stepConverged);
+        }
+
+        tStep_ = nekrs::timeStep();
         nekrs::finishStep();
         time = endTimeOuterStep;
       }
@@ -289,10 +298,11 @@ int main(int argc, char** argv)
         nekrs::processUpdFile();
         sig_processUpdFile = 0;
       }
- 
-      if (nekrs::printInfoFreq()) {
-        if (tStep % nekrs::printInfoFreq() == 0)
-          nekrs::printInfo(time, tStep, false, true);
+
+      // print solver stats only 
+      if (nekrs::printStepInfoFreq()) {
+        if (tStep % nekrs::printStepInfoFreq() == 0)
+          nekrs::printStepInfo(time, tStep, false, true);
       }
  
       if (checkpointStep) nekrs::writeCheckpoint(time, tStep);
@@ -310,9 +320,10 @@ int main(int argc, char** argv)
       nekrs::updateTimer("elapsedStepSum", elapsedStepSum);
       nekrs::updateTimer("elapsed", elapsedTime);
 
-      if (nekrs::printInfoFreq()) {
-        if (tStep % nekrs::printInfoFreq() == 0) {
-          nekrs::printInfo(time, tStep, true, false);
+      // print step summary 
+      if (nekrs::printStepInfoFreq()) {
+        if (tStep % nekrs::printStepInfoFreq() == 0) {
+          nekrs::printStepInfo(time, tStep, true, false);
         }
       }
  

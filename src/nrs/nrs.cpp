@@ -1476,7 +1476,7 @@ void nrs_t::makeNLT(double time, int tstep, occa::memory &o_Usubcycling)
   }
 }
 
-void nrs_t::printInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo)
+void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo)
 {
   cds_t *cds = this->cds;
 
@@ -1550,11 +1550,14 @@ void nrs_t::printInfo(double time, int tstep, bool printStepInfo, bool printVerb
       this->flowRatePrintInfo(verboseInfo && printVerboseInfo);
     }
 
+    const auto printTimers = printStepInfo && this->timeStepConverged;
+
     if (printStepInfo) {
       printf("step= %d  t= %.8e  dt=%.1e  C= %.3f", tstep, time, this->dt[0], cfl);
+      if (!printTimers) std::cout << std::endl;
     }
 
-    if (!verboseInfo) {
+    if (!verboseInfo) { // print basic solver stats
       bool cvodePrinted = false;
       for (int is = 0; is < this->Nscalar; is++) {
         if (cds->compute[is] && !cds->cvodeSolve[is]) {
@@ -1581,7 +1584,7 @@ void nrs_t::printInfo(double time, int tstep, bool printStepInfo, bool printVerb
       }
     }
 
-    if (this->timeStepConverged && printStepInfo) {
+    if (printTimers) {
       printf("  elapsedStep= %.2es  elapsedStepSum= %.5es\n", elapsedStep, elapsedStepSum);
     }
   }
