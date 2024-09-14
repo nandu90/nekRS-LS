@@ -19,7 +19,7 @@ deviceMemory<dfloat> o_kappa;
 
 #include "mv_cyl.oudf"
 
-void meshcodedFixedValueVelocity(bcData *bc)
+void codedFixedValueMesh(bcData *bc)
 {
   const dfloat vPiston = p_AMP*sin(p_OMEGA*bc->time);
 
