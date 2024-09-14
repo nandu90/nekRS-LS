@@ -150,6 +150,7 @@ boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary 
 
                             none                                       no-op (internal or periodic) 
                             interpolation                              neknek boundary (int)
+                                                                       assign int values in codedFixedValue
 
                             zeroValue                                  velocity only (w, wall)
                             codedFixedValue                            user specified Dirichlet (v, t, inlet)
