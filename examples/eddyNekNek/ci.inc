@@ -247,21 +247,21 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
   switch(ciMode) {
     case 1:
       CiEvalTest("velocity (LinfErr: " + to_string_f(uErr) + ")", uErr < 2e-5);
-      CiEvalTest("scalar00 (LinfErr: " + to_string_f(uErr) + ")", s00Err < 8e-8);
+      CiEvalTest("scalar00 (LinfErr: " + to_string_f(s00Err) + ")", s00Err < 8e-8);
       break;
 
     case 2:
       CiEvalTest("velocity (LinfErr: " + to_string_f(uErr) + ")", uErr < 2e-2);
-      CiEvalTest("scalar00 (LinfErr: " + to_string_f(uErr) + ")", s00Err < 5e-6);
+      CiEvalTest("scalar00 (LinfErr: " + to_string_f(s00Err) + ")", s00Err < 5e-6);
       break;
 
     case 3:
-      CiEvalTest("scalar00 (LinfErr: " + to_string_f(uErr) + ")", s00Err < 4e-4);
+      CiEvalTest("scalar00 (LinfErr: " + to_string_f(s00Err) + ")", s00Err < 4e-4);
       break;
 
     case 4:
       CiEvalTest("velocity (LinfErr: " + to_string_f(uErr) + ")", uErr < 2e-5);
-      CiEvalTest("scalar00 (LinfErr: " + to_string_f(uErr) + ")", s00Err < 8e-8);
+      CiEvalTest("scalar00 (LinfErr: " + to_string_f(s00Err) + ")", s00Err < 8e-8);
       break;
   }
 }
