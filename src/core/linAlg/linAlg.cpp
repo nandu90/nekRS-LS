@@ -651,7 +651,6 @@ dfloat linAlg_t::amaxMany(const dlong N,
 
   if (N > 1) {
     amaxManyKernel(Nblock, N, Nfields, fieldOffset, o_x, o_scratch);
-
     o_scratch.copyTo(scratch, Nbytes);
   } else {
     o_x.copyTo(scratch, N);
@@ -659,7 +658,7 @@ dfloat linAlg_t::amaxMany(const dlong N,
 
   dfloat max = scratch[0];
   for (dlong n = 1; n < Nblock; ++n) {
-    max = (scratch[n] > max) ? scratch[n] : max;
+    max = std::max(max, scratch[n]);
   }
 
   if (_comm != MPI_COMM_SELF) {
