@@ -1,5 +1,6 @@
 #include "velRecycling.hpp"
 #include "tavg.hpp"
+#include "avm.hpp"
 //#include "nekAscent.hpp"
 
 static int NSLABS;
@@ -7,6 +8,7 @@ static int NELSLAB;
 static int renderStep;
 
 deviceMemory<dfloat> o_qcriterion;
+deviceMemory<dfloat> o_nuAVM;
 
 std::unique_ptr<iofld> iofld;
 
@@ -15,6 +17,45 @@ std::unique_ptr<iofld> iofld;
 #include "turbPipe.oudf"
 
 #endif
+
+void uservp(double time)
+{
+  auto mesh = nrs->meshV;
+  auto cds = nrs->cds;
+
+  static auto firstTime = true;
+  if (firstTime) {
+    avm::setup(mesh, nrs->gsh);
+    o_nuAVM.resize(mesh->Nlocal);
+    nrs->addUserCheckpointField("scalar01", std::vector<deviceMemory<dfloat>>{o_nuAVM});
+    firstTime = false; 
+  }
+  const auto scalarIndex = 0;
+  const auto sid = scalarDigitStr(scalarIndex);
+
+  dfloat kappa = 1.0;
+  platform->options.getArgs("SCALAR" + sid + " REGULARIZATION AVM ACTIVATION WIDTH", kappa);
+
+  dfloat logS0 = 2.0;
+  platform->options.getArgs("SCALAR" + sid + " REGULARIZATION AVM DECAY THRESHOLD", logS0);
+
+  dfloat scalingCoeff = 1.0;
+  platform->options.getArgs("SCALAR" + sid + " REGULARIZATION AVM SCALING COEFF", scalingCoeff);
+
+  dfloat absTol = 0;
+  platform->options.getArgs("SCALAR" + sid + " REGULARIZATION AVM ABSOLUTE TOL", absTol);
+
+  dfloat rhoD0;
+  platform->options.getArgs("SCALAR" + sid + " DIFFUSIVITY", rhoD0);
+
+  auto o_rhoD = cds->o_diff.slice(cds->fieldOffsetScan[scalarIndex], mesh->Nlocal);
+  platform->linAlg->fill(mesh->Nlocal, rhoD0, o_rhoD); 
+
+  auto o_S = cds->o_S.slice(cds->fieldOffsetScan[scalarIndex], mesh->Nlocal);
+  std::cout << "apply avm " << absTol << "," << scalingCoeff << std::endl;
+  avm::viscosity(nrs->fieldOffset, nrs->o_U, o_S, o_nuAVM, absTol, scalingCoeff);
+  platform->linAlg->axpby(mesh->Nlocal, 1.0, o_nuAVM, 1.0, o_rhoD);
+}
 
 void UDF_Setup0(MPI_Comm comm, setupAide &options)
 {
@@ -25,6 +66,10 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 
 void UDF_Setup()
 {
+#if 0
+  nrs->userProperties = &uservp;
+#endif
+
   auto mesh = nrs->meshV;
   const auto zLen = abs( 
               platform->linAlg->max(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm) - 
@@ -156,7 +201,7 @@ void UDF_Setup()
 
 void UDF_ExecuteStep(double time, int tstep)
 {
-  mesh_t *mesh = nrs->meshV;
+  auto mesh = nrs->meshV;
 
   if (tstep == 0) {
     nrs->writeCheckpoint(time, tstep); 

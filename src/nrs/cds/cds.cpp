@@ -452,11 +452,14 @@ void cds_t::applyAVM()
  
     dfloat scalingCoeff = 1.0;
     platform->options.getArgs("SCALAR" + sid + " REGULARIZATION AVM SCALING COEFF", scalingCoeff);
- 
+
+    dfloat absTol = 0;
+    platform->options.getArgs("SCALAR" + sid + " REGULARIZATION AVM ABSOLUTE TOL", absTol);
+
     const bool makeCont = platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION AVM C0", "TRUE");
  
     auto o_Si = o_S.slice(fieldOffsetScan[scalarIndex], mesh->Nlocal);
-    auto o_eps = avm::viscosity(vFieldOffset, o_U, o_Si, scalingCoeff, logS0, kappa, makeCont);
+    auto o_eps = avm::viscosity(vFieldOffset, o_U, o_Si, absTol, scalingCoeff, logS0, kappa, makeCont);
  
     if (verbose) {
       const dfloat maxEps = platform->linAlg->max(mesh->Nlocal, o_eps, platform->comm.mpiComm);

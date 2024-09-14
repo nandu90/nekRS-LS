@@ -16,6 +16,7 @@ occa::kernel relativeMassAveragedModeKernel;
 
 occa::kernel computeMaxViscKernel;
 occa::kernel interpolateP1Kernel;
+occa::kernel modesKernel;
 
 occa::memory o_vertexIds;
 occa::memory o_r;
@@ -114,10 +115,11 @@ void setup(mesh_t *mesh_, oogs_t *gsh_)
   o_baseLineDecay = baseLineDecayKlockner(mesh->N);
   o_invVT = [&] () 
   {
-    std::vector<dfloat> V(mesh->Np *  mesh->Np);
-    VandermondeHex3D(mesh->N, mesh->Np, mesh->r, mesh->s, mesh->t, V.data());
-    auto invV = platform->linAlg->matrixInverse(mesh->Np, V);
-    auto invVT = platform->linAlg->matrixTranspose(mesh->Np, invV);
+    std::vector<dfloat> V(mesh->Nq *  mesh->Nq);
+    Vandermonde1D(mesh->N, mesh->Nq, mesh->r, V.data());
+    auto invV = platform->linAlg->matrixInverse(mesh->Nq, V);
+    auto invVT = platform->linAlg->matrixTranspose(mesh->Nq, invV);
+
     auto o_out = platform->device.malloc<dfloat>(invVT.size());
     o_out.copyFrom(invVT.data());
     return o_out;
@@ -133,24 +135,37 @@ void setup(mesh_t *mesh_, oogs_t *gsh_)
 
   kernelName = "interpolateP1";
   interpolateP1Kernel = platform->kernelRequests.load(kernelName);
+
+  kernelName = "core-tensorProduct1DHex3D";
+  modesKernel = platform->kernelRequests.load(kernelName);
 }
 
 occa::memory viscosity(dlong UFieldOffset, const occa::memory& o_U, const occa::memory& o_S,
-                       dfloat scalingCoeff, dfloat logS0, dfloat kappa, bool C0)
+                       dfloat absTol, dfloat scalingCoeff, dfloat logS0, dfloat kappa, bool makeCont)
+{
+  auto o_nu = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+  viscosity(UFieldOffset, o_U, o_S, o_nu, absTol, scalingCoeff, logS0, kappa, makeCont);
+  return o_nu;
+}
+
+void viscosity(dlong UFieldOffset, const occa::memory& o_U, const occa::memory& o_S, occa::memory& o_nu,
+               dfloat absTol, dfloat scalingCoeff, dfloat logS0, dfloat kappa, bool C0)
 {
   occa::memory o_logSk = platform->o_memPool.reserve<dfloat>(mesh->Nelements);
+  occa::memory o_Shat = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
+
+  modesKernel(mesh->Nelements, o_invVT, o_S, o_Shat); 
   relativeMassAveragedModeKernel(mesh->Nelements,
-                                 mesh->o_Jw,
+                                 absTol,
                                  o_modeMap,
                                  o_invVT,
                                  o_leastSquares1D,
                                  o_baseLineDecay,
                                  0,
-                                 o_S,
+                                 o_Shat,
                                  o_logSk);
 
   dfloat visMaxCoeff = 1.0;
-  occa::memory o_nu = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
   computeMaxViscKernel(mesh->Nelements,
                        UFieldOffset,
                        logS0,
@@ -169,8 +184,6 @@ occa::memory viscosity(dlong UFieldOffset, const occa::memory& o_U, const occa::
     oogs::startFinish(o_nu, 1, 0, ogsDfloat, ogsMax, gsh);
     interpolateP1Kernel(mesh->Nelements, o_vertexIds, o_r, o_s, o_t, o_nu);
   }
-
-  return o_nu;
 }
 
 } // namespace avm

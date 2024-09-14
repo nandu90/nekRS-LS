@@ -70,6 +70,10 @@ void registerCoreKernels()
   fileName = oklpath + "/core/" + kernelName + ".okl";
   platform->kernelRequests.add(section + kernelName, fileName, meshProps);
 
+  kernelName = "tensorProduct1D" + suffix;
+  fileName = oklpath + "/core/" + kernelName + ".okl";
+  platform->kernelRequests.add(section + kernelName, fileName, meshProps);
+
   kernelName = "relativeMassHighestMode";
   fileName = oklpath + "/core/" + kernelName + ".okl";
   platform->kernelRequests.add(kernelName, fileName, meshProps);

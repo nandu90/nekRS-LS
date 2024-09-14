@@ -1475,6 +1475,8 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           {"scalingcoeff"},
           {"activationwidth"},
           {"decaythreshold"},
+          {"absolutetol"},
+
       };
       const std::vector<std::string> list = serializeString(regularization, '+');
       for (const std::string s : list) {
@@ -1514,7 +1516,16 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
 
           const auto nmodeStr = parseValueForKey(s, "nmodes");
           if (!nmodeStr.empty()) {
-            append_error("nmodes qualifier is invalid for avm highestmodaldecay!\n");
+            append_error("nModes qualifier is invalid for avm!\n");
+          }
+          const auto cutoffratioStr = parseValueForKey(s, "cutoffratio");
+          if (!cutoffratioStr.empty()) {
+            append_error("cutoffRatio qualifier is invalid for avm!\n");
+          }
+
+          const auto absTolStr = parseValueForKey(s, "absolutetol");
+          if (!absTolStr.empty()) {
+            options.setArgs(parPrefix + "REGULARIZATION AVM ABSOLUTE TOL", absTolStr);
           }
 
           const auto scalingcoeffStr = parseValueForKey(s, "scalingcoeff");
@@ -1535,6 +1546,11 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
             options.setArgs(parPrefix + "REGULARIZATION AVM DECAY THRESHOLD", thresholdStr);
           }
         }
+
+        if (options.getArgs(parPrefix + "REGULARIZATION AVM ABSOLUTE TOL").empty()) {
+          append_error("absoluteTol qualifier required for avm!\n");
+        }
+
       }
 
       if (usesHPFRT) {
