@@ -83,6 +83,7 @@ using dlong = long long int;
 #include <cstdint>
 #include <sys/stat.h>
 #include <cfenv>
+#include <csignal>
 
 #ifdef CPPTRACE_ENABLED
 #include <cpptrace/cpptrace.hpp>
