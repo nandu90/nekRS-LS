@@ -13,7 +13,8 @@ deviceMemory<dfloat> o_nuAVM;
 
 std::unique_ptr<iofld> iofld;
 
-int processAscentYaml = 0;
+#define ASCENT_UPDATE_SIGNAL SIGUSR1
+volatile sig_atomic_t processAscentYaml = 0;
 
 #ifdef __okl__
 
@@ -189,7 +190,7 @@ void UDF_Setup()
     auto handleSignal = [](int signal) {
       processAscentYaml = 1;
     };
-    std::signal(SIGUSR1, handleSignal);
+    std::signal(ASCENT_UPDATE_SIGNAL, handleSignal);
 
     auto cds = nrs->cds;
     auto meshV = nrs->meshV;
@@ -249,8 +250,10 @@ void UDF_ExecuteStep(double time, int tstep)
 
 #ifdef NEKRS_ASCENT_ENABLED 
   if (processAscentYaml) {
+    blockSignal(ASCENT_UPDATE_SIGNAL);
     nekAscent::run(time, tstep);
     processAscentYaml = 0;
+    unblockSignal(ASCENT_UPDATE_SIGNAL);
   }
 #endif
 }
