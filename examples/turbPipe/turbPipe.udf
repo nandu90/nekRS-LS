@@ -221,13 +221,13 @@ void UDF_ExecuteStep(double time, int tstep)
     tavg::run(time);
   }
 
-  auto computeQ = nrs->isCheckpointStep;
 #ifdef NEKRS_ASCENT_ENABLED
+  blockSignal(ASCENT_UPDATE_SIGNAL);
   MPI_Bcast(&processAscentYaml, 1, MPI_INT, 0, platform->comm.mpiComm);
   processAscentYaml = processAscentYaml || (tstep % processAscentYamlFrequency == 0);
-  if (processAscentYaml) computeQ = 1;
 #endif
-  if (computeQ) {
+
+  if (nrs->isCheckpointStep || processAscentYaml) {
     nrs->Qcriterion(nrs->o_U, o_qcriterion);
   }
 
@@ -250,10 +250,9 @@ void UDF_ExecuteStep(double time, int tstep)
 
 #ifdef NEKRS_ASCENT_ENABLED 
   if (processAscentYaml) {
-    blockSignal(ASCENT_UPDATE_SIGNAL);
     nekAscent::run(time, tstep);
     processAscentYaml = 0;
-    unblockSignal(ASCENT_UPDATE_SIGNAL);
   }
+  unblockSignal(ASCENT_UPDATE_SIGNAL);
 #endif
 }
