@@ -41,4 +41,4 @@ regularization = avm+absoluteTol=1e-3
 # adjust to actual mesh 
 NSLABS  = 60
 NELSLAB = 132 
-renderStep = 100 # ascent
+processAscentYamlFrequency = 100

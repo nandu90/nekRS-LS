@@ -1,16 +1,19 @@
 #include "velRecycling.hpp"
 #include "tavg.hpp"
 #include "avm.hpp"
+#include <csignal>
 //#include "nekAscent.hpp"
 
 static int NSLABS;
 static int NELSLAB;
-static int renderStep;
+static int processAscentYamlFrequency;
 
 deviceMemory<dfloat> o_qcriterion;
 deviceMemory<dfloat> o_nuAVM;
 
 std::unique_ptr<iofld> iofld;
+
+int processAscentYaml = 0;
 
 #ifdef __okl__
 
@@ -61,7 +64,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 {
   platform->par->extract("casedata", "nslabs", NSLABS);
   platform->par->extract("casedata", "nelslab", NELSLAB);
-  platform->par->extract("casedata", "renderstep", renderStep); // ascent
+  platform->par->extract("casedata", "processAscentYamlFrequency", processAscentYamlFrequency); // ascent
 }
 
 void UDF_Setup()
@@ -183,6 +186,11 @@ void UDF_Setup()
 
 #ifdef NEKRS_ASCENT_ENABLED 
   {
+    auto handleSignal = [](int signal) {
+      processAscentYaml = 1;
+    };
+    std::signal(SIGUSR1, handleSignal);
+
     auto cds = nrs->cds;
     auto meshV = nrs->meshV;
     auto meshT = (nrs->cds) ? cds->mesh[0] : meshV;
@@ -214,7 +222,9 @@ void UDF_ExecuteStep(double time, int tstep)
 
   auto computeQ = nrs->isCheckpointStep;
 #ifdef NEKRS_ASCENT_ENABLED
-  if (tstep % renderStep == 0) computeQ = 1;
+  MPI_Bcast(&processAscentYaml, 1, MPI_INT, 0, platform->comm.mpiComm);
+  processAscentYaml = processAscentYaml || (tstep % processAscentYamlFrequency == 0);
+  if (processAscentYaml) computeQ = 1;
 #endif
   if (computeQ) {
     nrs->Qcriterion(nrs->o_U, o_qcriterion);
@@ -238,8 +248,9 @@ void UDF_ExecuteStep(double time, int tstep)
 #endif
 
 #ifdef NEKRS_ASCENT_ENABLED 
-  if (tstep % renderStep == 0) {
+  if (processAscentYaml) {
     nekAscent::run(time, tstep);
+    processAscentYaml = 0;
   }
 #endif
 }
