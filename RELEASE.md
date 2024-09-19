@@ -34,7 +34,7 @@ This list provides an overview of the most significant changes in this release, 
 * change par section `TEMPERATURE` to `SCALAR00` in case it does not represent indeed a physical temperature (e.g. lowMach or CHT)
 * `scalarDirichletConditions` -> `codedFixedValueVelocity` (same for scalars)
 * `scalarNeumannConditions` -> `codedFixedGradientVelocity` (same for scalars)
-* `useric` of nek5000 is no longer automatically called, instead call it in `UDF_Setup` (see e.g. turbChannel example)
+* `useric` of nek5000 is no longer automatically called, instead call it in `UDF_Setup` (see e.g. lowMach example)
 * `nek::userchk` is no longer called automatically during setup 
 * `nek::copyToNek` -> `nrs->copyToNek` (same for all other variants) 
 * send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd` (no automatic check every N steps)
@@ -61,6 +61,7 @@ This list provides an overview of the most significant changes in this release, 
 * `pointInterpolation_t::setPoints(int, dfloat*, dfloat*, dfloat*)` -> `pointInterpolation_t::setPoints(const std::vector<dfloat>&, const std::vector<dfloat>&, const std::vector<dfloat>&)`
 * use `iofld` class instead of `writeFld`
 * `nrs->usrwrk` was removed (it's a user variable not used anywhere in the code)
+* field file extension start with 0-index
 
 ## Known Bugs / Restrictions
 
