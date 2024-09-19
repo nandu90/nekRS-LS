@@ -2,7 +2,7 @@
 #include "tavg.hpp"
 #include "avm.hpp"
 #include <csignal>
-#include "nekAscent.hpp"
+//#include "nekAscent.hpp"
 
 static int NSLABS;
 static int NELSLAB;
