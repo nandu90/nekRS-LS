@@ -110,6 +110,20 @@ void UDF_Setup()
   nrs->userProperties = &uservp;
   nrs->userScalarSource = &userq;
 
+  auto mesh = nrs->meshV;
+
+  if (platform->options.getArgs("RESTART FILE NAME").empty()) {
+    auto cds = nrs->cds;
+    for(int n = 0; n < mesh->Nlocal; n++) {
+      nrs->U[n + 0 * nrs->fieldOffset] = 1;
+      nrs->U[n + 1 * nrs->fieldOffset] = 0;
+      nrs->U[n + 2 * nrs->fieldOffset] = 0;
+      cds->S[n + cds->fieldOffsetScan[0]] = 1.0;
+      cds->S[n + cds->fieldOffsetScan[1]] = 0.01; 
+      cds->S[n + cds->fieldOffsetScan[2]] = 0.1;
+    } 
+  }
+
   const int scalarFieldStart = 1;
   RANSktau::setup(scalarFieldStart);
 }

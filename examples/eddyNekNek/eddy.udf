@@ -226,6 +226,11 @@ void UDF_Setup()
 {
   nrs->userConvergenceCheck = timeStepConverged;
   nrs->userScalarSource = &userq;
+
+  if (!platform->options.getArgs("RESTART FILE NAME").empty()) {
+    nek::getIC();
+    nrs->copyFromNek();
+  }
 }
 
 void UDF_ExecuteStep(double time, int tstep)

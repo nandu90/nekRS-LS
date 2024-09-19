@@ -16,10 +16,21 @@ void userf(double time)
 
 void UDF_Setup()
 {
+  auto mesh = nrs->meshV;
   nrs->userVelocitySource = &userf;
 
   const auto nBin = 256;
   o_hist.resize(nBin);
+
+  if (platform->options.getArgs("RESTART FILE NAME").empty()) {
+    for(int n = 0; n < mesh->Nlocal; n++) { 
+      nrs->U[n + 0 * nrs->fieldOffset] = 0;
+      nrs->U[n + 1 * nrs->fieldOffset] = 0;
+      nrs->U[n + 2 * nrs->fieldOffset] = 0;
+      nrs->cds->S[n] = 1 - mesh->z[n];
+    }
+  }
+
 }
 
 void UDF_ExecuteStep(double time, int tstep)

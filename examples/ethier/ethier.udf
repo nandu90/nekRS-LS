@@ -337,6 +337,11 @@ int timeStepConverged(int stage)
 
 void UDF_Setup()
 {
+  if (platform->options.getArgs("RESTART FILE NAME").empty()) {
+    nek::getIC();
+    nrs->copyFromNek();
+  }
+
   // only ciMode 1 exercises the particles
   if (ciMode == 1) {
 

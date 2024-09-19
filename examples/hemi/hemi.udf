@@ -83,6 +83,16 @@ void UDF_Setup()
 {
   auto mesh = nrs->meshV;
 
+  if (platform->options.getArgs("RESTART FILE NAME").empty()) {
+    const auto c1 = M_PI * 0.5/0.6;
+    for(int n = 0; n < mesh->Nlocal; n++) {
+      const auto arg = c1 * mesh->z[n];
+      nrs->U[n + 0 * nrs->fieldOffset] = (arg > 0.5*M_PI) ? 1.0 : sin(arg);
+      nrs->U[n + 1 * nrs->fieldOffset] = 0;
+      nrs->U[n + 2 * nrs->fieldOffset] = 0;
+    }
+  }
+
   xMin = platform->linAlg->min(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm);
   yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
   zMin = platform->linAlg->min(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm);
@@ -187,7 +197,7 @@ void addNewParticles(nrs_t *nrs, double time, int tstep)
   platform->linAlg->fill(nPartAdd, Stk, o_propNewPart);
 
   // interpolate fluid velocity onto new particle positions (set initial velocity as fluid velocity)
-  auto interpolator = pointInterpolation_t(nrs->meshV);
+  auto interpolator = pointInterpolation_t(nrs->meshV, platform->comm.mpiComm);
   interpolator.setPoints(xPart, yPart, zPart);
   interpolator.find();
 

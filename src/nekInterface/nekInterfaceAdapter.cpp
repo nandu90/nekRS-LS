@@ -372,7 +372,7 @@ void writeFld(const std::string& filename,
   }
 }
 
-void uic(int ifield)
+void getIC(int ifield)
 {
   (*nek_uic_ptr)(&ifield);
 }
@@ -409,7 +409,7 @@ void getIC(void)
   options->getArgs("NUMBER OF SCALARS", Nscalar);
 
   for (int ifield = 1; ifield <= 1 + Nscalar; ifield++) {
-    uic(ifield);
+    getIC(ifield);
   }
 }
 

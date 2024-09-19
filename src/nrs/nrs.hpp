@@ -256,6 +256,7 @@ public:
   void ocopyToNek(double time, int tstep);
   void copyToNek(double time);
   void copyFromNek(double &time);
+  void copyFromNek();
   void ocopyFromNek(double &time);
 
 private:

@@ -1056,11 +1056,6 @@ void nrs_t::setIC()
     copyTo(/* occa */ false);
 
     platform->options.setArgs("START TIME", (requestedTime.size()) ? requestedTime : to_string_f(time));
-  } else {
-    nek::getIC();
-    double startTime;
-    copyFromNek(startTime);
-    platform->options.setArgs("START TIME", to_string_f(startTime));
   }
 
   if (platform->comm.mpiRank == 0) std::cout << "calling UDF_Setup ... \n" << std::flush; 
@@ -1838,6 +1833,7 @@ void nrs_t::copyToNek(double time, int tstep)
   copyToNek(time);
 }
 
+
 void nrs_t::ocopyFromNek(double &time)
 {
   copyFromNek(time);
@@ -1856,6 +1852,12 @@ void nrs_t::ocopyFromNek(double &time)
     mesh->o_z.copyFrom(mesh->z);
     mesh->o_U.copyFrom(mesh->U);
   }
+}
+
+void nrs_t::copyFromNek()
+{
+  double time; // dummy
+  copyFromNek(time);
 }
 
 void nrs_t::copyFromNek(double &time)

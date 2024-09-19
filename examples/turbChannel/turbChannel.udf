@@ -37,6 +37,31 @@ void useric(nrs_t *nrs)
   platform->options.getArgs("VISCOSITY", mue);
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
+    auto rescale = [&](dfloat newMin, dfloat newMax, dfloat *x)
+    {
+      auto min = std::numeric_limits<dfloat>::max();
+      auto max = std::numeric_limits<dfloat>::lowest();
+      for(int i = 0; i < mesh->Nlocal ; i++) {
+        min = std::min(min, x[i]);
+        max = std::max(max, x[i]);
+      }
+      MPI_Allreduce(MPI_IN_PLACE, &min, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm);
+      MPI_Allreduce(MPI_IN_PLACE, &max, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm);
+      const auto scale = (newMax - newMin)/(max - min);
+
+      for(int i = 0; i < mesh->Nlocal ; i++) {
+        x[i] = newMin + scale*(x[i] - min);
+      }
+    };
+
+    rescale(0.0, xLength, mesh->x);
+    rescale(0.0, 1.0, mesh->x);
+    rescale(0.0, zLength, mesh->z);
+
+    for (int i = 0; i < mesh->Nlocal; i++) {
+      mesh->y[i] = tanh(betaY * (2*mesh->y[i] - 1)) / tanh(betaY);
+    }
+
     for (int i = 0; i < mesh->Nlocal; i++) {
       const auto x = mesh->x[i];
       const auto y = mesh->y[i];
@@ -62,10 +87,6 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
   platform->par->extract("casedata", "zLength", zLength);
   platform->par->extract("casedata", "xLength", xLength);
   platform->par->extract("casedata", "betaY", betaY);
-
-  *nek::ptr<double>("xlen") = xLength;
-  *nek::ptr<double>("zlen") = zLength;
-  *nek::ptr<double>("betam") = betaY;
 }
 
 void UDF_Setup()
