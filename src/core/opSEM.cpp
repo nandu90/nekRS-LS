@@ -90,11 +90,13 @@ occa::memory strongDivergence(mesh_t *mesh, dlong offset, const occa::memory &o_
 
 void laplacian(mesh_t *mesh, dlong offset, const occa::memory &o_lambda, const occa::memory &o_in, occa::memory& o_out)
 {
+  static occa::memory o_fieldOffsetScan;
   static occa::kernel kernel;
   if (!kernel.isInitialized()) {
     kernel = platform->kernelRequests.load(section + "weakLaplacian" + suffix);
+    o_fieldOffsetScan = platform->device.malloc<dlong>(1);
   }
-  kernel(mesh->Nelements, 1, 0, mesh->o_ggeo, mesh->o_D, o_lambda, o_in, o_out);
+  kernel(mesh->Nelements, 1, o_fieldOffsetScan, mesh->o_ggeo, mesh->o_D, o_lambda, o_in, o_out);
 }
 
 occa::memory laplacian(mesh_t *mesh, dlong offset, const occa::memory &o_lambda, const occa::memory &o_in)
