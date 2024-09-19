@@ -2,7 +2,7 @@
 #include "tavg.hpp"
 #include "avm.hpp"
 #include <csignal>
-//#include "nekAscent.hpp"
+#include "nekAscent.hpp"
 
 static int NSLABS;
 static int NELSLAB;
@@ -196,12 +196,19 @@ void UDF_Setup()
     auto meshV = nrs->meshV;
     auto meshT = (nrs->cds) ? cds->mesh[0] : meshV;
 
-    nekAscent::addVectorField("velocity", nrs->o_U, meshV, nrs->fieldOffset);
-    nekAscent::addScalarField("scalar00", cds->o_S.slice(cds->fieldOffsetScan[0]), meshT);
-    nekAscent::addScalarField("Qcriterion", o_qcriterion, meshV);
+    deviceMemory<dfloat> o_ux(nrs->o_U.slice(0 * nrs->fieldOffset));
+    deviceMemory<dfloat> o_uy(nrs->o_U.slice(1 * nrs->fieldOffset));
+    deviceMemory<dfloat> o_uz(nrs->o_U.slice(2 * nrs->fieldOffset));
+    std::vector<deviceMemory<dfloat>> o_U{o_ux, o_uy, o_uz};
+    nekAscent::addVariable("velocity", meshV, o_U);
+
+    deviceMemory<dfloat> o_scalar0(cds->o_S.slice(cds->fieldOffsetScan[0])); 
+    nekAscent::addVariable("scalar00", meshT, std::vector<deviceMemory<dfloat>>{o_scalar0});
+
+    nekAscent::addVariable("Qcriterion", meshV, std::vector<deviceMemory<dfloat>>{o_qcriterion});
 
     const int Nviz = 1.5 * mesh->N;
-    const auto uniform = false;
+    const auto uniform = true;
     nekAscent::setup(nrs->_mesh, "ascent.yaml", Nviz, uniform);
   }
 #endif
@@ -223,7 +230,7 @@ void UDF_ExecuteStep(double time, int tstep)
 
 #ifdef NEKRS_ASCENT_ENABLED
   blockSignal(ASCENT_UPDATE_SIGNAL);
-  MPI_Bcast(&processAscentYaml, 1, MPI_INT, 0, platform->comm.mpiComm);
+  MPI_Bcast(const_cast<sig_atomic_t*>(&processAscentYaml), 1, MPI_INT, 0, platform->comm.mpiComm);
   processAscentYaml = processAscentYaml || (tstep % processAscentYamlFrequency == 0);
 #endif
 
