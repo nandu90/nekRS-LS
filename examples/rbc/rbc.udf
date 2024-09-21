@@ -9,14 +9,14 @@ static deviceMemory<float> o_hist;
 
 void userf(double time)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
   auto o_zNLT = nrs->o_NLT + 2*nrs->fieldOffset;
   platform->linAlg->axpby(mesh->Nlocal, 1.0, nrs->cds->o_S, 0.0, o_zNLT); 
 }
 
 void UDF_Setup()
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
   nrs->userVelocitySource = &userf;
 
   const auto nBin = 256;
@@ -37,7 +37,7 @@ void UDF_Setup()
 
 void UDF_ExecuteStep(double time, int tstep)
 {
-  auto mesh = nrs->_mesh;
+  auto mesh = nrs->mesh;
 
   auto weightedHistogram = [&](auto uMin, auto uMax, auto Nlocal, const auto& o_wght, const auto& o_u, auto& o_out) 
   {

@@ -108,8 +108,6 @@ struct mesh_t {
 
   int cht;
 
-  mesh_t *fluid;
-
   hlong Nnodes;
   dfloat *EX; // coordinates of vertices for each element
   dfloat *EY;
@@ -263,7 +261,7 @@ struct mesh_t {
   occa::kernel hlongSumKernel;
 };
 
-mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &kernelInfo);
+std::pair<mesh_t*, mesh_t*> createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &kernelInfo);
 mesh_t *createMeshMG(mesh_t *_mesh, int Nc);
 
 occa::properties meshKernelProperties(int N);

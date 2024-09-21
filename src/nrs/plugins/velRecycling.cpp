@@ -42,7 +42,7 @@ static void _setup(occa::memory &o_wrk_, const int bID_, const dfloat wbar_)
   bID = bID_;
   wbar = wbar_;
 
-  mesh_t *mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   nekrsCheck(o_wrk.length() < nrs->NVfields * nrs->fieldOffset,
              platform->comm.mpiComm,
@@ -91,7 +91,7 @@ void velRecycling::copy()
              "%s\n",
              "called prior to tavg::setup()!");
 
-  mesh_t *mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   if (interp) {
     const dlong offset = o_Uint.length() / nrs->NVfields;
@@ -123,7 +123,7 @@ void velRecycling::setup(occa::memory o_wrk_,
 {
   _setup(o_wrk_, bID_, wbar_);
 
-  mesh_t *mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   const dlong Ntotal = mesh->Np * mesh->Nelements;
 
@@ -169,7 +169,7 @@ void velRecycling::setup(occa::memory o_wrk_,
 {
   _setup(o_wrk_, bID_, wbar_);
 
-  mesh_t *mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   int cnt = 0;
   for (int e = 0; e < mesh->Nelements; e++) {

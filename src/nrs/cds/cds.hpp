@@ -9,7 +9,7 @@
 struct cdsConfig_t {
 
   int Nscalar;
-  mesh_t *mesh;
+  mesh_t *meshT;
   mesh_t *meshV;
   dfloat *g0 = nullptr;
   dfloat *dt = nullptr;

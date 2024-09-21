@@ -46,8 +46,7 @@ public:
 
   int elementType = HEXAHEDRA;
 
-  mesh_t *_mesh = nullptr;
-  mesh_t *meshV = nullptr;
+  mesh_t* mesh = nullptr;
 
   elliptic *uSolver = nullptr;
   elliptic *vSolver = nullptr;

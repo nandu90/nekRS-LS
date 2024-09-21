@@ -26,7 +26,7 @@ static dfloat A;
 
 deviceMemory<dfloat> implicitForcing(dfloat time)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   poolDeviceMemory<dfloat> o_F(mesh->Nlocal);
   platform->linAlg->fill(o_F.size(), -A, o_F);
@@ -41,7 +41,7 @@ void linearForcing(dfloat time)
   const auto invTau0 = uPrime / l;
   const auto k0 = 1.5 * uPrime * uPrime;
 
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   auto avg = [&](auto o_u)
   { 
@@ -129,7 +129,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 
 void UDF_Setup()
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   nrs->userVelocitySource = &linearForcing;
   nrs->userVelocityImplicitLinearTerm = &implicitForcing;

@@ -46,8 +46,9 @@ bool neknekCoupled()
 
 void neknek_t::reserveAllocation()
 {
+  auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
   this->fieldOffset_ = alignStride<dfloat>(this->npt_);
-  this->o_pointMap_ = platform->device.malloc<dlong>(nrs->_mesh->Nlocal);
+  this->o_pointMap_ = platform->device.malloc<dlong>(mesh->Nlocal);
 
   int nStates = this->nEXT_ + 1;
   if (this->multirate()) {
@@ -78,7 +79,7 @@ void neknek_t::updateInterpPoints()
   const dlong nsessions = this->nsessions_;
   const dlong sessionID = this->sessionID_;
 
-  auto mesh = nrs->_mesh;
+  auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
 
   this->interpolator.reset();
   this->interpolator = std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiCommParent, true, intBIDs);
@@ -105,7 +106,7 @@ void neknek_t::findIntPoints()
   const dlong nsessions = this->nsessions_;
   const dlong sessionID = this->sessionID_;
 
-  auto mesh = nrs->_mesh;
+  auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
 
   this->interpolator.reset();
   this->interpolator = std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiCommParent, true, intBIDs);
@@ -181,7 +182,7 @@ void neknek_t::setup()
   dlong globalRank;
   MPI_Comm_rank(platform->comm.mpiCommParent, &globalRank);
 
-  auto mesh = nrs->_mesh;
+  auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
 
   const int nsessions = this->nsessions_;
   if (platform->comm.mpiRank == 0) {
@@ -369,7 +370,7 @@ occa::memory neknek_t::partitionOfUnity()
   }
   recomputePartition = false;
 
-  auto mesh = nrs->_mesh;
+  auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
 
   auto pointInterp = pointInterpolation_t(mesh, platform->comm.mpiCommParent, true, intBIDs);
 
@@ -439,7 +440,7 @@ void neknek_t::lag()
 
 void neknek_t::extrapolate(int tstep)
 {
-  auto *mesh = nrs->meshV;
+  auto *mesh = nrs->mesh;
   int extOrder = std::min(tstep, this->nEXT_);
   int bdfOrder = std::min(tstep, nrs->nBDF);
   nek::extCoeff(this->coeffEXT.data(), nrs->dt, extOrder, bdfOrder);

@@ -33,7 +33,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
     return;
   }
 
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   const int rank = platform->comm.mpiRank;
 

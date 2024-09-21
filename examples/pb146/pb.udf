@@ -6,7 +6,7 @@
 
 void UDF_Setup() 
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
     std::vector<dfloat> U(mesh->dim * nrs->fieldOffset, 0.0);

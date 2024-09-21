@@ -20,7 +20,7 @@ void extractLine(nrs_t *nrs, double time)
   static deviceMemory<dfloat> o_Up;
 
   if (!interpolator) {
-    auto mesh = nrs->meshV;
+    auto mesh = nrs->mesh;
     const auto yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
     const auto yMax = platform->linAlg->max(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
 
@@ -46,7 +46,7 @@ void extractLine(nrs_t *nrs, double time)
       o_Up.resize(nrs->NVfields * offset);
     }
 
-    interpolator = new pointInterpolation_t(nrs->meshV, platform->comm.mpiComm);
+    interpolator = new pointInterpolation_t(nrs->mesh, platform->comm.mpiComm);
     interpolator->setPoints(xp, yp, zp);
     interpolator->find();
   }
@@ -73,7 +73,7 @@ void userq(double time)
 
 void uservp(double time)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
   auto cds = nrs->cds;
 
   RANSktau::updateProperties();
@@ -110,7 +110,7 @@ void UDF_Setup()
   nrs->userProperties = &uservp;
   nrs->userScalarSource = &userq;
 
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
   const auto ktauFieldStart = 1;
 
   std::vector<dfloat> U(mesh->dim * nrs->fieldOffset, 0.0);

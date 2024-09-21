@@ -38,6 +38,8 @@ This list provides an overview of the most significant changes in this release, 
 * use `nrs->o_U` instead of `nrs->U` (host version was removed) 
 * use `cds->o_S` instead of `cds->S` (host version was removed)
 * use `mesh->o_x` instead of `mesh->x` (host version was removed, same for other components) 
+* `nrs->meshV` -> `nrs->mesh`
+* `nrs->_mesh` -> `cds->mesh[0]`
 * `nek::userchk` is no longer called automatically during setup 
 * `nek::copyToNek` -> `nrs->copyToNek` (same for all other variants) 
 * send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd` (no automatic check every N steps)

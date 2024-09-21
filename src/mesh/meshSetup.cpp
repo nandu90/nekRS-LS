@@ -199,7 +199,7 @@ void meshLoadKernels(mesh_t *mesh)
   }
 }
 
-mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &kernelInfo)
+std::pair<mesh_t*, mesh_t*> createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &kernelInfo)
 {
   int rank, size;
   MPI_Comm_rank(comm, &rank);
@@ -325,12 +325,12 @@ mesh_t *createMesh(MPI_Comm comm, int N, int cubN, bool cht, occa::properties &k
     }
   }
 
-  mesh->fluid = mesh;
+  mesh_t* meshV = nullptr;
   if (mesh->cht) {
-    mesh->fluid = createMeshV(comm, N, cubN, mesh, kernelInfo);
+    meshV = createMeshV(comm, N, cubN, mesh, kernelInfo);
   }
 
-  return mesh;
+  return {mesh, meshV};
 }
 
 mesh_t *createMeshMG(mesh_t *_mesh, int Nc)

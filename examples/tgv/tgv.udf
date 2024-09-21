@@ -15,7 +15,7 @@ magSqr(const dlong Ntotal, const dlong offset, @ restrict const dfloat *U, @ res
 
 void printDiagnostics(nrs_t *nrs, double time, int tstep)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   dfloat mue, rho;
   platform->options.getArgs("VISCOSITY", mue);
@@ -95,7 +95,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 
 void UDF_Setup()
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
     dfloat U0, V0, W0;

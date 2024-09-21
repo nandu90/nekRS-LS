@@ -57,7 +57,7 @@ auto generateInflowPoints(nrs_t *nrs)
 
   std::vector<dfloat> xPart, yPart, zPart;
 
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   const auto py = static_cast<int>(std::round(std::sqrt(nParticlesInject)));
   const auto pz = py;
@@ -81,7 +81,7 @@ auto generateInflowPoints(nrs_t *nrs)
 
 void UDF_Setup()
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
     auto [x, y, z] = mesh->xyzHost();
@@ -202,7 +202,7 @@ void addNewParticles(nrs_t *nrs, double time, int tstep)
   platform->linAlg->fill(nPartAdd, Stk, o_propNewPart);
 
   // interpolate fluid velocity onto new particle positions (set initial velocity as fluid velocity)
-  auto interpolator = pointInterpolation_t(nrs->meshV, platform->comm.mpiComm);
+  auto interpolator = pointInterpolation_t(nrs->mesh, platform->comm.mpiComm);
   interpolator.setPoints(xPart, yPart, zPart);
   interpolator.find();
 

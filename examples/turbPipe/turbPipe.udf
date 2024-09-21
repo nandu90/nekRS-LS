@@ -24,7 +24,7 @@ volatile sig_atomic_t processAscentYaml = 0;
 
 void uservp(double time)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
   auto cds = nrs->cds;
 
   static auto firstTime = true;
@@ -74,7 +74,7 @@ void UDF_Setup()
   nrs->userProperties = &uservp;
 #endif
 
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
   const auto zLen = abs( 
               platform->linAlg->max(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm) - 
               platform->linAlg->min(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm)
@@ -205,7 +205,7 @@ void UDF_Setup()
     std::signal(ASCENT_UPDATE_SIGNAL, handleSignal);
 
     auto cds = nrs->cds;
-    auto meshV = nrs->meshV;
+    auto meshV = nrs->mesh;
     auto meshT = (nrs->cds) ? cds->mesh[0] : meshV;
 
     deviceMemory<dfloat> o_ux(nrs->o_U.slice(0 * nrs->fieldOffset));
@@ -221,7 +221,7 @@ void UDF_Setup()
 
     const int Nviz = 1.5 * mesh->N;
     const auto uniform = true;
-    nekAscent::setup(nrs->_mesh, "ascent.yaml", Nviz, uniform);
+    nekAscent::setup(mesh, "ascent.yaml", Nviz, uniform);
   }
 #endif
 
@@ -229,7 +229,7 @@ void UDF_Setup()
 
 void UDF_ExecuteStep(double time, int tstep)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   if (tstep == 0) {
     nrs->writeCheckpoint(time, tstep); 

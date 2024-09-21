@@ -89,7 +89,7 @@ void findUThetaTau(dfloat uWall, dfloat tempWall, dfloat &uTau, dfloat &thetaTau
 
 auto planarAverage()
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
   poolDeviceMemory<dfloat> o_work(6 * nrs->fieldOffset);
 
   // <u>(y)
@@ -116,13 +116,13 @@ auto planarAverage()
 
 void userf(double time)
 {
-  auto mesh = nrs->meshV;
-  coriolis(mesh->Nlocal, nrs->fieldOffset, nrs->meshV->o_y, nrs->cds->o_S, nrs->o_U, o_divTau, nrs->o_NLT);
+  auto mesh = nrs->mesh;
+  coriolis(mesh->Nlocal, nrs->fieldOffset, nrs->mesh->o_y, nrs->cds->o_S, nrs->o_U, o_divTau, nrs->o_NLT);
 }
 
 void userq(double time)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
   auto o_divTauY = o_divTau.slice(2 * nrs->fieldOffset , nrs->fieldOffset);
   platform->linAlg->axpby(mesh->Nlocal, -1.0, o_divTauY, 1.0, nrs->cds->o_NLT, 0, 0);
 }
@@ -130,7 +130,7 @@ void userq(double time)
 void writeProfiles(double time, int tstep)
 {
   const std::string fname = "profiles.dat";
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   auto o_data = [&]()
   {
@@ -302,7 +302,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 
 void UDF_Setup()
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   o_divTau.resize(3 * nrs->fieldOffset);
 
@@ -391,7 +391,7 @@ void UDF_ExecuteStep(double time, int tstep)
 
   restoreDt();
 
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   if (nrs->timeStepConverged && time >= startTimeStatistics) {
     tavg::run(time);

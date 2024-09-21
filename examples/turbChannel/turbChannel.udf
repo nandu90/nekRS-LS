@@ -11,7 +11,7 @@ static dfloat betaY;
 
 void userf(double time)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
   dfloat mue, rho;
   platform->options.getArgs("VISCOSITY", mue);
   platform->options.getArgs("DENSITY", rho);
@@ -24,7 +24,7 @@ void userf(double time)
 
 void useric(nrs_t *nrs)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
     const auto C = 5.17;

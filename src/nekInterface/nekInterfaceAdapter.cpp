@@ -1004,6 +1004,7 @@ int setup(int numberActiveFields)
   re2::nelg(options->getArgs("MESH FILE"), nelgt, nelgv, platform->comm.mpiComm);
   const int cht = (nelgt > nelgv) && nscal;
 
+
   auto boundaryIDMap = [&](bool vMesh = false)
   {
     const std::string prefix = (cht && vMesh) ? "MESHV " : "MESH ";
@@ -1150,6 +1151,26 @@ int setup(int numberActiveFields)
   dfloat startTime;
   options->getArgs("START TIME", startTime);
   *(nekData.time) = startTime;
+
+  {
+    hlong NelementsV = nekData.nelv;
+    MPI_Allreduce(MPI_IN_PLACE, &NelementsV, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
+    nekrsCheck(NelementsV != nelgv,
+               MPI_COMM_SELF,
+               EXIT_FAILURE,
+               "%s\n",
+               "Invalid element partitioning");
+
+    if (cht) {
+      hlong NelementsT = nekData.nelt;
+      MPI_Allreduce(MPI_IN_PLACE, &NelementsT, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
+      nekrsCheck(NelementsT <= NelementsV || NelementsT != nelgt,
+                 MPI_COMM_SELF,
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "Invalid solid element partitioning");
+    }
+  }
 
   return 0;
 }

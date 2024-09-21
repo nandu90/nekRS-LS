@@ -378,7 +378,7 @@ void ciTestParticles(nrs_t *nrs, lpm_t *particles, occa::kernel exactUVWPKernel,
   std::vector<dfloat> yExpected(yp0_g.size(), 0.0);
   std::vector<dfloat> zExpected(zp0_g.size(), 0.0);
 
-  auto o_y0 = platform->device.malloc<dfloat>(nrs->meshV->dim * xp0_g.size());
+  auto o_y0 = platform->device.malloc<dfloat>(nrs->mesh->dim * xp0_g.size());
   if (particles->numParticles() > 0) {
     auto o_x0coord = o_y0 + 0 * xp0_g.size();
     auto o_y0coord = o_y0 + 1 * yp0_g.size();
@@ -463,7 +463,7 @@ void ciTestParticles(nrs_t *nrs, lpm_t *particles, occa::kernel exactUVWPKernel,
 // however, pointInterpolation_t itself is not thread-safe, so the two objects cannot be used concurrently.
 void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   auto o_Ue = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset);
   auto o_Pe = platform->device.malloc<dfloat>(nrs->fieldOffset);
@@ -568,13 +568,13 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
 
 void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
   exactUVWPKernel(mesh->Nlocal, time, mesh->o_x, mesh->o_y, mesh->o_z, nrs->fieldOffset, nrs->o_P, nrs->o_U);
   
   auto o_Usave = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
   nrs->o_U.copyTo(o_Usave, nrs->NVfields * nrs->fieldOffset);
 
-  std::vector<mesh_t*> meshes = {nrs->meshV, nrs->meshV, nrs->meshV};
+  std::vector<mesh_t*> meshes = {nrs->mesh, nrs->mesh, nrs->mesh};
   LVector_t<dfloat> UL(meshes, true);
   LVector_t<dfloat> VL(meshes, false); // create secondary vector, not managed
 
@@ -588,7 +588,7 @@ void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
   auto checkErr = [&](bool subtract = true){
     auto o_Uerr = platform->o_memPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
     if(subtract){
-      platform->linAlg->axpbyzMany(nrs->meshV->Nlocal,
+      platform->linAlg->axpbyzMany(nrs->mesh->Nlocal,
                                   nrs->NVfields,
                                   nrs->fieldOffset,
                                   1.0,
@@ -597,7 +597,7 @@ void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
                                   nrs->o_U,
                                   o_Uerr);
     }
-    platform->linAlg->aydxMany(nrs->meshV->Nlocal,
+    platform->linAlg->aydxMany(nrs->mesh->Nlocal,
                               nrs->NVfields,
                               nrs->fieldOffset,
                               1,
@@ -609,13 +609,13 @@ void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
     auto o_Uyerr = o_Uerr + 1 * nrs->fieldOffset;
     auto o_Uzerr = o_Uerr + 2 * nrs->fieldOffset;
     
-    platform->linAlg->abs(nrs->meshV->Nlocal, o_Uxerr);
-    platform->linAlg->abs(nrs->meshV->Nlocal, o_Uyerr);
-    platform->linAlg->abs(nrs->meshV->Nlocal, o_Uzerr);
+    platform->linAlg->abs(nrs->mesh->Nlocal, o_Uxerr);
+    platform->linAlg->abs(nrs->mesh->Nlocal, o_Uyerr);
+    platform->linAlg->abs(nrs->mesh->Nlocal, o_Uzerr);
 
-    auto LinfUx = platform->linAlg->max(nrs->meshV->Nlocal, o_Uxerr, platform->comm.mpiComm);
-    auto LinfUy = platform->linAlg->max(nrs->meshV->Nlocal, o_Uyerr, platform->comm.mpiComm);
-    auto LinfUz = platform->linAlg->max(nrs->meshV->Nlocal, o_Uzerr, platform->comm.mpiComm);
+    auto LinfUx = platform->linAlg->max(nrs->mesh->Nlocal, o_Uxerr, platform->comm.mpiComm);
+    auto LinfUy = platform->linAlg->max(nrs->mesh->Nlocal, o_Uyerr, platform->comm.mpiComm);
+    auto LinfUz = platform->linAlg->max(nrs->mesh->Nlocal, o_Uzerr, platform->comm.mpiComm);
     if (platform->comm.mpiRank == 0) {
       printf("relLinf Ux/y/z error: %g/%g/%g\n", LinfUx, LinfUy, LinfUz);
     }
@@ -676,9 +676,9 @@ void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
   auto o_Ux = nrs->o_U + 0 * nrs->fieldOffset;
   auto o_Uy = nrs->o_U + 1 * nrs->fieldOffset;
   auto o_Uz = nrs->o_U + 2 * nrs->fieldOffset;
-  platform->linAlg->add(nrs->meshV->Nlocal, -val, o_Ux);
-  platform->linAlg->add(nrs->meshV->Nlocal, -val, o_Uy);
-  platform->linAlg->add(nrs->meshV->Nlocal, -val, o_Uz);
+  platform->linAlg->add(nrs->mesh->Nlocal, -val, o_Ux);
+  platform->linAlg->add(nrs->mesh->Nlocal, -val, o_Uy);
+  platform->linAlg->add(nrs->mesh->Nlocal, -val, o_Uz);
   
   checkErr(false);
 
@@ -693,7 +693,7 @@ void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
 void ciTestSurfaceIntegral(nrs_t *nrs)
 {
   const int rank = platform->comm.mpiRank;
-  auto *mesh = nrs->meshV;
+  auto *mesh = nrs->mesh;
   const int nbID = 1;
   const auto testTol = 1e-2;
 
@@ -721,7 +721,7 @@ void ciTestSurfaceIntegral(nrs_t *nrs)
 
 void ciTestDistance(nrs_t *nrs)
 {
-  auto mesh = nrs->meshV;
+  auto mesh = nrs->mesh;
 
   int nbID = 1;
   int bID = 1;
