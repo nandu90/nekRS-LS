@@ -192,17 +192,14 @@ dfloat nrs_t::adjustDt(int tstep)
         const auto minRho = platform->linAlg->min(this->mesh->Nlocal, this->o_rho, platform->comm.mpiComm);
         const auto maxU = maxFU / minRho;
 
-        auto [x, y, z] = mesh->xyzHost();
+        std::vector<dfloat> Jw(mesh->Nlocal);
+        mesh->o_Jw.copyTo(Jw.data(), Jw.size());
 
-        auto minLengthScale = 10 * std::numeric_limits<double>::max();
+        auto minLengthScale = 10 * std::numeric_limits<dfloat>::max();
         for (int i = 0; i < this->mesh->Nlocal; i++) {
-          const double lengthScale = sqrt( (x[0] - x[1]) * (x[0] - x[1]) + 
-                                           (y[0] - y[1]) * (y[0] - y[1]) +
-                                           (z[0] - z[1]) * (z[0] - z[1]) );
-          minLengthScale = std::min(lengthScale, minLengthScale);
+          minLengthScale = std::min(std::cbrt(Jw[i]), minLengthScale);
         }
-
-        MPI_Allreduce(MPI_IN_PLACE, &minLengthScale, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm);
+        MPI_Allreduce(MPI_IN_PLACE, &minLengthScale, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm);
         if (maxU > TOLToZero) {
           dt_ = sqrt(targetCFL * minLengthScale / maxU);
         } else {
