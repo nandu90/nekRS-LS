@@ -427,23 +427,20 @@ void xm1N(dfloat *_x, dfloat *_y, dfloat *_z, int N, dlong Nelements)
     return; 
   }
 
-  auto x = (double *)calloc(Np, sizeof(double));
-  auto y = (double *)calloc(Np, sizeof(double));
-  auto z = (double *)calloc(Np, sizeof(double));
+  std::vector<double> x(Np);
+  std::vector<double> y(Np);
+  std::vector<double> z(Np);
 
   for (dlong e = 0; e < Nelements; ++e) {
-    map_m_to_n(x, N + 1, &nekData.xm1[e * nxyz], nekData.nx1);
-    map_m_to_n(y, N + 1, &nekData.ym1[e * nxyz], nekData.nx1);
-    map_m_to_n(z, N + 1, &nekData.zm1[e * nxyz], nekData.nx1);
+    map_m_to_n(x.data(), N + 1, &nekData.xm1[e * nxyz], nekData.nx1);
+    map_m_to_n(y.data(), N + 1, &nekData.ym1[e * nxyz], nekData.nx1);
+    map_m_to_n(z.data(), N + 1, &nekData.zm1[e * nxyz], nekData.nx1);
     for (int i = 0; i < Np; i++) {
       _x[i + e * Np] = x[i];
       _y[i + e * Np] = y[i];
       _z[i + e * Np] = z[i];
     }
   }
-  free(x);
-  free(y);
-  free(z);
 }
 
 void ifoutfld(int i)

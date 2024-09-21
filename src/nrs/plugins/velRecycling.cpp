@@ -191,6 +191,8 @@ void velRecycling::setup(occa::memory o_wrk_,
   std::vector<dfloat> yBid(nPoints);
   std::vector<dfloat> zBid(nPoints);
 
+  auto [x, y, z] = mesh->xyzHost();
+
   cnt = 0;
   for (int e = 0; e < mesh->Nelements; e++) {
     for (int n = 0; n < mesh->Nfp * mesh->Nfaces; n++) {
@@ -198,9 +200,9 @@ void velRecycling::setup(occa::memory o_wrk_,
       const int idM = mesh->vmapM[e * mesh->Nfp * mesh->Nfaces + n];
       if (mesh->EToB[f + e * mesh->Nfaces] == bID) {
         maskIds[cnt] = idM;
-        xBid[cnt] = mesh->x[idM] + xOffset;
-        yBid[cnt] = mesh->y[idM] + yOffset;
-        zBid[cnt] = mesh->z[idM] + zOffset;
+        xBid[cnt] = x[idM] + xOffset;
+        yBid[cnt] = y[idM] + yOffset;
+        zBid[cnt] = z[idM] + zOffset;
         cnt++;
       }
     }

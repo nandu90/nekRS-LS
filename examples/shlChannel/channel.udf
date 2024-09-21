@@ -49,7 +49,7 @@ void UDF_Setup()
 void UDF_ExecuteStep(double time, int tstep)
 {
   if (nrs->isCheckpointStep) {
-    nrs->ocopyToNek(time, tstep);
+    nrs->copyToNek(time, tstep);
     nek::userchk();
   }
   if (ciMode) {

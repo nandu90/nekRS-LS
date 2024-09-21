@@ -133,6 +133,8 @@ void neknek_t::findIntPoints()
   std::vector<dlong> pointMap(mesh->Nlocal, -1);
 
   if (this->fields.size()) {
+    auto [x, y, z] = mesh->xyzHost();
+
     dlong ip = 0;
     for (dlong e = 0; e < mesh->Nelements; ++e) {
       for (dlong f = 0; f < mesh->Nfaces; ++f) {
@@ -145,9 +147,9 @@ void neknek_t::findIntPoints()
           auto bcType = bcMap::id(bID, this->fields[0]);
 
           if (isIntBc(bcType, this->fields[0])) {
-            neknekX[ip] = mesh->x[idM];
-            neknekY[ip] = mesh->y[idM];
-            neknekZ[ip] = mesh->z[idM];
+            neknekX[ip] = x[idM];
+            neknekY[ip] = y[idM];
+            neknekZ[ip] = z[idM];
             session[ip] = sessionID;
             pointMap[idM] = ip;
             ++ip;

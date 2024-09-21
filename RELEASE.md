@@ -35,6 +35,9 @@ This list provides an overview of the most significant changes in this release, 
 * `scalarDirichletConditions` -> `codedFixedValueVelocity` (same for scalars)
 * `scalarNeumannConditions` -> `codedFixedGradientVelocity` (same for scalars)
 * `useric` of nek5000 is no longer automatically called, instead call it in `UDF_Setup` (see e.g. lowMach example)
+* use `nrs->o_U` instead of `nrs->U` (host version was removed) 
+* use `cds->o_S` instead of `cds->S` (host version was removed)
+* use `mesh->o_x` instead of `mesh->x` (host version was removed, same for other components) 
 * `nek::userchk` is no longer called automatically during setup 
 * `nek::copyToNek` -> `nrs->copyToNek` (same for all other variants) 
 * send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd` (no automatic check every N steps)
@@ -62,6 +65,9 @@ This list provides an overview of the most significant changes in this release, 
 * use `iofld` class instead of `writeFld`
 * `nrs->usrwrk` was removed (it's a user variable not used anywhere in the code)
 * field file extension start with 0-index
+* `nek::copyToNek` -> `nrs->copyToNek`
+* `nek::copyFromNek` -> `nrs->copyFromNek`
+* `nek::ocopyFromNek` and `nek::ocopyToNek` was removed 
 
 ## Known Bugs / Restrictions
 

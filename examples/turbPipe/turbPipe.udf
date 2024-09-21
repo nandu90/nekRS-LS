@@ -80,6 +80,13 @@ void UDF_Setup()
               platform->linAlg->min(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm)
             ); 
 
+  std::vector<dfloat> x(mesh->Nlocal);
+  std::vector<dfloat> y(mesh->Nlocal);
+  std::vector<dfloat> z(mesh->Nlocal);
+  mesh->o_x.copyTo(x.data());
+  mesh->o_y.copyTo(y.data());
+  mesh->o_z.copyTo(z.data());
+
   o_qcriterion.resize(mesh->Nlocal);
 
 #if 0
@@ -94,7 +101,7 @@ void UDF_Setup()
     std::vector<int> elementFilter;
     for(int e = 0; e < mesh->Nelements; e++) {
        auto zmaxLocal = std::numeric_limits<dfloat>::lowest();
-       for(int i = 0; i < mesh->Np; i++) zmaxLocal = std::max(mesh->z[i + e * mesh->Np], zmaxLocal);
+       for(int i = 0; i < mesh->Np; i++) zmaxLocal = std::max(z[i + e * mesh->Np], zmaxLocal);
        if (zmaxLocal > zRecycLayer) elementFilter.push_back(e);
     }
     return elementFilter;
@@ -109,16 +116,19 @@ void UDF_Setup()
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
     auto rand = randomVector<dfloat>(mesh->Nlocal, -1.0, 1.0, true);
 
+    std::vector<dfloat> U(mesh->dim * nrs->fieldOffset, 0.0);
+    std::vector<dfloat> S(mesh->Nlocal, 0.0);
+
     for (int n = 0; n < mesh->Nlocal; n++) {
       const auto R = 0.5;
 
-      const auto xr = mesh->x[n] / R;
-      const auto yr = mesh->y[n] / R;
-      const auto zo = 2 * M_PI * mesh->z[n] / zLen;
+      const auto xr = x[n] / R;
+      const auto yr = y[n] / R;
+      const auto zo = 2 * M_PI * z[n] / zLen;
 
       auto rr = xr * xr + yr * yr;
       rr = (rr > 0) ? sqrt(rr) : 0.0;
-      const auto th = atan2(mesh->y[n], mesh->x[n]);
+      const auto th = atan2(y[n], x[n]);
 
       auto uz = 6/5. * (1 - pow(rr, 6));
 
@@ -137,12 +147,14 @@ void UDF_Setup()
       if (amp_sin < -amp_clip) amp_sin = -amp_clip;
       if (rr > (1 - blt)) uz += amp_sin;
 
-      nrs->U[n + 0 * nrs->fieldOffset] = 0.05 * pow(rand[n], 2);
-      nrs->U[n + 1 * nrs->fieldOffset] = 0.1  * pow(rand[n], 3);
-      nrs->U[n + 2 * nrs->fieldOffset] = uz + 0.01 * rand[n];
+      U[n + 0 * nrs->fieldOffset] = 0.05 * pow(rand[n], 2);
+      U[n + 1 * nrs->fieldOffset] = 0.1  * pow(rand[n], 3);
+      U[n + 2 * nrs->fieldOffset] = uz + 0.01 * rand[n];
 
-      nrs->cds->S[n] = 0;
+      S[n] = 0;
     }
+    nrs->o_U.copyFrom(U.data(), U.size());
+    nrs->cds->o_S.copyFrom(S.data(), S.size());
   }
 
   nrs->o_usrwrk.resize(nrs->NVfields * nrs->fieldOffset);

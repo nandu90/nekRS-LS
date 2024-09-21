@@ -84,13 +84,17 @@ void UDF_Setup()
   auto mesh = nrs->meshV;
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
+    auto [x, y, z] = mesh->xyzHost();
+
+    std::vector<dfloat> U(mesh->dim * nrs->fieldOffset, 0.0);
     const auto c1 = M_PI * 0.5/0.6;
     for(int n = 0; n < mesh->Nlocal; n++) {
-      const auto arg = c1 * mesh->z[n];
-      nrs->U[n + 0 * nrs->fieldOffset] = (arg > 0.5*M_PI) ? 1.0 : sin(arg);
-      nrs->U[n + 1 * nrs->fieldOffset] = 0;
-      nrs->U[n + 2 * nrs->fieldOffset] = 0;
+      const auto arg = c1 * z[n];
+      U[n + 0 * nrs->fieldOffset] = (arg > 0.5*M_PI) ? 1.0 : sin(arg);
+      U[n + 1 * nrs->fieldOffset] = 0;
+      U[n + 2 * nrs->fieldOffset] = 0;
     }
+    nrs->o_U.copyFrom(U.data(), U.size());
   }
 
   xMin = platform->linAlg->min(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm);
@@ -127,7 +131,8 @@ void UDF_Setup()
   interpolator.setPoints(xPart, yPart, zPart);
   interpolator.find();
 
-  std::vector<dfloat> U(nrs->U, nrs->U + mesh->dim * nrs->fieldOffset);
+  std::vector<dfloat> U(mesh->dim * nrs->fieldOffset);
+  nrs->o_U.copyTo(U.data(), U.size());
   interpolator.eval(nrs->NVfields, nrs->fieldOffset, U, nParticles, particleU0);
 
   // set particle initial positions and velocities
@@ -244,9 +249,9 @@ void UDF_ExecuteStep(double time, int tstep)
   }
 
   if (nrs->isCheckpointStep) {
-    nrs->ocopyToNek(time, tstep);
+    nrs->copyToNek(time, tstep);
     nek::userchk(); // compute lambda2
-    nrs->ocopyFromNek(time);
+    nrs->copyFromNek(time);
 
     particles->writeFld();
   }

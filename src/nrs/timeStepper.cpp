@@ -195,14 +195,14 @@ dfloat nrs_t::adjustDt(int tstep)
 
         const auto minRho = platform->linAlg->min(this->meshV->Nlocal, this->o_rho, platform->comm.mpiComm);
         const auto maxU = maxFU / minRho;
-        const auto x = this->meshV->x;
-        const auto y = this->meshV->y;
-        const auto z = this->meshV->z;
+
+        auto [x, y, z] = meshV->xyzHost();
 
         auto minLengthScale = 10 * std::numeric_limits<double>::max();
         for (int i = 0; i < this->meshV->Nlocal; i++) {
-          const double lengthScale = sqrt((x[0] - x[1]) * (x[0] - x[1]) + (y[0] - y[1]) * (y[0] - y[1]) +
-                                          (z[0] - z[1]) * (z[0] - z[1]));
+          const double lengthScale = sqrt( (x[0] - x[1]) * (x[0] - x[1]) + 
+                                           (y[0] - y[1]) * (y[0] - y[1]) +
+                                           (z[0] - z[1]) * (z[0] - z[1]) );
           minLengthScale = std::min(lengthScale, minLengthScale);
         }
 

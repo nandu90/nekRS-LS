@@ -465,10 +465,6 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
 {
   auto mesh = nrs->meshV;
 
-  mesh->o_x.copyTo(mesh->x, mesh->Nlocal);
-  mesh->o_y.copyTo(mesh->y, mesh->Nlocal);
-  mesh->o_z.copyTo(mesh->z, mesh->Nlocal);
-
   auto o_Ue = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset);
   auto o_Pe = platform->device.malloc<dfloat>(nrs->fieldOffset);
   exactUVWPKernel(mesh->Nlocal, time, mesh->o_x, mesh->o_y, mesh->o_z, nrs->fieldOffset, o_Pe, o_Ue);
@@ -737,14 +733,19 @@ void ciTestDistance(nrs_t *nrs)
   std::vector<dfloat> dist(mesh->Nlocal);
   o_dist.copyTo(dist.data(), mesh->Nlocal);
 
+  std::vector<dfloat> x(mesh->Nlocal);
+  std::vector<dfloat> y(mesh->Nlocal);
+  std::vector<dfloat> z(mesh->Nlocal);
+
+  mesh->o_x.copyTo(x.data());
+  mesh->o_y.copyTo(y.data());
+  mesh->o_z.copyTo(z.data());
+
   // distance from wall is 1-r
   dfloat maxRelErr = 0.0;
   std::vector<dfloat> refVal(mesh->Nlocal, 0.0);
   for(int n = 0; n < mesh->Nlocal; ++n){
-    const auto x = mesh->x[n];
-    const auto y = mesh->y[n];
-    const auto z = mesh->z[n];
-    const auto r = std::sqrt(x*x + y*y + z*z);
+    const auto r = std::sqrt(x[n]*x[n] + y[n]*y[n] + z[n]*z[n]);
 
     const auto ref = std::abs(1. - r);
     refVal[n] = ref;
@@ -1007,7 +1008,7 @@ void ciTestErrors(nrs_t *nrs,
   }
 
 
-  nrs->ocopyToNek(time, tstep);
+  nrs->copyToNek(time, tstep);
   nek::userchk();
 
   auto err = nek::ptr<double>("errors");

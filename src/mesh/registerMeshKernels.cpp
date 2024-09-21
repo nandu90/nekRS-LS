@@ -71,7 +71,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
 
       // N to M
       for (int M = 1; M < mesh_t::maxNqIntp; M++) {
-        if (M == N) continue;
+        //if (M == N) continue;
 
         {
           auto transpose = false;

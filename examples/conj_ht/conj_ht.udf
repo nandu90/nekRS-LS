@@ -61,18 +61,25 @@ void UDF_Setup()
   nrs->userScalarSource = &userq;
   nrs->userProperties = &uservp;
 
+
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
-    auto mesh = nrs->meshV;
-    for(int n = 0; n < mesh->Nlocal; n++) {
-      nrs->U[n + 0 * nrs->fieldOffset] = 4.0 * mesh->y[n] * (1.0 - mesh->y[n]);
-      nrs->U[n + 1 * nrs->fieldOffset] = 0;
-      nrs->U[n + 2 * nrs->fieldOffset] = 0;
-      nrs->cds->S[n] = 0; 
+    {
+      auto mesh = nrs->meshV;
+      auto [x, y, z] = mesh->xyzHost();
+      std::vector<dfloat> U(mesh->dim * nrs->fieldOffset, 0.0);
+      for(int n = 0; n < mesh->Nlocal; n++) {
+        U[n + 0 * nrs->fieldOffset] = 4.0 * y[n] * (1.0 - y[n]);
+      }
+      nrs->o_U.copyFrom(U.data(), U.size());
     }
 
-    mesh = nrs->_mesh;
-    for(int n = 0; n < mesh->Nlocal; n++) {
-      nrs->cds->S[n] = 0; 
+    {
+      auto mesh = nrs->_mesh;
+      std::vector<dfloat> T(mesh->Nlocal);
+      for(int n = 0; n < mesh->Nlocal; n++) {
+        T[n] = 0; 
+      }
+      nrs->cds->o_S.copyFrom(T.data(), T.size());
     }
   }
 }
@@ -80,7 +87,7 @@ void UDF_Setup()
 void UDF_ExecuteStep(double time, int tstep)
 {
   if (nrs->isCheckpointStep) {
-    nrs->ocopyToNek(time, tstep);
+    nrs->copyToNek(time, tstep);
     nek::userchk();
   }
   if (ciMode) {

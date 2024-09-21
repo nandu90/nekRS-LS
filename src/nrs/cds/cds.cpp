@@ -107,7 +107,6 @@ cds_t::cds_t(cdsConfig_t &cfg)
   this->dp0thdt = cfg.dp0thdt;
   this->alpha0Ref = cfg.alpha0Ref;
 
-  //auto mesh = this->mesh[0];
   this->cht = (this->mesh[0] != this->meshV) ? true : false;
 
   this->fieldOffsetScan[0] = 0;
@@ -122,15 +121,13 @@ cds_t::cds_t(cdsConfig_t &cfg)
 
   this->o_fieldOffsetScan = platform->device.malloc<dlong>(this->NSfields, this->fieldOffsetScan.data());
 
-  this->gsh = oogs::setup(this->meshV->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO);
+  this->gsh = oogs::setup(this->meshV->ogs, 1, 0, ogsDfloat, NULL, OOGS_AUTO);
   this->qqt = new QQt(this->gsh);
 
   this->gshT = (this->cht)
-                   ? oogs::setup(this->mesh[0]->ogs, 1, this->fieldOffset[0], ogsDfloat, NULL, OOGS_AUTO)
+                   ? oogs::setup(this->mesh[0]->ogs, 1, 0, ogsDfloat, NULL, OOGS_AUTO)
                    : this->gsh;
   this->qqtT = new QQt(this->gshT);
-
-  this->S = (dfloat *)calloc(std::max(this->nBDF, this->nEXT) * this->fieldOffsetSum, sizeof(dfloat));
 
   this->o_prop = platform->device.malloc<dfloat>(2 * this->fieldOffsetSum);
   this->o_diff = this->o_prop.slice(0 * this->fieldOffsetSum);
@@ -193,7 +190,7 @@ cds_t::cds_t(cdsConfig_t &cfg)
   this->o_cvodeSolve = platform->device.malloc<dlong>(this->NSfields, this->cvodeSolve.data());
 
   int nFieldsAlloc = this->anyEllipticSolver ? std::max(this->nBDF, this->nEXT) : 1;
-  this->o_S = platform->device.malloc<dfloat>(nFieldsAlloc * this->fieldOffsetSum, this->S);
+  this->o_S = platform->device.malloc<dfloat>(nFieldsAlloc * this->fieldOffsetSum);
 
   nFieldsAlloc = this->anyEllipticSolver ? this->nEXT : 1;
   this->o_NLT = platform->device.malloc<dfloat>(nFieldsAlloc * this->fieldOffsetSum);

@@ -94,8 +94,6 @@ public:
   occa::memory o_compute;
   occa::memory o_cvodeSolve;
 
-  dfloat *S = nullptr;
-
   std::vector<dfloat> filterS;
   occa::memory o_applyFilterRT;
   occa::memory o_filterS;
