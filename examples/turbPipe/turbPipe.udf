@@ -248,11 +248,11 @@ void UDF_ExecuteStep(double time, int tstep)
   processAscentYaml = processAscentYaml || (tstep % processAscentYamlFrequency == 0 && tstep > 0);
 #endif
 
-  if (nrs->isCheckpointStep || processAscentYaml) {
+  if (nrs->checkpointStep || processAscentYaml) {
     nrs->Qcriterion(nrs->o_U, o_qcriterion);
   }
 
-  if (nrs->isCheckpointStep) {
+  if (nrs->checkpointStep) {
     auto o_UZ = nrs->o_U + 2 * nrs->fieldOffset;
     const dfloat ubar =
         platform->linAlg->innerProd(mesh->Nlocal, o_UZ, mesh->o_Jw, platform->comm.mpiComm) / mesh->volume;

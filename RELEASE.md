@@ -35,9 +35,9 @@ This list provides an overview of the most significant changes in this release, 
 * `scalarDirichletConditions` -> `codedFixedValueVelocity` (same for scalars)
 * `scalarNeumannConditions` -> `codedFixedGradientVelocity` (same for scalars)
 * `useric` of nek5000 is no longer automatically called, instead call it in `UDF_Setup` (see e.g. lowMach example)
-* use `nrs->o_U` instead of `nrs->U` (host version was removed) 
-* use `cds->o_S` instead of `cds->S` (host version was removed)
-* use `mesh->o_x` instead of `mesh->x` (host version was removed, same for other components) 
+* use temporary instead of `nrs->U` and copy to `nrs->o_U`
+* use temporary instead of `cds->S` and copy to `cds->o_S`
+* use `auto [x, y, z] = mesh->xyzHost()` instead of `mesh->x` (same for other components) 
 * `nrs->meshV` -> `nrs->mesh`
 * `nrs->_mesh` -> `cds->mesh[0]`
 * `nek::userchk` is no longer called automatically during setup 
@@ -62,7 +62,7 @@ This list provides an overview of the most significant changes in this release, 
 * `occaProperties` > `deviceKernelProperties`
 * `occa::memory` -> `deviceMemory` 
 * remove `nrs_t` argument from `<plugin>::setup`
-* `nrs->isOutputStep` -> `nrs->isCheckpointStep`
+* `nrs->isOutputStep` -> `nrs->checkpointStep`
 * `pointInterpolation_t::setPoints(int, dfloat*, dfloat*, dfloat*)` -> `pointInterpolation_t::setPoints(const std::vector<dfloat>&, const std::vector<dfloat>&, const std::vector<dfloat>&)`
 * use `iofld` class instead of `writeFld`
 * `nrs->usrwrk` was removed (it's a user variable not used anywhere in the code)

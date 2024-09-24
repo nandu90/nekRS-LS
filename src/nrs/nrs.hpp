@@ -94,7 +94,7 @@ public:
   int tstep = 0;
   int lastStep = 0;
   int outerCorrector = 1;
-  int isCheckpointStep = 0;
+  int checkpointStep = 0;
   int outputForceStep = 0;
 
   int Nsubsteps = 0;
