@@ -31,17 +31,18 @@
 This list provides an overview of the most significant changes in this release, although it may not encompass all modifications. We acknowledge that this release introduces several breaking changes. These adjustments were essential to enhance the stability of the user interface in future iterations. We apologize for any inconvenience this may cause.
 
 * run `build.sh` instead of `nrsconfig` to build the code
-* change par section `TEMPERATURE` to `SCALAR00` in case it does not represent indeed a physical temperature (e.g. lowMach or CHT)
-* `scalarDirichletConditions` -> `codedFixedValueVelocity` (same for scalars)
-* `scalarNeumannConditions` -> `codedFixedGradientVelocity` (same for scalars)
-* `useric` of nek5000 is no longer automatically called, instead call it in `UDF_Setup` (see e.g. lowMach example)
+* change par section `TEMPERATURE` to `SCALAR00` in case it does not represent indeed a physical temperature
+* `velocityDirichletConditions` -> `codedFixedValueVelocity` (same for scalars)
+* `velocityNeumannConditions` -> `codedFixedGradientVelocity` (same for scalars)
+* `nek::useric` is no longer automatically called, instead call it in `UDF_Setup` (see e.g. lowMach example)
+* `nek::userchk` is no longer called automatically 
 * use temporary instead of `nrs->U` and copy to `nrs->o_U`
 * use temporary instead of `cds->S` and copy to `cds->o_S`
 * use `auto [x, y, z] = mesh->xyzHost()` instead of `mesh->x` (same for other components) 
 * `nrs->meshV` -> `nrs->mesh`
 * `nrs->_mesh` -> `cds->mesh[0]`
-* `nek::userchk` is no longer called automatically during setup 
-* `nek::copyToNek` -> `nrs->copyToNek` (same for all other variants) 
+* `nek::copyToNek` -> `nrs->copyToNek`
+* `nek::copyFromNek` and `nek::ocopyToNek` were removed 
 * send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd` (no automatic check every N steps)
 * use `auto foo = platform->o_memPool.reserve<T>(nWords)` instead of preallocated slices of `occa::memory::o_mempool`
 * change count argument of `occa::memory::slice, occa::memory::copyFrom, occa::memory::copyTo` to number of words instead of bytes 
@@ -67,9 +68,7 @@ This list provides an overview of the most significant changes in this release, 
 * use `iofld` class instead of `writeFld`
 * `nrs->usrwrk` was removed (it's a user variable not used anywhere in the code)
 * field file extension start with 0-index
-* `nek::copyToNek` -> `nrs->copyToNek`
-* `nek::copyFromNek` -> `nrs->copyFromNek`
-* `nek::ocopyFromNek` and `nek::ocopyToNek` was removed 
+
 
 ## Known Bugs / Restrictions
 
