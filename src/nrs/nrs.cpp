@@ -1554,13 +1554,6 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool print
 
 void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforceFP64, int N_, bool uniform)
 {
-  std::string outputMeshSave;
-  static bool firstTime = true;
-  if (firstTime) {
-    platform->options.getArgs("CHECKPOINT OUTPUT MESH", outputMeshSave);
-    platform->options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
-  }
-
   const auto outXYZ = (enforceOutXYZ) ? true : platform->options.compareArgs("CHECKPOINT OUTPUT MESH", "TRUE");
 
   if (!checkpointWriter->isInitialized()) {
@@ -1618,11 +1611,6 @@ void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforce
   }
 
   checkpointWriter->process();
-
-  if (firstTime) {
-    platform->options.setArgs("CHECKPOINT OUTPUT MESH", outputMeshSave);
-    firstTime = false;
-  }
 }
 
 int nrs_t::lastStepLocalSession(double timeNew, int tstep, double elapsedTime)
