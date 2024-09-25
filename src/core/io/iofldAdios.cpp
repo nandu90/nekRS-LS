@@ -140,7 +140,7 @@ void iofldAdios::putVariableConvert(const std::vector<occa::memory> &o_fld, occa
   nekrsCheck(dim_fld != 1 && dim_fld != 3,
              MPI_COMM_SELF,
              EXIT_FAILURE,
-             "%s %d\n",
+             "%s %zu\n",
              "invalid field dimension=",
              dim_fld);
 

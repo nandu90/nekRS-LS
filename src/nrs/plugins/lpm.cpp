@@ -391,7 +391,7 @@ void lpm_t::initialize(int nParticles, double t0, const occa::memory &o_y0)
   nekrsCheck(o_y0.length() != nParticles * nDOFs_,
              platform->comm.mpiComm,
              EXIT_FAILURE,
-             "o_y0.length() = %ld , while expecting %d words!\n",
+             "o_y0.length() = %llu , while expecting %d words!\n",
              o_y0.length(),
              nParticles * nDOFs_);
 
@@ -1414,19 +1414,19 @@ void lpm_t::addParticles(int newNParticles,
   nekrsCheck(o_yNewPart.length() < expectedYSize,
              MPI_COMM_SELF,
              EXIT_FAILURE,
-             "o_yNewPart length is %ld but expected %d words!\n",
+             "o_yNewPart length is %llu but expected %d words!\n",
              o_yNewPart.length(),
              expectedYSize);
   nekrsCheck(o_propNewPart.length() < expectedPropSize,
              MPI_COMM_SELF,
              EXIT_FAILURE,
-             "o_propNewPart length is %ld but expected %d words!\n",
+             "o_propNewPart length is %llu but expected %d words!\n",
              o_propNewPart.length(),
              expectedPropSize);
   nekrsCheck(o_ydotNewPart.length() < expectedYdotSize,
              MPI_COMM_SELF,
              EXIT_FAILURE,
-             "o_ydotNewPart length is %ld but expected %d words!\n",
+             "o_ydotNewPart length is %llu but expected %d words!\n",
              o_ydotNewPart.length(),
              expectedYdotSize);
 

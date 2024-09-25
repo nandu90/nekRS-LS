@@ -249,7 +249,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
 
         nekrsCheck(Rows[i] < 0 || Cols[i] < 0 || std::isnan(Vals[i]),
                    MPI_COMM_SELF, EXIT_FAILURE,
-                   "invalid {row %d, col %d , val %g}\n",
+                   "invalid {row %lld, col %lld , val %g}\n",
                    Rows[i], Cols[i], Vals[i]);
       }
       free(coarseA);

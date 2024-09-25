@@ -7,7 +7,6 @@ occa::memory mesh_t::intpMatrix(std::vector<dfloat> M)
   nekrsCheck(M.size() > mesh_t::maxNqIntp, 
              MPI_COMM_SELF, 
              EXIT_FAILURE, 
-             "%s\n", 
              "target N has to be smaller or equal to %d", mesh_t::maxNqIntp - 1);
 
   static std::array<occa::memory, mesh_t::maxNqIntp> o_J;
