@@ -4,10 +4,15 @@ function(add_nek5000)
 
 message(CHECK_START "Checking for a supported Nek5000 Fortran compiler")
 
-if(USING_GNU OR USING_INTEL_LLVM OR USING_NVHPC OR USING_FLANG)
+string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "GNU" USING_Fortran_GNU)
+string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "IntelLLVM" USING_Fortran_INTEL_LLVM)
+string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "NVHPC" USING_Fortran_NVHPC)
+string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "Flang" USING_Fortran_FLANG)
+
+if(USING_Fortran_GNU OR USING_Fortran_INTEL_LLVM OR USING_Fortran_NVHPC OR USING_Fortran_FLANG)
   message(CHECK_PASS "Found the ${CMAKE_Fortran_COMPILER_ID} Fortran compiler")
 else()
-  message(FATAL_ERROR "No supported Fortran compiler found to build Nek5000 interface!")
+  message(FATAL_ERROR "Fortran compiler ${CMAKE_Fortran_COMPILER_ID} not supported to build Nek5000 interface!")
 endif()
 
 if (${NEK5000_PPLIST} MATCHES "PARRSB")
