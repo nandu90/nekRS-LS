@@ -32,7 +32,7 @@ FetchContent_Declare(
   URL ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party/nek5000)
 FetchContent_GetProperties(nek5000_content)
 if (NOT nek5000_content_POPULATED)
-  FetchContent_Populate(nek5000_content)
+  FetchContent_MakeAvailable(nek5000_content)
 endif()
 
 set(NEK5000_SOURCE_DIR ${nek5000_content_SOURCE_DIR})
@@ -54,7 +54,7 @@ FetchContent_Declare(
   SOURCE_DIR ${NEK5000_GS_DIR}
 )
 if (NOT nek5000_gs_content_POPULATED)
-  FetchContent_Populate(nek5000_gs_content)
+  FetchContent_MakeAvailable(nek5000_gs_content)
 endif()
 
 # ./build/_deps/nek5000_content-src/3rd_party/gslib/lib/libgs.a
@@ -78,7 +78,7 @@ if (NOT parrsb_content_POPULATED)
   # Moves `install` script so it doesn't get clobbered when 
   # populating content.  
   #file(RENAME ${PARRSB_DIR}/install temp_parrsb_install)
-  FetchContent_Populate(parrsb_content)
+  FetchContent_MakeAvailable(parrsb_content)
   #file(RENAME temp_parrsb_install ${PARRSB_DIR}/install)
 endif()
 
