@@ -18,7 +18,7 @@ void nrs_t::initOuterStep(double time, dfloat _dt, int tstep)
 
 void nrs_t::finishOuterStep() {}
 
-bool nrs_t::runOuterStep(std::function<bool(int)> convergenceCheck, int stage)
+void nrs_t::runOuterStep(std::function<bool(int)> convergenceCheck, int stage)
 {
   int innerSteps = 1;
   platform->options.getArgs("NEKNEK MULTIRATE STEPS", innerSteps);
@@ -39,6 +39,7 @@ bool nrs_t::runOuterStep(std::function<bool(int)> convergenceCheck, int stage)
     restoreSolutionState();
   }
 
+  // run sub-stepping
   for (int step = 1; step <= innerSteps; ++step) {
     const auto last = (step == innerSteps);
     initInnerStep(time, dt[0], tstep);
@@ -47,7 +48,7 @@ bool nrs_t::runOuterStep(std::function<bool(int)> convergenceCheck, int stage)
     int innerStage = 1;
     bool converged = false;
     do {
-      converged = runInnerStep(convergenceCheck, innerStage++);
+      converged = runInnerStep(convergenceCheck, innerStage++, outerConverged);
     } while (!converged);
 
     finishInnerStep();
@@ -65,6 +66,4 @@ bool nrs_t::runOuterStep(std::function<bool(int)> convergenceCheck, int stage)
   if (!outerConverged) {
     neknek->setCorrectorTime(time);
   }
-
-  return outerConverged;
 }

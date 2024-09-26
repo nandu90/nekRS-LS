@@ -257,11 +257,11 @@ public:
 
 private:
   void initInnerStep(double time, dfloat dt, int tstep);
-  bool runInnerStep(std::function<bool(int)> convergenceCheck, int stage);
+  bool runInnerStep(std::function<bool(int)> convergenceCheck, int stage, bool outerConverged);
   void finishInnerStep();
 
   void initOuterStep(double time, dfloat dt, int tstep);
-  bool runOuterStep(std::function<bool(int)> convergenceCheck, int stage);
+  void runOuterStep(std::function<bool(int)> convergenceCheck, int stage);
   void finishOuterStep();
 
   int tStepOuterStart;

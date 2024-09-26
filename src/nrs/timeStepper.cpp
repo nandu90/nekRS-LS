@@ -520,20 +520,18 @@ void nrs_t::finishInnerStep()
 
 bool nrs_t::runStep(std::function<bool(int)> convergenceCheck, int iter)
 {
-  this->timeStepConverged = false;
+  timeStepConverged = false;
 
-  bool converged;
   if (platform->options.compareArgs("NEKNEK MULTIRATE TIMESTEPPER", "TRUE")) {
-    converged = runOuterStep(convergenceCheck, iter);
+    runOuterStep(convergenceCheck, iter);
   } else {
-    converged = runInnerStep(convergenceCheck, iter);
+    runInnerStep(convergenceCheck, iter, true);
   }
-  this->timeStepConverged = converged;
 
-  return this->timeStepConverged;
+  return timeStepConverged;
 }
 
-bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter)
+bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter, bool outerConverged)
 {
   this->outerCorrector = iter;
 
@@ -617,21 +615,23 @@ bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter)
     mesh->o_U.copyFrom(o_Unew, this->NVfields * this->fieldOffset);
   }
 
-  auto timeStepConverged = convergenceCheck(iter);
+  const auto converged = convergenceCheck(iter);
+  timeStepConverged = converged && outerConverged;
 
-  platform->timer.tic("udfExecuteStep", 1);
   nek::ifoutfld(0);
   checkpointStep = 0;
   if (checkpointStep0 && timeStepConverged) {
     nek::ifoutfld(1);
     checkpointStep = 1;
   }
+
+  platform->timer.tic("udfExecuteStep", 1);
   if (udf.executeStep) {
     udf.executeStep(timeNew, tstep);
   }
   platform->timer.toc("udfExecuteStep");
 
-  return timeStepConverged;
+  return converged;
 }
 
 void nrs_t::saveSolutionState()
