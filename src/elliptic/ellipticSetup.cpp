@@ -148,6 +148,10 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
                                                      platform->comm.mpiComm) /
                          elliptic->mesh->volume;
 
+  nekrsCheck(std::isnan(elliptic->lambda0Avg) || elliptic->lambda0Avg == 0, 
+             MPI_COMM_SELF, EXIT_FAILURE, 
+             "unreasonable lambda0Avg=%g!\n", elliptic->lambda0Avg); 
+
   elliptic->poisson = (elliptic->o_lambda1.isInitialized()) ? 0 : 1;
 
   platform->options.getArgs("ELEMENT TYPE", elliptic->elementType);
