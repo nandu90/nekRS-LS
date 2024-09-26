@@ -32,34 +32,27 @@ occa::memory mesh_t::intpMatrix(std::vector<dfloat> M)
   return o_J[M.size() - 1];
 }
 
-void mesh_t::interpolate(const occa::memory& o_z, mesh_t *mesh, occa::memory& o_zM)
+void mesh_t::interpolate(const occa::memory& o_z, mesh_t *mesh, occa::memory& o_zM, bool uniform)
 {
+  if (uniform) {
+    auto M = [&]()
+    {
+      std::vector<dfloat> r(mesh->N + 1);
+      r[0] = -1.0;
+      r[mesh->N] = 1.0;
+  
+      const auto dr = (r[mesh->N] - r[0]) / mesh->N;
+      for(int i = 1; i < mesh->N; i++) r[i] = r[i-1] + dr;
+      return r;
+    }();
+
+    this->intpKernel[mesh->N](this->Nelements, intpMatrix(M), o_z, o_zM);
+    return;
+  }
+
   std::vector<dfloat> M(mesh->Nq);
   for(int i = 0; i < M.size(); i++) M[i] = mesh->r[i];
 
   const dlong nel = std::min(this->Nelements, mesh->Nelements);
   this->intpKernel[mesh->N](nel, intpMatrix(M), o_z, o_zM);
-}
-
-void mesh_t::map2Uniform(const occa::memory& o_z, mesh_t *meshU, occa::memory& o_zU)
-{
-  const auto Nu = meshU->N;
-
-  auto U = [&]()
-  {
-    std::vector<dfloat> r(Nu + 1);
-    r[0] = -1.0;
-    r[Nu] = 1.0;
- 
-    const auto dr = (r[Nu] - r[0]) / Nu;
-    for(int i = 1; i < Nu; i++) r[i] = r[i-1] + dr;
-    return r;
-  }();
-
-  this->intpKernel[Nu](this->Nelements, intpMatrix(U), o_z, o_zU);
-}
-
-void mesh_t::map2Uniform(const occa::memory& o_z, occa::memory& o_zU)
-{
-  map2Uniform(o_z, this, o_zU); 
 }

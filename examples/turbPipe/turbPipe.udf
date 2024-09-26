@@ -221,9 +221,7 @@ void UDF_Setup()
 
     const int Nviz = 1.5 * mesh->N;
     const auto uniform = true;
-    const auto async = false; 
-    const auto stageThroughHost = false;
-    nekAscent::setup(mesh, "ascent.yaml", Nviz, uniform, async, stageThroughHost);
+    nekAscent::setup(mesh, "ascent.yaml", Nviz, uniform);
   }
 #endif
 
