@@ -617,14 +617,6 @@ void printStepInfo(double time, int tstep, bool printStepInfo, bool printVerbose
   nrs->printStepInfo(time, tstep, printStepInfo, printVerboseInfo);
 }
 
-void verboseStepInfo(bool enabled)
-{
-  platform->options.setArgs("VERBOSE SOLVER INFO", "FALSE");
-  if (enabled) {
-    platform->options.setArgs("VERBOSE SOLVER INFO", "TRUE");
-  }
-}
-
 void updateTimer(const std::string &key, double time)
 {
   platform->timer.set(key, time);

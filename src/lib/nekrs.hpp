@@ -45,7 +45,6 @@ int exitValue(void);
 bool stepConverged(void);
 void processUpdFile();
 void printStepInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo);
-void verboseStepInfo(bool enabled);
 void updateTimer(const std::string &key, double time);
 void resetTimer(const std::string &key);
 

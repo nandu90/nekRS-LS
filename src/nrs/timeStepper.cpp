@@ -616,7 +616,8 @@ bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter, bo
   }
 
   const auto converged = convergenceCheck(iter);
-  timeStepConverged = converged && outerConverged;
+
+  timeStepConverged = outerConverged && converged;
 
   nek::ifoutfld(0);
   checkpointStep = 0;
