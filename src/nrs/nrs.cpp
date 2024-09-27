@@ -296,7 +296,7 @@ static void setupEllipticSolvers(nrs_t *nrs)
       nrs->vSolver = new elliptic("velocity", mesh, nrs->fieldOffset, EToBy, o_lambda0, o_lambda1);
       nrs->wSolver = new elliptic("velocity", mesh, nrs->fieldOffset, EToBz, o_lambda0, o_lambda1);
     }
-  } // flow
+  }
 
   if (nrs->flow) {
     auto mesh = nrs->mesh;
@@ -315,7 +315,7 @@ static void setupEllipticSolvers(nrs_t *nrs)
       nrs->cds->dpdt = nrs->pSolver->nullSpace();
     }
 
-  } // flow
+  }
 
   if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
     auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
@@ -704,7 +704,7 @@ void nrs_t::init()
 
   this->o_Ue = platform->device.malloc<dfloat>(this->NVfields * this->fieldOffset);
 
-  this->o_P = platform->device.malloc<dfloat>(this->fieldOffset);
+  this->o_P = platform->device.malloc<dfloat>(mesh->Nlocal);
 
   this->o_JwF = platform->device.malloc<dfloat>(this->NVfields * this->fieldOffset);
   this->o_NLT = platform->device.malloc<dfloat>(this->NVfields * this->nEXT * this->fieldOffset);
@@ -853,10 +853,9 @@ void nrs_t::init()
     }
   }
 
-  if (platform->comm.mpiRank == 0) {
-    std::cout << std::endl;
-  }
+
   printMeshMetrics(meshT);
+  if (mesh != meshT) printMeshMetrics(mesh);
 
   setupEllipticSolvers(this);
 }
@@ -1053,6 +1052,11 @@ void nrs_t::setIC()
   double startTime;
   platform->options.getArgs("START TIME", startTime);
   copyToNek(startTime, 0, true); // ensure both codes are in sync 
+
+  nekrsCheck(platform->options.compareArgs("LOWMACH", "TRUE") && p0th[0] <= 1e-6,
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "Unreasonable p0th value %g!", p0th[0]);
 }
 
 void nrs_t::printRunStat(int step)
@@ -1503,33 +1507,6 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool print
     if (printStepInfo) {
       printf("step= %d  t= %.8e  dt=%.1e  C= %.3f", tstep, time, this->dt[0], cfl);
       if (!printTimers) std::cout << std::endl;
-    }
-
-    if (!verboseInfo) { // print basic solver stats
-      bool cvodePrinted = false;
-      for (int is = 0; is < this->Nscalar; is++) {
-        if (cds->compute[is] && !cds->cvodeSolve[is]) {
-          printf("  S: %d", cds->solver[is]->Niter());
-        } else if (cds->cvodeSolve[is] && !cvodePrinted) {
-          this->cds->cvode->printInfo(false);
-          cvodePrinted = true;
-        }
-      }
-
-      if (this->flow) {
-        printf("  P: %d", this->pSolver->Niter());
-        if (this->uvwSolver) {
-          printf("  UVW: %d", this->uvwSolver->Niter());
-        } else {
-          printf("  U: %d  V: %d  W: %d",
-                 this->uSolver->Niter(),
-                 this->vSolver->Niter(),
-                 this->wSolver->Niter());
-        }
-      }
-      if (this->meshSolver) {
-        printf("  MSH: %d", this->meshSolver->Niter());
-      }
     }
 
     if (printTimers) {
