@@ -148,7 +148,7 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
                                                      platform->comm.mpiComm) /
                          elliptic->mesh->volume;
 
-  nekrsCheck(std::isnan(elliptic->lambda0Avg) || elliptic->lambda0Avg == 0, 
+  nekrsCheck(!std::isnormal(elliptic->lambda0Avg) || elliptic->lambda0Avg == 0, 
              MPI_COMM_SELF, EXIT_FAILURE, 
              "unreasonable lambda0Avg=%g!\n", elliptic->lambda0Avg); 
 
