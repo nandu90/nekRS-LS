@@ -106,24 +106,24 @@ occa::memory pressureSolve(nrs_t *nrs, double time, int stage)
   platform->timer.toc("pressure rhs");
   platform->flopCounter->add("pressure RHS", flopCount);
 
-  occa::memory o_p = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
-  o_p.copyFrom(nrs->o_P);
+  occa::memory o_P = platform->o_memPool.reserve<dfloat>(nrs->o_P.size());
+  o_P.copyFrom(nrs->o_P);
 
-  nrs->pSolver->solve(o_lambda0, o_NULL, o_pRhs, o_p);
+  nrs->pSolver->solve(o_lambda0, o_NULL, o_pRhs, o_P);
 
   if (platform->verbose) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                                  1,
                                                                  nrs->fieldOffset,
                                                                  mesh->ogs->o_invDegree,
-                                                                 o_p,
+                                                                 o_P,
                                                                  platform->comm.mpiComm);
     if (platform->comm.mpiRank == 0) {
       printf("p norm: %.15e\n", debugNorm);
     }
   }
 
-  return o_p;
+  return o_P;
 }
 
 occa::memory velocitySolve(nrs_t *nrs, double time, int stage)

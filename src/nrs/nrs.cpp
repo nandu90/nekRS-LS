@@ -704,7 +704,7 @@ void nrs_t::init()
 
   this->o_Ue = platform->device.malloc<dfloat>(this->NVfields * this->fieldOffset);
 
-  this->o_P = platform->device.malloc<dfloat>(mesh->Nlocal);
+  this->o_P = platform->device.malloc<dfloat>(this->fieldOffset);
 
   this->o_JwF = platform->device.malloc<dfloat>(this->NVfields * this->fieldOffset);
   this->o_NLT = platform->device.malloc<dfloat>(this->NVfields * this->nEXT * this->fieldOffset);
@@ -738,7 +738,7 @@ void nrs_t::init()
 
   if (platform->options.compareArgs("CONSTANT FLOW RATE", "TRUE")) {
     this->o_Uc = platform->device.malloc<dfloat>(this->NVfields * this->fieldOffset);
-    this->o_Pc = platform->device.malloc<dfloat>(this->fieldOffset);
+    this->o_Pc = platform->device.malloc<dfloat>(mesh->Nlocal);
     this->o_prevProp = platform->device.malloc<dfloat>(2 * this->fieldOffset);
     this->o_prevProp.copyFrom(this->o_prop, this->o_prevProp.length());
   }
@@ -1753,7 +1753,7 @@ void nrs_t::copyFromNek(double &time)
   }
 
   {
-    auto P = platform->memPool.reserve<dfloat>(fieldOffset);
+    auto P = platform->memPool.reserve<dfloat>(o_P.size());
     auto Pptr = P.ptr<dfloat>(); 
     for (int i = 0; i < mesh->Nlocal; i++) {
       Pptr[i] = nekData.pr[i];

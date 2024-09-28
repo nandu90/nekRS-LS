@@ -95,8 +95,8 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
   if (platform->verbose) 
     printNorm(o_rhs, "o_rhs");
 
-  auto o_x0 = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
-  o_x0.copyFrom(o_x, elliptic->Nfields * elliptic->fieldOffset);
+  auto o_x0 = platform->o_memPool.reserve<dfloat>(o_x.size());
+  o_x0.copyFrom(o_x);
 
   if (platform->verbose) 
     printNorm(o_x0, "o_x0");
@@ -117,7 +117,7 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
   // compute initial residual r = rhs - Ax0
   auto o_r = [&]()
   {
-    auto o_r = platform->o_memPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
+    auto o_r = platform->o_memPool.reserve<dfloat>(o_rhs.size());
     auto& o_Ap = o_x;
     ellipticAx(elliptic, mesh->Nelements, mesh->o_elementList, o_x0, o_Ap, dfloatString);
     platform->linAlg->axpbyzMany(mesh->Nlocal,
@@ -189,7 +189,7 @@ void ellipticSolve(elliptic_t *elliptic, const occa::memory &o_lambda0, const oc
     }
 
     elliptic->resNorm = elliptic->res0Norm;
-    platform->linAlg->fill(elliptic->fieldOffset * elliptic->Nfields, 0.0, o_x);
+    platform->linAlg->fill(o_x.size(), 0.0, o_x);
 
     if (options.compareArgs("SOLVER", "PCG")) {
       elliptic->Niter = pcg(elliptic, tol, maxIter, elliptic->resNorm, o_r, o_x);
