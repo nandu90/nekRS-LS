@@ -106,7 +106,7 @@ occa::memory pressureSolve(nrs_t *nrs, double time, int stage)
   platform->timer.toc("pressure rhs");
   platform->flopCounter->add("pressure RHS", flopCount);
 
-  occa::memory o_P = platform->o_memPool.reserve<dfloat>(nrs->o_P.size());
+  occa::memory o_P = platform->o_memPool.reserve<dfloat>(mesh->Nlocal);
   o_P.copyFrom(nrs->o_P);
 
   nrs->pSolver->solve(o_lambda0, o_NULL, o_pRhs, o_P);
@@ -223,9 +223,9 @@ occa::memory velocitySolve(nrs_t *nrs, double time, int stage)
       const auto o_rhsX = o_rhs.slice(0 * nrs->fieldOffset);
       const auto o_rhsY = o_rhs.slice(1 * nrs->fieldOffset);
       const auto o_rhsZ = o_rhs.slice(2 * nrs->fieldOffset);
-      nrs->uSolver->solve(o_lambda0, o_lambda1, o_rhsX, o_U.slice(0 * nrs->fieldOffset));
-      nrs->vSolver->solve(o_lambda0, o_lambda1, o_rhsY, o_U.slice(1 * nrs->fieldOffset));
-      nrs->wSolver->solve(o_lambda0, o_lambda1, o_rhsZ, o_U.slice(2 * nrs->fieldOffset));
+      nrs->uSolver->solve(o_lambda0, o_lambda1, o_rhsX, o_U.slice(0 * nrs->fieldOffset, mesh->Nlocal));
+      nrs->vSolver->solve(o_lambda0, o_lambda1, o_rhsY, o_U.slice(1 * nrs->fieldOffset, mesh->Nlocal));
+      nrs->wSolver->solve(o_lambda0, o_lambda1, o_rhsZ, o_U.slice(2 * nrs->fieldOffset, mesh->Nlocal));
     }
 
     return o_U;
