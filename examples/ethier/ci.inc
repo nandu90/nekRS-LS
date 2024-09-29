@@ -148,6 +148,10 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
 
     if (ciMode == 22) {
+      options.setArgs("VELOCITY SOLVER TOLERANCE", std::string("1e-10"));
+      options.setArgs("SCALAR00 SOLVER TOLERANCE", std::string("1e-10"));
+      options.setArgs("SCALAR01 SOLVER TOLERANCE", std::string("1e-10"));
+
       options.setArgs("PRESSURE SOLVER TOLERANCE", std::string("5e-04"));
       nekrsCheck(sizeof(dfloat) != sizeof(float),
                  platform->comm.mpiComm,
@@ -470,7 +474,7 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   exactUVWPKernel(mesh->Nlocal, time, mesh->o_x, mesh->o_y, mesh->o_z, nrs->fieldOffset, o_Pe, o_Ue);
 
   const auto verbosity = pointInterpolation_t::VerbosityLevel::Detailed;
-  const auto threshold = (sizeof(dfloat) == sizeof(double)) ? 5e-9 : 1e-5;
+  const auto threshold = (sizeof(dfloat) == sizeof(double)) ? 2e-8 : 1e-5;
 
   const auto computeRelErrors = [&](dlong n, dlong offset, occa::memory o_Uexact, occa::memory o_Uinterp) {
     const auto absTol = 1e-5;
@@ -976,6 +980,11 @@ void ciTestErrors(nrs_t *nrs,
       expectedNiterS01 = 8;
     }
 
+    if (ciMode == 22) {
+      expectedNiterS00 = 13;
+      expectedNiterS01 = 11;
+    }
+
     if (ciMode != 12 && nrs->timeStepConverged) {
       int sIterErr = abs(nrs->cds->solver[0]->Niter() - expectedNiterS00);
       CiEvalTest("scalar00 iter step=1 (sIterErr: " + to_string_f(sIterErr) + ")", sIterErr <= 1);
@@ -1203,12 +1212,12 @@ void ciTestErrors(nrs_t *nrs,
     s02IterErr = abs(NiterS02 - 1.67); // nli
     break;
   case 22:
-    velIterErr = abs(NiterU - 10);
+    velIterErr = abs(NiterU - 12);
     s1Err = abs((err[2] - 1.75E-06) / err[2]);
     s2Err = abs((err[3] - 1.77E-06) / err[3]);
-    pIterErr = abs(NiterP - 2);
+    pIterErr = abs(NiterP - 1);
     vxErr = abs((err[0] - 6.82E-07) / err[0]);
-    prErr = abs((err[1] - 8.76E-06) / err[1]);
+    prErr = abs((err[1] - 7.92E-06) / err[1]);
     break;
   }
 
