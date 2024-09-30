@@ -253,14 +253,16 @@ jobs:
 
     - name: 'eddyNekNek'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/build
-      run: ctest -R eddyNekNek
+      run: |
+           ctest -R eddyNekNek
            if [ $? -ne 0 ]; then
              cat  ${{ env.NEKRS_EXAMPLES }}/eddyNekNek/inside/logfile
            fi
 
     - name: 'eddyNekNekNek'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/build
-      run: ctest -R eddyNekNekNek 
+      run: |
+           ctest -R eddyNekNekNek 
            if [ $? -ne 0 ]; then
              cat  ${{ env.NEKRS_EXAMPLES }}/eddyNekNek/middle/logfile
            fi
