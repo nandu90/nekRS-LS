@@ -66,6 +66,7 @@ function(add target num_processes par_file cimodes fp32 working_directory build_
     endif()
 
     set_tests_properties(${name} PROPERTIES ENVIRONMENT "FP32=${fp32_value}")
+    set_tests_properties(${name} PROPERTIES RESOURCE_LOCK ${working_directory})
   endforeach()
 endfunction()
 
