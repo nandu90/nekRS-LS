@@ -29,14 +29,18 @@ function(get_tests filter_string result_var)
   set(${result_var} "${matching_tests}" PARENT_SCOPE)
 endfunction()
 
-function(add_nekrs_test target num_processes par_file cimodes fp32)
-
-set(working_directory "${EXAMPLES_DIR}/${target}")
-  if (ARGC GREATER 5)
-    set(working_directory "${ARGV5}")
+function(add target num_processes par_file cimodes fp32 working_directory build_only)
+  if(working_directory STREQUAL "" )
+    set(working_directory "${EXAMPLES_DIR}/${target}")
   endif()
 
- foreach(cimode ${cimodes})
+  if(fp32)
+    set(fp32_value 1)
+  else()
+    set(fp32_value 0)
+  endif()
+
+  foreach(cimode ${cimodes})
     set (name "${target}_${cimode}")
     list(APPEND TESTS ${test_name}) 
     message(STATUS "adding test ${name}")
@@ -49,37 +53,23 @@ set(working_directory "${EXAMPLES_DIR}/${target}")
       set(num_processes ${NRANKS})
     endif()
  
-    if(fp32)
-      set(fp32_value 1)
+    if(build_only)
+      add_test(NAME ${name} WORKING_DIRECTORY ${working_directory}
+               COMMAND ${LAUNCHER} ${par_file} ${num_processes} --cimode ${cimode} --build-only ${num_processes}
+               DEPENDS ${target})
     else()
-      set(fp32_value 0)
+      add_test(NAME ${name} WORKING_DIRECTORY ${working_directory}
+               COMMAND ${LAUNCHER} ${par_file} ${num_processes} --cimode ${cimode}
+               DEPENDS ${target})
     endif()
- 
-    add_test(NAME ${name} WORKING_DIRECTORY ${working_directory}
-             COMMAND ${LAUNCHER} ${par_file} ${num_processes} --cimode ${cimode}
-             DEPENDS ${target})
+
     set_tests_properties(${name} PROPERTIES ENVIRONMENT "FP32=${fp32_value}")
   endforeach()
 endfunction()
 
-add_nekrs_test("ethier" 2 "ethier.par" "1;2;3;4;7;8;9;10;11;12;14;15;19" FALSE)
-add_nekrs_test("ethier" 2 "mv_ethier.par" "5;6" FALSE)
-add_nekrs_test("ethier" 2 "ethierScalar.par" "13" FALSE)
-add_nekrs_test("ethier" 1 "ethier.par" "22" TRUE)
-
-add_nekrs_test("lowMach" 2 "lowMach.par" "1" FALSE)
-
-add_nekrs_test("mv_cyl" 2 "mv_cyl.par" "1;2;3;5;6" FALSE)
-
-add_nekrs_test("mv_cyl_derived_bc" 2 "mv_cyl_derived_bc.par" "1;2;3;5;6" FALSE "${EXAMPLES_DIR}/mv_cyl")
-
-add_nekrs_test("conj_ht" 2 "conj_ht.par" "1;2" FALSE)
-
-add_nekrs_test("channel" 2 "channel.par" "1;2" FALSE)
-
-add_nekrs_test("shlChannel" 2 "channel.par" "1;2" FALSE)
-
-add_nekrs_test("ktauChannel" 2 "channel.par" "1;2" FALSE)
+set(USE_FP32 ON)
+set(BUILD_ONLY ON)
+set(dir "")
 
 function(add_eddy_neknek)
   set(name "eddyNekNek") 
@@ -89,25 +79,48 @@ function(add_eddy_neknek)
     return()
   endif()
 
-  add_nekrs_test(${name} 2 "${name}.sess" "1;3;4" FALSE)
-  add_nekrs_test(${name} 2 "${name}Mv.sess" "2" FALSE)
+  add(${name} 2 "${name}.sess" "1;3;4" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+  add(${name} 2 "${name}Mv.sess" "2" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
 endfunction()
 
 function(add_eddy_nekneknek)
   set(name "eddyNekNekNek") 
-  set(working_directory "${EXAMPLES_DIR}/eddyNekNek")
+  set(dir "${EXAMPLES_DIR}/eddyNekNek")
 
   if(NRANKS GREATER 0 AND NOT NRANKS EQUAL 3)
     message (STATUS "disabling test ${name}")
     return()
   endif()
 
-  add_nekrs_test(${name} 3 "${name}.sess" "1" FALSE ${working_directory})
-  add_nekrs_test(${name} 3 "${name}Mv.sess" "2" FALSE ${working_directory})
+  add(${name} 3 "${name}.sess" "1" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+  add(${name} 3 "${name}Mv.sess" "2" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
 endfunction()
+
+## TESTS ##
+
+add("ethier-buildOnly" 2 "ethier.par" "1" "${USE_FP32}" "${EXAMPLES_DIR}/ethier" ON)
+add("ethier" 2 "ethier.par" "1;2;3;4;7;8;9;10;11;12;14;15;19" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+add("ethier" 2 "mv_ethier.par" "5;6" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+add("ethier" 2 "ethierScalar.par" "13" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+add("ethier" 1 "ethier.par" "22" ON "${dir}" "${BUILD_ONLY}")
+
+add("lowMach" 2 "lowMach.par" "1" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+
+add("mv_cyl" 2 "mv_cyl.par" "1;2;3;5;6" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+add("mv_cyl_derived_bc" 2 "mv_cyl_derived_bc.par" "1;2;3;5;6" "${USE_FP32}" "${EXAMPLES_DIR}/mv_cyl" "${BUILD_ONLY}")
+
+add("conj_ht" 2 "conj_ht.par" "1;2" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+
+add("channel" 2 "channel.par" "1;2" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+
+add("shlChannel" 2 "channel.par" "1;2" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+
+add("ktauChannel" 2 "channel.par" "1;2" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
 
 add_eddy_neknek()
 add_eddy_nekneknek()
+
+###
 
 foreach(test ${TESTS})
   set_tests_properties(${test} PROPERTIES EXCLUDE_FROM_ALL TRUE)
