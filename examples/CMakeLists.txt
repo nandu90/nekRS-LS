@@ -69,7 +69,7 @@ function(add target num_processes par_file cimodes fp32 working_directory build_
   endforeach()
 endfunction()
 
-set(USE_FP32 ON)
+set(USE_FP32 OFF)
 set(BUILD_ONLY ON)
 set(dir "")
 
