@@ -253,19 +253,11 @@ jobs:
 
     - name: 'eddyNekNek'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/build
-      run: |
-           ctest -R eddyNekNek
-           if [ $? -ne 0 ]; then
-             cat  ${{ env.NEKRS_EXAMPLES }}/eddyNekNek/inside/logfile
-           fi
+      run: ctest -R eddyNekNek || (cat ${{ env.NEKRS_EXAMPLES }}/eddyNekNek/inside/logfile; exit 1) 
 
     - name: 'eddyNekNekNek'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/build
-      run: |
-           ctest -R eddyNekNekNek 
-           if [ $? -ne 0 ]; then
-             cat  ${{ env.NEKRS_EXAMPLES }}/eddyNekNek/middle/logfile
-           fi
+      run: ctest -R eddyNekNekNek || (cat ${{ env.NEKRS_EXAMPLES }}/eddyNekNek/middle/logfile; exit 1) 
 
   ktauChannel:
     needs: install
