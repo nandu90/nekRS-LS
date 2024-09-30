@@ -2,16 +2,18 @@ cmake_minimum_required(VERSION 3.21)
 project(nekrsTests NONE)
 enable_testing()
 
-set(EXAMPLES_DIR "${CMAKE_CURRENT_LIST_DIR}")
-set(LAUNCHER "nrsmpi" CACHE STRING "Path to the launcher executable")
-set(NRANKS "0" CACHE STRING "Number of MPI ranks to run a test")
-set(TESTS "")
-
 if(NOT DEFINED ENV{NEKRS_HOME})
     message(FATAL_ERROR "NEKRS_HOME is not defined. Please set the environment variable.")
 else()
     message(STATUS "NEKRS_HOME is set to: $ENV{NEKRS_HOME}")
 endif()
+set (NEKRS_HOME "$ENV{NEKRS_HOME}")
+
+set(EXAMPLES_DIR "${CMAKE_CURRENT_LIST_DIR}")
+set(LAUNCHER "${NEKRS_HOME}/bin/nrsmpi" CACHE STRING "Path to the launcher executable")
+set(NRANKS "0" CACHE STRING "Number of MPI ranks to run a test")
+set(TESTS "")
+
 
 if(NRANKS GREATER 0)
   message(STATUS "numer of MPI ranks to run tests: ${NRANKS}")
