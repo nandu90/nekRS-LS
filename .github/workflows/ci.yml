@@ -141,7 +141,7 @@ jobs:
 
     - name: 'mv_cyl'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/build
-      run: ctest --output-on-failure -R mv_cyl
+      run: ctest --output-on-failure -R "^mv_cyl$"
 
     - name: 'mv_cyl_derived_bc'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/build
@@ -253,7 +253,7 @@ jobs:
 
     - name: 'eddyNekNek'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/build
-      run: ctest -R eddyNekNek || (cat ${{ env.NEKRS_EXAMPLES }}/eddyNekNek/inside/logfile; exit 1) 
+      run: ctest -R "^eddyNekNek$" || (cat ${{ env.NEKRS_EXAMPLES }}/eddyNekNek/inside/logfile; exit 1) 
 
     - name: 'eddyNekNekNek'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/build
