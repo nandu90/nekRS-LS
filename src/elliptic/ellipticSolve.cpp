@@ -139,7 +139,7 @@ void ellipticSolve(elliptic_t *elliptic,
     platform->linAlg
         ->axpbyzMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, -1.0, o_Ap, 1.0, o_rhs, o_r);
 
-    if (elliptic->allNeumann) {
+    if (elliptic->nullspace) {
       ellipticZeroMean(elliptic, o_r);
     }
     ellipticApplyMask(elliptic, o_r, dfloatString);
@@ -230,7 +230,7 @@ void ellipticSolve(elliptic_t *elliptic,
 
   platform->linAlg->axpbyMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_x0, 1.0, o_x);
 
-  if (elliptic->allNeumann) {
+  if (elliptic->nullspace) {
     ellipticZeroMean(elliptic, o_x);
   }
 
