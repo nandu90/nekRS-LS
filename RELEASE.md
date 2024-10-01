@@ -34,17 +34,17 @@ This list provides an overview of the most significant changes in this release, 
 * change par section `TEMPERATURE` to `SCALAR00` in case it does not represent indeed a physical temperature
 * `velocityDirichletConditions` -> `codedFixedValueVelocity` (same for scalars)
 * `velocityNeumannConditions` -> `codedFixedGradientVelocity` (same for scalars)
-* `nek::useric` is no longer automatically called, instead call it in `UDF_Setup` (see e.g. lowMach example)
+* `nek::useric` is no longer automatically called, if needed call it in `UDF_Setup` (see e.g. lowMach example)
 * `nek::userchk` is no longer called automatically 
 * use temporary instead of `nrs->U` and copy to `nrs->o_U`
 * use temporary instead of `cds->S` and copy to `cds->o_S`
 * use `auto [x, y, z] = mesh->xyzHost()` instead of `mesh->x` (same for other components) 
 * `nrs->meshV` -> `nrs->mesh`
 * `nrs->_mesh` -> `cds->mesh[0]`
-* `nek::copyToNek` -> `nrs->copyToNek`
-* `nek::copyFromNek` and `nek::ocopyToNek` were removed 
-* send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd` (no automatic check every N steps)
-* use `auto foo = platform->o_memPool.reserve<T>(nWords)` instead of preallocated slices of `occa::memory::o_mempool`
+* `nek::ocopyToNek` -> `nrs->copyToNek`
+* `nek::ocopyFromNek` -> `nek::copyFromNek`
+* send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd`
+* use `auto foo = platform->o_memPool.reserve<T>(nWords)` instead of e.g. `platform->o_mempool.slice0`
 * change count argument of `occa::memory::slice, occa::memory::copyFrom, occa::memory::copyTo` to number of words instead of bytes 
 * define `time` as double (instead of defloat) in all UDF functions
 * remove `nrs_t` argument from UDF API functions (nrs object is now globally accessible within udf if the Navier Stokes solver is enabled)
@@ -55,8 +55,8 @@ This list provides an overview of the most significant changes in this release, 
 * `nrs_t::userDivergence = std::function<void(double)>` -> `udf::udfdif = std::function<void(nrs_t *, dfloat, occa::memory)>`
 * `tavg::setup(dlong fieldOffset, const fields& fields)` -> `tavg::setup(nrs_t*)`
 * `planarAvg(mesh_t*, const std::string&, int, int, int, int, dlong, occa::memory o_avg)` -> `postProcessing::planarAvg(nrs_t*, const std::string&, int, int, int, int, occa::memory)`
-* `nrs->o_NLT` -> `nrs->o_FU`
-* `cds->o_NLT` ->  `cds->o_FS`
+* `nrs->o_FU` -> `nrs->o_NLT`
+* `cds->o_FS` -> `cds->o_NLT`
 * `::postProcessing` functions are now members of `nrs_t` (except planarAvg)
 * use `nekrs_registerPtr` instead of common blocks NRSSCPTR / SCNRS in usr file and access them using `nek::ptr` in udf (see e.g. channel example)
 * `occaKernel` -> `deviceKernel`
@@ -65,9 +65,9 @@ This list provides an overview of the most significant changes in this release, 
 * remove `nrs_t` argument from `<plugin>::setup`
 * `nrs->isOutputStep` -> `nrs->checkpointStep`
 * `pointInterpolation_t::setPoints(int, dfloat*, dfloat*, dfloat*)` -> `pointInterpolation_t::setPoints(const std::vector<dfloat>&, const std::vector<dfloat>&, const std::vector<dfloat>&)`
-* use `iofld` class instead of `writeFld`
+* use `iofld` instead of `writeFld`
 * `nrs->usrwrk` was removed (it's a user variable not used anywhere in the code)
-* field file extension start with 0-index
+* field file extension starts with 0-index
 
 
 ## Known Bugs / Restrictions
