@@ -71,7 +71,7 @@ function(add target num_processes par_file cimodes fp32 working_directory build_
 endfunction()
 
 set(USE_FP32 OFF)
-set(BUILD_ONLY ON)
+set(BUILD_ONLY OFF)
 set(dir "")
 
 function(add_eddy_neknek)
