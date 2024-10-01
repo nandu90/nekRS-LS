@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(NekRS LANGUAGES C CXX Fortran VERSION 24.0.2)
+project(NekRS LANGUAGES C CXX Fortran VERSION 24.0.3)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
