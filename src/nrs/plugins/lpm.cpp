@@ -195,6 +195,7 @@ void lpm_t::registerProp(dlong Nfields, const std::string &_propName, bool outpu
              EXIT_FAILURE,
              "cannot register prop %s after calling initialize!\n",
              propName.c_str());
+
   const auto nprops = propIds.size();
   if (propIds.count(propName) == 0) {
     propIds[propName] = nprops;
@@ -242,13 +243,12 @@ void lpm_t::registerInterpField(const std::string &_interpFieldName,
              "cannot register interpField %s after calling initialize!\n",
              interpFieldName.c_str());
 
-  const auto nInterpFields = interpFieldIds.size();
   if (interpFieldIds.count(interpFieldName) == 0) {
-    interpFieldIds[interpFieldName] = nInterpFields;
+    interpFieldIds[interpFieldName] = nInterpFields_;
+    nInterpFields_ += Nfields;
     interpFieldCounts[interpFieldName] = Nfields;
     outputInterpFields[interpFieldName] = output;
     interpFieldInputs[interpFieldName] = o_fld;
-    nInterpFields_ += Nfields;
     fieldType[interpFieldName] = FieldType::INTERP_FIELD;
   }
 }
