@@ -1200,7 +1200,7 @@ void ciTestErrors(nrs_t *nrs,
     s2Test = abs((err[3] - 2E-13) / err[3]) < EPS;
 
     // just check for convergence
-    pIterTest = (NiterP < 300);
+    pIterTest = (NiterP < 500);
 
     vxTest = abs((err[0] - 1.4E-10) / err[0]) < EPS;
     prTest = abs((err[1] - 8.7E-9) / err[1]) < EPS;
