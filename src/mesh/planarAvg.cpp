@@ -126,7 +126,7 @@ void fusedPlanarAvg(mesh_t *mesh,
   }
 
   const auto Nlocal = nflds * mesh->Nq * elemDir;
-  auto o_scratch = platform->o_memPool.reserve<dfloat>(Nlocal);
+  auto o_scratch = platform->deviceMemoryPool.reserve<dfloat>(Nlocal);
 
   if (o_locToGlobE.byte_size() == 0) {
     std::vector<dlong> globalElement(mesh->Nelements, 0);

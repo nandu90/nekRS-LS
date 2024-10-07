@@ -3,18 +3,8 @@
 #include "findpts.hpp"
 #include "pointInterpolation.hpp"
 
-pointInterpolation_t::pointInterpolation_t(mesh_t *mesh,
-                                           MPI_Comm comm,
-                                           bool mySession_,
-                                           std::vector<int> bID)
-    : pointInterpolation_t(mesh,
-                           comm,
-                           mesh->Nlocal,
-                           mesh->Nlocal,
-                           0.01,
-                           0,
-                           true,
-                           bID)
+pointInterpolation_t::pointInterpolation_t(mesh_t *mesh, MPI_Comm comm, bool mySession_, std::vector<int> bID)
+    : pointInterpolation_t(mesh, comm, mesh->Nlocal, mesh->Nlocal, 0.01, 0, true, bID)
 {
 }
 
@@ -44,9 +34,7 @@ pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
              "Communicator must be either platform->comm.mpiComm or platform->comm.mpiCommParent");
 
   newton_tol =
-      (sizeof(dfloat) == sizeof(double))
-      ? std::max(5e-13, newton_tol_)
-      : std::max(1e-6, newton_tol_);
+      (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(1e-6, newton_tol_);
 
   auto x = platform->memPool.reserve<dfloat>(mesh->Nlocal);
   auto y = platform->memPool.reserve<dfloat>(mesh->Nlocal);
@@ -60,7 +48,7 @@ pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
 
   std::vector<dfloat> distanceINT;
   if (bIntID.size()) {
-    auto o_bIntID = platform->o_memPool.reserve<int>(bIntID.size());
+    auto o_bIntID = platform->deviceMemoryPool.reserve<int>(bIntID.size());
     o_bIntID.copyFrom(bIntID.data());
     _o_distanceINT = mesh->minDistance(bIntID.size(), o_bIntID, "cheap_dist");
     distanceINT.resize(mesh->Nlocal);
@@ -173,7 +161,7 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
 
 void pointInterpolation_t::eval(dlong nFields,
                                 dlong inputFieldOffset,
-                                const occa::memory& o_in,
+                                const occa::memory &o_in,
                                 dlong outputFieldOffset,
                                 occa::memory &o_out)
 {
@@ -217,9 +205,9 @@ void pointInterpolation_t::eval(dlong nFields,
 
 void pointInterpolation_t::eval(dlong nFields,
                                 dlong inputFieldOffset,
-                                const std::vector<dfloat>& in,
+                                const std::vector<dfloat> &in,
                                 dlong outputFieldOffset,
-                                std::vector<dfloat>& out)
+                                std::vector<dfloat> &out)
 {
   nekrsCheck(!findCalled,
              platform->comm.mpiComm,
@@ -238,20 +226,31 @@ void pointInterpolation_t::eval(dlong nFields,
              inputFieldOffset,
              mesh->Nlocal);
 
-  findpts_->eval(nPoints, nFields, inputFieldOffset, outputFieldOffset, const_cast<dfloat*>(in.data()), &data_, out.data());
+  findpts_->eval(nPoints,
+                 nFields,
+                 inputFieldOffset,
+                 outputFieldOffset,
+                 const_cast<dfloat *>(in.data()),
+                 &data_,
+                 out.data());
 
   if (timerLevel != TimerLevel::None) {
     platform->timer.toc("pointInterpolation_t::eval");
   }
 }
 
-void pointInterpolation_t::setPoints(const std::vector<dfloat>& x, const std::vector<dfloat>& y, const std::vector<dfloat>& z)
+void pointInterpolation_t::setPoints(const std::vector<dfloat> &x,
+                                     const std::vector<dfloat> &y,
+                                     const std::vector<dfloat> &z)
 {
   std::vector<dlong> session;
   this->setPoints(x, y, z, session);
 }
 
-void pointInterpolation_t::setPoints(const std::vector<dfloat>& x, const std::vector<dfloat>& y, const std::vector<dfloat>& z, const std::vector<dlong>& session)
+void pointInterpolation_t::setPoints(const std::vector<dfloat> &x,
+                                     const std::vector<dfloat> &y,
+                                     const std::vector<dfloat> &z,
+                                     const std::vector<dlong> &session)
 {
   auto o_x = platform->device.malloc<dfloat>(x.size());
   o_x.copyFrom(x.data());
@@ -264,7 +263,7 @@ void pointInterpolation_t::setPoints(const std::vector<dfloat>& x, const std::ve
   if (session.size()) {
     o_session = platform->device.malloc<dlong>(session.size());
     o_session.copyFrom(session.data());
-  } 
+  }
   this->setPoints(o_x, o_y, o_z, o_session);
 }
 

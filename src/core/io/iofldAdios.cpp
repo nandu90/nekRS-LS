@@ -156,7 +156,7 @@ void iofldAdios::putVariableConvert(const std::vector<occa::memory> &o_fld, occa
                  "%s\n",
                  "field has be of type dfloat for mapping to a different N or a uniform mesh");
 
-      auto o_tmp = platform->o_memPool.reserve<dfloat>(mesh_vis->Nlocal);
+      auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(mesh_vis->Nlocal);
       if (uniform) {
         mesh->interpolate(o_fld[dim_i], mesh_vis, o_tmp, true);
       } else {
@@ -386,7 +386,7 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
   std::vector<occa::memory> o_out;
   const auto o_outSize = maxRemoteSizes.first;
   for (int dim = 0; dim < o_outSize; dim++) {
-    o_out.push_back(platform->o_memPool.reserve<T>(winFieldOffset));
+    o_out.push_back(platform->deviceMemoryPool.reserve<T>(winFieldOffset));
     o_out[dim].copyFrom(o_win.slice(dim * winFieldOffset));
   }
 

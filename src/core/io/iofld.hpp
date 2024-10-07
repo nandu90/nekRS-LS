@@ -61,6 +61,8 @@ public:
   bool uniform = false;
   int precision = 32;
   bool outputMesh = false;
+  bool redistribute = true;
+  bool interpolate = false;
 
   void writeAttribute(const std::string& key_, const std::string& val)
   {
@@ -77,10 +79,15 @@ public:
       precision = stoi(val);
       nekrsCheck(precision != 64 && precision != 32,
                  MPI_COMM_SELF, EXIT_FAILURE, "invalid precision value %d\n", precision);
-    } else if (key == "uniform" || key == "equidistant") {
+    } else if (key.find("uniform") == 0 || key.find("equidistant") == 0) {
       uniform = (val == "true") ? true : false;
     } else if (key == "outputmesh") {
       outputMesh = (val == "true") ? true : false;
+    } else if (key == "redistribute") {
+      redistribute = (val == "true") ? true : false;
+    } else if (key == "interpolaten") {
+      interpolate = (val == "true") ? true : false;
+      if (interpolate) redistribute = false;
     } else {
       nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "invalid attribute %s\n", key_.c_str());
     }

@@ -58,7 +58,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 
   buildOnly = false;
   if (options.compareArgs("BUILD ONLY", "TRUE")) {
-   buildOnly = true; 
+    buildOnly = true;
   }
 
   if (options.getArgs("CHECKPOINT ENGINE").empty()) {
@@ -128,15 +128,14 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
                  tmpDir.c_str());
     }
 
-    const auto multiSession = [&]() 
-    {
+    const auto multiSession = [&]() {
       int retVal;
       MPI_Comm_compare(comm.mpiComm, comm.mpiCommParent, &retVal);
       return (retVal == MPI_IDENT) ? false : true;
     }();
 
     if (multiSession) {
-      int sessionID; 
+      int sessionID;
       options.getArgs("NEKNEK SESSION ID", sessionID);
       tmpDir = fs::path(tmpDir) / fs::path("sess" + std::to_string(sessionID));
       fs::create_directories(tmpDir);
@@ -182,7 +181,6 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   kernelInfo["defines/"
              "p_PI"] = M_PI;
 
-
   if (device.mode() == "CUDA") {
     kernelInfo["defines/smXX"] = 1;
   }
@@ -209,19 +207,20 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 
   const std::string floatingPointType = static_cast<std::string>(kernelInfo["defines/dfloat"]);
   if (floatingPointType.find("float") != std::string::npos) {
-      kernelInfo["defines/FP32"] = 1;
+    kernelInfo["defines/FP32"] = 1;
   }
 
   const std::string extension = serial ? ".c" : ".okl";
 
-  if (rank == 0)
+  if (rank == 0) {
     compileDummyKernel(*this);
+  }
 
   {
     occa::json properties;
     properties["resize_through_host"] = 1;
-    o_memPool = device.occaDevice().createMemoryPool(properties);
-    o_memPool.setAlignment(ALIGN_SIZE);
+    deviceMemoryPool = device.occaDevice().createMemoryPool(properties);
+    deviceMemoryPool.setAlignment(ALIGN_SIZE);
   }
 
   {
@@ -233,19 +232,16 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   }
 }
 
-// input files required for JIT kernel compilation or load 
+// input files required for JIT kernel compilation or load
 void platform_t::bcastJITKernelSourceFiles()
 {
   if (platform->verbose && comm.mpiRank == 0) {
-    std::cout << "broadcast kernel sources to " << platform->tmpDir << std::endl; 
+    std::cout << "broadcast kernel sources to " << platform->tmpDir << std::endl;
   }
 
   const auto NEKRS_HOME_NEW = fs::path(tmpDir) / "nekrs";
   const auto srcPath = fs::path(getenv("NEKRS_HOME"));
-  for (auto &entry : {
-                       fs::path("include"),
-                       fs::path("kernels")
-                     }) {
+  for (auto &entry : {fs::path("include"), fs::path("kernels")}) {
 
     fileBcast(srcPath / entry, NEKRS_HOME_NEW, comm.mpiComm, verbose);
   }

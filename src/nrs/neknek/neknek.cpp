@@ -82,7 +82,8 @@ void neknek_t::updateInterpPoints()
   auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
 
   this->interpolator.reset();
-  this->interpolator = std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiCommParent, true, intBIDs);
+  this->interpolator =
+      std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiCommParent, true, intBIDs);
   this->interpolator->setTimerName("neknek_t::");
 
   // neknekX[:] = mesh->x[pointMap[:]]
@@ -109,7 +110,8 @@ void neknek_t::findIntPoints()
   auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
 
   this->interpolator.reset();
-  this->interpolator = std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiCommParent, true, intBIDs);
+  this->interpolator =
+      std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiCommParent, true, intBIDs);
   this->interpolator->setTimerName("neknek_t::");
 
   // int points are the same for all neknek fields
@@ -263,8 +265,8 @@ void neknek_t::setup()
   this->o_scalarIndices_ = platform->device.malloc<int>(nrs->Nscalar, scalarIndices.data());
 
   for (int bID = 1; bID <= bcMap::size(this->fields[0]); ++bID) {
-    if (isIntBc(bcMap::id(bID, this->fields[0]), this->fields[0])) { 
-       intBIDs.push_back(bID);
+    if (isIntBc(bcMap::id(bID, this->fields[0]), this->fields[0])) {
+      intBIDs.push_back(bID);
     }
   }
 
@@ -376,10 +378,10 @@ occa::memory neknek_t::partitionOfUnity()
 
   auto o_dist = pointInterp.distanceINT();
 
-  auto o_sess = platform->o_memPool.reserve<dlong>(nrs->fieldOffset);
-  auto o_sumDist = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
-  auto o_found = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
-  auto o_interpDist = platform->o_memPool.reserve<dfloat>(nrs->fieldOffset);
+  auto o_sess = platform->deviceMemoryPool.reserve<dlong>(nrs->fieldOffset);
+  auto o_sumDist = platform->deviceMemoryPool.reserve<dfloat>(nrs->fieldOffset);
+  auto o_found = platform->deviceMemoryPool.reserve<dfloat>(nrs->fieldOffset);
+  auto o_interpDist = platform->deviceMemoryPool.reserve<dfloat>(nrs->fieldOffset);
   o_sumDist.copyFrom(o_dist, mesh->Nlocal);
 
   std::vector<dfloat> found(mesh->Nlocal);
@@ -517,7 +519,7 @@ void neknek_t::exchange(bool allTimeStates, bool lagState)
   if (this->Nscalar_) {
     auto o_S = nrs->cds->o_S;
     if (this->Nscalar_ != nrs->Nscalar) {
-      o_S = platform->o_memPool.reserve<dfloat>(nStates * this->Nscalar_ * nrs->fieldOffset);
+      o_S = platform->deviceMemoryPool.reserve<dfloat>(nStates * this->Nscalar_ * nrs->fieldOffset);
       this->mapScalarKernel(nrs->cds->mesh[0]->Nlocal,
                             nrs->Nscalar,
                             nrs->fieldOffset,

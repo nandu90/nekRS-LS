@@ -44,7 +44,7 @@ public:
   device_t device;
   occa::properties kernelInfo;
   timer::timer_t timer;
-  occa::memoryPool o_memPool;
+  occa::memoryPool deviceMemoryPool;
   occa::memoryPool memPool;
   kernelRequestManager_t kernelRequests;
   Par *par;
@@ -63,7 +63,6 @@ public:
   occa::kernel copyPfloatToDfloatKernel;
   occa::kernel copyDfloatToDoubleKernel;
   occa::kernel copyDoubleToDfloatKernel;
-
 };
 #endif
 

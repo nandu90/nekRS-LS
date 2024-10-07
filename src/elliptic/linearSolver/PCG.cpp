@@ -54,7 +54,6 @@ dfloat update(elliptic_t *elliptic,
 {
   mesh_t *mesh = elliptic->mesh;
 
-
   const bool serial = platform->serial;
 
   // r <= r - alpha*A*p
@@ -69,7 +68,7 @@ dfloat update(elliptic_t *elliptic,
 
   dfloat rdotr1 = 0;
 #ifdef ELLIPTIC_ENABLE_TIMER
-  platform->timer.tic("dotp",0);
+  platform->timer.tic("dotp", 0);
 #endif
   if (serial) {
     rdotr1 = *((dfloat *)o_tmpReductions.ptr());
@@ -367,7 +366,6 @@ int combinedPCG(elliptic_t *elliptic,
       printf("it %d r norm %.15e\n", iter, rdotr);
     }
 
-
     // converged, update solution prior to exit
     if (rdotr <= tol) {
       const dlong singleVectorUpdate = iter % 2 == 1;
@@ -420,23 +418,24 @@ int pcg(elliptic_t *elliptic,
 {
   setupAide &options = elliptic->options;
 
-  const auto Nlocal = (elliptic->Nfields > 1) ?
-                      elliptic->Nfields * static_cast<size_t>(elliptic->fieldOffset) : elliptic->mesh->Nlocal;
+  const auto Nlocal = (elliptic->Nfields > 1) ? elliptic->Nfields * static_cast<size_t>(elliptic->fieldOffset)
+                                              : elliptic->mesh->Nlocal;
 
-  o_p = platform->o_memPool.reserve<dfloat>(Nlocal);
-  o_z = (elliptic->options.compareArgs("PRECONDITIONER", "NONE")) ? o_r : platform->o_memPool.reserve<dfloat>(Nlocal);
-  o_Ap = platform->o_memPool.reserve<dfloat>(Nlocal);
+  o_p = platform->deviceMemoryPool.reserve<dfloat>(Nlocal);
+  o_z = (elliptic->options.compareArgs("PRECONDITIONER", "NONE"))
+            ? o_r
+            : platform->deviceMemoryPool.reserve<dfloat>(Nlocal);
+  o_Ap = platform->deviceMemoryPool.reserve<dfloat>(Nlocal);
   if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
-    o_v = platform->o_memPool.reserve<dfloat>(Nlocal);
+    o_v = platform->deviceMemoryPool.reserve<dfloat>(Nlocal);
   }
 
-  o_tmpReductions = [&]() 
-  {
+  o_tmpReductions = [&]() {
     int Nreductions = 1;
     if (options.compareArgs("SOLVER", "PCG+COMBINED")) {
       Nreductions = CombinedPCGId::nReduction;
     }
-    auto mesh = elliptic->mesh; 
+    auto mesh = elliptic->mesh;
     const dlong Nlocal = mesh->Np * mesh->Nelements;
     const dlong Nblock = (Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
@@ -445,11 +444,10 @@ int pcg(elliptic_t *elliptic,
       h_tmpReductions = platform->device.mallocHost<dfloat>(Nreductions * Nblock);
     }
 
-    return platform->o_memPool.reserve<dfloat>(Nreductions * Nblock);
+    return platform->deviceMemoryPool.reserve<dfloat>(Nreductions * Nblock);
   }();
 
-  const auto Niter = [&]() 
-  {
+  const auto Niter = [&]() {
     if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
       return combinedPCG(elliptic, tol, MAXIT, rdotr, o_r, o_x);
     } else {

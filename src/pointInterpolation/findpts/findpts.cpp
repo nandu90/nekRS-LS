@@ -54,8 +54,8 @@ struct hash_data_3 {
 };
 
 struct findpts_dummy_ms_data {
-    unsigned int *nsid;
-    double       *distfint;
+  unsigned int *nsid;
+  double *distfint;
 };
 
 struct findpts_data_3 {
@@ -64,7 +64,7 @@ struct findpts_data_3 {
   struct hash_data_3 hash;
   struct array savpt;
   struct findpts_dummy_ms_data fdms;
-  uint   fevsetup;
+  uint fevsetup;
 };
 
 auto *gslibFindptsSetup(MPI_Comm mpi_comm,
@@ -963,8 +963,9 @@ findpts_t::findpts_t(MPI_Comm comm,
   const int n[dim] = {Nq, Nq, Nq};
   const int ms[dim] = {m, m, m};
 
-  if (platform->options.compareArgs("ENABLE FINDPTS DETAILED TIMER", "TRUE"))
+  if (platform->options.compareArgs("ENABLE FINDPTS DETAILED TIMER", "TRUE")) {
     this->timerLevel = TimerLevel::Detailed;
+  }
 
   this->_findptsData = gslibFindptsSetup(comm,
                                          elx,
@@ -1613,10 +1614,10 @@ void findpts_t::find(data_t *const findPtsData,
 {
   occa::memory o_xint, o_yint, o_zint, o_session;
   if (npt > 0) {
-    o_xint = platform->o_memPool.reserve<dfloat>(npt);
-    o_yint = platform->o_memPool.reserve<dfloat>(npt);
-    o_zint = platform->o_memPool.reserve<dfloat>(npt);
-    o_session = platform->o_memPool.reserve<dlong>(npt);
+    o_xint = platform->deviceMemoryPool.reserve<dfloat>(npt);
+    o_yint = platform->deviceMemoryPool.reserve<dfloat>(npt);
+    o_zint = platform->deviceMemoryPool.reserve<dfloat>(npt);
+    o_session = platform->deviceMemoryPool.reserve<dlong>(npt);
   }
 
   o_xint.copyFrom(x_base, npt);

@@ -105,7 +105,7 @@ void SolutionProjection::updateProjectionSpace()
   // printf("norm_new:%g norm_orig:%g sumAlpha:%g\n", norm_new, norm_orig, sumAlpha);
   norm_new = sqrt(norm_new);
 
-  dfloat tol = 1e-6;
+  const dfloat tol = (sizeof(dfloat) == sizeof(double)) ? 1e-6: 1e-4;
   const dfloat test = norm_new / norm_orig;
   if (test > tol) {
     const dfloat scale = 1.0 / norm_new;
@@ -178,7 +178,7 @@ void SolutionProjection::computePreProjection(occa::memory &o_r)
 
   flopCount += Nfields * (1 + 2 * (numVecsProjection - 1)) * static_cast<double>(Nlocal);
   if (type == ProjectionType::CLASSIC) {
-    auto o_rtmp = platform->o_memPool.reserve<dfloat>(Nfields * fieldOffset);
+    auto o_rtmp = platform->deviceMemoryPool.reserve<dfloat>(Nfields * fieldOffset);
     accumulateKernel(Nlocal, numVecsProjection, fieldOffset, o_alpha, o_bb, o_rtmp);
     platform->linAlg->axpbyMany(Nlocal, Nfields, fieldOffset, mone, o_rtmp, one, o_r);
 

@@ -57,12 +57,10 @@ function(add target num_processes par_file cimodes fp32 working_directory build_
  
     if(build_only)
       add_test(NAME ${name} WORKING_DIRECTORY ${working_directory}
-               COMMAND ${LAUNCHER} ${par_file} ${num_processes} --cimode ${cimode} --build-only ${num_processes}
-               DEPENDS ${target})
+               COMMAND ${LAUNCHER} ${par_file} ${num_processes} --cimode ${cimode} --build-only ${num_processes})
     else()
       add_test(NAME ${name} WORKING_DIRECTORY ${working_directory}
-               COMMAND ${LAUNCHER} ${par_file} ${num_processes} --cimode ${cimode}
-               DEPENDS ${target})
+               COMMAND ${LAUNCHER} ${par_file} ${num_processes} --cimode ${cimode})
     endif()
 
     set_tests_properties(${name} PROPERTIES ENVIRONMENT "FP32=${fp32_value}")
@@ -105,7 +103,7 @@ add("ethier-buildOnly" 2 "ethier.par" "1" "${USE_FP32}" "${EXAMPLES_DIR}/ethier"
 add("ethier" 2 "ethier.par" "1;2;3;4;7;8;9;10;11;12;14;15;19" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
 add("ethier" 2 "mv_ethier.par" "5;6" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
 add("ethier" 2 "ethierScalar.par" "13" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
-add("ethier" 1 "ethier.par" "22" ON "${dir}" "${BUILD_ONLY}")
+add("ethier" 2 "ethier.par" "22" ON "${dir}" "${BUILD_ONLY}")
 
 add("lowMach" 2 "lowMach.par" "1" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
 

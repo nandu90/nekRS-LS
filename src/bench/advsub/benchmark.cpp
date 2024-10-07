@@ -60,7 +60,7 @@ std::map<CallParameters, occa::kernel> cachedResults;
 
 template <typename T>
 occa::kernel benchmarkAdvsub(int Nfields,
-                             int Nelements,
+                             dlong Nelements,
                              int Nq,
                              int cubNq,
                              int nEXT,
@@ -105,11 +105,11 @@ occa::kernel benchmarkAdvsub(int Nfields,
   const int N = Nq - 1;
   const int Np = Nq * Nq * Nq;
   const int Ntotal = Np * Nelements;
-  const int fieldOffset = alignStride<dfloat>(Ntotal);
+  const dlong fieldOffset = alignStride<dfloat>(Ntotal);
 
   const int cubN = cubNq - 1;
   const int cubNp = cubNq * cubNq * cubNq;
-  const int cubatureOffset = alignStride<dfloat>(cubNp * Nelements); 
+  const dlong cubatureOffset = alignStride<dfloat>(cubNp * Nelements); 
 
   const int NVfields = 3;
 
@@ -195,8 +195,8 @@ occa::kernel benchmarkAdvsub(int Nfields,
     return referenceKernel;
   }
 
-  const auto wordSize = sizeof(dfloat);
-
+  std::vector<dlong> elementList(Nelements);
+  std::iota(elementList.begin(), elementList.end(), 0);
   auto invLMM = randomVector<dfloat>(fieldOffset * nEXT, 0, 1, true);
   auto cubD = randomVector<dfloat>(cubNq * cubNq, 0, 1, true);
   auto NU = randomVector<dfloat>(Nfields * fieldOffset, 0, 1, true);
@@ -205,11 +205,9 @@ occa::kernel benchmarkAdvsub(int Nfields,
   auto Ud = randomVector<dfloat>(Nfields * fieldOffset, 0, 1, true);
   auto BdivW = randomVector<dfloat>(fieldOffset * nEXT, 0, 1, true);
 
-  // elementList[e] = e
-  std::vector<dlong> elementList(Nelements);
-  std::iota(elementList.begin(), elementList.end(), 0);
   auto o_elementList = platform->device.malloc(elementList.size() * sizeof(dlong), elementList.data());
 
+  const auto wordSize = sizeof(dfloat);
   auto o_invLMM = platform->device.malloc(invLMM.size() * wordSize, invLMM.data());
   auto o_cubD = platform->device.malloc(cubD.size() * wordSize, cubD.data());
   auto o_NU = platform->device.malloc(NU.size() * wordSize, NU.data());
@@ -241,9 +239,9 @@ occa::kernel benchmarkAdvsub(int Nfields,
   }
 
   auto kernelRunner = [&](occa::kernel &subcyclingKernel) {
-    const auto c0 = 0.1;
-    const auto c1 = 0.2;
-    const auto c2 = 0.3;
+    const dfloat c0 = 0.1;
+    const dfloat c1 = 0.2;
+    const dfloat c2 = 0.3;
 
     if (!dealias) {
       subcyclingKernel(Nelements,
@@ -282,8 +280,8 @@ occa::kernel benchmarkAdvsub(int Nfields,
     auto kernel = buildKernel(kernelVariant);
     if (!kernel.isInitialized()) return occa::kernel();
 
-    auto o_NUref = platform->device.malloc(o_NU.size());
     kernelRunner(referenceKernel);
+    auto o_NUref = platform->device.malloc(o_NU.size());
     o_NU.copyTo(o_NUref);
 
     kernelRunner(kernel);

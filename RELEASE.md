@@ -34,12 +34,10 @@ This list provides an overview of the most significant changes in this release, 
 * change par section `TEMPERATURE` to `SCALAR00` in case it does not represent indeed a physical temperature
 * `velocityDirichletConditions` -> `codedFixedValueVelocity` (same for scalars)
 * `velocityNeumannConditions` -> `codedFixedGradientVelocity` (same for scalars)
-* `nek::useric` is no longer automatically called, if needed call it in `UDF_Setup` (see e.g. lowMach example)
-* `nek::userchk` is no longer called automatically 
+* `nek::userchk` is no longer called automatically during the setup phase 
 * use temporary instead of `nrs->U` and copy to `nrs->o_U`
 * use temporary instead of `cds->S` and copy to `cds->o_S`
 * use `auto [x, y, z] = mesh->xyzHost()` instead of `mesh->x` (same for other components) 
-* `nrs->meshV` -> `nrs->mesh`
 * `nrs->_mesh` -> `cds->mesh[0]`
 * `nek::ocopyToNek` -> `nrs->copyToNek`
 * `nek::ocopyFromNek` -> `nek::copyFromNek`

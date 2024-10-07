@@ -199,7 +199,7 @@ cvode_t::cvode_t(cds_t *_cds)
     platform->copyDfloatToPfloatKernel(mesh->Nelements * mesh->Np * mesh->Nvgeo, mesh->o_vgeo, o_vgeoPfloat);
   }
 
-  o_rhoCpAvg = platform->o_memPool.reserve<dfloat>(cds->fieldOffset[0]);
+  o_rhoCpAvg = platform->deviceMemoryPool.reserve<dfloat>(cds->fieldOffset[0]);
 
   if (platform->comm.mpiRank == 0) {
     std::cout << "done\n";
@@ -754,7 +754,7 @@ void cvode_t::applyDirichlet(double time)
   // lower than any other possible Dirichlet value
   static constexpr dfloat TINY = -1e30;
 
-  auto o_S_start = platform->o_memPool.reserve<dfloat>(cds->fieldOffsetSum);
+  auto o_S_start = platform->deviceMemoryPool.reserve<dfloat>(cds->fieldOffsetSum);
 
   for (int is = 0; is < cds->NSfields; is++) {
     if (!cds->compute[is]) {
