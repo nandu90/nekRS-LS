@@ -572,21 +572,15 @@ void nrs_t::init()
                "%s\n",
                "Conjugate heat transfer not supported in a moving mesh!");
 
-    nekrsCheck(nelgt != nelgv && !platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE"),
-               platform->comm.mpiComm,
-               EXIT_FAILURE,
-               "%s\n",
-               "Conjugate heat transfer requires a temperature field!");
-
     return (nelgt > nelgv) ? 1 : 0;
   }();
 
-  nekrsCheck(platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE") &&
-                 (!cht && !platform->options.compareArgs("LOWMACH", "TRUE")),
+  nekrsCheck((cht || platform->options.compareArgs("LOWMACH", "TRUE")) && 
+             !platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE"), 
              platform->comm.mpiComm,
              EXIT_FAILURE,
              "%s\n",
-             "TEMPERATURE field requires conjugate heat transfer or lowMach");
+             "conjugate heat transfer or lowMach requires a TEMPERATURE field");
 
   platform->options.getArgs("SUBCYCLING STEPS", this->Nsubsteps);
 

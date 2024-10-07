@@ -31,7 +31,7 @@
 This list provides an overview of the most significant changes in this release, although it may not encompass all modifications. We acknowledge that this release introduces several breaking changes. These adjustments were essential to enhance the stability of the user interface in future iterations. We apologize for any inconvenience this may cause.
 
 * run `build.sh` instead of `nrsconfig` to build the code
-* change par section `TEMPERATURE` to `SCALAR00` in case it does not represent indeed a physical temperature
+* change par section `SCALAR00` to `TEMPERATURE` in case it represent indeed a physical temperature
 * `velocityDirichletConditions` -> `codedFixedValueVelocity` (same for scalars)
 * `velocityNeumannConditions` -> `codedFixedGradientVelocity` (same for scalars)
 * `nek::userchk` is no longer called automatically during the setup phase 
