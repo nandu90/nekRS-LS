@@ -966,7 +966,6 @@ void ciTestErrors(nrs_t *nrs,
       expectedNiterP = 3;
     }
 
-#if 0
     if (nrs->timeStepConverged) {
       const int pIterTest = abs(NiterP - expectedNiterP);
       CiEvalTest("pressure iter step=1 (pIterTest: " + to_string_f(pIterTest) + ")", pIterTest <= 1);
@@ -997,7 +996,6 @@ void ciTestErrors(nrs_t *nrs,
       CiEvalTest("scalar01 iter step=1 (sIterErr: " + to_string_f(sIterErr) + ")", sIterErr <= 1);
       nekrsCheck(sIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
-#endif
   }
 
   if (ciMode == 1) {
