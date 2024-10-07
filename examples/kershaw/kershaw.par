@@ -1,5 +1,5 @@
 [GENERAL] 
-verbose = true
+verbose = false 
 polynomialOrder = 7
 timeStepper = tombo2
 subCyclingSteps = 1
