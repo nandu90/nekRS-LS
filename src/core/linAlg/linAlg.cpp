@@ -1454,7 +1454,7 @@ void linAlg_t::linearCombination(const dlong N,
 }
 
 dfloat linAlg_t::maxRelativeError(const dlong N,
-                                  const dlong Nfields,
+                                  const int Nfields,
                                   const dlong fieldOffset,
                                   const dfloat absTol,
                                   const occa::memory &o_u,
@@ -1467,7 +1467,7 @@ dfloat linAlg_t::maxRelativeError(const dlong N,
 }
 
 dfloat linAlg_t::maxAbsoluteError(const dlong N,
-                                  const dlong Nfields,
+                                  const int Nfields,
                                   const dlong fieldOffset,
                                   const dfloat absTol,
                                   const occa::memory &o_u,
