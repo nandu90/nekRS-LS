@@ -3,8 +3,8 @@
 
 namespace
 {
-constexpr int Nbaseline{100};
-constexpr int Nwarmup{10};
+constexpr int Nbaseline{1000};
+constexpr int Nwarmup{1000};
 
 double run(int Nsamples, std::function<void(occa::kernel &)> kernelRunner, occa::kernel &kernel)
 {
