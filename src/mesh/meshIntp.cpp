@@ -32,7 +32,7 @@ occa::memory mesh_t::intpMatrix(std::vector<dfloat> M)
   return o_J[M.size() - 1];
 }
 
-void mesh_t::interpolate(const occa::memory& o_z, mesh_t *mesh, occa::memory& o_zM, bool uniform, int nel_)
+void mesh_t::interpolate(const occa::memory& o_z, mesh_t *mesh, occa::memory& o_zM, bool uniform, dlong nel_)
 {
   auto nel = (nel_ > 0) ? nel_ : this->Nelements;
 
