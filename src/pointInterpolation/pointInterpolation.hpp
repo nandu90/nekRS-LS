@@ -33,9 +33,9 @@ public:
             dlong inputFieldOffset,
             const occa::memory& o_in,
             dlong outputFieldOffset,
-            occa::memory& o_out);
-
-  void eval(dlong nFields, dlong inputFieldOffset, const std::vector<dfloat>& in, dlong outputFieldOffset, std::vector<dfloat> &out);
+            occa::memory& o_out,
+            dlong nPoints = -1,
+            dlong findPtsOffset = 0);
 
   auto *ptr()
   {
@@ -84,6 +84,8 @@ private:
   bool findCalled = false;
 
   bool pointsAdded = false;
+
+  bool updateFindPtsDataOnTarget = true;
 
   // correponds  to which setPoints overload is called
   bool useHostPoints = false;

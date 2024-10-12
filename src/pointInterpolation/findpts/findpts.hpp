@@ -128,23 +128,14 @@ public:
   void eval(const dlong npt, const occa::memory &o_in, data_t *findPtsData, occa::memory &o_out);
 
   void eval(const dlong npt,
+            const dlong offset,
+            const bool updatePointsOnTarget,
             const dlong nFields,
             const dlong inputOffset,
             const dlong outputOffset,
             const occa::memory &o_in,
             data_t *findPtsData,
             occa::memory &o_out);
-
-  // Host versions (copies to device when needed)
-  void eval(const dlong npt, dfloat *in, data_t *findPtsData, dfloat *out);
-
-  void eval(const dlong npt,
-            const dlong nFields,
-            const dlong inputOffset,
-            const dlong outputOffset,
-            dfloat *in,
-            data_t *findPtsData,
-            dfloat *out);
 
   // set timer level
   void setTimerLevel(TimerLevel level)
@@ -261,21 +252,9 @@ private:
                     const int pn);
 
   template <typename OutputType>
-  void findptsEvalImpl(dfloat *out,
-                       const int *const code_base,
-                       const int *const proc_base,
-                       const int *const el_base,
-                       const dfloat *const r_base,
-                       const int npt,
-                       const int nFields,
-                       const int inputOffset,
-                       const int outputOffset,
-                       const dfloat *const in,
-                       hashData_t &hash,
-                       crystal &cr);
-
-  template <typename OutputType>
   void findptsEvalImpl(occa::memory &o_out,
+                       dlong offset,
+                       bool updateSrcData,
                        const int *const code_base,
                        const int *const proc_base,
                        const int *const el_base,
@@ -288,14 +267,14 @@ private:
                        hashData_t &hash,
                        crystal &cr);
 
-  template <typename OutputType>
-  void findptsLocalEvalInternal(OutputType *opt,
-                                const evalSrcPt_t *spt,
-                                const int pn,
-                                const int nFields,
-                                const int inputOffset,
-                                const int outputOffset,
-                                const occa::memory &o_in);
+template <typename OutputType>
+void findptsLocalEvalInternal(const evalSrcPt_t *spt,
+                              const int pn,
+                              const int nFields,
+                              const int inputOffset,
+                              const occa::memory &o_in,
+                              OutputType *opt);
+
 };
 
 } // namespace findpts
