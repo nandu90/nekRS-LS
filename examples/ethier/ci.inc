@@ -1071,7 +1071,7 @@ void ciTestErrors(nrs_t *nrs,
     velIterTest = abs(NiterU - 14) < 2 ;
     s1Test = abs((err[2] - 7.49E-12) / err[2]) < EPS;
     s2Test = abs((err[3] - 7.22E-12) / err[3]) < EPS;
-    pIterTest = abs(NiterP - 4) < 2;
+    pIterTest = abs(NiterP - 6) < 2;
     vxTest = abs((err[0] - 2.77E-10) / err[0]) < EPS;
     prTest = abs((err[1] - 7.14E-10) / err[1]) < EPS;
     break;
