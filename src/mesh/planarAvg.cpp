@@ -158,7 +158,7 @@ void fusedPlanarAvg(mesh_t *mesh,
                            o_avg,
                            o_scratch);
 
-  platform->comm.allreduce(o_scratch, Nlocal, comm_t::type::dfloat, comm_t::op::sum, platform->comm.mpiComm);
+  platform->comm.allreduce(o_scratch, Nlocal, comm_t::op::sum, platform->comm.mpiComm);
 
   scatterPlanarValuesKernel(mesh->Nelements,
                             nflds,
