@@ -1,8 +1,15 @@
 #ifdef NEKRS_ENABLE_ADIOS
 
 #include "iofldAdios.hpp"
+#include "pointInterpolation.hpp"
+#include "randomVector.hpp"
 
-static bool isLittleEndian() {
+// fix if general interpolation + different polynorder (results are incorrect)
+// add platform->copyFloatToDfloat()
+// convert to o_userBuf type
+
+static bool isLittleEndian()
+{
   const uint32_t value = 0x01020304;
   uint8_t bytes[4];
 
@@ -36,7 +43,7 @@ void iofldAdios::openEngine()
     adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::Write);
   } else {
     if (platform->comm.mpiRank == 0) {
-      std::cout << "reading checkpoint ..." << std::endl; 
+      std::cout << "reading checkpoint ..." << std::endl;
       std::cout << " fileName: " << fileNameBase << std::endl << std::flush;
     }
     adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::ReadRandomAccess);
@@ -58,7 +65,8 @@ void iofldAdios::openEngine()
     }
 
     for (const auto &entry : adiosIO.AvailableVariables(true)) {
-      _availableVariables.push_back(entry.first);
+      std::string name = entry.first;
+      _availableVariables.push_back(name);
     }
   }
 }
@@ -70,7 +78,7 @@ std::string iofldAdios::vtkSchema()
       <UnstructuredGrid>
           <Piece NumberOfPoints="numOfPoints" NumberOfCells="numOfCells">
               <Points>
-                  <DataArray Name="vertices" />
+                  <DataArray Name="mesh" />
               </Points>
               <Cells>
                   <DataArray Name="connectivity" />
@@ -79,12 +87,12 @@ std::string iofldAdios::vtkSchema()
               <PointData>
   )";
 
-  std::string endianTag = isLittleEndian() ? "LittleEndian" : "BigEndian"; 
+  std::string endianTag = isLittleEndian() ? "LittleEndian" : "BigEndian";
 
   std::string placeholder = "ENDIANTYPE";
   auto pos = schema.find(placeholder);
   if (pos != std::string::npos) {
-      schema.replace(pos, placeholder.length(), endianTag);
+    schema.replace(pos, placeholder.length(), endianTag);
   }
 
   for (auto &entry : userFields) {
@@ -245,7 +253,7 @@ template <typename OutputType> size_t iofldAdios::write_()
     o_xyz.push_back(mesh->o_y);
     o_xyz.push_back(mesh->o_z);
     putVariableConvert<dfloat, OutputType>(o_xyz, o_coordVertices);
-    putVariable<OutputType>("vertices",
+    putVariable<OutputType>("mesh",
                             o_coordVertices,
                             {static_cast<size_t>(mesh_vis->Nlocal), static_cast<size_t>(mesh_vis->dim)},
                             adiosMode);
@@ -350,7 +358,6 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
   auto o_win = platform->device.mallocHost<T>(maxRemoteSizes.first * winFieldOffset);
 #endif
 
-
   int typeSize;
   MPI_Datatype mpiType;
   if constexpr (std::is_same_v<T, double>) {
@@ -375,7 +382,7 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
 
         const MPI_Aint winOffset = Np * localElementIndex + dim * winFieldOffset;
         const auto o_inSlice = o_in.at(dim).slice(e * Np, Np);
-       
+
         MPI_Put(o_inSlice.ptr(), Np, mpiType, targetRank, winOffset, Np, mpiType, win);
       }
     }
@@ -386,7 +393,7 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
   std::vector<occa::memory> o_out;
   const auto o_outSize = maxRemoteSizes.first;
   for (int dim = 0; dim < o_outSize; dim++) {
-    o_out.push_back(platform->deviceMemoryPool.reserve<T>(winFieldOffset));
+    o_out.push_back(platform->deviceMemoryPool.reserve<T>(mesh_vis->Nlocal));
     o_out[dim].copyFrom(o_win.slice(dim * winFieldOffset));
   }
 
@@ -405,8 +412,8 @@ std::vector<occa::memory> iofldAdios::getDataConvert(const std::string &name)
     return o_out;
   }
 
-  //nekrsCheck(var.type != adios2::GetType<Tadios>, MPI_COMM_SELF, EXIT_FAILURE,
-  //           "ADIOS variable type does not match Tadios!\n");  
+  // nekrsCheck(var.type != adios2::GetType<Tadios>, MPI_COMM_SELF, EXIT_FAILURE,
+  //            "ADIOS variable type does not match Tadios!\n");
 
   const auto nDim = var.dim;
   const size_t Nlocal = in.size() / nDim;
@@ -430,47 +437,151 @@ std::vector<occa::memory> iofldAdios::getDataConvert(const std::string &name)
 template <typename Tadios>
 void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_userBuf)
 {
-  std::vector<occa::memory> o_convDistributedData;
-  if (o_userBuf.at(0).dtype() == occa::dtype::get<double>()) {
-    auto o_convData = getDataConvert<Tadios, double>(name);
-    o_convDistributedData = redistributeField<double>(o_convData);
-  }
-  if (o_userBuf.at(0).dtype() == occa::dtype::get<float>()) {
-    auto o_convData = getDataConvert<Tadios, float>(name);
-    o_convDistributedData = redistributeField<float>(o_convData);
-  }
 
-  for (int dim = 0; dim < o_convDistributedData.size(); dim++) {
-    if (mesh_vis != mesh) {
-      mesh_vis->interpolate(o_convDistributedData[dim], mesh, o_userBuf[dim]);
+  auto o_convDistributedData = [&]()
+  {
+    std::vector<occa::memory> o_out;
+
+    if (o_userBuf.at(0).dtype() == occa::dtype::get<double>()) {
+      auto convData = getDataConvert<Tadios, double>(name);
+      if (redistribute) {
+        o_out = redistributeField<double>(convData);
+      } else {
+        for (int dim = 0; dim < o_userBuf.size(); dim++) {
+          auto Nlocal = (convData.size()) ? convData.at(dim).size() : 0;
+          o_out.push_back(platform->deviceMemoryPool.reserve<double>(Nlocal));
+          if (Nlocal) o_out.at(dim).copyFrom(convData.at(dim));
+        }
+      }
+    } else if (o_userBuf.at(0).dtype() == occa::dtype::get<float>()) {
+      auto convData = getDataConvert<Tadios, float>(name);
+      if (redistribute) {
+        o_out = redistributeField<float>(convData);
+      } else {
+        for (int dim = 0; dim < o_userBuf.size(); dim++) {
+          auto Nlocal = (convData.size()) ? convData.at(dim).size() : 0;
+          o_out.push_back(platform->deviceMemoryPool.reserve<float>(Nlocal));
+          if (Nlocal) o_out.at(dim).copyFrom(convData.at(dim));
+        }
+      }
+    }
+
+    return o_out;
+  }();
+
+  auto convertToDfloat = [&]()
+  { 
+    std::vector<occa::memory> o_work;
+    if (o_userBuf.at(0).dtype() == occa::dtype::get<dfloat>()) {
+      o_work = o_convDistributedData;
     } else {
-      o_userBuf[dim].copyFrom(o_convDistributedData[dim]);
+      const auto Nlocal = o_convDistributedData.at(0).size();
+      for (int dim = 0; dim < o_convDistributedData.size(); dim++) {
+        o_work.push_back(platform->deviceMemoryPool.reserve<dfloat>(Nlocal));
+
+        if (o_userBuf.at(0).dtype() == occa::dtype::get<double>()) {
+          platform->copyDoubleToDfloatKernel(Nlocal, o_convDistributedData.at(dim), o_work.at(dim));
+          nekrsCheck((std::is_same<float, dfloat>::value), MPI_COMM_SELF, 
+                     EXIT_FAILURE, "%s\n", "cannot convert field of type double to float!");
+        } else {
+          platform->copyFloatToDfloatKernel(Nlocal, o_convDistributedData.at(dim), o_work.at(dim));
+        }
+      }
+    }
+    return o_work;
+  };
+
+  auto convertFromDfloat = [&](const occa::memory& o_tmp, occa::memory& o_buf)
+  {
+    if (o_buf.dtype() == occa::dtype::get<double>()) {
+       platform->copyDfloatToDoubleKernel(o_buf.size(), o_tmp, o_buf); 
+    } else {
+       platform->copyDfloatToFloatKernel(o_buf.size(), o_tmp, o_buf); 
+    }
+  };
+
+  if (pointInterpolation) {
+    auto o_work = convertToDfloat();
+    static std::shared_ptr<pointInterpolation_t> interp;
+    if (name == "mesh") {
+      mesh_vis->Nelements = o_work.at(0).size() / mesh_vis->Np;
+      mesh_vis->Nlocal = mesh_vis->Nelements * mesh_vis->Np;
+
+      mesh_vis->o_x = platform->device.malloc<dfloat>(mesh_vis->Nlocal);
+      mesh_vis->o_y = platform->device.malloc<dfloat>(mesh_vis->Nlocal);
+      mesh_vis->o_z = platform->device.malloc<dfloat>(mesh_vis->Nlocal);
+      mesh_vis->o_x.copyFrom(o_work.at(0));
+      mesh_vis->o_y.copyFrom(o_work.at(1));
+      mesh_vis->o_z.copyFrom(o_work.at(2));
+
+      interp = std::make_shared<pointInterpolation_t>(mesh_vis, platform->comm.mpiComm);
+      interp->setPoints(mesh->o_x, mesh->o_y, mesh->o_z);
+      const auto verbosity = pointInterpolation_t::VerbosityLevel::Detailed;
+      interp->find(verbosity);
+    } else {
+      for (int dim = 0; dim < o_work.size(); dim++) {
+        auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(interp->numPoints());
+
+        dlong pointOffset = 0;
+        const auto pointBlockSize = 64 * mesh->Np;
+        int nPointsBlocks = (interp->numPoints() + pointBlockSize - 1) / pointBlockSize;
+        MPI_Allreduce(MPI_IN_PLACE, &nPointsBlocks, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+        
+        for (int block = 0; block < nPointsBlocks; block++) {
+          const auto nPoints = std::max(std::min(interp->numPoints() - pointOffset, pointBlockSize), 0);
+          auto o_tmpBlock = (nPoints) ? o_tmp.slice(pointOffset, nPoints) : o_NULL;
+          interp->eval(1, 0, o_work.at(dim), 0, o_tmpBlock, nPoints, pointOffset);
+          pointOffset += pointBlockSize;
+        }
+
+        convertFromDfloat(o_tmp, o_userBuf.at(dim));
+      }
+    }
+  } else if (mesh_vis->N != mesh->N) {
+    auto o_work = convertToDfloat();
+    for (int dim = 0; dim < o_work.size(); dim++) {
+      auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(o_userBuf.at(dim).size());
+      mesh_vis->interpolate(o_work.at(dim), mesh, o_tmp);
+      convertFromDfloat(o_tmp, o_userBuf.at(dim));
+    }
+  } else {
+    for (int dim = 0; dim < o_convDistributedData.size(); dim++) {
+      nekrsCheck(o_userBuf.at(dim).size() < o_convDistributedData.at(dim).size(),
+                 MPI_COMM_SELF,
+                 EXIT_FAILURE,
+                 "user buffer for %s too small!\n",
+                 name.c_str());
+
+      o_userBuf.at(dim).copyFrom(o_convDistributedData.at(dim));
     }
   }
 }
 
 template <typename Tadios> void iofldAdios::getData(const std::string &name, variantType &variant)
 {
-#define HANDLE_TYPE(TYPE, MPI_TYPE) \
-    if (std::holds_alternative<std::reference_wrapper<TYPE>>(variant)) { \
-        auto &value = std::get<std::reference_wrapper<TYPE>>(variant).get(); \
-        if (platform->comm.mpiRank == 0) { \
-            value = *(variables[name].data.ptr<Tadios>()); \
-        } \
-        MPI_Bcast(&value, 1, MPI_TYPE, 0, platform->comm.mpiComm); \
-    }
+#define HANDLE_TYPE(TYPE, MPI_TYPE)                                                                          \
+  if (std::holds_alternative<std::reference_wrapper<TYPE>>(variant)) {                                       \
+    auto &value = std::get<std::reference_wrapper<TYPE>>(variant).get();                                     \
+    if (platform->comm.mpiRank == 0) {                                                                       \
+      value = *(variables[name].data.ptr<Tadios>());                                                         \
+    }                                                                                                        \
+    MPI_Bcast(&value, 1, MPI_TYPE, 0, platform->comm.mpiComm);                                               \
+  }
 
-    HANDLE_TYPE(int, MPI_INT)
-    HANDLE_TYPE(long long int, MPI_LONG_LONG_INT)
-    HANDLE_TYPE(float, MPI_FLOAT)
-    HANDLE_TYPE(double, MPI_DOUBLE)
+  HANDLE_TYPE(int, MPI_INT)
+  HANDLE_TYPE(long long int, MPI_LONG_LONG_INT)
+  HANDLE_TYPE(float, MPI_FLOAT)
+  HANDLE_TYPE(double, MPI_DOUBLE)
 #undef HANDLE_TYPE
 }
 
 template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::string &name, size_t varStep)
 {
   auto adiosVariable = adiosIO.InquireVariable<T>(name);
-  if (!static_cast<bool>(adiosVariable)) return 1; // variable not found
+
+  if (!static_cast<bool>(adiosVariable)) {
+    return 1; // variable not found
+  }
 
   adiosVariable.SetStepSelection(adios2::Box<std::size_t>(varStep, 1));
 
@@ -510,7 +621,9 @@ template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::str
   }
 
   const auto &blocks = adiosEngine.BlocksInfo(adiosVariable, varStep);
-  if (blocks.size() == 0) return 1; // step not found 
+  if (blocks.size() == 0) {
+    return 1; // step not found
+  }
 
   variable var;
   var.type = adios2::GetType<T>();
@@ -587,31 +700,38 @@ size_t iofldAdios::read()
     getVariable<uint32_t>(allocateOnly, "polynomialOrder", 0);
     getVariable<uint64_t>(allocateOnly, "globalElementIds", 0);
 
-    for (const auto &name : userVariables) {
+    for (auto name : userVariables) {
       const auto &type = adiosIO.VariableType(name);
 
       int err = 0;
       auto typeFound = false;
-#define HANDLE_TYPE(TYPE, STEP) \
-      if (type == adios2::GetType<TYPE>()) { \
-        err = getVariable<TYPE>(allocateOnly, name, STEP); \
-        typeFound = true; \
-      }
+#define HANDLE_TYPE(TYPE, STEP)                                                                              \
+  if (type == adios2::GetType<TYPE>()) {                                                                     \
+    err = getVariable<TYPE>(allocateOnly, name, STEP);                                                       \
+    typeFound = true;                                                                                        \
+  }
       HANDLE_TYPE(double, step)
       HANDLE_TYPE(float, step)
       HANDLE_TYPE(int, step)
       HANDLE_TYPE(long long int, step)
- 
-      // fallback if mesh was not found 
+
+      // fallback to step 0 if mesh was not found in requested step
       if (err && name == "mesh") {
         HANDLE_TYPE(double, 0)
         HANDLE_TYPE(float, 0)
       }
 #undef HANDLE_TYPE
-      nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, 
-                 "requested variable %s not found in file!\n", name.c_str());
-      nekrsCheck(!typeFound, platform->comm.mpiComm, EXIT_FAILURE, 
-                 "ADIOS variable %s has unsupported type %s!\n", name.c_str(), type.c_str());
+      nekrsCheck(err,
+                 platform->comm.mpiComm,
+                 EXIT_FAILURE,
+                 "requested variable %s not found in file!\n",
+                 name.c_str());
+      nekrsCheck(!typeFound,
+                 platform->comm.mpiComm,
+                 EXIT_FAILURE,
+                 "ADIOS variable %s has unsupported type %s!\n",
+                 name.c_str(),
+                 type.c_str());
     }
   }
 
@@ -622,10 +742,13 @@ size_t iofldAdios::read()
     const auto &name = entry.first;
     auto &variant = entry.second;
 
-    const auto available = std::find(_availableVariables.begin(), _availableVariables.end(), name) !=
-                           _availableVariables.end();
-    nekrsCheck(!available, platform->comm.mpiComm, EXIT_FAILURE, 
-               "requested variable %s not found in file!\n", name.c_str());
+    const auto available =
+        std::find(_availableVariables.begin(), _availableVariables.end(), name) != _availableVariables.end();
+    nekrsCheck(!available,
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "requested variable %s not found in file!\n",
+               name.c_str());
 
     const auto &adiosType = variables[name].type;
 
@@ -643,30 +766,40 @@ size_t iofldAdios::read()
   mesh_vis = [&]() {
     variantType v = std::ref(N);
     getData<uint32_t>("polynomialOrder", v);
-    if (N != mesh->N) {
+    if (N != mesh->N || pointInterpolation) {
       return genVisMesh();
     } else {
       return mesh;
     }
   }();
 
-  for (auto &o_entry : userFields) {
-    const auto &name = o_entry.first;
-    auto &o_userBuf = o_entry.second;
+  auto assignUserBuf = [&](bool meshRequested = false)
+  {
+    for (auto &o_entry : userFields) {
+      const auto &name = o_entry.first;
+      auto &o_userBuf = o_entry.second;
 
-    if (std::find(_availableVariables.begin(), _availableVariables.end(), name) ==
-        _availableVariables.end()) {
-      continue;
+      if (std::find(_availableVariables.begin(), _availableVariables.end(), name) ==
+          _availableVariables.end()) {
+        continue;
+      }
+
+      if ((meshRequested && name != "mesh") || (!meshRequested && name == "mesh")) {
+        continue;
+      }
+
+      const auto &adiosType = variables[name].type;
+ 
+      if (adiosType == adios2::GetType<double>()) {
+        getData<double>(name, o_userBuf);
+      } else if (adiosType == adios2::GetType<float>()) {
+        getData<float>(name, o_userBuf);
+      }
     }
+  };
 
-    const auto &adiosType = variables[name].type;
-
-    if (adiosType == adios2::GetType<double>()) {
-      getData<double>(name, o_userBuf);
-    } else if (adiosType == adios2::GetType<float>()) {
-      getData<float>(name, o_userBuf);
-    }
-  }
+  assignUserBuf(true);
+  assignUserBuf();
 
   return 0;
 }
@@ -675,6 +808,12 @@ void iofldAdios::close()
 {
   if (static_cast<bool>(adiosEngine)) {
     adiosEngine.Close();
+  }
+
+  if (mesh_vis != mesh) {
+    mesh_vis->o_x.free();
+    mesh_vis->o_y.free();
+    mesh_vis->o_z.free();
   }
 }
 

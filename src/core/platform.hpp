@@ -62,7 +62,9 @@ public:
   occa::kernel copyDfloatToPfloatKernel;
   occa::kernel copyPfloatToDfloatKernel;
   occa::kernel copyDfloatToDoubleKernel;
+  occa::kernel copyDfloatToFloatKernel;
   occa::kernel copyDoubleToDfloatKernel;
+  occa::kernel copyFloatToDfloatKernel;
 };
 #endif
 

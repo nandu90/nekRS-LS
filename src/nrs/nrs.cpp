@@ -897,6 +897,19 @@ void nrs_t::restartFromFile(const std::string &restartStr)
     return val;
   }();
 
+  auto pointInterpolation = [&]() {
+    auto it = std::find_if(options.begin(), options.end(), [](const std::string &s) {
+      return s.find("int") != std::string::npos;
+    });
+
+    auto found = false;
+    if (it != options.end()) {
+      found = true;
+      options.erase(it);
+    }
+    return found; 
+  }();
+ 
   const auto requestedFields = [&]() {
     std::vector<std::string> flds;
     for (const auto &entry : {"x", "u", "p", "t", "s"}) {
@@ -992,6 +1005,8 @@ void nrs_t::restartFromFile(const std::string &restartStr)
       }
     }
   }
+
+  if (pointInterpolation) iofld->readAttribute("interpolate", "true");
 
   iofld->process();
 
