@@ -402,7 +402,7 @@ void device_t::printMemoryUsage(MPI_Comm comm) const
     int width = 12;
     std::cout << "occa max memory usage: " << std::setw(width) << std::right << std::get<0>(maxMemSizes)
               << " bytes" << std::endl;
-    std::cout << "  deviceMemoryPool:           " << std::setw(width) << std::right
+    std::cout << "  deviceMemoryPool:    " << std::setw(width) << std::right
               << std::get<1>(maxMemSizes) << " bytes" << std::endl;
     std::cout << "  mempool:             " << std::setw(width) << std::right << std::get<2>(maxMemSizes)
               << " bytes" << std::endl
