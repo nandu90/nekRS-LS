@@ -229,7 +229,7 @@ template <typename OutputType> size_t iofldAdios::write_()
     putVariable<uint32_t>("numOfPoints", NumOfPoints, adiosMode);
     putVariable<uint32_t>("polynomialOrder", mesh_vis->N, adiosMode);
 
-    auto o_globalElementsIds = platform->memPool.reserve<uint64_t>(mesh_vis->Nelements);
+    auto o_globalElementsIds = platform->memoryPool.reserve<uint64_t>(mesh_vis->Nelements);
     auto globalElementsIdsPtr = static_cast<uint64_t *>(o_globalElementsIds.ptr());
     for (int e = 0; e < o_globalElementsIds.size(); e++) {
       globalElementsIdsPtr[e] = nek::localElementIdToGlobal(e);
@@ -238,7 +238,7 @@ template <typename OutputType> size_t iofldAdios::write_()
     writtenBytes += o_globalElementsIds.size() * sizeof(uint64_t);
 
     auto o_connectivity =
-        platform->memPool.reserve<uint64_t>(static_cast<uint64_t>(NumOfCells) * (mesh_vis->Nverts + 1));
+        platform->memoryPool.reserve<uint64_t>(static_cast<uint64_t>(NumOfCells) * (mesh_vis->Nverts + 1));
     generateConnectivity(o_connectivity);
     putVariable<uint64_t>("connectivity",
                           o_connectivity,
@@ -246,7 +246,7 @@ template <typename OutputType> size_t iofldAdios::write_()
                           adiosMode);
     writtenBytes += o_connectivity.size() * sizeof(uint64_t);
 
-    auto o_coordVertices = platform->memPool.reserve<OutputType>(mesh_vis->dim * mesh_vis->Nlocal);
+    auto o_coordVertices = platform->memoryPool.reserve<OutputType>(mesh_vis->dim * mesh_vis->Nlocal);
 
     std::vector<occa::memory> o_xyz;
     o_xyz.push_back(mesh->o_x);
@@ -266,7 +266,7 @@ template <typename OutputType> size_t iofldAdios::write_()
     for (const auto &entry : std::get<1>(fld)) {
       fldSize += entry.size();
     }
-    o_fldDataScratch.push_back(platform->memPool.reserve<OutputType>(fldSize));
+    o_fldDataScratch.push_back(platform->memoryPool.reserve<OutputType>(fldSize));
   }
 
   // after this point no memPool reservations are allowed to ensure pointers
@@ -353,7 +353,7 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
 
   const size_t winFieldOffset = maxRemoteSizes.second;
 #if 1
-  auto o_win = platform->memPool.reserve<T>(maxRemoteSizes.first * winFieldOffset);
+  auto o_win = platform->memoryPool.reserve<T>(maxRemoteSizes.first * winFieldOffset);
 #else
   auto o_win = platform->device.mallocHost<T>(maxRemoteSizes.first * winFieldOffset);
 #endif
@@ -419,7 +419,7 @@ std::vector<occa::memory> iofldAdios::getDataConvert(const std::string &name)
   const size_t Nlocal = in.size() / nDim;
 
   for (int dim = 0; dim < nDim; dim++) {
-    auto out = platform->memPool.reserve<Tout>(Nlocal);
+    auto out = platform->memoryPool.reserve<Tout>(Nlocal);
 
     // get latest pointer just in case a previous reserve has caused a resize
     auto inPtr = static_cast<Tadios *>(in.ptr());
@@ -438,8 +438,7 @@ template <typename Tadios>
 void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_userBuf)
 {
 
-  auto o_convDistributedData = [&]()
-  {
+  auto o_convDistributedData = [&]() {
     std::vector<occa::memory> o_out;
 
     if (o_userBuf.at(0).dtype() == occa::dtype::get<double>()) {
@@ -450,7 +449,9 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
         for (int dim = 0; dim < o_userBuf.size(); dim++) {
           auto Nlocal = (convData.size()) ? convData.at(dim).size() : 0;
           o_out.push_back(platform->deviceMemoryPool.reserve<double>(Nlocal));
-          if (Nlocal) o_out.at(dim).copyFrom(convData.at(dim));
+          if (Nlocal) {
+            o_out.at(dim).copyFrom(convData.at(dim));
+          }
         }
       }
     } else if (o_userBuf.at(0).dtype() == occa::dtype::get<float>()) {
@@ -461,7 +462,9 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
         for (int dim = 0; dim < o_userBuf.size(); dim++) {
           auto Nlocal = (convData.size()) ? convData.at(dim).size() : 0;
           o_out.push_back(platform->deviceMemoryPool.reserve<float>(Nlocal));
-          if (Nlocal) o_out.at(dim).copyFrom(convData.at(dim));
+          if (Nlocal) {
+            o_out.at(dim).copyFrom(convData.at(dim));
+          }
         }
       }
     }
@@ -469,8 +472,7 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
     return o_out;
   }();
 
-  auto convertToDfloat = [&]()
-  { 
+  auto convertToDfloat = [&]() {
     std::vector<occa::memory> o_work;
     if (o_userBuf.at(0).dtype() == occa::dtype::get<dfloat>()) {
       o_work = o_convDistributedData;
@@ -481,8 +483,11 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
 
         if (o_userBuf.at(0).dtype() == occa::dtype::get<double>()) {
           platform->copyDoubleToDfloatKernel(Nlocal, o_convDistributedData.at(dim), o_work.at(dim));
-          nekrsCheck((std::is_same<float, dfloat>::value), MPI_COMM_SELF, 
-                     EXIT_FAILURE, "%s\n", "cannot convert field of type double to float!");
+          nekrsCheck((std::is_same<float, dfloat>::value),
+                     MPI_COMM_SELF,
+                     EXIT_FAILURE,
+                     "%s\n",
+                     "cannot convert field of type double to float!");
         } else {
           platform->copyFloatToDfloatKernel(Nlocal, o_convDistributedData.at(dim), o_work.at(dim));
         }
@@ -491,12 +496,11 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
     return o_work;
   };
 
-  auto convertFromDfloat = [&](const occa::memory& o_tmp, occa::memory& o_buf)
-  {
+  auto convertFromDfloat = [&](const occa::memory &o_tmp, occa::memory &o_buf) {
     if (o_buf.dtype() == occa::dtype::get<double>()) {
-       platform->copyDfloatToDoubleKernel(o_buf.size(), o_tmp, o_buf); 
+      platform->copyDfloatToDoubleKernel(o_buf.size(), o_tmp, o_buf);
     } else {
-       platform->copyDfloatToFloatKernel(o_buf.size(), o_tmp, o_buf); 
+      platform->copyDfloatToFloatKernel(o_buf.size(), o_tmp, o_buf);
     }
   };
 
@@ -526,7 +530,7 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
         const auto pointBlockSize = 64 * mesh->Np;
         int nPointsBlocks = (interp->numPoints() + pointBlockSize - 1) / pointBlockSize;
         MPI_Allreduce(MPI_IN_PLACE, &nPointsBlocks, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-        
+
         for (int block = 0; block < nPointsBlocks; block++) {
           const auto nPoints = std::max(std::min(interp->numPoints() - pointOffset, pointBlockSize), 0);
           auto o_tmpBlock = (nPoints) ? o_tmp.slice(pointOffset, nPoints) : o_NULL;
@@ -651,7 +655,7 @@ template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::str
   if (var.blocks.size() == 0) {
     var.data = o_NULL;
   } else if (var.dim == 0) {
-    var.data = platform->memPool.reserve<T>(1);
+    var.data = platform->memoryPool.reserve<T>(1);
   } else {
     const auto Nlocal = [&]() {
       size_t sum = 0;
@@ -660,7 +664,7 @@ template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::str
       }
       return sum;
     }();
-    var.data = platform->memPool.reserve<T>(Nlocal);
+    var.data = platform->memoryPool.reserve<T>(Nlocal);
   }
 
   if (platform->verbose && var.blocks.size()) {
@@ -773,8 +777,7 @@ size_t iofldAdios::read()
     }
   }();
 
-  auto assignUserBuf = [&](bool meshRequested = false)
-  {
+  auto assignUserBuf = [&](bool meshRequested = false) {
     for (auto &o_entry : userFields) {
       const auto &name = o_entry.first;
       auto &o_userBuf = o_entry.second;
@@ -789,7 +792,7 @@ size_t iofldAdios::read()
       }
 
       const auto &adiosType = variables[name].type;
- 
+
       if (adiosType == adios2::GetType<double>()) {
         getData<double>(name, o_userBuf);
       } else if (adiosType == adios2::GetType<float>()) {

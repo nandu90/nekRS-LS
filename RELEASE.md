@@ -42,7 +42,7 @@ This list provides an overview of the most significant changes in this release, 
 * `nek::ocopyToNek` -> `nrs->copyToNek`
 * `nek::ocopyFromNek` -> `nek::copyFromNek`
 * send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd`
-* use `auto foo = platform->o_memPool.reserve<T>(nWords)` instead of e.g. `platform->o_mempool.slice0`
+* use `auto foo = platform->deviceMemoryPool.reserve<T>(nWords)` instead of e.g. `platform->o_mempool.slice0`
 * change count argument of `occa::memory::slice, occa::memory::copyFrom, occa::memory::copyTo` to number of words instead of bytes 
 * define `time` as double (instead of defloat) in all UDF functions
 * remove `nrs_t` argument from UDF API functions (nrs object is now globally accessible within udf if the Navier Stokes solver is enabled)

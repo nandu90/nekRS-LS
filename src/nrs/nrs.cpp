@@ -575,8 +575,8 @@ void nrs_t::init()
     return (nelgt > nelgv) ? 1 : 0;
   }();
 
-  nekrsCheck((cht || platform->options.compareArgs("LOWMACH", "TRUE")) && 
-             !platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE"), 
+  nekrsCheck((cht || platform->options.compareArgs("LOWMACH", "TRUE")) &&
+                 !platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE"),
              platform->comm.mpiComm,
              EXIT_FAILURE,
              "%s\n",
@@ -907,9 +907,9 @@ void nrs_t::restartFromFile(const std::string &restartStr)
       found = true;
       options.erase(it);
     }
-    return found; 
+    return found;
   }();
- 
+
   const auto requestedFields = [&]() {
     std::vector<std::string> flds;
     for (const auto &entry : {"x", "u", "p", "t", "s"}) {
@@ -1006,7 +1006,9 @@ void nrs_t::restartFromFile(const std::string &restartStr)
     }
   }
 
-  if (pointInterpolation) iofld->readAttribute("interpolate", "true");
+  if (pointInterpolation) {
+    iofld->readAttribute("interpolate", "true");
+  }
 
   iofld->process();
 
@@ -1668,7 +1670,7 @@ void nrs_t::copyToNek(double time, bool updateMesh_)
   };
 
   {
-    auto U = platform->memPool.reserve<dfloat>(mesh->dim * fieldOffset);
+    auto U = platform->memoryPool.reserve<dfloat>(mesh->dim * fieldOffset);
     o_U.copyTo(U, U.size());
     auto vx = U.ptr<dfloat>() + 0 * fieldOffset;
     auto vy = U.ptr<dfloat>() + 1 * fieldOffset;
@@ -1683,7 +1685,7 @@ void nrs_t::copyToNek(double time, bool updateMesh_)
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     auto mesh = (cht) ? cds->mesh[0] : this->mesh;
 
-    auto U = platform->memPool.reserve<dfloat>(mesh->dim * fieldOffset);
+    auto U = platform->memoryPool.reserve<dfloat>(mesh->dim * fieldOffset);
     mesh->o_U.copyTo(U, U.size());
     auto wx = U.ptr<dfloat>() + 0 * fieldOffset;
     auto wy = U.ptr<dfloat>() + 1 * fieldOffset;
@@ -1701,7 +1703,7 @@ void nrs_t::copyToNek(double time, bool updateMesh_)
   }
 
   {
-    auto P = platform->memPool.reserve<dfloat>(mesh->Nlocal);
+    auto P = platform->memoryPool.reserve<dfloat>(mesh->Nlocal);
     o_P.copyTo(P, P.size());
     auto Pptr = P.ptr<dfloat>();
     for (int i = 0; i < mesh->Nlocal; i++) {
@@ -1714,7 +1716,7 @@ void nrs_t::copyToNek(double time, bool updateMesh_)
     for (int is = 0; is < Nscalar; is++) {
       auto mesh = cds->mesh[is];
 
-      auto S = platform->memPool.reserve<dfloat>(mesh->Nlocal);
+      auto S = platform->memoryPool.reserve<dfloat>(mesh->Nlocal);
       cds->o_S.copyTo(S, S.size(), 0, cds->fieldOffsetScan[is]);
 
       auto Sptr = S.ptr<dfloat>();
@@ -1743,7 +1745,7 @@ void nrs_t::copyFromNek(double &time)
   p0th[0] = *(nekData.p0th);
 
   {
-    auto U = platform->memPool.reserve<dfloat>(mesh->dim * fieldOffset);
+    auto U = platform->memoryPool.reserve<dfloat>(mesh->dim * fieldOffset);
     auto vx = U.ptr<dfloat>() + 0 * fieldOffset;
     auto vy = U.ptr<dfloat>() + 1 * fieldOffset;
     auto vz = U.ptr<dfloat>() + 2 * fieldOffset;
@@ -1758,7 +1760,7 @@ void nrs_t::copyFromNek(double &time)
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     auto mesh = (cht) ? cds->mesh[0] : this->mesh;
 
-    auto U = platform->memPool.reserve<dfloat>(mesh->dim * fieldOffset);
+    auto U = platform->memoryPool.reserve<dfloat>(mesh->dim * fieldOffset);
     auto wx = U.ptr<dfloat>() + 0 * fieldOffset;
     auto wy = U.ptr<dfloat>() + 1 * fieldOffset;
     auto wz = U.ptr<dfloat>() + 2 * fieldOffset;
@@ -1771,7 +1773,7 @@ void nrs_t::copyFromNek(double &time)
   }
 
   {
-    auto P = platform->memPool.reserve<dfloat>(o_P.size());
+    auto P = platform->memoryPool.reserve<dfloat>(o_P.size());
     auto Pptr = P.ptr<dfloat>();
     for (int i = 0; i < mesh->Nlocal; i++) {
       Pptr[i] = nekData.pr[i];
@@ -1785,7 +1787,7 @@ void nrs_t::copyFromNek(double &time)
       auto mesh = cds->mesh[is];
       auto Ti = nekData.t + is * nekFieldOffset;
 
-      auto S = platform->memPool.reserve<dfloat>(mesh->Nlocal);
+      auto S = platform->memoryPool.reserve<dfloat>(mesh->Nlocal);
 
       auto Sptr = S.ptr<dfloat>();
       for (int i = 0; i < mesh->Nlocal; i++) {

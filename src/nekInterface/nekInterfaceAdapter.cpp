@@ -168,32 +168,32 @@ void readFld(fldData &data)
 
   occa::memory xm, ym, zm;
   if (*ptr<int>("getxr")) {
-    xm = platform->memPool.reserve<double>(Nlocal);
-    ym = platform->memPool.reserve<double>(Nlocal);
-    zm = platform->memPool.reserve<double>(Nlocal);
+    xm = platform->memoryPool.reserve<double>(Nlocal);
+    ym = platform->memoryPool.reserve<double>(Nlocal);
+    zm = platform->memoryPool.reserve<double>(Nlocal);
   }
 
   occa::memory vx, vy, vz;
   if (*ptr<int>("getur")) {
-    vx = platform->memPool.reserve<double>(Nlocal);
-    vy = platform->memPool.reserve<double>(Nlocal);
-    vz = platform->memPool.reserve<double>(Nlocal);
+    vx = platform->memoryPool.reserve<double>(Nlocal);
+    vy = platform->memoryPool.reserve<double>(Nlocal);
+    vz = platform->memoryPool.reserve<double>(Nlocal);
   }
 
   occa::memory pr;
   if (*ptr<int>("getpr")) {
-    pr = platform->memPool.reserve<double>(Nlocal);
+    pr = platform->memoryPool.reserve<double>(Nlocal);
   }
 
   occa::memory t;
   if (*ptr<int>("gettr")) {
-    t = platform->memPool.reserve<double>(Nlocal);
+    t = platform->memoryPool.reserve<double>(Nlocal);
   }
 
   occa::memory s;
   const auto nsr = *ptr<int>("npsr");
   if (nsr) {
-    s = platform->memPool.reserve<double>(nekFieldOffset * nsr);
+    s = platform->memoryPool.reserve<double>(nekFieldOffset * nsr);
   }
 
   (*nek_readfld_ptr)(static_cast<double *>(xm.ptr()),
@@ -899,25 +899,25 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
         const int bufSize = 4096;
         char buf[bufSize];
         snprintf(buf,
-                bufSize,
-                "cd %s"
-                " && cp -f %s/makefile.template makefile"
-                " && make %s"
-                "S=%s "
-                "OPT_INCDIR=\"%s\" "
-                "CASENAME=%s "
-                "CASEDIR=%s "
-                "-f %s/Makefile lib usr libnekInterface "
-                "%s",
-                cache_dir.c_str(),
-                nek5000_dir.c_str(),
-                make_args.c_str(),
-                nek5000_dir.c_str(),
-                include_dirs.c_str(),
-                casename.c_str(),
-                cache_dir.c_str(),
-                nekInterface_dir.c_str(),
-                out_args.c_str());
+                 bufSize,
+                 "cd %s"
+                 " && cp -f %s/makefile.template makefile"
+                 " && make %s"
+                 "S=%s "
+                 "OPT_INCDIR=\"%s\" "
+                 "CASENAME=%s "
+                 "CASEDIR=%s "
+                 "-f %s/Makefile lib usr libnekInterface "
+                 "%s",
+                 cache_dir.c_str(),
+                 nek5000_dir.c_str(),
+                 make_args.c_str(),
+                 nek5000_dir.c_str(),
+                 include_dirs.c_str(),
+                 casename.c_str(),
+                 cache_dir.c_str(),
+                 nekInterface_dir.c_str(),
+                 out_args.c_str());
 
         if (verbose && rank == 0) {
           printf("\n%s\n", buf);

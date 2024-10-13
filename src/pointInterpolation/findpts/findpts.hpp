@@ -189,6 +189,9 @@ private:
   occa::kernel localEvalMaskKernel;
   occa::kernel localKernel;
 
+  occa::stream defaultStream;
+  occa::stream localEvalStream;
+
   // data for elx
   occa::memory o_x;
   occa::memory o_y;

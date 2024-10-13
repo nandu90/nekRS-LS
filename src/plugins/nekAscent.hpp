@@ -178,7 +178,7 @@ void updateFieldData()
         } else {
           occa::memory o_tmp;
           if (stageThroughHost) {
-            o_tmp = platform->memPool.reserve<dfloat>(mesh_vis->Nlocal);
+            o_tmp = platform->memoryPool.reserve<dfloat>(mesh_vis->Nlocal);
             auto ptr = o_tmp.ptr<dfloat>();
             for (int i = 0; i < o_tmp.size(); i++) {
               ptr[i] = 0.0;

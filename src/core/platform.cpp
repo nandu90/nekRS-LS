@@ -227,8 +227,8 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
     occa::json properties;
     properties["resize_through_host"] = 1;
     properties["host"] = true;
-    memPool = device.occaDevice().createMemoryPool(properties);
-    memPool.setAlignment(ALIGN_SIZE);
+    memoryPool = device.occaDevice().createMemoryPool(properties);
+    memoryPool.setAlignment(ALIGN_SIZE);
   }
 }
 

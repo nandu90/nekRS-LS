@@ -318,11 +318,19 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
   } else if (strcasecmp(requestedOccaMode.c_str(), "DPCPP") == 0) {
     int plat = 0;
     options.getArgs("PLATFORM NUMBER", plat);
-    snprintf(deviceConfig, deviceConfigSize, "{mode: 'dpcpp', device_id: %d, platform_id: %d}", device_id, plat);
+    snprintf(deviceConfig,
+             deviceConfigSize,
+             "{mode: 'dpcpp', device_id: %d, platform_id: %d}",
+             device_id,
+             plat);
   } else if (strcasecmp(requestedOccaMode.c_str(), "OPENCL") == 0) {
     int plat = 0;
     options.getArgs("PLATFORM NUMBER", plat);
-    snprintf(deviceConfig, deviceConfigSize, "{mode: 'OpenCL', device_id: %d, platform_id: %d}", device_id, plat);
+    snprintf(deviceConfig,
+             deviceConfigSize,
+             "{mode: 'OpenCL', device_id: %d, platform_id: %d}",
+             device_id,
+             plat);
   } else if (strcasecmp(requestedOccaMode.c_str(), "OPENMP") == 0) {
     nekrsCheck(true, _comm.mpiComm, EXIT_FAILURE, "%s\n", "OpenMP backend currently not supported!");
     snprintf(deviceConfig, deviceConfigSize, "{mode: 'OpenMP'}");
@@ -389,7 +397,7 @@ void device_t::printMemoryUsage(MPI_Comm comm) const
     std::vector<uint64_t> work;
     work.push_back(platform->device.occaDevice().maxMemoryAllocated());
     work.push_back(platform->deviceMemoryPool.size());
-    work.push_back(platform->memPool.size());
+    work.push_back(platform->memoryPool.size());
 
     MPI_Allreduce(MPI_IN_PLACE, work.data(), work.size(), MPI_UINT64_T, MPI_MAX, comm);
     return std::make_tuple(work[0], work[1], work[2]);
@@ -402,8 +410,8 @@ void device_t::printMemoryUsage(MPI_Comm comm) const
     int width = 12;
     std::cout << "occa max memory usage: " << std::setw(width) << std::right << std::get<0>(maxMemSizes)
               << " bytes" << std::endl;
-    std::cout << "  deviceMemoryPool:    " << std::setw(width) << std::right
-              << std::get<1>(maxMemSizes) << " bytes" << std::endl;
+    std::cout << "  deviceMemoryPool:    " << std::setw(width) << std::right << std::get<1>(maxMemSizes)
+              << " bytes" << std::endl;
     std::cout << "  mempool:             " << std::setw(width) << std::right << std::get<2>(maxMemSizes)
               << " bytes" << std::endl
               << std::flush;
