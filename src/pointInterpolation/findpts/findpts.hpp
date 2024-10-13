@@ -21,7 +21,18 @@ static constexpr int CODE_BORDER = 1;
 static constexpr int CODE_NOT_FOUND = 2;
 static constexpr int dim = 3;
 
+// src cache on target
+struct cache_t { 
+  occa::memory o_el;
+  occa::memory o_r; 
+  std::vector<dlong> proc;
+  std::vector<dlong> index;
+};
+
 struct data_t {
+  bool updateCache = true;
+  cache_t cache;
+
   std::vector<dlong> code;
   std::vector<dlong> proc;
   std::vector<dlong> el;
@@ -129,7 +140,6 @@ public:
 
   void eval(const dlong npt,
             const dlong offset,
-            const bool updatePointsOnTarget,
             const dlong nFields,
             const dlong inputOffset,
             const dlong outputOffset,
@@ -254,11 +264,7 @@ private:
   template <typename OutputType>
   void findptsEvalImpl(occa::memory &o_out,
                        dlong offset,
-                       bool updateSrcData,
-                       const int *const code_base,
-                       const int *const proc_base,
-                       const int *const el_base,
-                       const dfloat *const r_base,
+                       data_t *findPtsData,
                        const int npt,
                        const int nFields,
                        const int inputOffset,
@@ -268,8 +274,8 @@ private:
                        crystal &cr);
 
 template <typename OutputType>
-void findptsLocalEvalInternal(const evalSrcPt_t *spt,
-                              const int pn,
+void findptsLocalEvalInternal(const occa::memory& o_el,
+                              const occa::memory& o_r,
                               const int nFields,
                               const int inputOffset,
                               const occa::memory &o_in,

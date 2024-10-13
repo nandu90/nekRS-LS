@@ -154,7 +154,7 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
     MPI_Allreduce(MPI_IN_PLACE, counts.data(), counts.size(), MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
     MPI_Allreduce(MPI_IN_PLACE, &maxDistNorm, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm);
 
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank == 0 && verbosity == VerbosityLevel::Detailed) {
       std::cout << "pointInterpolation_t::find:"
                 << " total= " << counts[0] 
                 << " boundary= " << counts[1] << " (max distNorm=" << maxDistNorm << ")"
@@ -168,7 +168,7 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
   }
 
   findCalled = true;
-  updateFindPtsDataOnTarget = true;
+  data_.updateCache = true;
 }
 
 void pointInterpolation_t::eval(dlong nFields,
@@ -183,7 +183,7 @@ void pointInterpolation_t::eval(dlong nFields,
   if (outputFieldOffset == 0) outputFieldOffset = o_out.size();
 
   auto nPoints_ = (nPointsIn > -1) ? nPointsIn : nPoints;
-  if (nPointsIn >= 0) updateFindPtsDataOnTarget = true; // enforce update as cache cannot be used
+  if (nPointsIn >= 0) data_.updateCache = true; // enforce update as cache cannot be used
 
   nekrsCheck(!findCalled,
              MPI_COMM_SELF,
@@ -225,7 +225,6 @@ void pointInterpolation_t::eval(dlong nFields,
 
   findpts_->eval(nPoints_, 
                  offset, 
-                 updateFindPtsDataOnTarget, 
                  nFields, 
                  inputFieldOffset, 
                  outputFieldOffset, 
@@ -237,7 +236,7 @@ void pointInterpolation_t::eval(dlong nFields,
     platform->timer.toc("pointInterpolation_t::eval");
   }
 
-  updateFindPtsDataOnTarget = false;
+  data_.updateCache = false;
 }
 
 void pointInterpolation_t::setPoints(const std::vector<dfloat> &x,

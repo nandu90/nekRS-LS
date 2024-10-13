@@ -11,6 +11,10 @@ using findpts::TimerLevel;
 class pointInterpolation_t
 {
 public:
+  static constexpr int CODE_INTERNAL = 0;
+  static constexpr int CODE_BORDER = 1;
+  static constexpr int CODE_NOT_FOUND = 2;
+
   enum class VerbosityLevel { None, Basic, Detailed };
   pointInterpolation_t(mesh_t *mesh,
                        MPI_Comm comm,
@@ -84,8 +88,6 @@ private:
   bool findCalled = false;
 
   bool pointsAdded = false;
-
-  bool updateFindPtsDataOnTarget = true;
 
   // correponds  to which setPoints overload is called
   bool useHostPoints = false;

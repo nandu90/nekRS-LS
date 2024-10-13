@@ -1,7 +1,6 @@
 #include <cfloat>
 #include "platform.hpp"
 #include "bcMap.hpp"
-#include "findpts.hpp"
 #include "neknek.hpp"
 #include "nrs.hpp"
 #include "nekInterfaceAdapter.hpp"
@@ -400,7 +399,7 @@ occa::memory neknek_t::partitionOfUnity()
 
     auto &data = pointInterp.data();
     for (int n = 0; n < mesh->Nlocal; ++n) {
-      found[n] = (data.code[n] == findpts::CODE_NOT_FOUND) ? 0.0 : 1.0;
+      found[n] = (data.code[n] == pointInterpolation_t::CODE_NOT_FOUND) ? 0.0 : 1.0;
     }
 
     o_found.copyFrom(found.data());
