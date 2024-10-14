@@ -183,8 +183,6 @@ void neknek_t::setup()
   dlong globalRank;
   MPI_Comm_rank(platform->comm.mpiCommParent, &globalRank);
 
-  auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
-
   const int nsessions = this->nsessions_;
   if (platform->comm.mpiRank == 0) {
     printf("initializing neknek with %d sessions\n", nsessions);
@@ -213,6 +211,8 @@ void neknek_t::setup()
   this->fields = [&]() {
     std::vector<std::string> list;
     for (auto &&field : nrsFieldsToSolve(platform->options)) {
+      auto mesh = (field == "scalar00") ?  nrs->cds->mesh[0] : nrs->mesh;
+
       int intFound = 0;
       for (dlong e = 0; e < mesh->Nelements; ++e) {
         for (dlong f = 0; f < mesh->Nfaces; ++f) {
