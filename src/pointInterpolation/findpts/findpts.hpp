@@ -268,21 +268,13 @@ private:
   void findptsEvalImpl(occa::memory &o_out,
                        dlong offset,
                        data_t *findPtsData,
-                       const int npt,
+                       const dlong npt,
                        const int nFields,
-                       const int inputOffset,
-                       const int outputOffset,
+                       const dlong inputOffset,
+                       const dlong outputOffset,
                        const occa::memory &o_in,
                        hashData_t &hash,
                        crystal &cr);
-
-template <typename OutputType>
-void findptsLocalEvalInternal(const occa::memory& o_el,
-                              const occa::memory& o_r,
-                              const int nFields,
-                              const int inputOffset,
-                              const occa::memory &o_in,
-                              OutputType *opt);
 
 };
 

@@ -462,67 +462,13 @@ void findpts_t::findptsLocal(int *const code,
 }
 
 template <typename OutputType>
-void findpts_t::findptsLocalEvalInternal(const occa::memory &o_el,
-                                         const occa::memory &o_r,
-                                         const int nFields,
-                                         const int inputOffset,
-                                         const occa::memory &o_in,
-                                         OutputType *opt)
-{
-  const dlong pn = o_el.size();
-
-  if (timerLevel == TimerLevel::Detailed) {
-    platform->timer.tic(timerName + "findptsLocalEvalInternal");
-  }
-
-  if (pn == 0) {
-    if (timerLevel == TimerLevel::Detailed) {
-      platform->timer.toc(timerName + "findptsLocalEvalInternal");
-    }
-
-    // provide 0-time tic/toc to allow global reduction later in timer reporting
-    if (timerLevel != TimerLevel::None) {
-      platform->timer.tic(timerName + "findptsLocalEvalInternal::localEvalKernel");
-      platform->timer.toc(timerName + "findptsLocalEvalInternal::localEvalKernel");
-    }
-    return;
-  }
-
-  const int outputOffset = pn;
-  auto o_out = platform->deviceMemoryPool.reserve<dfloat>(nFields * outputOffset);
-
-  if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "findptsLocalEvalInternal::localEvalKernel");
-  }
-
-  this->localEvalKernel(pn, nFields, inputOffset, outputOffset, o_el, o_r, o_in, o_out);
-
-  if (timerLevel != TimerLevel::None) {
-    platform->timer.toc(timerName + "findptsLocalEvalInternal::localEvalKernel");
-  }
-
-  auto out = platform->memoryPool.reserve<dfloat>(o_out.size());
-  o_out.copyTo(out);
-
-  auto outPtr = out.ptr<dfloat>();
-  for (int point = 0; point < pn; ++point) {
-    for (int field = 0; field < nFields; ++field) {
-      opt[point].out[field] = outPtr[point + field * outputOffset];
-    }
-  }
-  if (timerLevel == TimerLevel::Detailed) {
-    platform->timer.toc(timerName + "findptsLocalEvalInternal");
-  }
-}
-
-template <typename OutputType>
 void findpts_t::findptsEvalImpl(occa::memory &o_out,
                                 dlong findPtsDataOffset,
                                 data_t *findPtsData,
-                                const int npt,
+                                const dlong npt,
                                 const int nFields,
-                                const int inputOffset,
-                                const int outputOffset,
+                                const dlong inputOffset,
+                                const dlong outputOffset,
                                 const occa::memory &o_in,
                                 hashData_t &hash,
                                 crystal &cr)
@@ -535,6 +481,33 @@ void findpts_t::findptsEvalImpl(occa::memory &o_out,
   if (out.size() < nFields * outputOffset) {
     constexpr int growthFactor = 2;
     out.resize(growthFactor * nFields * outputOffset);
+  }
+
+  // evaluate local points
+  if (timerLevel != TimerLevel::None) {
+    platform->timer.tic(timerName + "findptsEvalImpl::eval local points");
+  }
+  if (npt > 0) {
+  platform->device.occaDevice().setStream(localEvalStream);
+
+    this->localEvalMaskKernel(npt,
+                              nFields,
+                              inputOffset,
+                              outputOffset,
+                              this->rank,
+                              this->o_proc + findPtsDataOffset * sizeof(dlong),
+                              this->o_code + findPtsDataOffset * sizeof(dlong),
+                              this->o_el + findPtsDataOffset * sizeof(dlong),
+                              this->o_r + dim * findPtsDataOffset * sizeof(dfloat),
+                              o_in,
+                              o_out);
+
+    o_out.copyTo(out.data(), nFields * outputOffset * sizeof(dfloat), 0, "async: true");
+  platform->device.occaDevice().setStream(defaultStream);
+
+  }
+  if (timerLevel != TimerLevel::None) {
+    platform->timer.toc(timerName + "findptsEvalImpl::eval local points");
   }
 
   // transfer non-local (found on a remote rank) points
@@ -557,8 +530,8 @@ void findpts_t::findptsEvalImpl(occa::memory &o_out,
       platform->timer.tic(timerName + "findptsEvalImpl::copy data to target::sarray_transfer");
     }
 
-    struct array src;
-    array_init(evalSrcPt_t, &src, numSend);
+    static struct array src;
+    array_reserve(evalSrcPt_t, &src, numSend);
     auto spt = (evalSrcPt_t *)src.ptr;
 
     int cnt = 0;
@@ -612,39 +585,10 @@ void findpts_t::findptsEvalImpl(occa::memory &o_out,
       findPtsData->updateCache = false;
 
     }
-
-    array_free(&spt);
   }
 
   if (timerLevel == TimerLevel::Detailed) {
     platform->timer.toc(timerName + "findptsEvalImpl::copy data to target");
-  }
-
-  // evaluate local points
-  if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "findptsEvalImpl::eval local points");
-  }
-  if (npt > 0) {
-    platform->device.occaDevice().setStream(localEvalStream);
-
-    this->localEvalMaskKernel(npt,
-                              nFields,
-                              inputOffset,
-                              outputOffset,
-                              this->rank,
-                              this->o_proc + findPtsDataOffset * sizeof(dlong),
-                              this->o_code + findPtsDataOffset * sizeof(dlong),
-                              this->o_el + findPtsDataOffset * sizeof(dlong),
-                              this->o_r + dim * findPtsDataOffset * sizeof(dfloat),
-                              o_in,
-                              o_out);
-
-    o_out.copyTo(out.data(), nFields * outputOffset * sizeof(dfloat), 0, "async: true");
-
-    platform->device.occaDevice().setStream(defaultStream);
-  }
-  if (timerLevel != TimerLevel::None) {
-    platform->timer.toc(timerName + "findptsEvalImpl::eval local points");
   }
 
   // evaluate non-local points
@@ -652,30 +596,51 @@ void findpts_t::findptsEvalImpl(occa::memory &o_out,
     platform->timer.tic(timerName + "findptsEvalImpl::eval non-local points");
   }
 
-  struct array outpt;
+  static struct array outpt;
   {
-    array_init(OutputType, &outpt, findPtsData->cache.index.size());
-    auto opt = (OutputType *)outpt.ptr;
+    const dlong n = findPtsData->cache.index.size();
+    array_reserve(OutputType, &outpt, n);
+    outpt.n = n; 
 
-    const auto timerNameSave = timerName;
-    timerName = timerName + "findptsEvalImpl::eval non-local points::";
-    findptsLocalEvalInternal(findPtsData->cache.o_el,
-                             findPtsData->cache.o_r,
-                             nFields,
-                             inputOffset,
-                             o_in,
-                             opt);
-    timerName = timerNameSave;
+    auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(nFields * n);
+    const dlong offset = o_tmp.size() / nFields;
+
+    if (timerLevel != TimerLevel::None) {
+      platform->timer.tic(timerName + "findptsEvalImpl::eval non-local points::kernel");
+    }
+
+    if (n) { 
+      this->localEvalKernel(n, 
+                            nFields, 
+                            inputOffset, 
+                            offset, 
+                            findPtsData->cache.o_el, 
+                            findPtsData->cache.o_r, 
+                            o_in, 
+                            o_tmp);
+    }
+ 
+    if (timerLevel != TimerLevel::None) {
+      platform->timer.toc(timerName + "findptsEvalImpl::eval non-local points::kernel");
+    }
+ 
+    auto tmp = platform->memoryPool.reserve<dfloat>(o_tmp.size());
+    o_tmp.copyTo(tmp);
+
+    auto opt = (OutputType *)outpt.ptr;
+    auto tmpPtr = tmp.ptr<dfloat>();
+    for (dlong i = 0; i < n; i++) { 
+      for (int field = 0; field < nFields; ++field) {
+        opt[i].out[field] = tmpPtr[i + field * offset];
+      }
+      opt[i].index = findPtsData->cache.index[i];
+      opt[i].proc = findPtsData->cache.proc[i];
+    }
 
     if (timerLevel == TimerLevel::Detailed) {
       platform->timer.tic(timerName + "findptsEvalImpl::eval non-local points::sarray_transfer");
     }
 
-    for (int i = 0; i < findPtsData->cache.proc.size(); i++) {
-      opt[i].index = findPtsData->cache.index[i];
-      opt[i].proc = findPtsData->cache.proc[i];
-    }
-    outpt.n = findPtsData->cache.index.size();
     sarray_transfer(OutputType, &outpt, proc, 1, &cr);
 
     if (timerLevel == TimerLevel::Detailed) {
@@ -707,8 +672,6 @@ void findpts_t::findptsEvalImpl(occa::memory &o_out,
     if (outputOffset) {
       o_out.copyFrom(out.data(), nFields * outputOffset * sizeof(dfloat));
     }
-
-    array_free(&outpt);
   }
 
   if (timerLevel == TimerLevel::Detailed) {
