@@ -142,7 +142,6 @@ void SolutionProjection::computePreProjection(occa::memory &o_r)
   dfloat flopCount = 0.0;
 
   dfloat one = 1.0;
-  dfloat zero = 0.0;
   dfloat mone = -1.0;
   if (numVecsProjection <= 0) {
     return;
@@ -194,7 +193,6 @@ void SolutionProjection::computePreProjection(occa::memory &o_r)
 void SolutionProjection::computePostProjection(occa::memory &o_x)
 {
   const dfloat one = 1.0;
-  const dfloat zero = 0.0;
 
   if (numVecsProjection == 0) {
     // reset bases

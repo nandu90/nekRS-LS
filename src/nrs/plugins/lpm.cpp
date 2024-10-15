@@ -1717,8 +1717,6 @@ void lpm_t::writeFld()
   ++out_step;
 
   MPI_Comm mpi_comm = platform->comm.mpiComm;
-  int mpi_rank = platform->comm.mpiRank;
-  int mpi_size = platform->comm.mpiCommSize;
 
   long long int globalNPartOutput = nPartOutput;
 

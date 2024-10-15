@@ -235,7 +235,6 @@ void RANSktau::setup(int ifld)
   }
 
   auto cds = nrs->cds;
-  auto mesh = nrs->mesh;
 
   nekrsCheck(cds->NSfields < kFieldIndex + 1,
              platform->comm.mpiComm,

@@ -24,7 +24,6 @@ namespace
 static void compileDummyKernel(platform_t &plat)
 {
   const bool buildNodeLocal = plat.cacheLocal;
-  auto rank = buildNodeLocal ? plat.comm.localRank : plat.comm.mpiRank;
   const std::string dummyKernelName = "myDummyKernelName";
   const std::string dummyKernelStr = std::string("@kernel void myDummyKernelName(int N) {"
                                                  "  for (int i = 0; i < N; ++i; @tile(64, @outer, @inner)) {}"

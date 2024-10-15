@@ -74,10 +74,6 @@ void neknek_t::updateInterpPoints()
     return;
   }
 
-  auto neknek = nrs->neknek;
-  const dlong nsessions = this->nsessions_;
-  const dlong sessionID = this->sessionID_;
-
   auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
 
   this->interpolator.reset();
@@ -103,7 +99,6 @@ void neknek_t::updateInterpPoints()
 
 void neknek_t::findIntPoints()
 {
-  const dlong nsessions = this->nsessions_;
   const dlong sessionID = this->sessionID_;
 
   auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
@@ -441,7 +436,6 @@ void neknek_t::lag()
 
 void neknek_t::extrapolate(int tstep)
 {
-  auto *mesh = nrs->mesh;
   int extOrder = std::min(tstep, this->nEXT_);
   int bdfOrder = std::min(tstep, nrs->nBDF);
   nek::extCoeff(this->coeffEXT.data(), nrs->dt, extOrder, bdfOrder);

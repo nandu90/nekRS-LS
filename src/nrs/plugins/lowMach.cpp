@@ -67,7 +67,6 @@ void lowMach::setup(dfloat alpha_, const occa::memory &o_beta_, const occa::memo
   o_beta = o_beta_;
   o_kappa = o_kappa_;
 
-  auto mesh = _nrs->mesh;
   int err = 1;
   if (platform->options.compareArgs("SCALAR00 IS TEMPERATURE", "TRUE")) {
     err = 0;
