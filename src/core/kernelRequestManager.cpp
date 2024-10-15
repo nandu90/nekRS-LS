@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <regex>
 #include "sha1.hpp"
+#include "threadPool.hpp"
 
 kernelRequestManager_t::kernelRequestManager_t(const platform_t &m_platform)
     : kernelsProcessed(false), platformRef(m_platform)
@@ -174,31 +175,39 @@ void kernelRequestManager_t::compile()
   constexpr int hashLength = 16 + 1; // null-terminated 
   auto hashes = (char*) std::calloc(requests.size() * hashLength, sizeof(char)); 
 
-  auto reqIdStart = std::numeric_limits<long int>::max();
-  auto reqIdEnd = static_cast<long int>(1);
+
+  auto Nthreads = 1;
+  if (getenv("NEKRS_JIT_THREADS")) Nthreads = std::stoi(getenv("NEKRS_JIT_THREADS")); 
+  ThreadPool pool(Nthreads); 
 
   if (rank < ranksCompiling) { 
     for (auto&& req : requests) {
-      const auto reqId = std::distance(requests.begin(), requests.find(req));
-      if (reqId % ranksCompiling == rank) {
-        reqIdStart = std::min(reqIdStart, static_cast<long int>(reqId));
-        reqIdEnd = std::max(reqIdEnd, static_cast<long int>(reqId));
+      auto retVal = pool.enqueue(
+        [&]() 
+        {
+          const auto reqId = std::distance(requests.begin(), requests.find(req));
+          if (reqId % ranksCompiling != rank) return;
 
-        if (platform->verbose || platform->buildOnly) {
-          std::cout << "Compiling request <" << req.requestName << ">";
-          fflush(stdout);
-        }
+          if (platform->verbose || platform->buildOnly) {
+            std::cout << "Compiling request <" << req.requestName << ">";
+          }
 
-        auto knl = device.compileKernel(req.fileName, req.props, req.suffix, MPI_COMM_SELF);
-        const auto hash = knl.hash().getString();
-        std::strncpy(hashes + reqId*hashLength, hash.c_str(), hashLength); 
-        if (platform->verbose || platform->buildOnly) {
-          std::cout << " (" << hash << ") on rank " << rank << std::endl;
+          auto knl = device.compileKernel(req.fileName, req.props, req.suffix, MPI_COMM_SELF);
+          const auto hash = knl.hash().getString();
+          nekrsCheck(hash.size() == 0, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "Invalid hash!");
+
+          std::strncpy(hashes + reqId*hashLength, hash.c_str(), hashLength); 
+          if (platform->verbose || platform->buildOnly) {
+            std::cout << " (" << hash << ") on rank " << rank << std::flush << std::endl;
+          }
         }
-      }
+      );          
     }
   }
-  MPI_Barrier(platform->comm.mpiComm); // finish compilation
+ 
+  // finish compilation
+  pool.finish(); 
+  MPI_Barrier(platform->comm.mpiComm);
 
   // a-posteriori check for duplicated hash causing a potential race condition
   // no parallel version available yet 
