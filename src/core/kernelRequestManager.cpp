@@ -154,8 +154,12 @@ void kernelRequestManager_t::compile()
                                platform->cacheLocal ? platformRef.comm.mpiCommLocalSize : platformRef.comm.mpiCommSize
                              );
 
+  auto Nthreads = 1;
+  if (getenv("NEKRS_JITC_NTHREADS")) Nthreads = std::stoi(getenv("NEKRS_JITC_NTHREADS")); 
+
   if (platformRef.comm.mpiRank == 0 && (platform->verbose || platform->buildOnly)) {
     std::cout << "requests.size(): " << requests.size() << std::endl;
+    std::cout << "Nthreads: " << Nthreads << std::endl;
   }
 
   {
@@ -176,8 +180,6 @@ void kernelRequestManager_t::compile()
   auto hashes = (char*) std::calloc(requests.size() * hashLength, sizeof(char)); 
 
 
-  auto Nthreads = 1;
-  if (getenv("NEKRS_JIT_THREADS")) Nthreads = std::stoi(getenv("NEKRS_JIT_THREADS")); 
   ThreadPool pool(Nthreads); 
 
   if (rank < ranksCompiling) { 
