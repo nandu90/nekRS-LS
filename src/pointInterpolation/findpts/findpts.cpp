@@ -663,7 +663,7 @@ void findpts_t::findptsEvalImpl(occa::memory &o_out,
     platform->device.occaDevice().setStream(defaultStream);
 
     auto opt = (OutputType *)outpt.ptr;
-    for (int i; i < outpt.n; i++) {
+    for (int i = 0; i < outpt.n; i++) {
       for (int field = 0; field < nFields; ++field) {
         out[opt[i].index + outputOffset * field] = opt[i].out[field];
       }
@@ -875,11 +875,6 @@ findpts_t::~findpts_t()
 static slong lfloor(dfloat x)
 {
   return floor(x);
-}
-
-static slong lceil(dfloat x)
-{
-  return ceil(x);
 }
 
 static ulong hash_index_aux(dfloat low, dfloat fac, ulong n, dfloat x)
