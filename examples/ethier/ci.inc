@@ -972,16 +972,16 @@ void ciTestErrors(nrs_t *nrs,
       nekrsCheck(pIterTest > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
 
-    int expectedNiterS00 = 17;
-    int expectedNiterS01 = 14;
+    int expectedNiterS00 = 16;
+    int expectedNiterS01 = 16;
     if (ciMode == 19 && nrs->timeStepConverged) {
       expectedNiterS00 = 11;
-      expectedNiterS01 = 8;
+      expectedNiterS01 = 11;
     }
 
     if (ciMode == 22) {
       expectedNiterS00 = 13;
-      expectedNiterS01 = 11;
+      expectedNiterS01 = 13;
     }
 
     if (ciMode != 12 && nrs->timeStepConverged) {

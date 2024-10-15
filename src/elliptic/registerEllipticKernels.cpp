@@ -125,18 +125,19 @@ void registerEllipticKernels(std::string section, int poissonEquation)
       occa::properties properties = platform->kernelInfo;
 
       kernelName = "fusedCopyDfloatToPfloat";
-      fileName = oklpath + kernelName + extension;
+      fileName = oklpath + kernelName + fileNameExtension;
       platform->kernelRequests.add(kernelName, fileName, properties);
 
       properties["defines/p_Nfields"] = Nfields;
 
       kernelName = "ellipticBlockUpdatePCG";
-      fileName = oklpath + "ellipticBlockUpdatePCG" + extension;
+      fileName = oklpath + "ellipticBlockUpdatePCG" + fileNameExtension;
       platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, properties);
 
       kernelName = "multiScaledAddwOffset";
       fileName = oklpath + kernelName + extension;
       platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, properties);
+
       kernelName = "accumulate";
       fileName = oklpath + kernelName + extension;
       platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, properties);

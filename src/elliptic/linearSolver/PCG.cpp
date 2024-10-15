@@ -38,6 +38,8 @@
 namespace
 {
 
+constexpr auto tiny = 10 * std::numeric_limits<dfloat>::min();
+
 occa::memory o_p;
 occa::memory o_z;
 occa::memory o_Ap;
@@ -68,10 +70,10 @@ dfloat update(elliptic_t *elliptic,
 
   dfloat rdotr1 = 0;
 #ifdef ELLIPTIC_ENABLE_TIMER
-  platform->timer.tic("dotp", 0);
+  platform->timer.tic("dotp");
 #endif
   if (serial) {
-    rdotr1 = *((dfloat *)o_tmpReductions.ptr());
+    rdotr1 = *(o_tmpReductions.ptr<dfloat>());
   } else {
     auto tmp = h_tmpReductions.ptr<dfloat>();
     o_tmpReductions.copyTo(tmp);
@@ -230,7 +232,7 @@ int standardPCG(elliptic_t *elliptic,
                                                                o_p,
                                                                o_Ap,
                                                                platform->comm.mpiComm);
-    alpha = rdotz1 / (pAp + 10 * std::numeric_limits<dfloat>::min());
+    alpha = rdotz1 / (pAp + tiny);
 
 #ifdef DEBUG
     printf("alpha: %.15e\n", alpha);
@@ -275,7 +277,6 @@ int combinedPCG(elliptic_t *elliptic,
   const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
   const int preco = !options.compareArgs("PRECONDITIONER", "NONE");
 
-  constexpr auto tiny = 10 * std::numeric_limits<dfloat>::min();
 
   dfloat betakm1 = 0;
   dfloat betakm2 = 0;
@@ -287,7 +288,6 @@ int combinedPCG(elliptic_t *elliptic,
 
   /*aux variables */
   auto &o_Minv = (preco) ? precon->o_invDiagA : o_null;
-  auto &o_weight = elliptic->o_invDegree;
   platform->linAlg->fill(o_p.size(), 0.0, o_p);
   platform->linAlg->fill(o_v.size(), 0.0, o_v);
 

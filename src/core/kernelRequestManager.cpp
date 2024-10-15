@@ -196,7 +196,7 @@ void kernelRequestManager_t::compile()
 
           auto knl = device.compileKernel(req.fileName, req.props, req.suffix, MPI_COMM_SELF);
           const auto hash = knl.hash().getString();
-          nekrsCheck(hash.size() == 0, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "Invalid hash!");
+          nekrsCheck(hash.size() != hashLength - 1, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "Invalid hash!");
 
           std::strncpy(hashes + reqId*hashLength, hash.c_str(), hashLength); 
           if (platform->verbose || platform->buildOnly) {
