@@ -440,7 +440,7 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
     std::vector<occa::memory> o_out;
 
     if (o_userBuf.at(0).dtype() == occa::dtype::get<double>()) {
-      auto convData = getDataConvert<Tadios, double>(name);
+      auto convData = getDataConvert<Tadios, double>(name); // on host
       if (redistribute) {
         o_out = redistributeField<double>(convData);
       } else {
@@ -472,6 +472,8 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
 
   auto convertToDfloat = [&]() {
     std::vector<occa::memory> o_work;
+    // type of o_userBuf might not be available (in case it's zero), 
+    // instead use the type matching o_userBuf   
     if (o_userBuf.at(0).dtype() == occa::dtype::get<dfloat>()) {
       o_work = o_convDistributedData;
     } else {
@@ -524,7 +526,8 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
         auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(interp->numPoints());
 
         dlong pointOffset = 0;
-        const auto pointBlockSize = 64 * mesh->Np;
+        const int pointBlockSize = alignStride<dlong>(128 * mesh->Np);
+
         int nPointsBlocks = (interp->numPoints() + pointBlockSize - 1) / pointBlockSize;
         MPI_Allreduce(MPI_IN_PLACE, &nPointsBlocks, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
 

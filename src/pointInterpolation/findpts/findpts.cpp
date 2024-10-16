@@ -145,98 +145,6 @@ auto *gslibFindptsSetup(MPI_Comm mpi_comm,
 
 namespace findpts
 {
-namespace
-{
-
-namespace pool
-{
-static occa::memory o_scratch;
-static occa::memory h_out;
-static occa::memory h_r;
-static occa::memory h_el;
-static occa::memory h_dist2;
-static occa::memory h_code;
-
-static dfloat *out;
-static dfloat *r;
-static dlong *el;
-static dfloat *dist2;
-static dlong *code;
-
-static void manageBuffers(dlong pn, dlong outputOffset, dlong nOutputFields)
-{
-  if (pn == 0) {
-    return;
-  }
-
-  dlong Nbytes = 0;
-  Nbytes += pn * sizeof(dlong);                            // code
-  Nbytes += pn * sizeof(dlong);                            // element
-  Nbytes += pn * sizeof(dlong);                            // elsid
-  Nbytes += pn * sizeof(dlong);                            // session
-  Nbytes += pn * sizeof(dfloat);                           // dist2
-  Nbytes += pn * sizeof(dfloat);                           // disti
-  Nbytes += dim * pn * sizeof(dfloat);                     // r,s,t data
-  Nbytes += dim * pn * sizeof(dfloat);                     // x,y,z coordinates
-  Nbytes += nOutputFields * outputOffset * sizeof(dfloat); // output buffer
-
-  if (Nbytes > pool::o_scratch.byte_size()) {
-    if (pool::o_scratch.byte_size()) {
-      pool::o_scratch.free();
-    }
-    void *buffer = std::calloc(Nbytes, 1);
-    pool::o_scratch = platform->device.malloc(Nbytes);
-    pool::o_scratch.copyFrom(buffer);
-    std::free(buffer);
-  }
-
-  const auto NbytesR = dim * pn * sizeof(dfloat);
-  if (NbytesR > pool::h_r.size()) {
-    if (pool::h_r.size()) {
-      pool::h_r.free();
-    }
-    pool::h_r = platform->device.mallocHost(NbytesR);
-    pool::r = (dfloat *)pool::h_r.ptr();
-  }
-
-  const auto NbytesEl = pn * sizeof(dlong);
-  if (NbytesEl > pool::h_el.size()) {
-    if (pool::h_el.size()) {
-      pool::h_el.free();
-    }
-    pool::h_el = platform->device.mallocHost(NbytesEl);
-    pool::el = (dlong *)pool::h_el.ptr();
-  }
-
-  const auto NbytesCode = pn * sizeof(dlong);
-  if (NbytesCode > pool::h_code.size()) {
-    if (pool::h_code.size()) {
-      pool::h_code.free();
-    }
-    pool::h_code = platform->device.mallocHost(NbytesCode);
-    pool::code = (dlong *)pool::h_code.ptr();
-  }
-
-  const auto NbytesDist2 = pn * sizeof(dfloat);
-  if (NbytesDist2 > pool::h_dist2.size()) {
-    if (pool::h_dist2.size()) {
-      pool::h_dist2.free();
-    }
-    pool::h_dist2 = platform->device.mallocHost(NbytesDist2);
-    pool::dist2 = (dfloat *)pool::h_dist2.ptr();
-  }
-
-  const auto NbytesOut = nOutputFields * outputOffset * sizeof(dfloat);
-  if (NbytesOut > pool::h_out.size() && NbytesOut > 0) {
-    if (pool::h_out.size()) {
-      pool::h_out.free();
-    }
-    pool::h_out = platform->device.mallocHost(NbytesOut);
-    pool::out = (dfloat *)pool::h_out.ptr();
-  }
-}
-} // namespace pool
-} // namespace
 
 void findpts_t::findptsLocal(int *const code,
                              int *const el,
@@ -268,45 +176,24 @@ void findpts_t::findptsLocal(int *const code,
     return;
   }
 
-  pool::manageBuffers(pn, 0, 0);
+  auto o_code = platform->deviceMemoryPool.reserve<dlong>(pn);
+  auto o_el = platform->deviceMemoryPool.reserve<dlong>(pn);
+  auto o_elsid = platform->deviceMemoryPool.reserve<dlong>(pn);
+  auto o_r = platform->deviceMemoryPool.reserve<dfloat>(dim * pn);
+  auto o_dist2 = platform->deviceMemoryPool.reserve<dfloat>(pn);
+  auto o_disti = platform->deviceMemoryPool.reserve<dfloat>(pn);
 
-  dlong byteOffset = 0;
+  auto o_sess = platform->deviceMemoryPool.reserve<dlong>(pn);
+  auto o_xint = platform->deviceMemoryPool.reserve<dfloat>(pn);
+  auto o_yint = platform->deviceMemoryPool.reserve<dfloat>(pn);
+  auto o_zint = platform->deviceMemoryPool.reserve<dfloat>(pn);
 
-  occa::memory o_code = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dlong) * pn;
+  o_xint.copyFrom(x);
+  o_yint.copyFrom(y);
+  o_zint.copyFrom(z);
 
-  occa::memory o_el = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dlong) * pn;
-
-  occa::memory o_elsid = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dlong) * pn;
-
-  occa::memory o_sess = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dlong) * pn;
-
-  occa::memory o_r = pool::o_scratch + byteOffset;
-  byteOffset += dim * sizeof(dfloat) * pn;
-
-  occa::memory o_dist2 = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dfloat) * pn;
-
-  occa::memory o_disti = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dfloat) * pn;
-
-  occa::memory o_xint = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dfloat) * pn;
-
-  occa::memory o_yint = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dfloat) * pn;
-
-  occa::memory o_zint = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dfloat) * pn;
-
-  o_xint.copyFrom(x, sizeof(dfloat) * pn);
-  o_yint.copyFrom(y, sizeof(dfloat) * pn);
-  o_zint.copyFrom(z, sizeof(dfloat) * pn);
   if (useMultiSessionSupport) {
-    o_sess.copyFrom(sess, sizeof(dlong) * pn);
+    o_sess.copyFrom(sess);
   }
 
   if (timerLevel != TimerLevel::None) {
@@ -347,13 +234,14 @@ void findpts_t::findptsLocal(int *const code,
   }
 
   if (pn > 0) {
-    o_code.copyTo(code, sizeof(dlong) * pn);
-    o_el.copyTo(el, sizeof(dlong) * pn);
-    o_elsid.copyTo(elsid, sizeof(dlong) * pn);
-    o_r.copyTo(r, dim * sizeof(dfloat) * pn);
-    o_dist2.copyTo(dist2, sizeof(dfloat) * pn);
-    o_disti.copyTo(disti, sizeof(dfloat) * pn);
+    o_code.copyTo(code);
+    o_el.copyTo(el);
+    o_elsid.copyTo(elsid);
+    o_r.copyTo(r);
+    o_dist2.copyTo(dist2);
+    o_disti.copyTo(disti);
   }
+
   if (timerLevel == TimerLevel::Detailed) {
     platform->timer.toc(timerName + "findptsLocal");
   }
@@ -388,27 +276,12 @@ void findpts_t::findptsLocal(int *const code,
     return;
   }
 
-  pool::manageBuffers(pn, 0, 0);
-
-  dlong byteOffset = 0;
-
-  occa::memory o_code = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dlong) * pn;
-
-  occa::memory o_el = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dlong) * pn;
-
-  occa::memory o_elsid = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dlong) * pn;
-
-  occa::memory o_r = pool::o_scratch + byteOffset;
-  byteOffset += dim * sizeof(dfloat) * pn;
-
-  occa::memory o_dist2 = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dfloat) * pn;
-
-  occa::memory o_disti = pool::o_scratch + byteOffset;
-  byteOffset += sizeof(dfloat) * pn;
+  auto o_code = platform->deviceMemoryPool.reserve<dlong>(pn);
+  auto o_el = platform->deviceMemoryPool.reserve<dlong>(pn);
+  auto o_elsid = platform->deviceMemoryPool.reserve<dlong>(pn);
+  auto o_r = platform->deviceMemoryPool.reserve<dfloat>(dim * pn);
+  auto o_dist2 = platform->deviceMemoryPool.reserve<dfloat>(pn);
+  auto o_disti = platform->deviceMemoryPool.reserve<dfloat>(pn);
 
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic(timerName + "findptsLocal::localKernel");
@@ -444,18 +317,20 @@ void findpts_t::findptsLocal(int *const code,
                     o_r,
                     o_dist2,
                     o_disti);
+
   if (timerLevel != TimerLevel::None) {
     platform->timer.toc(timerName + "findptsLocal::localKernel");
   }
 
   if (pn > 0) {
-    o_code.copyTo(code, sizeof(dlong) * pn);
-    o_el.copyTo(el, sizeof(dlong) * pn);
-    o_elsid.copyTo(elsid, sizeof(dlong) * pn);
-    o_r.copyTo(r, dim * sizeof(dfloat) * pn);
-    o_dist2.copyTo(dist2, sizeof(dfloat) * pn);
-    o_disti.copyTo(disti, sizeof(dfloat) * pn);
+    o_code.copyTo(code);
+    o_el.copyTo(el);
+    o_elsid.copyTo(elsid);
+    o_r.copyTo(r);
+    o_dist2.copyTo(dist2);
+    o_disti.copyTo(disti);
   }
+
   if (timerLevel == TimerLevel::Detailed) {
     platform->timer.toc(timerName + "findptsLocal");
   }
