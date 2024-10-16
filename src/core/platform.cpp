@@ -67,7 +67,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   exitValue = 0;
 
   // only relevant for SERIAL backend
-  setenv("OCCA_MEM_BYTE_ALIGN", std::to_string(ALIGN_SIZE).c_str(), 1);
+  setenv("OCCA_MEM_BYTE_ALIGN", std::to_string(ALIGN_SIZE_BYTES).c_str(), 1);
 
   cacheLocal = 0;
   if (getenv("NEKRS_CACHE_LOCAL")) {
@@ -219,7 +219,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
     occa::json properties;
     properties["resize_through_host"] = 1;
     deviceMemoryPool = device.occaDevice().createMemoryPool(properties);
-    deviceMemoryPool.setAlignment(ALIGN_SIZE);
+    deviceMemoryPool.setAlignment(ALIGN_SIZE_BYTES);
   }
 
   {
@@ -227,7 +227,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
     properties["resize_through_host"] = 1;
     properties["host"] = true;
     memoryPool = device.occaDevice().createMemoryPool(properties);
-    memoryPool.setAlignment(ALIGN_SIZE);
+    memoryPool.setAlignment(ALIGN_SIZE_BYTES);
   }
 }
 
