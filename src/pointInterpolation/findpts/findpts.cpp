@@ -1003,7 +1003,6 @@ void findpts_t::find(data_t *const findPtsData,
     platform->timer.tic(timerName + "find::unfound");
   }
   {
-    int index;
     int *code = code_base, *proc = proc_base;
     const dfloat *xp[dim];
     struct srcPt_t *pt;
@@ -1017,7 +1016,7 @@ void findpts_t::find(data_t *const findPtsData,
 
     dfloat x[dim];
 
-    for (index = 0; index < npt; ++index) {
+    for (int index = 0; index < npt; ++index) {
       for (int d = 0; d < dim; ++d) {
         x[d] = *xp[d];
       }
@@ -1274,8 +1273,7 @@ void findpts_t::find(data_t *const findPtsData,
             cselsid = elsid[index];
             csproc = proc_base[index];
             csel = el_base[index];
-            unsigned d;
-            for (d = 0; d < findpts::dim; ++d) {
+            for (int d = 0; d < findpts::dim; ++d) {
               csr[d] = r_base[d];
             }
             ioriginator = 0;
@@ -1292,8 +1290,7 @@ void findpts_t::find(data_t *const findPtsData,
             cselsid = opt->elsid;
             csproc = opt->proc;
             csel = opt->el;
-            unsigned d;
-            for (d = 0; d < findpts::dim; ++d) {
+            for (int d = 0; d < findpts::dim; ++d) {
               csr[d] = opt->r[d];
             }
           }
@@ -1307,8 +1304,7 @@ void findpts_t::find(data_t *const findPtsData,
             aselsid = cselsid;
             asproc = csproc;
             asel = csel;
-            unsigned d;
-            for (d = 0; d < findpts::dim; ++d) {
+            for (int d = 0; d < findpts::dim; ++d) {
               asr[d] = csr[d];
             }
           }

@@ -1,8 +1,6 @@
 #ifdef NEKRS_ENABLE_ADIOS
 
 #include "iofldAdios.hpp"
-#include "pointInterpolation.hpp"
-#include "randomVector.hpp"
 
 // fix if general interpolation + different polynorder (results are incorrect)
 // add platform->copyFloatToDfloat()
@@ -506,7 +504,6 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
 
   if (pointInterpolation) {
     auto o_work = convertToDfloat();
-    static std::shared_ptr<pointInterpolation_t> interp;
     if (name == "mesh") {
       mesh_vis->Nelements = o_work.at(0).size() / mesh_vis->Np;
       mesh_vis->Nlocal = mesh_vis->Nelements * mesh_vis->Np;
@@ -518,7 +515,7 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
       mesh_vis->o_y.copyFrom(o_work.at(1));
       mesh_vis->o_z.copyFrom(o_work.at(2));
 
-      interp = std::make_shared<pointInterpolation_t>(mesh_vis, platform->comm.mpiComm);
+      interp = std::make_unique<pointInterpolation_t>(mesh_vis, platform->comm.mpiComm);
       interp->setPoints(mesh->o_x, mesh->o_y, mesh->o_z);
       const auto verbosity = pointInterpolation_t::VerbosityLevel::Detailed;
       interp->find(verbosity);
