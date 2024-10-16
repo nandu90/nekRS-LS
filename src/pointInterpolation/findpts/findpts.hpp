@@ -167,11 +167,6 @@ public:
 
   crystal *crystalRouter();
 
-  // For use in, e.g., nek-nek
-  // If altering code, proc, el, r, or dist2 after a find call,
-  // update device arrays with this function
-  void o_update(data_t &data);
-
 private:
   static constexpr int maxFields = 30;
 

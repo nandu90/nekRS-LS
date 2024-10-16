@@ -370,14 +370,14 @@ void findpts_t::findptsEvalImpl(occa::memory &o_out,
                               inputOffset,
                               outputOffset,
                               this->rank,
-                              this->o_proc + findPtsDataOffset * sizeof(dlong),
-                              this->o_code + findPtsDataOffset * sizeof(dlong),
-                              this->o_el + findPtsDataOffset * sizeof(dlong),
-                              this->o_r + dim * findPtsDataOffset * sizeof(dfloat),
+                              this->o_proc + findPtsDataOffset,
+                              this->o_code + findPtsDataOffset,
+                              this->o_el + findPtsDataOffset,
+                              this->o_r + dim * findPtsDataOffset,
                               o_in,
                               o_out);
 
-    o_out.copyTo(out.data(), nFields * outputOffset * sizeof(dfloat), 0, "async: true");
+    o_out.copyTo(out.data(), nFields * outputOffset, 0, "async: true");
   platform->device.occaDevice().setStream(defaultStream);
 
   }
@@ -545,7 +545,7 @@ void findpts_t::findptsEvalImpl(occa::memory &o_out,
     }
 
     if (outputOffset) {
-      o_out.copyFrom(out.data(), nFields * outputOffset * sizeof(dfloat));
+      o_out.copyFrom(out.data(), nFields * outputOffset);
     }
   }
 
@@ -652,18 +652,18 @@ findpts_t::findpts_t(MPI_Comm comm,
   this->cr = &findptsData->cr;
 
   if (x != nullptr) {
-    this->o_x = platform->device.malloc(Nlocal * sizeof(dfloat));
-    this->o_y = platform->device.malloc(Nlocal * sizeof(dfloat));
-    this->o_z = platform->device.malloc(Nlocal * sizeof(dfloat));
+    this->o_x = platform->device.malloc<dfloat>(Nlocal);
+    this->o_y = platform->device.malloc<dfloat>(Nlocal);
+    this->o_z = platform->device.malloc<dfloat>(Nlocal);
     if (useMultiSessionSupport) {
-      this->o_distfint = platform->device.malloc(Nlocal * sizeof(dfloat));
+      this->o_distfint = platform->device.malloc<dfloat>(Nlocal);
     }
 
-    this->o_x.copyFrom(x, Nlocal * sizeof(dfloat));
-    this->o_y.copyFrom(y, Nlocal * sizeof(dfloat));
-    this->o_z.copyFrom(z, Nlocal * sizeof(dfloat));
+    this->o_x.copyFrom(x, Nlocal);
+    this->o_y.copyFrom(y, Nlocal);
+    this->o_z.copyFrom(z, Nlocal);
     if (useMultiSessionSupport) {
-      this->o_distfint.copyFrom(distfint, Nlocal * sizeof(dfloat));
+      this->o_distfint.copyFrom(distfint, Nlocal);
     }
     std::vector<dfloat> c(dim * Nelements, 0.0);
     std::vector<dfloat> A(dim * dim * Nelements, 0.0);
@@ -690,15 +690,15 @@ findpts_t::findpts_t(MPI_Comm comm,
       }
     }
 
-    this->o_c = platform->device.malloc(c.size() * sizeof(dfloat));
-    this->o_A = platform->device.malloc(A.size() * sizeof(dfloat));
-    this->o_min = platform->device.malloc(minBound.size() * sizeof(dfloat));
-    this->o_max = platform->device.malloc(maxBound.size() * sizeof(dfloat));
+    this->o_c = platform->device.malloc<dfloat>(c.size());
+    this->o_A = platform->device.malloc<dfloat>(A.size());
+    this->o_min = platform->device.malloc<dfloat>(minBound.size());
+    this->o_max = platform->device.malloc<dfloat>(maxBound.size());
 
-    this->o_c.copyFrom(c.data(), c.size() * sizeof(dfloat));
-    this->o_A.copyFrom(A.data(), A.size() * sizeof(dfloat));
-    this->o_min.copyFrom(minBound.data(), minBound.size() * sizeof(dfloat));
-    this->o_max.copyFrom(maxBound.data(), maxBound.size() * sizeof(dfloat));
+    this->o_c.copyFrom(c.data(), c.size());
+    this->o_A.copyFrom(A.data(), A.size());
+    this->o_min.copyFrom(minBound.data(), minBound.size());
+    this->o_max.copyFrom(maxBound.data(), maxBound.size());
   }
 
   auto hash = findptsData->local.hd;
@@ -709,10 +709,10 @@ findpts_t::findpts_t(MPI_Comm comm,
     hashFac[d] = hash.fac[d];
   }
   this->hash_n = hash.hash_n;
-  this->o_hashMin = platform->device.malloc(dim * sizeof(dfloat));
-  this->o_hashFac = platform->device.malloc(dim * sizeof(dfloat));
-  this->o_hashMin.copyFrom(hashMin, dim * sizeof(dfloat));
-  this->o_hashFac.copyFrom(hashFac, dim * sizeof(dfloat));
+  this->o_hashMin = platform->device.malloc<dfloat>(dim);
+  this->o_hashFac = platform->device.malloc<dfloat>(dim);
+  this->o_hashMin.copyFrom(hashMin, dim);
+  this->o_hashFac.copyFrom(hashFac, dim);
 
   std::string orderSuffix = "_" + std::to_string(Nq - 1);
 
@@ -720,12 +720,12 @@ findpts_t::findpts_t(MPI_Comm comm,
   this->localEvalMaskKernel = platform->kernelRequests.load("findptsLocalEvalMask" + orderSuffix);
   this->localKernel = platform->kernelRequests.load("findptsLocal" + orderSuffix);
 
-  this->o_wtend_x = platform->device.malloc(6 * Nq * sizeof(dfloat));
-  this->o_wtend_y = platform->device.malloc(6 * Nq * sizeof(dfloat));
-  this->o_wtend_z = platform->device.malloc(6 * Nq * sizeof(dfloat));
-  this->o_wtend_x.copyFrom(findptsData->local.fed.wtend[0], 6 * Nq * sizeof(dfloat));
-  this->o_wtend_y.copyFrom(findptsData->local.fed.wtend[1], 6 * Nq * sizeof(dfloat));
-  this->o_wtend_z.copyFrom(findptsData->local.fed.wtend[2], 6 * Nq * sizeof(dfloat));
+  this->o_wtend_x = platform->device.malloc<dfloat>(6 * Nq);
+  this->o_wtend_y = platform->device.malloc<dfloat>(6 * Nq);
+  this->o_wtend_z = platform->device.malloc<dfloat>(6 * Nq);
+  this->o_wtend_x.copyFrom(findptsData->local.fed.wtend[0], 6 * Nq);
+  this->o_wtend_y.copyFrom(findptsData->local.fed.wtend[1], 6 * Nq);
+  this->o_wtend_z.copyFrom(findptsData->local.fed.wtend[2], 6 * Nq);
 
   const auto hd_d_size = getHashSize(findptsData, Nelements, local_hash_size);
 
@@ -733,8 +733,8 @@ findpts_t::findpts_t(MPI_Comm comm,
   for (dlong i = 0; i < hd_d_size; ++i) {
     offsets[i] = findptsData->local.hd.offset[i];
   }
-  this->o_offset = platform->device.malloc(offsets.size() * sizeof(dlong));
-  this->o_offset.copyFrom(offsets.data(), offsets.size() * sizeof(dlong));
+  this->o_offset = platform->device.malloc<dlong>(offsets.size());
+  this->o_offset.copyFrom(offsets.data(), offsets.size());
 }
 
 findpts_t::~findpts_t()
@@ -788,18 +788,13 @@ void findpts_t::find(data_t *const findPtsData,
 }
 
 void findpts_t::find(data_t *const findPtsData,
-                     const occa::memory &o_xintIn,
-                     const occa::memory &o_yintIn,
-                     const occa::memory &o_zintIn,
-                     const occa::memory &o_sessIn,
+                     const occa::memory &o_xint,
+                     const occa::memory &o_yint,
+                     const occa::memory &o_zint,
+                     const occa::memory &o_session,
                      const dlong sessionIdMatch,
                      const dlong npt)
 {
-  const auto o_xint = o_xintIn.isInitialized() ? o_xintIn.cast(occa::dtype::byte) : o_xintIn;
-  const auto o_yint = o_yintIn.isInitialized() ? o_yintIn.cast(occa::dtype::byte) : o_yintIn;
-  const auto o_zint = o_zintIn.isInitialized() ? o_zintIn.cast(occa::dtype::byte) : o_zintIn;
-  const auto o_session = o_sessIn.isInitialized() ? o_sessIn.cast(occa::dtype::byte) : o_sessIn;
-
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic(timerName + "find");
   }
@@ -834,11 +829,11 @@ void findpts_t::find(data_t *const findPtsData,
 
   platform->timer.tic(timerName + "find::initial copy op");
   if (npt) {
-    o_xint.copyTo(x_base.data(), npt * sizeof(dfloat));
-    o_yint.copyTo(y_base.data(), npt * sizeof(dfloat));
-    o_zint.copyTo(z_base.data(), npt * sizeof(dfloat));
+    o_xint.copyTo(x_base.data(), npt);
+    o_yint.copyTo(y_base.data(), npt);
+    o_zint.copyTo(z_base.data(), npt);
     if (useMultiSessionSupport) {
-      o_session.copyTo(session.data(), npt * sizeof(dlong));
+      o_session.copyTo(session.data(), npt);
     } else {
       std::fill(session.begin(), session.end(), 0);
     }
@@ -1224,23 +1219,23 @@ void findpts_t::find(data_t *const findPtsData,
   }
 
   if (npt) {
-    if (o_code.byte_size() < npt * sizeof(dlong)) {
+    if (o_code.byte_size() < npt) {
       if (o_code.byte_size()) {
         o_code.free();
         o_el.free();
         o_r.free();
         o_proc.free();
       }
-      o_code = platform->device.malloc(npt * sizeof(dlong));
-      o_el = platform->device.malloc(npt * sizeof(dlong));
-      o_r = platform->device.malloc(npt * dim * sizeof(dfloat));
-      o_proc = platform->device.malloc(npt * sizeof(dlong));
+      o_code = platform->device.malloc<dlong>(npt);
+      o_el = platform->device.malloc<dlong>(npt);
+      o_r = platform->device.malloc<dfloat>(npt * dim);
+      o_proc = platform->device.malloc<dlong>(npt);
     }
 
-    o_code.copyFrom(code_base, npt * sizeof(dlong));
-    o_el.copyFrom(el_base, npt * sizeof(dlong));
-    o_r.copyFrom(r_base, npt * dim * sizeof(dfloat));
-    o_proc.copyFrom(proc_base, npt * sizeof(dlong));
+    o_code.copyFrom(code_base, npt);
+    o_el.copyFrom(el_base, npt);
+    o_r.copyFrom(r_base, npt * dim);
+    o_proc.copyFrom(proc_base, npt);
   }
   if (timerLevel == TimerLevel::Detailed) {
     platform->timer.toc(timerName + "find::copy to device");
@@ -1302,13 +1297,10 @@ void findpts_t::eval(const dlong npt,
                      const dlong nFields,
                      const dlong inputOffset,
                      const dlong outputOffset,
-                     const occa::memory &o_fldIn,
+                     const occa::memory &o_in,
                      data_t *findPtsData,
-                     occa::memory &o_fldOut)
+                     occa::memory &o_out)
 {
-  auto o_in = o_fldIn.isInitialized() ? o_fldIn.cast(occa::dtype::byte) : o_fldIn;
-  auto o_out = o_fldOut.isInitialized() ? o_fldOut.cast(occa::dtype::byte) : o_fldOut;
-
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic(timerName + "eval");
   }
@@ -1350,31 +1342,6 @@ void findpts_t::eval(const dlong npt,
 crystal *findpts_t::crystalRouter()
 {
   return this->cr;
-}
-
-void findpts_t::o_update(data_t &data)
-{
-  auto npt = data.code.size();
-  if (npt == 0) {
-    return;
-  }
-  if (o_code.byte_size() < npt * sizeof(dlong)) {
-    if (o_code.byte_size()) {
-      o_code.free();
-      o_el.free();
-      o_r.free();
-      o_proc.free();
-    }
-    o_code = platform->device.malloc(npt * sizeof(dlong));
-    o_el = platform->device.malloc(npt * sizeof(dlong));
-    o_r = platform->device.malloc(npt * dim * sizeof(dfloat));
-    o_proc = platform->device.malloc(npt * sizeof(dlong));
-  }
-
-  o_code.copyFrom(data.code_base, npt * sizeof(dlong));
-  o_el.copyFrom(data.el_base, npt * sizeof(dlong));
-  o_r.copyFrom(data.r_base, npt * dim * sizeof(dfloat));
-  o_proc.copyFrom(data.proc_base, npt * sizeof(dlong));
 }
 
 } // namespace findpts

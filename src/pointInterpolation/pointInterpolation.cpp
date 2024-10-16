@@ -311,9 +311,3 @@ void pointInterpolation_t::setTimerName(std::string name)
   timerName = name;
   findpts_->setTimerName(name);
 }
-
-void pointInterpolation_t::o_update()
-{
-  findCalled = true;
-  findpts_->o_update(data_);
-}
