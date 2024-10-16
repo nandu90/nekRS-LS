@@ -90,7 +90,7 @@ dfloat update(elliptic_t *elliptic,
   platform->timer.toc("dotp");
 #endif
 
-  platform->flopCounter->add(elliptic->name + " ellipticUpdatePC",
+  platform->flopCounter->add(elliptic->name + " ellipticUpdatePCG",
                              elliptic->Nfields * static_cast<double>(mesh->Nlocal) * 6 + mesh->Nlocal);
 
   return rdotr1;
@@ -136,8 +136,11 @@ void combinedPCGReductions(elliptic_t *elliptic,
     }
   }
 
-  // batch into single, large all-reduce
+  // batch into single fused all-reduce
   MPI_Allreduce(MPI_IN_PLACE, reductions.data(), nRed, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
+
+  platform->flopCounter->add(elliptic->name + " ellipticCombinedPCGReductions",
+                             elliptic->Nfields * static_cast<double>(mesh->Nlocal) * 3 * 7);
 }
 
 int standardPCG(elliptic_t *elliptic,
@@ -321,6 +324,10 @@ int combinedPCG(elliptic_t *elliptic,
                                          o_x,
                                          o_r);
 
+    platform->flopCounter->add(elliptic->name + " ellipticCombinedPCGPreMatVecKernel",
+                               elliptic->Nfields * static_cast<double>(mesh->Nlocal) * 0.5*(11 + 5));
+
+
     ellipticOperator(elliptic, o_p, o_v, dfloatString);
 
     combinedPCGReductions(elliptic, preco, o_Minv, o_v, o_p, o_r, reductions);
@@ -430,22 +437,22 @@ int pcg(elliptic_t *elliptic,
     o_v = platform->deviceMemoryPool.reserve<dfloat>(Nlocal);
   }
 
-  o_tmpReductions = [&]() {
-    int Nreductions = 1;
-    if (options.compareArgs("SOLVER", "PCG+COMBINED")) {
-      Nreductions = CombinedPCGId::nReduction;
-    }
+  const auto Nblock = [&]()
+  {
     auto mesh = elliptic->mesh;
     const dlong Nlocal = mesh->Np * mesh->Nelements;
-    const dlong Nblock = (Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
-
-    if (h_tmpReductions.size() < Nreductions * Nblock) {
-      h_tmpReductions.free();
-      h_tmpReductions = platform->device.mallocHost<dfloat>(Nreductions * Nblock);
-    }
-
-    return platform->deviceMemoryPool.reserve<dfloat>(Nreductions * Nblock);
+    return (Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
   }();
+
+
+  auto Nreductions = [&]() {
+    int n = 1;
+    if (options.compareArgs("SOLVER", "PCG+COMBINED")) n = CombinedPCGId::nReduction; 
+    return n;
+  }();
+
+  h_tmpReductions = platform->memoryPool.reserve<dfloat>(Nreductions * Nblock);
+  o_tmpReductions = platform->deviceMemoryPool.reserve<dfloat>(h_tmpReductions.size());
 
   const auto Niter = [&]() {
     if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
@@ -463,7 +470,9 @@ int pcg(elliptic_t *elliptic,
   if (elliptic->options.compareArgs("SOLVER", "PCG+COMBINED")) {
     o_v.free();
   }
+
   o_tmpReductions.free();
+  h_tmpReductions.free();
 
   return Niter;
 }
