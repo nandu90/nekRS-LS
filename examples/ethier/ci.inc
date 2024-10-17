@@ -877,11 +877,7 @@ void ciTestLinAlg(nrs_t *nrs, const int N)
   evaluateMethod(linAlg->amax(N, o_x, comm), &amaxRef, "amax");
   o_x.free();
 
-  int fieldOffset = N;
-  const int pageW = ALIGN_SIZE / sizeof(dfloat);
-  if (fieldOffset % pageW) {
-    fieldOffset = (fieldOffset / pageW + 1) * pageW;
-  }
+  int fieldOffset = alignStride<dfloat>(N);
 
   constexpr int maxFields = 10;
   for (int Nfields = 1; Nfields <= maxFields; ++Nfields) {

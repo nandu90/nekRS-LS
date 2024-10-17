@@ -147,6 +147,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
 
   std::vector<int> kernelVariants = {0};
   if (!platform->serial && dealias) {
+
     if (!isScalar) {
 
       std::vector<int> kernelSearchSpace = {6, 7, 8, 9, 16};
@@ -195,28 +196,77 @@ occa::kernel benchmarkAdvsub(int Nfields,
     return referenceKernel;
   }
 
+  const auto wordSize = sizeof(dfloat);
+
+#if 1
+  auto lambda = randomVector<dfloat>(4, 1, 2, true);
+#else
+  std::vector<dfloat> lambda(4, 1.0);
+#endif
+
+  auto generateField = [&](const int Nfields, const int Nq, const dlong offset, const dfloat lambda)
+  {
+    const dlong Np = Nq * Nq * Nq;
+    const dlong Nlocal = Nelements * Np; 
+    std::vector<dfloat> out((Nfields > 1) ? Nfields * offset : Nlocal, 0.0);
+
+   // convert to [-1, 1] 
+    auto convertToRange =  [&](int n) {
+      return 2.0 * (static_cast<double>(n) / Nq) - 1;
+    };
+
+    for (int f = 0; f < Nfields; f++) {
+      for (int e = 0; e < Nelements; e++) {
+        for (int i = 0; i < Nq; i++) {
+          for (int j = 0; j < Nq; j++) {
+            for (int k = 0; k < Nq; k++) {
+              const auto x = convertToRange(i);
+              const auto y = convertToRange(j);
+              const auto z = convertToRange(k);
+
+              const auto id = i * j * k + e * Np + f * offset;
+              out[id] = (f+1) * lambda * sin(M_PI * x + e) * sin(M_PI * y) * sin(M_PI * z);
+            }   
+          }
+        }
+      }
+    }
+    return out;
+  };
+
   std::vector<dlong> elementList(Nelements);
   std::iota(elementList.begin(), elementList.end(), 0);
-  auto invLMM = randomVector<dfloat>(fieldOffset * nEXT, 0, 1, true);
-  auto cubD = randomVector<dfloat>(cubNq * cubNq, 0, 1, true);
-  auto NU = randomVector<dfloat>(Nfields * fieldOffset, 0, 1, true);
-  auto conv = randomVector<dfloat>(NVfields * cubatureOffset * nEXT, 0, 1, true);
-  auto cubInterpT = randomVector<dfloat>(Nq * cubNq, 0, 1, true);
-  auto Ud = randomVector<dfloat>(Nfields * fieldOffset, 0, 1, true);
-  auto BdivW = randomVector<dfloat>(fieldOffset * nEXT, 0, 1, true);
-
   auto o_elementList = platform->device.malloc(elementList.size() * sizeof(dlong), elementList.data());
 
-  const auto wordSize = sizeof(dfloat);
-  auto o_invLMM = platform->device.malloc(invLMM.size() * wordSize, invLMM.data());
+#if 1
+  auto cubD = randomVector<dfloat>(cubNq * cubNq, 1, 2, true);
+#else
+  std::vector<dfloat> cubD(cubNq * cubNq, 1.0);
+#endif
   auto o_cubD = platform->device.malloc(cubD.size() * wordSize, cubD.data());
-  auto o_NU = platform->device.malloc(NU.size() * wordSize, NU.data());
-  auto o_conv = platform->device.malloc(conv.size() * wordSize, conv.data());
+
+#if 1
+  auto cubInterpT = randomVector<dfloat>(Nq * cubNq, 1, 2, true);
+#else
+  std::vector<dfloat> cubInterpT(Nq * cubNq, 1.0);
+#endif
+
   auto o_cubInterpT = platform->device.malloc(cubInterpT.size() * wordSize, cubInterpT.data());
-  auto o_Ud = platform->device.malloc(Ud.size() * wordSize, Ud.data());
+
+  auto conv = generateField(NVfields * nEXT, cubNq, cubatureOffset, lambda[0]);
+  auto o_conv = platform->device.malloc(conv.size() * wordSize, conv.data());
+
+  auto invLMM = generateField(nEXT, Nq, fieldOffset, lambda[1]);
+  auto o_invLMM = platform->device.malloc(invLMM.size() * wordSize, invLMM.data());
+
+  auto BdivW = generateField(nEXT, Nq, fieldOffset, lambda[2]);
   auto o_BdivW = platform->device.malloc(BdivW.size() * wordSize, BdivW.data());
 
-  // popular cubD, cubInterpT with correct data
+  auto Ud = generateField(Nfields, Nq, fieldOffset, lambda[3]);
+  auto o_Ud = platform->device.malloc(Ud.size() * wordSize, Ud.data());
+
+  std::vector<dfloat> NU(Nfields * fieldOffset, 0);
+  auto o_NU = platform->device.malloc(NU.size() * wordSize, NU.data());
 
   auto buildKernel2 = [&props, &oklpath](const std::string& _fileName)
   {
@@ -293,19 +343,24 @@ occa::kernel benchmarkAdvsub(int Nfields,
       o_NUref.copyTo(referenceResults.data(), referenceResults.size() * wordSize, i*fieldOffset * wordSize);
       o_NU.copyTo(results.data(), results.size() * wordSize, i*fieldOffset * wordSize);
 
-      const auto absTol = 1e-2;
+      const auto absTol = 1.0;
       const auto err = maxRelErr<dfloat>(referenceResults, results, platform->comm.mpiComm, absTol);
       const auto scale = 100 * range<dfloat>(referenceResults, absTol);
-      const auto eps = 2e-7; // to avoid random false positives when using scale * std::numeric_limits<dfloat>::epsilon();
-  
+      const auto eps = scale * std::numeric_limits<dfloat>::epsilon();
+ 
       if (err > eps || std::isnan(err)) {
         if (platform->comm.mpiRank == 0 && verbosity > 1) {
-          std::cout << "advSub: Ignore version " << kernelVariant << " as correctness check failed with " << err
+          std::cout << "advSub: Ignore version " << kernelVariant << " as correctness check failed with err=" << err
                     << std::endl;
         }
  
         // pass un-initialized kernel to skip this kernel variant
         return occa::kernel();
+      } else {
+        if (platform->comm.mpiRank == 0 && verbosity > 1) {
+          std::cout << "advSub: kernel version " << kernelVariant << " passed correctness check with err=" << err
+                    << std::endl;
+        }
       }
     }
 
