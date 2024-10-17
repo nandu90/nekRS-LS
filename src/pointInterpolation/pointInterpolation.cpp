@@ -3,21 +3,20 @@
 #include "findpts.hpp"
 #include "pointInterpolation.hpp"
 
-pointInterpolation_t::pointInterpolation_t(mesh_t *mesh, MPI_Comm comm, bool mySession_, std::vector<int> bID)
-    : pointInterpolation_t(mesh, comm, mesh->Nlocal, mesh->Nlocal, 0.01, 0, true, bID)
-{
-}
-
 pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
                                            MPI_Comm comm,
-                                           dlong localHashSize,
-                                           dlong globalHashSize,
+                                           bool mySession_,
+                                           std::vector<int> bIntID,
                                            double bb_tol,
                                            double newton_tol_,
-                                           bool mySession_,
-                                           std::vector<int> bIntID)
-    : mesh(mesh_), newton_tol(newton_tol_), mySession(mySession_), nPoints(0)
+                                           dlong localHashSize,
+                                           dlong globalHashSize)
+
+    : mesh(mesh_), mySession(mySession_), nPoints(0)
 {
+  if (localHashSize == 0) localHashSize = mesh->Nlocal; 
+  if (globalHashSize == 0) globalHashSize = mesh->Nlocal;
+
   // communicator is implicitly required to be either platform->comm.mpiComm or platform->comm.mpiCommParent
   // due to other communicator synchronous calls, such as platform->timer.tic
   bool supported = false;
@@ -33,7 +32,7 @@ pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
              "Communicator must be either platform->comm.mpiComm or platform->comm.mpiCommParent");
 
   newton_tol =
-      (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(1e-6, newton_tol_);
+    (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(1e-6, newton_tol_);
 
   auto x = platform->memoryPool.reserve<dfloat>(mesh->Nlocal);
   auto y = platform->memoryPool.reserve<dfloat>(mesh->Nlocal);
