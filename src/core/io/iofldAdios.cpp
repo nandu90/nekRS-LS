@@ -697,12 +697,26 @@ size_t iofldAdios::read()
     return variables;
   }();
 
+   auto isAvailable = [&] (const std::string& name, bool abort = false)
+   {
+      auto exists = std::find(_availableVariables.begin(), _availableVariables.end(), name) != _availableVariables.end();
+      nekrsCheck(!exists && abort,
+                 platform->comm.mpiComm,
+                 EXIT_FAILURE,
+                 "requested variable %s not found in file!\n",
+                 name.c_str());
+      return exists;
+   };
+
   // first allocate then get variable to ensure deferred pointer to memPool remains valid
   for (int pass = 0; pass < 2; pass++) {
     const auto allocateOnly = (pass == 0) ? true : false;
 
     getVariable<uint32_t>(allocateOnly, "polynomialOrder", 0);
+    isAvailable("polynomialOrder", true);
+
     getVariable<uint64_t>(allocateOnly, "globalElementIds", 0);
+    isAvailable("globalElementIds", true);
 
     for (auto name : userVariables) {
       const auto &type = adiosIO.VariableType(name);
@@ -725,6 +739,7 @@ size_t iofldAdios::read()
         HANDLE_TYPE(float, 0)
       }
 #undef HANDLE_TYPE
+
       nekrsCheck(err,
                  platform->comm.mpiComm,
                  EXIT_FAILURE,
@@ -746,9 +761,7 @@ size_t iofldAdios::read()
     const auto &name = entry.first;
     auto &variant = entry.second;
 
-    const auto available =
-        std::find(_availableVariables.begin(), _availableVariables.end(), name) != _availableVariables.end();
-    nekrsCheck(!available,
+    nekrsCheck(!isAvailable(name),
                platform->comm.mpiComm,
                EXIT_FAILURE,
                "requested variable %s not found in file!\n",
@@ -782,10 +795,7 @@ size_t iofldAdios::read()
       const auto &name = o_entry.first;
       auto &o_userBuf = o_entry.second;
 
-      if (std::find(_availableVariables.begin(), _availableVariables.end(), name) ==
-          _availableVariables.end()) {
-        continue;
-      }
+      if (!isAvailable(name)) continue; 
 
       if ((meshRequested && name != "mesh") || (!meshRequested && name == "mesh")) {
         continue;
