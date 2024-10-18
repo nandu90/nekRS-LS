@@ -1219,8 +1219,8 @@ void findpts_t::find(data_t *const findPtsData,
   }
 
   if (npt) {
-    if (o_code.byte_size() < npt) {
-      if (o_code.byte_size()) {
+    if (o_code.size() < npt) {
+      if (o_code.size()) {
         o_code.free();
         o_el.free();
         o_r.free();
