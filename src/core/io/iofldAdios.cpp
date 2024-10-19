@@ -2,10 +2,6 @@
 
 #include "iofldAdios.hpp"
 
-// fix if general interpolation + different polynorder (results are incorrect)
-// add platform->copyFloatToDfloat()
-// convert to o_userBuf type
-
 static bool isLittleEndian()
 {
   const uint32_t value = 0x01020304;

@@ -489,6 +489,10 @@ void UDF_ExecuteStep(double time, int tstep)
     }
   }
 
+  if (ciMode == 23) {
+    ciCheckpointing(nrs);
+  }
+
   // only ciMode 1 exercises the particles path
   if (ciMode == 1) {
     particles->integrate(time);

@@ -315,7 +315,11 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("SCALAR01 SOLVER", "CVODE");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
   }
-
+  if (ciMode == 23) {
+    options.setArgs("NUMBER TIMESTEPS", std::string("0"));
+    options.setArgs("END TIME", std::string("0"));
+    options.setArgs("CHECKPOINT INTERVAL", std::string("0"));
+  }
 }
 
 auto generatePoints(int nPoints, double R)
@@ -720,6 +724,43 @@ void ciTestSurfaceIntegral(nrs_t *nrs)
       CiFailTest();
     }
   }
+}
+
+void ciCheckpointing(nrs_t *nrs)
+{
+  auto run = [&](const std::string& engine, const std::string& restartFile, bool readOnly = false) 
+  {
+    const auto tol = 10 * std::numeric_limits<float>::epsilon();
+    const double time = 0.123; // just for testing, actual solution is based on t==0
+
+    if (!readOnly) {
+      platform->options.setArgs("CHECKPOINT ENGINE", engine);
+      nrs->checkpointWriter = iofldFactory::create();
+  
+      nrs->writeCheckpoint(time, 0);
+    }
+
+    nrs->restartFromFile(restartFile); 
+ 
+    double startTime;
+    platform->options.getArgs("START TIME", startTime);
+ 
+    nrs->copyToNek(0.0, 0);
+    nek::userchk();
+ 
+    auto err = nek::ptr<double>("errors");
+    CiEvalTest("velocity", err[0] < tol);
+    CiEvalTest("pressure", err[1] < tol);
+    CiEvalTest("scalar00", err[2] < tol);
+    CiEvalTest("scalar01", err[3] < tol);
+    CiEvalTest("time", std::abs(startTime- time) < tol);
+
+    nrs->checkpointWriter.reset();
+  };
+
+  run("NEK", "ethier0.f00000");
+  run("ADIOS", "ethier.bp");
+  run("ADIOS", "ethier.bp+int", true);
 }
 
 void ciTestDistance(nrs_t *nrs)

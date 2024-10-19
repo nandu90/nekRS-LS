@@ -545,7 +545,6 @@ nrs_t::nrs_t()
   platform->options.getArgs("MESH DIMENSION", this->NVfields);
   platform->options.getArgs("ELEMENT TYPE", this->elementType);
 
-  checkpointWriter = iofldFactory::create();
 }
 
 void nrs_t::init()
@@ -1011,6 +1010,7 @@ void nrs_t::restartFromFile(const std::string &restartStr)
   }
 
   iofld->process();
+  iofld->close();
 
   platform->options.setArgs("START TIME", (requestedTime.size()) ? requestedTime : to_string_f(time));
 }
@@ -1547,6 +1547,10 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool print
 
 void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforceFP64, int N_, bool uniform)
 {
+  if (!checkpointWriter) {
+    checkpointWriter = iofldFactory::create();
+  }
+
   const auto outXYZ =
       (enforceOutXYZ) ? true : platform->options.compareArgs("CHECKPOINT OUTPUT MESH", "TRUE");
 
