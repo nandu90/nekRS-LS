@@ -3,25 +3,26 @@
 ## What is new? 
 
 * FP32 solver mode
+* DPCPP backend to support Intel GPUs
 * Interpolation based velocity recycling
 * [Ascent](https://ascent.readthedocs.io/en/latest/) in situ visualisation plugin
 * iofld class reading/writing field files including [ADIOS2](https://adios2.readthedocs.io/) support 
 * Addtional output options (element filter and interpolation on uniform grid / different polynomial-order)
 * Multi session nek-nek including multi-rate time stepping
+* Improved memory management
 * CHT nek-nek support
 * nek-nek support for nrsqsub scripts
 * Improved JIT compilation performance
-* HIP support for BoomerAMG
-* Intel GPU support
+* HIP support for SEMFEM  
 * Aero forces
 * opSEM class
 * Mesh surface ops
 * Linear implicit velocity source term
-* Combined CG for improved performance
 * Various bug fixes
 
 ## Good to know
 
+* GPU aware MPI is disabled by default (`NEKRS_GPU_MPI=0`)
 * HYPRE replaces AmgX
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
 * after fixing a bug in the linear solver residual norm, iteration counts have increased compared to previous versions
@@ -77,7 +78,7 @@ This list provides an overview of the most significant changes in this release, 
 
 ## Thanks to our Contributors
 
-@kris-rowe, @yslan, @MalachiTimothyPhillips, @tcew
+@kris-rowe, @tcew, @yslan, @MalachiTimothyPhillips, @thilinarmtb
 
 We are grateful to all who added new features, filed issues or helped resolve them, 
 asked and answered questions, and were part of inspiring discussions.
