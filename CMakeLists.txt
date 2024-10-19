@@ -333,6 +333,11 @@ configure_file(
   ${CMAKE_INSTALL_PREFIX}/nekrs.conf
   @ONLY)
 
+configure_file(
+  ${CMAKE_CURRENT_LIST_DIR}/examples/CMakeLists.txt  # Input file
+  ${CMAKE_INSTALL_PREFIX}/examples/CMakeLists.txt  # Output file (build directory)
+  @ONLY)
+
 file(MAKE_DIRECTORY ${CMAKE_INSTALL_PREFIX}/3rd_party)
 
 install(

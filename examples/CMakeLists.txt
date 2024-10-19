@@ -9,12 +9,13 @@ else()
 endif()
 set (NEKRS_HOME "$ENV{NEKRS_HOME}")
 
+set(BACKEND "@BACKEND_DEFAULT@")
 set(EXAMPLES_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(LAUNCHER "${NEKRS_HOME}/bin/nrsmpi" CACHE STRING "Path to the launcher executable")
 set(NRANKS "0" CACHE STRING "Number of MPI ranks to run a test")
 set(TESTS "")
 
-
+ message(STATUS "backend: ${BACKEND}")
 if(NRANKS GREATER 0)
   message(STATUS "numer of MPI ranks to run tests: ${NRANKS}")
 endif()
@@ -100,7 +101,12 @@ endfunction()
 ## TESTS ##
 
 add("ethier-buildOnly" 2 "ethier.par" "1" "${USE_FP32}" "${EXAMPLES_DIR}/ethier" ON)
-add("ethier" 2 "ethier.par" "1;2;3;4;7;8;9;10;11;12;14;15;19;23" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+add("ethier" 2 "ethier.par" "1;2;4;7;8;9;10;11;12;14;15;19;23" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+
+if(NOT BACKEND STREQUAL "DPCPP")
+  add("ethier" 2 "ethier.par" "3" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+endif()
+
 add("ethier" 2 "mv_ethier.par" "5;6" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
 add("ethier" 2 "ethierScalar.par" "13" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
 add("ethier" 2 "ethier.par" "22" ON "${dir}" "${BUILD_ONLY}")
