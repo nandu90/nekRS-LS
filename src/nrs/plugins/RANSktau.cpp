@@ -191,6 +191,9 @@ void RANSktau::updateSourceTerms()
 
   SijMag2OiOjSkKernel(mesh->Nelements * mesh->Np, nrs->fieldOffset, 1, o_SijOij, o_OiOjSk, o_SijMag2);
 
+  platform->options.getArgs("VISCOSITY", mueLam);
+  platform->options.getArgs("DENSITY", rho);
+
   computeKernel(mesh->Nelements,
                 nrs->fieldOffset, // assumes offset is always the same
                 rho,
@@ -215,9 +218,6 @@ void RANSktau::setup(int ifld)
 
   nrs = dynamic_cast<nrs_t *>(platform->solver);
   kFieldIndex = ifld; // tauFieldIndex is assumed to be kFieldIndex+1
-
-  platform->options.getArgs("VISCOSITY", mueLam);
-  platform->options.getArgs("DENSITY", rho);
 
   for (int i = 0; i < 2; i++) {
     auto cds = nrs->cds;
