@@ -63,7 +63,8 @@ void QQt::startFinish(const std::string& op,
                       occa::memory& o_v,
                       const dlong stride)
 {
-  startFinish(op, o_v, stride, o_v.size()/stride);
+  const int k = (stride > 0) ? o_v.size()/stride : 1;
+  startFinish(op, o_v, stride, k);
 }
 
 void QQt::startFinish(const std::string& op,
