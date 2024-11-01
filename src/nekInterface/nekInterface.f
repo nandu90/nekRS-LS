@@ -776,22 +776,25 @@ c-----------------------------------------------------------------------
       return
       end
 c-----------------------------------------------------------------------
-      integer*8 function nekf_set_vert(nx, isTmsh)
+      integer*8 function nekf_set_vert(nx, isTmsh, numberInt)
 
       include 'SIZE'
       include 'TOTAL'
       include 'NEKINTF'
 
-      integer npts, isTmsh
+      integer npts, isTmsh, numberInt
 
       common /ivrtx/ vertex ((2**ldim),lelt)
       integer*8 vertex
 
       integer*8 ngv
+      logical numberInt_
 
       nel = nelt
       if (isTmsh.eq.0) nel = nelv
-      call set_vert(glo_num,ngv,nx,nel,vertex,.false.)
+      numberInt_ = .false.
+      if (numberInt.eq.1) numberInt_ = .true. 
+      call set_vert(glo_num,ngv,nx,nel,vertex,numberInt_)
 
       nekf_set_vert = ngv
 

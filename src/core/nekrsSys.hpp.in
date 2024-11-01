@@ -69,6 +69,7 @@ using dlong = long long int;
 #include <tuple>
 #include <regex>
 #include <string>
+#include <cstring>
 #include <vector>
 #include <map>
 #include <algorithm>
@@ -162,7 +163,6 @@ constexpr double targetTimeBenchmark{0.5};
 constexpr int BLOCKSIZE = 256;
 constexpr int ALIGN_SIZE_BYTES = 256;
 constexpr int NSCALAR_MAX = 99;
-const occa::memory o_NULL;
 
 template <typename T> unsigned int alignStride(unsigned int stride)
 {

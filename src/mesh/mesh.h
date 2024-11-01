@@ -130,6 +130,7 @@ struct mesh_t {
   occa::memory o_elementInfo;
 
   hlong *globalIds;
+  hlong *globalFaceIds;
   ogs_t *ogs;
   oogs_t *oogs;
 
@@ -283,7 +284,8 @@ void meshConnect(mesh_t *mesh);
 void meshParallelConnect(mesh_t *mesh);
 
 /* build global connectivity in parallel */
-void meshGlobalIds(mesh_t *mesh);
+void meshGlobalIds(mesh_t *mesh, bool numberInterior = false);
+void meshGlobalFaceIds(mesh_t* mesh);
 
 void planarAvg(mesh_t *mesh,
                const std::string &dir,

@@ -2,7 +2,10 @@
 #include "nekInterfaceAdapter.hpp"
 #include "bcMap.hpp"
 #include "fileUtils.hpp"
+#include "fileBcast.hpp"
 #include "re2Reader.hpp"
+
+static bool usrFileExists = false;
 
 nekdata_private nekData;
 static int rank;
@@ -71,7 +74,7 @@ static void (*nek_setics_ptr)(void);
 static int (*nek_bcmap_ptr)(int *, int *, int *);
 static void (*nek_gen_bcmap_ptr)(void);
 static int (*nek_nbid_ptr)(int *);
-static long long (*nek_set_vert_ptr)(int *, int *);
+static long long (*nek_set_vert_ptr)(int *, int *, int *);
 
 static void (*nek_setbd_ptr)(double *, double *, int *);
 static void (*nek_setabbd_ptr)(double *, double *, int *, int *);
@@ -628,7 +631,7 @@ void set_usr_handles(const char *session_in, int verbose)
   check_error(dlerror());
   nek_nbid_ptr = (int (*)(int *))dlsym(handle, fname("nekf_nbid"));
   check_error(dlerror());
-  nek_set_vert_ptr = (long long (*)(int *, int *))dlsym(handle, fname("nekf_set_vert"));
+  nek_set_vert_ptr = (long long (*)(int *, int *, int *))dlsym(handle, fname("nekf_set_vert"));
   check_error(dlerror());
 
   nek_setbd_ptr = (void (*)(double *, double *, int *))dlsym(handle, fname("setbd"));
@@ -832,7 +835,6 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
   const std::string usrFileCache = cache_dir / fs::path(usrCaseName).filename();
   const std::string libFile = cache_dir + "/lib" + casename + ".so";
 
-  int usrFileExists;
   if (platform->comm.mpiRank == 0) {
     usrFileExists = fs::exists(usrFile) && fs::file_size(usrFile) > 0;
   }
@@ -1252,9 +1254,9 @@ int setup(int numberActiveFields)
   return 0;
 }
 
-long long set_glo_num(int nx, int isTMesh)
+long long set_glo_num(int nx, int isTMesh, int numberInterior)
 {
-  return (*nek_set_vert_ptr)(&nx, &isTMesh);
+  return (*nek_set_vert_ptr)(&nx, &isTMesh, &numberInterior);
 }
 
 void bdfCoeff(dfloat *g0, dfloat *coeff, dfloat *_dt, int order)
@@ -1302,6 +1304,11 @@ void printMeshMetrics()
 const std::map<std::string, void *> &ptrList()
 {
   return ptrListData;
+}
+
+bool usrFile() 
+{
+  return usrFileExists;
 }
 
 } // namespace nek

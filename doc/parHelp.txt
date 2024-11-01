@@ -182,9 +182,12 @@ boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary 
 checkpointing               true [D], false
 
 regularization                                                         
-                            hpfrt                                      HPF stabilization
+                            hpfrt                                      high-pass filter stabilization
                               +nModes=<int>                            number of modes                                 
                               +scalingCoeff=<float>                    filter strength
+                            hpfrt                                       stabilization
+                            cjp                                        jump penalty stabilization
+                              +scalingCoeff=<float>                    penalty factor
                             avm                                        artificial viscosity method
                                                                        (has to be applied manually in case user user props)
                               +c0                                      make viscosity C0

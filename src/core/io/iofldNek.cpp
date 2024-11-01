@@ -110,8 +110,9 @@ size_t iofldNek::write()
       return count;
     }();
 
+    const auto isStart = (data.o_t.size() > 0) ? 1 : 0;
     for (int is = 0; is < Nscalar; is++) {
-      if (auto o_buf = inquireVariable<std::vector<occa::memory>>("scalar" + scalarDigitStr(is))) {
+      if (auto o_buf = inquireVariable<std::vector<occa::memory>>("scalar" + scalarDigitStr(isStart + is))) {
         data.o_s.push_back(o_buf->get());
       }
     }

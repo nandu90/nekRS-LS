@@ -5,6 +5,7 @@
 #include "linAlg.hpp"
 #include "flopCounter.hpp"
 #include "fileUtils.hpp"
+#include "fileBcast.hpp"
 
 std::string createOptionsPrefix(std::string section)
 {

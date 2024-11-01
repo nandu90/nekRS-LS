@@ -11,6 +11,7 @@
 #include "elliptic.hpp"
 #include "createEToBV.hpp"
 #include "iofldFactory.hpp"
+#include "cjp.hpp"
 
 static void computeDivUErr(nrs_t *nrs, dfloat &divUErrVolAvg, dfloat &divUErrL2)
 {
@@ -1017,10 +1018,21 @@ void nrs_t::restartFromFile(const std::string &restartStr)
 
 void nrs_t::setIC()
 {
-  getICFromNek();
+  if (nek::usrFile()) {
+    getICFromNek();
+  }
 
   if (!platform->options.getArgs("RESTART FILE NAME").empty()) {
     restartFromFile(platform->options.getArgs("RESTART FILE NAME"));
+  }
+
+  double startTime;
+  platform->options.getArgs("START TIME", startTime);
+
+  if (nek::usrFile()) {
+    copyToNek(startTime, 0, true);
+    nek::userchk();
+    copyFromNek();    
   }
 
   if (platform->comm.mpiRank == 0) {
@@ -1058,9 +1070,7 @@ void nrs_t::setIC()
     }
   }
 
-  double startTime;
-  platform->options.getArgs("START TIME", startTime);
-  copyToNek(startTime, 0, true); // ensure both codes are in sync
+  copyToNek(startTime, 0, true); // in case IC was updated in udf_setup 
 
   nekrsCheck(platform->options.compareArgs("LOWMACH", "TRUE") && p0th[0] <= 1e-6,
              platform->comm.mpiComm,
@@ -1436,8 +1446,25 @@ void nrs_t::makeNLT(double time, int tstep, occa::memory &o_Usubcycling)
       }
 
       platform->linAlg->axpby(this->NVfields * this->fieldOffset, -1.0, o_adv, 1.0, this->o_NLT);
-
       advectionFlops(this->mesh, this->NVfields);
+
+      if (platform->options.compareArgs("VELOCITY REGULARIZATION METHOD", "CJP")) {
+        dfloat coef;
+        platform->options.getArgs("VELOCITY REGULARIZATION CJP PENALTY FACTOR", coef);
+
+        auto o_Ux = this->o_U.slice(0 * this->fieldOffset, mesh->Nlocal);
+        auto o_Uy = this->o_U.slice(1 * this->fieldOffset, mesh->Nlocal);
+        auto o_Uz = this->o_U.slice(2 * this->fieldOffset, mesh->Nlocal);
+ 
+        auto o_NLTx = this->o_NLT.slice(0 * this->fieldOffset, mesh->Nlocal);
+        auto o_NLTy = this->o_NLT.slice(1 * this->fieldOffset, mesh->Nlocal);
+        auto o_NLTz = this->o_NLT.slice(2 * this->fieldOffset, mesh->Nlocal);
+ 
+        addCJP(mesh, coef, this->fieldOffset, this->o_U, o_Ux, o_NLTx);
+        addCJP(mesh, coef, this->fieldOffset, this->o_U, o_Uy, o_NLTy);
+        addCJP(mesh, coef, this->fieldOffset, this->o_U, o_Uz, o_NLTz);
+      }
+
     }
   }
 }

@@ -4,6 +4,7 @@
 #include "cds.hpp"
 #include "lowPassFilter.hpp"
 #include "avm.hpp"
+#include "cjp.hpp"
 #include "bcMap.hpp"
 
 static void advectionFlops(mesh_t *mesh, int Nfields)
@@ -380,6 +381,15 @@ void cds_t::makeNLT(int is, double time, int tstep, occa::memory &o_Usubcycling)
                                             this->o_NLT);
         }
         advectionFlops(this->mesh[0], 1);
+
+        if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "CJP")) {
+          dfloat coef;
+          platform->options.getArgs("SCALAR" + sid + " REGULARIZATION CJP PENALTY FACTOR", coef); 
+          auto o_Si = this->o_S.slice(fieldOffsetScan[is], mesh->Nlocal);
+          auto o_NLTi = this->o_NLT.slice(fieldOffsetScan[is], mesh->Nlocal);
+          auto nrs = dynamic_cast<nrs_t *>(platform->solver);
+          addCJP(mesh, coef, this->vFieldOffset, this->o_U, o_Si, o_NLTi);
+        }
       }
     }
 }

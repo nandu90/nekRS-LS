@@ -1466,8 +1466,9 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
     std::string regularization;
     if (ini->extract(parSection, "regularization", regularization)) {
       const std::vector<std::string> validValues = {
-          {"hpfrt"},
           {"none"},
+          {"hpfrt"},
+          {"cjp"},
           {"avm"},
           {"c0"},
           {"nmodes"},
@@ -1493,17 +1494,32 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         append_error("cannot specify both regularization and filtering!\n");
       }
       const bool usesAVM = std::find(list.begin(), list.end(), "avm") != list.end();
+      const bool usesCJP = std::find(list.begin(), list.end(), "cjp") != list.end();
       const bool usesHPFRT = std::find(list.begin(), list.end(), "hpfrt") != list.end();
-      if (!usesAVM && !usesHPFRT) {
-        append_error("regularization must use avm or hpfrt!\n");
+
+      if (!usesAVM && !usesHPFRT && !usesCJP) {
+        append_error("unknown regularization!\n");
       }
+
       if (usesAVM && isVelocity) {
         append_error("avm regularization is only enabled for scalars!\n");
+      }
+
+      if (usesCJP) {
+        options.setArgs(parPrefix + "REGULARIZATION METHOD", "CJP");
+        options.setArgs(parPrefix + "REGULARIZATION CJP PENALTY FACTOR", "0.8");
+        for (std::string s : list) {
+          const auto penaltyStr = parseValueForKey(s, "penaltyfactor");
+          if (!penaltyStr.empty()) {
+            options.setArgs(parPrefix + "REGULARIZATION CJP PENALTY FACTOR", penaltyStr);
+          }
+        }
       }
 
       if (usesHPFRT) {
         options.setArgs(parPrefix + "HPFRT MODES", "1");
         options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPFRT");
+        if (usesCJP) options.setArgs(parPrefix + "REGULARIZATION METHOD", "CJP+HPFRT");
       }
 
       if (usesAVM) {

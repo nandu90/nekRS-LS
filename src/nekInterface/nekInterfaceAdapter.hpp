@@ -130,6 +130,8 @@ void ifoutfld(int i);
 void getIC(void);
 void getIC(int ifield);
 
+bool usrFile();
+
 void restartFromFile(const std::string& fileName);
 void userchk(void);
 int bcmap(int bid, int ifld);
@@ -137,7 +139,7 @@ int bcmap(int bid, int ifld);
 int globalElementIdToRank(long long id);
 int globalElementIdToLocal(long long id);
 
-long long set_glo_num(int npts, int isTMesh);
+long long set_glo_num(int npts, int isTMesh, int numberInterior = 0);
 
 void bdfCoeff(dfloat *g0, dfloat *coeff, dfloat *dt, int order);
 void extCoeff(dfloat *coeff, dfloat *dt, int nAB, int nBDF);

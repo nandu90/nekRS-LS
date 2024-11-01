@@ -34,7 +34,6 @@ SOFTWARE.
 #include <string>
 #include <vector>
 
-#include "nekrsSys.hpp"
 #include <map>
 
 class setupAide

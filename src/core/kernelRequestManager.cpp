@@ -2,6 +2,7 @@
 #include "kernelRequestManager.hpp"
 #include "platform.hpp"
 #include "fileUtils.hpp"
+#include "fileBcast.hpp"
 #include <unordered_set>
 #include <regex>
 #include "sha1.hpp"

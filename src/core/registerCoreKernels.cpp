@@ -96,6 +96,14 @@ void registerCoreKernels()
   fileName = oklpath + "/core/" + kernelName + ".okl";
   platform->kernelRequests.add(kernelName, fileName, meshProps);
 
+  kernelName = "cjp" + suffix;
+  fileName = oklpath + "/core/" + kernelName + ".okl"; 
+  platform->kernelRequests.add(kernelName, fileName, meshProps);
+  
+  kernelName = "cjpHelper" + suffix;
+  fileName = oklpath + "/core/" + kernelName + ".okl";
+  platform->kernelRequests.add(kernelName, fileName, meshProps);
+
   {
     auto prop = meshProps;
     prop["includes"].asArray();

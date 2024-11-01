@@ -12,6 +12,8 @@
 #include "solver.hpp"
 #include "kernelRequestManager.hpp"
 
+const occa::memory o_NULL;
+
 class setupAide;
 class linAlg_t;
 class flopCounter_t;

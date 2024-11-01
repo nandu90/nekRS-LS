@@ -1,0 +1,162 @@
+#include <cstdio>
+
+#define surfaceTerms(vgid, sk, face, m, i, j)                                                                \
+  {                                                                                                          \
+    const dlong idM = vmapM[sk];                                                                             \
+    const dfloat nx = sgeo[sk * p_Nsgeo + p_NXID];                                                           \
+    const dfloat ny = sgeo[sk * p_Nsgeo + p_NYID];                                                           \
+    const dfloat nz = sgeo[sk * p_Nsgeo + p_NZID];                                                           \
+    const dfloat rx = vgeo[vgid + p_RXID * p_Np];                                                            \
+    const dfloat ry = vgeo[vgid + p_RYID * p_Np];                                                            \
+    const dfloat rz = vgeo[vgid + p_RZID * p_Np];                                                            \
+    const dfloat sx = vgeo[vgid + p_SXID * p_Np];                                                            \
+    const dfloat sy = vgeo[vgid + p_SYID * p_Np];                                                            \
+    const dfloat sz = vgeo[vgid + p_SZID * p_Np];                                                            \
+    const dfloat tx = vgeo[vgid + p_TXID * p_Np];                                                            \
+    const dfloat ty = vgeo[vgid + p_TYID * p_Np];                                                            \
+    const dfloat tz = vgeo[vgid + p_TZID * p_Np];                                                            \
+    const dfloat invJw = vgeo[vgid + p_IJWID * p_Np];                                                        \
+    const dfloat ndotdr = (nx * rx + ny * ry + nz * rz);                                                     \
+    const dfloat ndotds = (nx * sx + ny * sy + nz * sz);                                                     \
+    const dfloat ndotdt = (nx * tx + ny * ty + nz * tz);                                                     \
+    const dfloat udotn = nx * U[idM + 0*offset] + ny * U[idM + 1*offset] + nz * U[idM + 2*offset];           \
+    const dfloat scale = fabs(udotn) * h2Face[sk] * gFace[sk] * sgeo[sk * p_Nsgeo + p_WSJID];                \
+    if (face == 0 || face == 5) {                                                                            \
+      s_flux2[m][j][i] = scale * ndotdt;                                                                     \
+    }                                                                                                        \
+    if (face == 1 || face == 3) {                                                                            \
+      s_flux2[m][j][i] = scale * ndotds;                                                                     \
+    }                                                                                                        \
+    if (face == 2 || face == 4) {                                                                            \
+      s_flux2[m][j][i] = scale * ndotdr;                                                                     \
+    }                                                                                                        \
+  }
+
+@kernel void cjpHex3D(const dlong Nelements,
+                       const dlong offset,
+                       const dfloat coef,
+                       @ restrict const dfloat *D,
+                       @ restrict const dlong *vmapM,
+                       @ restrict const dfloat *vgeo,
+                       @ restrict const dfloat *sgeo,
+                       @ restrict const dfloat *h2Face,
+                       @ restrict const dfloat *U,
+                       @ restrict const dfloat *gFace,
+                       @ restrict dfloat *out)
+{
+  for (dlong e = 0; e < Nelements; e++; @outer(0)) {
+    @shared dfloat s_flux2[2][p_Nq][p_Nq];
+
+    @exclusive dfloat r_sum[p_Nq];
+
+    @shared dfloat s_D[p_Nq][p_Nq];
+
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+        s_D[j][i] = D[j * p_Nq + i];
+      }
+    }
+    @barrier();
+
+    // face 0 & 5 (r-s plane)
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+#pragma unroll p_Nq
+        for (int k = 0; k < p_Nq; ++k) {
+          r_sum[k] = 0.;
+        }
+
+        const dlong sk0 = e * p_Nfp * p_Nfaces + 0 * p_Nfp + i + j * p_Nq;
+        const dlong gid0 = e * p_Np * p_Nvgeo + 0 * p_Nq * p_Nq + j * p_Nq + i;
+        surfaceTerms(gid0, sk0, 0, 0, i, j);
+
+        const dlong sk5 = e * p_Nfp * p_Nfaces + 5 * p_Nfp + i + j * p_Nq;
+        const dlong gid5 = e * p_Np * p_Nvgeo + (p_Nq - 1) * p_Nq * p_Nq + j * p_Nq + i;
+        surfaceTerms(gid5, sk5, 5, 1, i, j);
+      }
+    }
+
+    @barrier();
+
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+#pragma unroll p_Nq
+        for (int k = 0; k < p_Nq; k++) {
+          r_sum[k] += s_D[0][k] * s_flux2[0][j][i];
+          r_sum[k] += s_D[p_Nq - 1][k] * s_flux2[1][j][i];
+        }
+      }
+    }
+
+    @barrier();
+
+    // face 1 & 3 (r-t plane)
+    for (int k = 0; k < p_Nq; ++k; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+        const dlong sk1 = e * p_Nfp * p_Nfaces + 1 * p_Nfp + i + k * p_Nq;
+        const dlong gid1 = e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + 0 * p_Nq + i;
+        surfaceTerms(gid1, sk1, 1, 0, i, k);
+
+        const dlong sk3 = e * p_Nfp * p_Nfaces + 3 * p_Nfp + i + k * p_Nq;
+        const dlong gid3 = e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + (p_Nq - 1) * p_Nq + i;
+        surfaceTerms(gid3, sk3, 3, 1, i, k);
+      }
+    }
+
+    @barrier();
+
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+#pragma unroll p_Nq
+        for (int k = 0; k < p_Nq; k++) {
+          r_sum[k] += s_D[0][j] * s_flux2[0][k][i];
+          r_sum[k] += s_D[p_Nq - 1][j] * s_flux2[1][k][i];
+        }
+      }
+    }
+
+    @barrier();
+
+    // face 2 & 4 (s-t plane)
+    for (int k = 0; k < p_Nq; ++k; @inner(1)) {
+      for (int j = 0; j < p_Nq; ++j; @inner(0)) {
+        const dlong sk2 = e * p_Nfp * p_Nfaces + 2 * p_Nfp + j + k * p_Nq;
+        const dlong gid2 = e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + j * p_Nq + (p_Nq - 1);
+        surfaceTerms(gid2, sk2, 2, 0, j, k);
+
+        const dlong sk4 = e * p_Nfp * p_Nfaces + 4 * p_Nfp + j + k * p_Nq;
+        const dlong gid4 = e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + j * p_Nq + 0;
+        surfaceTerms(gid4, sk4, 4, 1, j, k);
+      }
+    }
+
+    @barrier();
+
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+#pragma unroll p_Nq
+        for (int k = 0; k < p_Nq; k++) {
+          //r_sum[k] += s_D[0][i] * s_flux2[0][k][j];
+          //r_sum[k] += s_D[p_Nq - 1][i] * s_flux2[1][k][j];
+          r_sum[k] += s_D[p_Nq - 1][i] * s_flux2[0][k][j];
+          r_sum[k] += s_D[0][i] * s_flux2[1][k][j];
+        }
+      }
+    }
+
+    @barrier();
+
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+#pragma unroll p_Nq
+        for (int k = 0; k < p_Nq; ++k) {
+          const dlong gid = e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + j * p_Nq + i;
+          const dfloat invJw = vgeo[gid + p_IJWID * p_Np];
+
+          const dlong id = e * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
+          out[id] += invJw * coef * r_sum[k];
+        }
+      }
+    }
+  }
+}

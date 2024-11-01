@@ -7,10 +7,13 @@
 
 #include "udf.hpp"
 #include "fileUtils.hpp"
+#include "fileBcast.hpp"
 #include "platform.hpp"
 #include "bcMap.hpp"
 #include "bcType.h"
 #include "sha1.hpp"
+
+#include "udfMake.hpp"
 
 UDF udf = {NULL, NULL, NULL, NULL};
 
@@ -181,54 +184,10 @@ void adjustOudf(bool buildRequired, const std::string &postOklSource, const std:
   f.close();
 }
 
-void udfAutoKernels(const std::string &udfFileCache,
-                    const std::string &postOklSource,
-                    const std::string &oudfFileCache)
-{
-  const std::string includeFile = fs::path(udfFileCache).parent_path() / fs::path("udfAutoLoadKernel.hpp");
-  std::ofstream f(includeFile);
-
-  auto buffer = [&]() {
-    std::stringstream fbuffer;
-    std::ifstream postOklSourceStream(postOklSource);
-    fbuffer << postOklSourceStream.rdbuf();
-    postOklSourceStream.close();
-    return fbuffer.str();
-  }();
-
-  std::set<std::string> kernelNameList;
-  std::regex rexp(R"(\s*@kernel\s*void\s*([\S]*)\s*\()");
-  std::smatch res;
-
-  {
-    std::regex_token_iterator<std::string::iterator> end; // default constructor = end-of-sequence:
-    std::regex_token_iterator<std::string::iterator> token(buffer.begin(), buffer.end(), rexp, 1);
-    while (token != end) {
-      const auto kernelName = *token++;
-      kernelNameList.insert(kernelName);
-    }
-  }
-
-  for (auto entry : kernelNameList) {
-      f << "static occa::kernel " << entry << ";\n";
-  }
-
-  f << "void UDF_AutoLoadKernels(occa::properties& kernelInfo)" << std::endl << "{" << std::endl;
-
-  for (auto entry : kernelNameList) {
-    f << "  " << entry << " = "
-      << "oudfBuildKernel(kernelInfo, \"" << entry << "\");" << std::endl;
-  }
-
-  f << "}" << std::endl;
-
-  f.close();
-  fileSync(includeFile.c_str());
-}
-
 void udfBuild(setupAide &options)
 {
-  platform->options.getArgs("UDF FILE", udfFile);
+  options.getArgs("UDF FILE", udfFile);
+
   udfFile = fs::absolute(udfFile);
   if (platform->comm.mpiRank == 0) {
     nekrsCheck(!fs::exists(udfFile), MPI_COMM_SELF, EXIT_FAILURE, "Cannot find %s!\n", udfFile.c_str());
@@ -236,7 +195,6 @@ void udfBuild(setupAide &options)
 
   const int verbose = options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
   const std::string installDir(getenv("NEKRS_HOME"));
-  const std::string udf_dir = installDir + "/udf";
   const std::string cache_dir(getenv("NEKRS_CACHE_DIR"));
   const std::string udfLib = cache_dir + "/udf/libudf.so";
   const std::string udfFileCache = cache_dir + "/udf/udf.cpp";
@@ -277,7 +235,7 @@ void udfBuild(setupAide &options)
 
     // changes in udf include files + env-vars are currently not detected
     // note, we want to avoid calling system()
-    if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
+    if (options.compareArgs("BUILD ONLY", "TRUE")) {
       buildRequired = 1;
     } else if (!fs::exists(udfLib) || !fs::exists(oudfFileCache)) {
       buildRequired = 1;
@@ -325,193 +283,25 @@ void udfBuild(setupAide &options)
     }
   }
 
-  int err = 0;
-  err += [&]() {
-    if (buildRank == 0) {
-      double tStart = MPI_Wtime();
+  const auto err = (buildRank == 0 && buildRequired) ? udfMake(options, platform->solver->id(), platform->comm.mpiRank) : 0;
+  nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "see above and cmake.log for more details");
 
-      const int cmdSize = 4096;
-      char cmd[cmdSize];
-      mkdir(std::string(cache_dir + "/udf").c_str(), S_IRWXU);
+  if (platform->cacheBcast || platform->cacheLocal) {
+    const auto dst = fs::path(platform->tmpDir) / "udf";
+    fileBcast(fs::path(udfLib), dst, comm, platform->verbose);
+    fileBcast(fs::path(oudfFileCache), dst, comm, platform->verbose);
+  }
 
-      const std::string pipeToNull =
-          (platform->comm.mpiRank == 0) ? std::string("") : std::string("> /dev/null 2>&1");
-
-      if (buildRequired) {
-        if (platform->comm.mpiRank == 0) {
-          printf("building udf ... \n");
-        }
-        fflush(stdout);
-
-        {
-          std::ofstream f(udfHashFile, std::ios::trunc);
-          f << SHA1::from_file(udfFile);
-          f.close();
-        }
-
-        {
-          std::ofstream f(libnekrsHashFile, std::ios::trunc);
-          f << SHA1::from_file(libnekrsFile);
-          f.close();
-        }
-
-        auto solverIncludes = []()
-        {
-          std::string txt;
-          if (platform->solver->id() == "nrs") {
-             txt  = "#include \"nrs.hpp\"";
-             txt += "\n"; 
-             txt += "const auto nrs = dynamic_cast<nrs_t*>(platform->solver);";
-             txt += "\n"; 
-          }
-
-          return txt;
-        };
-
-        // generate udfFileCache
-        {
-          std::ofstream f(udfFileCache, std::ios::trunc);
-          f << "#include \"udf.hpp\"" << std::endl
-            << "#include \"udfAutoLoadKernel.hpp\"" << std::endl
-
-            << solverIncludes()
-
-            << "#include \"udfHelper.hpp\"" << std::endl
-            << "#include \"ci.hpp\"" << std::endl
-            << "#include \"" << udfFile << "\"" << std::endl;
-
-          // autoload plugins
-          std::map<std::string, std::string> pluginTable = {
-              {"nekrs_tavg_hpp_", "tavg::buildKernel"},
-              {"nekrs_RANSktau_hpp_", "RANSktau::buildKernel"},
-              {"nekrs_lowMach_hpp_", "lowMach::buildKernel"},
-              {"nekrs_velRecycling_hpp_", "velRecycling::buildKernel"},
-              {"nekrs_lpm_hpp_", "lpm_t::registerKernels"}};
-
-          f << "void UDF_AutoLoadPlugins(occa::properties& kernelInfo)" << std::endl << "{" << std::endl;
-
-          for (auto const &plugin : pluginTable) {
-            f << "#ifdef " << plugin.first << std::endl
-              << "  " << plugin.second << "(kernelInfo);" << std::endl
-              << "#endif" << std::endl;
-          }
-
-          f << "}" << std::endl;
-          f.close();
-        }
-
-        copyFile(std::string(udf_dir + std::string("/CMakeLists.txt")).c_str(),
-                 std::string(cache_dir + std::string("/udf/CMakeLists.txt")).c_str());
-
-        std::string cmakeFlags("-Wno-dev");
-        if (verbose) {
-          cmakeFlags += " --trace-expand";
-        }
-
-        { // generate dummy to make cmake happy that the file exists
-          const std::string includeFile = std::string(cache_dir + std::string("/udf/udfAutoLoadKernel.hpp"));
-          std::ofstream f(includeFile);
-          f << "// dummy";
-          f.close();
-          fileSync(includeFile.c_str());
-        }
-
-        extract_ifdef("__okl__", udfFile.c_str(), std::string(cache_dir + "/udf/okl.cpp").c_str());
-        bool oklSectionFound = fs::file_size(cache_dir + "/udf/okl.cpp");
-
-        if (!oklSectionFound && oudfFileExists) {
-          copyFile(oudfFile.c_str(), std::string(cache_dir + "/udf/okl.cpp").c_str());
-          if (platform->comm.mpiRank == 0) {
-            printf("Cannot find okl section in udf (oudf will be deprecated in next version!)\n");
-          }
-        } else if (!oklSectionFound) {
-          if (platform->comm.mpiRank == 0) {
-            printf("Cannot find oudf or okl section in udf\n");
-          }
-          return EXIT_FAILURE;
-        }
-
-        const std::string useFloat = (sizeof(dfloat) == sizeof(float)) ? "ON" : "OFF";
-        const std::string cmakeVerbose = (verbose) ? "ON" : "OFF";
-
-        snprintf(cmd,
-                 cmdSize,
-                "rm -f %s/*.so && cmake %s -S %s -B %s "
-                "-DNEKRS_USE_DFLOAT_FLOAT=%s "
-                "-DNEKRS_INSTALL_DIR=\"%s\" -DCASE_DIR=\"%s\" -DCMAKE_CXX_COMPILER=\"$NEKRS_CXX\" "
-                "-DCMAKE_CXX_FLAGS=\"$NEKRS_CXXFLAGS\" -DCMAKE_VERBOSE_MAKEFILE=%s >cmake.log 2>&1",
-                cmakeBuildDir.c_str(),
-                cmakeFlags.c_str(),
-                cmakeBuildDir.c_str(),
-                cmakeBuildDir.c_str(),
-                useFloat.c_str(),
-                installDir.c_str(),
-                case_dir.c_str(),
-                cmakeVerbose.c_str()
-              );
-        const int retVal = system(cmd);
-        if (verbose && platform->comm.mpiRank == 0) {
-          printf("%s (cmake retVal: %d)\n", cmd, retVal);
-        }
-        if (retVal) {
-          return EXIT_FAILURE;
-        }
-
-        auto stdoutFlag = (verbose) ? std::string("") : ">>cmake.log 2>&1"; 
-
-        { // generate pre-processed okl
-          snprintf(cmd, cmdSize, "cd %s && make -j1 okl.i %s", cmakeBuildDir.c_str(), stdoutFlag.c_str());
-          const int retVal = system(cmd);
-          if (verbose && platform->comm.mpiRank == 0) {
-            printf("%s (preprocessing retVal: %d)\n", cmd, retVal);
-          }
-          if (retVal) {
-            return EXIT_FAILURE;
-          }
-        }
-
-        if (oklSectionFound) {
-          udfAutoKernels(udfFileCache, postOklSource, cache_dir + "/udf/okl.cpp");
-        }
-
-        { // build
-          snprintf(cmd, cmdSize, "cd %s/udf && make -j1", cache_dir.c_str());
-          const int retVal = system(cmd);
-          if (verbose && platform->comm.mpiRank == 0) {
-            printf("%s (make retVal: %d)\n", cmd, retVal);
-          }
-          if (retVal) {
-            return EXIT_FAILURE;
-          }
-          fileSync(udfLib.c_str());
-        }
-
-        if (platform->comm.mpiRank == 0) {
-          printf("done (%gs)\n", MPI_Wtime() - tStart);
-        }
-        fflush(stdout);
-
-      } // buildRequired
-
-      if (fs::exists(cache_dir + "/udf/okl.cpp")) {
-        fs::rename(cache_dir + "/udf/okl.cpp", oudfFileCache);
-      }
-
-      adjustOudf(buildRequired, postOklSource, oudfFileCache); // call every time for verifyOudf
-      verifyOudf();
-
-      fileSync(oudfFileCache.c_str());
-
-    } // rank 0
-
-    if (platform->cacheBcast || platform->cacheLocal) {
-      const auto dst = fs::path(platform->tmpDir) / "udf";
-      fileBcast(fs::path(udfLib), dst, comm, platform->verbose);
-      fileBcast(fs::path(oudfFileCache), dst, comm, platform->verbose);
+  if (buildRank == 0) {
+    if (fs::exists(cache_dir + "/udf/okl.cpp")) {
+      fs::rename(cache_dir + "/udf/okl.cpp", oudfFileCache);
     }
 
-    return 0;
-  }();
+    adjustOudf(buildRequired, postOklSource, oudfFileCache); // call every time for verifyOudf
+    verifyOudf();
+
+    fileSync(oudfFileCache.c_str());
+  }
 
   // some BC kernels will include this file
   options.setArgs("OKL FILE CACHE", oudfFileCache);
@@ -525,10 +315,6 @@ void udfBuild(setupAide &options)
   MPI_Bcast(&pressureDirichletConditions, 1, MPI_INT, 0, comm);
   MPI_Bcast(&scalarNeumannConditions, 1, MPI_INT, 0, comm);
   MPI_Bcast(&scalarDirichletConditions, 1, MPI_INT, 0, comm);
-
-  MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_SUM, platform->comm.mpiComm);
-
-  nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "see above and cmake.log for more details");
 }
 
 void *udfLoadFunction(const char *fname, int errchk)

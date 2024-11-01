@@ -40,6 +40,7 @@ void oudfFindNeumann(std::string &field);
 void oudfInit(setupAide &options);
 void udfBuild(setupAide &options);
 void udfLoad();
+int udfMake(setupAide &options, const std::string &solverName, int rank);
 void udfEcho();
 void *udfLoadFunction(const char *fname, int errchk);
 void udfUnload();

@@ -35,7 +35,6 @@ This list provides an overview of the most significant changes in this release, 
 
 * run `build.sh` instead of `nrsconfig` to build the code
 * change par section `SCALAR00` to `TEMPERATURE` in case it represent indeed a physical temperature
-* `nek::userchk` is no longer called automatically during the setup phase 
 * host mirrored variables including `nrs->U, cds->S, mesh->x, nrs->usrwrk` have been removed 
 * send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd`
 * use `auto foo = platform->deviceMemoryPool.reserve<T>(nWords)` instead of pre-allocated dfloat slices like `platform->o_mempool.slice0`

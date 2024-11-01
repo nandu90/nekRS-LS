@@ -252,6 +252,8 @@ std::pair<mesh_t*, mesh_t*> createMesh(MPI_Comm comm, int N, int cubN, bool cht,
 
   checkEToB(mesh);
 
+  meshGlobalFaceIds(mesh);
+
   meshGlobalIds(mesh);
 
   meshParallelGatherScatterSetup(mesh,
@@ -381,6 +383,7 @@ mesh_t *createMeshMG(mesh_t *_mesh, int Nc)
   meshConnectFaceNodes3D(mesh);
 
   meshGlobalIds(mesh);
+
   meshParallelGatherScatterSetup(mesh, mesh->Nlocal, mesh->globalIds, platform->comm.mpiComm, OOGS_AUTO, 0);
 
   mesh->geometricFactors();
@@ -442,6 +445,8 @@ mesh_t *createMeshV(MPI_Comm comm, int N, int cubN, mesh_t *meshT, occa::propert
   mesh->EY = meshT->EY;
   free(mesh->EZ);
   mesh->EZ = meshT->EZ;
+
+  meshGlobalFaceIds(mesh); 
 
   // find mesh->EToP, mesh->EToE and mesh->EToF, required mesh->EToV
   meshParallelConnect(mesh);

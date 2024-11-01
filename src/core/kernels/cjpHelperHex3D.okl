@@ -1,0 +1,142 @@
+#include <cstdio>
+
+#define surfaceTerms(sk, face, m, i, j)                                                                      \
+  {                                                                                                          \
+    const dlong idM = vmapM[sk];                                                                             \
+    const dfloat nx = sgeo[sk * p_Nsgeo + p_NXID];                                                           \
+    const dfloat ny = sgeo[sk * p_Nsgeo + p_NYID];                                                           \
+    const dfloat nz = sgeo[sk * p_Nsgeo + p_NZID];                                                           \
+    const dfloat invJw = 1/Jw[idM];                                                                          \
+    s_nx[m][j][i] = nx;                                                                                      \
+    s_ny[m][j][i] = ny;                                                                                      \
+    s_nz[m][j][i] = nz;                                                                                      \
+    s_x[m][j][i] = x[idM];                                                                                   \
+    s_y[m][j][i] = y[idM];                                                                                   \
+    s_z[m][j][i] = z[idM];                                                                                   \
+    s_tmp1[m][j][i] = invJw * (nx * G[idM + 0*offset] + ny * G[idM + 1*offset] + nz * G[idM + 2*offset]);            \
+  }
+
+#define dist(i, j)                                                                                           \
+  {                                                                                                          \
+        const dfloat dx = s_x[1][j][i] - s_x[0][j][i];                                                       \
+        const dfloat dy = s_y[1][j][i] - s_y[0][j][i];                                                       \
+        const dfloat dz = s_z[1][j][i] - s_z[0][j][i];                                                       \
+        const dfloat nx = 0.5 * (s_nx[0][j][i] - s_nx[1][j][i]);                                             \
+        const dfloat ny = 0.5 * (s_ny[0][j][i] - s_ny[1][j][i]);                                             \
+        const dfloat nz = 0.5 * (s_nz[0][j][i] - s_nz[1][j][i]);                                             \
+        s_tmp2[j][i] = nx * dx + ny * dy + nz * dz;                                                          \
+  }  
+
+@kernel void cjpHelperHex3D(const dlong Nelements,
+                             const dlong offset,
+                             @ restrict const dfloat *x,
+                             @ restrict const dfloat *y,
+                             @ restrict const dfloat *z,
+                             @ restrict const dlong *vmapM,
+                             @ restrict const dfloat *Jw,
+                             @ restrict const dfloat *sgeo,
+                             @ restrict const dfloat *G,
+                             @ restrict dfloat *h2,
+                             @ restrict dfloat *out)
+{
+  for (dlong e = 0; e < Nelements; e++; @outer(0)) {
+    @shared dfloat s_nx[2][p_Nq][p_Nq];
+    @shared dfloat s_ny[2][p_Nq][p_Nq];
+    @shared dfloat s_nz[2][p_Nq][p_Nq];
+
+    @shared dfloat s_x[2][p_Nq][p_Nq];
+    @shared dfloat s_y[2][p_Nq][p_Nq];
+    @shared dfloat s_z[2][p_Nq][p_Nq];
+
+    @shared dfloat s_tmp1[2][p_Nq][p_Nq];
+    @shared dfloat s_tmp2[p_Nq][p_Nq];
+
+    // face 0 & 5 (r-s plane)
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+        const dlong sk0 = e * p_Nfp * p_Nfaces + 0 * p_Nfp + i + j * p_Nq;
+        const dlong sk5 = e * p_Nfp * p_Nfaces + 5 * p_Nfp + i + j * p_Nq;
+
+        surfaceTerms(sk0, 0, 0, i, j);
+        surfaceTerms(sk5, 5, 1, i, j);
+
+        dist(i, j);
+      }
+    }
+
+    @barrier();
+
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+        const dlong sk0 = e * p_Nfp * p_Nfaces + 0 * p_Nfp + i + j * p_Nq;
+        const dlong sk5 = e * p_Nfp * p_Nfaces + 5 * p_Nfp + i + j * p_Nq;
+ 
+        h2[sk0] = s_tmp2[j][i] * s_tmp2[j][i];
+        h2[sk5] = s_tmp2[j][i] * s_tmp2[j][i]; 
+
+        out[sk0] = s_tmp1[0][j][i]; 
+        out[sk5] = s_tmp1[1][j][i]; 
+      }
+    }
+
+    @barrier();
+
+    // face 1 & 3 (r-t plane)
+    for (int k = 0; k < p_Nq; ++k; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+        const dlong sk1 = e * p_Nfp * p_Nfaces + 1 * p_Nfp + i + k * p_Nq;
+        const dlong sk3 = e * p_Nfp * p_Nfaces + 3 * p_Nfp + i + k * p_Nq;
+
+        surfaceTerms(sk1, 1, 0, i, k);
+        surfaceTerms(sk3, 3, 1, i, k);
+
+        dist(i, k);
+      }
+    }
+
+    @barrier();
+
+    for (int k = 0; k < p_Nq; ++k; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+        const dlong sk1 = e * p_Nfp * p_Nfaces + 1 * p_Nfp + i + k * p_Nq;
+        const dlong sk3 = e * p_Nfp * p_Nfaces + 3 * p_Nfp + i + k * p_Nq;
+
+        h2[sk1] = s_tmp2[k][i] * s_tmp2[k][i];
+        h2[sk3] = s_tmp2[k][i] * s_tmp2[k][i]; 
+
+        out[sk1] = s_tmp1[0][k][i]; 
+        out[sk3] = s_tmp1[1][k][i]; 
+      }
+    }
+
+    @barrier();
+
+    // face 2 & 4 (s-t plane)
+    for (int k = 0; k < p_Nq; ++k; @inner(1)) {
+      for (int j = 0; j < p_Nq; ++j; @inner(0)) {
+        const dlong sk2 = e * p_Nfp * p_Nfaces + 2 * p_Nfp + j + k * p_Nq;
+        const dlong sk4 = e * p_Nfp * p_Nfaces + 4 * p_Nfp + j + k * p_Nq;
+
+        surfaceTerms(sk2, 2, 0, j, k);
+        surfaceTerms(sk4, 4, 1, j, k);
+
+        dist(j, k);
+      }
+    }
+
+    @barrier();
+
+    for (int k = 0; k < p_Nq; ++k; @inner(1)) {
+      for (int j = 0; j < p_Nq; ++j; @inner(0)) {
+        const dlong sk2 = e * p_Nfp * p_Nfaces + 2 * p_Nfp + j + k * p_Nq;
+        const dlong sk4 = e * p_Nfp * p_Nfaces + 4 * p_Nfp + j + k * p_Nq;
+
+        h2[sk2] = s_tmp2[k][j] * s_tmp2[k][j];
+        h2[sk4] = s_tmp2[k][j] * s_tmp2[k][j]; 
+
+        out[sk2] = s_tmp1[0][k][j]; 
+        out[sk4] = s_tmp1[1][k][j]; 
+      }
+    }
+  }
+}

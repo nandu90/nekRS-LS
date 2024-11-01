@@ -37,6 +37,7 @@ set(NRS_SRC
     src/core/io/iofldNek.cpp
     src/core/io/iofldAdios.cpp
     src/utils/fileUtils.cpp
+    src/utils/fileBcast.cpp
     src/utils/sha1.cpp
     src/utils/inipp.cpp
     src/utils/unifdef.c
@@ -194,3 +195,25 @@ if (NEKRS_BUILD_FLOAT)
   target_include_directories(nekrs-bin-fp32 PRIVATE src/lib src/utils)
   set_target_properties(nekrs-bin-fp32 PROPERTIES LINKER_LANGUAGE CXX OUTPUT_NAME nekrs-fp32)
 endif()
+
+function(add_udf_build)
+
+#  set(CMAKE_CXX_COMPILER ${MPI_UNDERLYING_COMPILER})
+#  add_executable(udfBuild-bin src/bin/udfBuild.cpp src/utils/unifdef.c src/utils/sha1.cpp src/utils/fileUtils.cpp src/core/setupAide.cpp)
+#  target_include_directories(udfBuild-bin PUBLIC
+#      $<TARGET_PROPERTY:nekrs-lib,INTERFACE_INCLUDE_DIRECTORIES>
+#  )
+
+add_custom_command(
+    OUTPUT udf_build_custom_target 
+    COMMAND ${MPI_UNDERLYING_COMPILER} src/bin/udfBuild.cpp -o buildUDF
+    DEPENDS src/utils/unifdef.c src/utils/sha1.cpp src/utils/fileUtils.cpp src/core/setupAide.cpp 
+)
+
+add_custom_target(udf_build ALL DEPENDS udf_build_custom_target)
+
+target_include_directories(udf_build
+    PRIVATE src/utils src/core 
+)
+
+endfunction()
