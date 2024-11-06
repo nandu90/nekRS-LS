@@ -1,6 +1,37 @@
-// used in boundary device functions
-struct bcData
+inline char *_strcpy(char *destination, const char *source)
 {
+  char *original_dest = destination;
+  while (*source != '\0') {
+    *destination = *source;
+    destination++;
+    source++;
+  }
+
+  *destination = '\0';
+  return original_dest;
+}
+
+inline char _toLower(char c)
+{
+  if (c >= 'A' && c <= 'Z') {
+    return c + ('a' - 'A');
+  }
+  return c;
+}
+
+inline int strCompare(const char *str1, const char *str2)
+{
+  while (*str1 != '\0' && *str2 != '\0' && (_toLower(*str1) == _toLower(*str2))) {
+    str1++;
+    str2++;
+  }
+
+  return _toLower(*str1) - _toLower(*str2);
+}
+
+struct bcData {
+  char fieldName[32];
+
   int idM;
 
   int fieldOffset;
@@ -33,5 +64,5 @@ struct bcData
   // properties
   dfloat trans, diff;
 
-  @globalPtr const dfloat* usrwrk;
+  @globalPtr const dfloat *usrwrk;
 };

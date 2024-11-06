@@ -31,7 +31,6 @@
 
 #include "mesh3D.h"
 #include "platform.hpp"
-#include "bcMap.hpp"
 
 void meshOccaPopulateDeviceHex3D(mesh_t *mesh, setupAide &newOptions, occa::properties &kernelInfo)
 {

@@ -578,27 +578,18 @@ template <typename Tadios> void iofldAdios::getData(const std::string &name, var
 template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::string &name, size_t varStep)
 {
   auto adiosVariable = adiosIO.InquireVariable<T>(name);
-
   if (!static_cast<bool>(adiosVariable)) {
     return 1; // variable not found
+  }
+
+  if (varStep > adiosVariable.Steps()) {
+    return 1; // step not found
   }
 
   adiosVariable.SetStepSelection(adios2::Box<std::size_t>(varStep, 1));
 
   if (!allocateOnly) {
-    nekrsCheck(variables.count(name) == 0,
-               MPI_COMM_SELF,
-               EXIT_FAILURE,
-               "variable %s not found!\n",
-               name.c_str());
-
     auto var = variables[name];
-
-    nekrsCheck(var.step != varStep,
-               MPI_COMM_SELF,
-               EXIT_FAILURE,
-               "step for variable %s not found!\n",
-               name.c_str());
 
     if (var.data.isInitialized()) {
       const auto getMode = adios2::Mode::Deferred;
@@ -621,9 +612,6 @@ template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::str
   }
 
   const auto &blocks = adiosEngine.BlocksInfo(adiosVariable, varStep);
-  if (blocks.size() == 0) {
-    return 1; // step not found
-  }
 
   variable var;
   var.type = adios2::GetType<T>();

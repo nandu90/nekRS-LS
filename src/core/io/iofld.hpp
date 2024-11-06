@@ -122,7 +122,7 @@ public:
 
     nekrsCheck(!initialized, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "illegal to call prior to iofld::open()!");
 
-    if (platform->comm.mpiRank == 0 && platform->verbose) {
+    if (platform->comm.mpiRank == 0) {
       std::cout << " user variables: ";
       for(const auto& entry : userSingleValues) std::cout << entry.first << " ";
       for(const auto& entry : userFields) std::cout << entry.first << " ";

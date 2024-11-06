@@ -171,23 +171,25 @@ void grad_u(dfloat *grad_u_x,
   }
 }
 
-void codedFixedValueVelocity(bcData *bc)
+void udfDirichlet(bcData *bc)
 {
-  dfloat u, v, w, p;
-  exact(&u, &v, &w, &p, bc->x, bc->y, bc->z, bc->time, p_nu);
-  bc->u = u;
-  bc->v = v;
-  bc->w = w;
+  if (strCompare(bc->fieldName, "velocity") == 0) {
+    dfloat u, v, w, p;
+    exact(&u, &v, &w, &p, bc->x, bc->y, bc->z, bc->time, p_nu);
+    bc->u = u;
+    bc->v = v;
+    bc->w = w;
+  }
+
+  if (strCompare(bc->fieldName, "scalar") == 0) {
+    dfloat u, v, w, p;
+    exact(&u, &v, &w, &p, bc->x, bc->y, bc->z, bc->time, p_nu);
+    bc->s = u;
+  }
+
 }
 
-void codedFixedValueScalar(bcData *bc)
-{
-  dfloat u, v, w, p;
-  exact(&u, &v, &w, &p, bc->x, bc->y, bc->z, bc->time, p_nu);
-  bc->s = u;
-}
-
-void codedFixedGradientScalar(bcData *bc)
+void udfNeumann(bcData *bc)
 {
   dfloat grad_u_x, grad_u_y, grad_u_z;
   grad_u(&grad_u_x, &grad_u_y, &grad_u_z, bc->x, bc->y, bc->z, bc->time, p_nu);

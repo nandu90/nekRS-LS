@@ -3,8 +3,7 @@
 #include "nrs.hpp"
 #include "udf.hpp"
 #include "alignment.hpp"
-#include "bcMap.hpp"
-#include "bdry.hpp"
+#include "bdryBase.hpp"
 
 namespace
 {

@@ -1,6 +1,5 @@
 #include "platform.hpp"
 #include "nekInterfaceAdapter.hpp"
-#include "bcMap.hpp"
 #include "fileUtils.hpp"
 #include "fileBcast.hpp"
 #include "re2Reader.hpp"
@@ -1062,7 +1061,7 @@ int setup(int numberActiveFields)
   options->getArgs("MESH CONNECTIVITY TOL", meshConTol);
 
   int nBcRead = 1; // at the very least we have to read the boundaryIDs
-  if (bcMap::useNekBCs()) {
+  if (platform->solver->bc->useNek()) {
     nBcRead += nscalSolve;
   }
 
@@ -1163,7 +1162,7 @@ int setup(int numberActiveFields)
   nekData.boundaryID = ptr<int>("boundaryID");
   nekData.boundaryIDt = ptr<int>("boundaryIDt");
 
-  if (bcMap::useNekBCs() && numberActiveFields > 0) {
+  if (platform->solver->bc->useNek() && numberActiveFields > 0) {
     if (rank == 0) {
       printf("importing BCs from nek\n");
     }
@@ -1187,7 +1186,7 @@ int setup(int numberActiveFields)
       for (int id = 0; id < nIDs; id++) {
         map[id] = bcmap(id + 1, 1, 0);
       }
-      bcMap::setBcMap("velocity", map, nIDs);
+      platform->solver->bc->setBcMap("velocity", map, nIDs);
 
       if (meshSolver) {
         if (rank == 0) {
@@ -1196,7 +1195,7 @@ int setup(int numberActiveFields)
         for (int id = 0; id < nIDs; id++) {
           map[id] = bcmap(id + 1, 1, 1);
         }
-        bcMap::setBcMap("mesh", map, nIDs);
+        platform->solver->bc->setBcMap("mesh", map, nIDs);
       }
 
       free(map);
@@ -1221,7 +1220,7 @@ int setup(int numberActiveFields)
       for (int id = 0; id < nIDs; id++) {
         map[id] = bcmap(id + 1, is + 2, 0);
       }
-      bcMap::setBcMap("scalar" + sid, map, nIDs);
+      platform->solver->bc->setBcMap("scalar" + sid, map, nIDs);
       free(map);
     }
   }
@@ -1306,7 +1305,7 @@ const std::map<std::string, void *> &ptrList()
   return ptrListData;
 }
 
-bool usrFile() 
+bool usrFile()
 {
   return usrFileExists;
 }

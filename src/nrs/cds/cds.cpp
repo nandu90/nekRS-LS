@@ -1,11 +1,9 @@
 #include "advectionSubCycling.hpp"
-#include "nrs.hpp"
 
 #include "cds.hpp"
 #include "lowPassFilter.hpp"
 #include "avm.hpp"
-#include "cjp.hpp"
-#include "bcMap.hpp"
+#include "gjp.hpp"
 
 static void advectionFlops(mesh_t *mesh, int Nfields)
 {
@@ -46,8 +44,8 @@ occa::memory cds_t::advectionSubcyling(int nEXT, double time, int scalarIdx)
   auto o_U = this->o_S.slice(this->fieldOffsetScan[scalarIdx], fieldOffset);
 
   auto kernel = (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE"))
-                      ? this->subCycleStrongCubatureVolumeKernel
-                      : this->subCycleStrongVolumeKernel;
+                    ? this->subCycleStrongCubatureVolumeKernel
+                    : this->subCycleStrongVolumeKernel;
 
   return advectionSubcyclingRK(mesh,
                                this->meshV,
@@ -125,9 +123,7 @@ cds_t::cds_t(cdsConfig_t &cfg)
   this->gsh = oogs::setup(this->meshV->ogs, 1, 0, ogsDfloat, NULL, OOGS_AUTO);
   this->qqt = new QQt(this->gsh);
 
-  this->gshT = (this->cht)
-                   ? oogs::setup(this->mesh[0]->ogs, 1, 0, ogsDfloat, NULL, OOGS_AUTO)
-                   : this->gsh;
+  this->gshT = (this->cht) ? oogs::setup(this->mesh[0]->ogs, 1, 0, ogsDfloat, NULL, OOGS_AUTO) : this->gsh;
   this->qqtT = new QQt(this->gshT);
 
   this->o_prop = platform->device.malloc<dfloat>(2 * this->fieldOffsetSum);
@@ -180,7 +176,8 @@ cds_t::cds_t(cdsConfig_t &cfg)
     int cnt = 0;
     for (int e = 0; e < mesh->Nelements; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
-        this->EToB[cnt + this->EToBOffset * is] = bcMap::id(mesh->EToB[f + e * mesh->Nfaces], "scalar" + sid);
+        this->EToB[cnt + this->EToBOffset * is] =
+            platform->solver->bc->typeId(mesh->EToB[f + e * mesh->Nfaces], "scalar" + sid);
         cnt++;
       }
     }
@@ -306,92 +303,94 @@ cds_t::cds_t(cdsConfig_t &cfg)
 
 void cds_t::makeNLT(int is, double time, int tstep, occa::memory &o_Usubcycling)
 {
-    const std::string sid = scalarDigitStr(is);
+  const std::string sid = scalarDigitStr(is);
 
-    auto mesh = (is) ? this->meshV : this->mesh[0];
-    const dlong isOffset = this->fieldOffsetScan[is];
+  auto mesh = (is) ? this->meshV : this->mesh[0];
+  const dlong isOffset = this->fieldOffsetScan[is];
 
-    if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPFRT")) {
-      const auto fieldOffset = this->fieldOffset[0]; // same for all scalars
-      this->filterRTKernel(this->meshV->Nelements,
-                           is,
-                           1,
-                           this->o_fieldOffsetScan,
-                           this->o_applyFilterRT,
-                           this->o_filterRT,
-                           this->o_filterS,
-                           this->o_rho,
-                           this->o_S,
-                           this->o_NLT);
+  if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPFRT")) {
+    const auto fieldOffset = this->fieldOffset[0]; // same for all scalars
+    this->filterRTKernel(this->meshV->Nelements,
+                         is,
+                         1,
+                         this->o_fieldOffsetScan,
+                         this->o_applyFilterRT,
+                         this->o_filterRT,
+                         this->o_filterS,
+                         this->o_rho,
+                         this->o_S,
+                         this->o_NLT);
 
-      double flops = 6 * mesh->Np * mesh->Nq + 4 * mesh->Np;
-      flops *= static_cast<double>(mesh->Nelements);
-      platform->flopCounter->add("scalarFilterRT", flops);
-    }
+    double flops = 6 * mesh->Np * mesh->Nq + 4 * mesh->Np;
+    flops *= static_cast<double>(mesh->Nelements);
+    platform->flopCounter->add("scalarFilterRT", flops);
+  }
 
-    const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
-    if (movingMesh && !this->Nsubsteps) {
-      this->advectMeshVelocityKernel(this->meshV->Nelements,
-                                     mesh->o_vgeo,
-                                     mesh->o_D,
-                                     isOffset,
-                                     this->vFieldOffset,
-                                     this->o_rho,
-                                     mesh->o_U,
-                                     this->o_S,
-                                     this->o_NLT);
-      double flops = 18 * mesh->Np * mesh->Nq + 21 * mesh->Np;
-      flops *= static_cast<double>(mesh->Nelements);
-      platform->flopCounter->add("scalar advectMeshVelocity", flops);
-    }
+  const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
+  if (movingMesh && !this->Nsubsteps) {
+    this->advectMeshVelocityKernel(this->meshV->Nelements,
+                                   mesh->o_vgeo,
+                                   mesh->o_D,
+                                   isOffset,
+                                   this->vFieldOffset,
+                                   this->o_rho,
+                                   mesh->o_U,
+                                   this->o_S,
+                                   this->o_NLT);
+    double flops = 18 * mesh->Np * mesh->Nq + 21 * mesh->Np;
+    flops *= static_cast<double>(mesh->Nelements);
+    platform->flopCounter->add("scalar advectMeshVelocity", flops);
+  }
 
-    if (platform->options.compareArgs("ADVECTION", "TRUE")) {
-      if (this->Nsubsteps) {
-        o_Usubcycling = this->advectionSubcyling(std::min(tstep, this->nEXT), time, is);
+  if (platform->options.compareArgs("ADVECTION", "TRUE")) {
+    if (this->Nsubsteps) {
+      o_Usubcycling = this->advectionSubcyling(std::min(tstep, this->nEXT), time, is);
+    } else {
+      if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+        this->strongAdvectionCubatureVolumeKernel(this->meshV->Nelements,
+                                                  1,
+                                                  0, /* weighted */
+                                                  0, /* sharedRho */
+                                                  mesh->o_vgeo,
+                                                  mesh->o_cubDiffInterpT,
+                                                  mesh->o_cubInterpT,
+                                                  mesh->o_cubProjectT,
+                                                  this->o_compute + is,
+                                                  this->o_fieldOffsetScan + is,
+                                                  this->vFieldOffset,
+                                                  this->vCubatureOffset,
+                                                  this->o_S,
+                                                  this->o_Urst,
+                                                  this->o_rho,
+                                                  this->o_NLT);
       } else {
-        if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
-          this->strongAdvectionCubatureVolumeKernel(this->meshV->Nelements,
-                                                    1,
-                                                    0, /* weighted */
-                                                    0, /* sharedRho */
-                                                    mesh->o_vgeo,
-                                                    mesh->o_cubDiffInterpT,
-                                                    mesh->o_cubInterpT,
-                                                    mesh->o_cubProjectT,
-                                                    this->o_compute + is,
-                                                    this->o_fieldOffsetScan + is,
-                                                    this->vFieldOffset,
-                                                    this->vCubatureOffset,
-                                                    this->o_S,
-                                                    this->o_Urst,
-                                                    this->o_rho,
-                                                    this->o_NLT);
-        } else {
-          this->strongAdvectionVolumeKernel(this->meshV->Nelements,
-                                            1,
-                                            0, /* weighted */
-                                            mesh->o_vgeo,
-                                            mesh->o_D,
-                                            this->o_compute + is,
-                                            this->o_fieldOffsetScan + is,
-                                            this->vFieldOffset,
-                                            this->o_S,
-                                            this->o_Urst,
-                                            this->o_rho,
-                                            this->o_NLT);
-        }
-        advectionFlops(this->mesh[0], 1);
-
-        if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "CJP")) {
-          dfloat coef;
-          platform->options.getArgs("SCALAR" + sid + " REGULARIZATION CJP PENALTY FACTOR", coef); 
-          auto o_Si = this->o_S.slice(fieldOffsetScan[is], mesh->Nlocal);
-          auto o_NLTi = this->o_NLT.slice(fieldOffsetScan[is], mesh->Nlocal);
-          auto nrs = dynamic_cast<nrs_t *>(platform->solver);
-          addCJP(mesh, coef, this->vFieldOffset, this->o_U, o_Si, o_NLTi);
-        }
+        this->strongAdvectionVolumeKernel(this->meshV->Nelements,
+                                          1,
+                                          0, /* weighted */
+                                          mesh->o_vgeo,
+                                          mesh->o_D,
+                                          this->o_compute + is,
+                                          this->o_fieldOffsetScan + is,
+                                          this->vFieldOffset,
+                                          this->o_S,
+                                          this->o_Urst,
+                                          this->o_rho,
+                                          this->o_NLT);
       }
+      advectionFlops(this->mesh[0], 1);
     }
+
+    if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "GJP")) {
+      dfloat pFactor;
+      platform->options.getArgs("SCALAR" + sid + " REGULARIZATION GJP PENALTY FACTOR", pFactor);
+      auto o_coef = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      platform->linAlg->axpby(mesh->Nlocal, pFactor, this->o_rho, 0, o_coef); 
+
+      auto o_Si = this->o_S.slice(fieldOffsetScan[is], mesh->Nlocal);
+      auto o_NLTi = this->o_NLT.slice(fieldOffsetScan[is], mesh->Nlocal);
+      addGJP(mesh, this->solver[is]->o_EToB(), o_coef, this->vFieldOffset, this->o_U, o_Si, o_NLTi);
+    }
+  }
 }
 
 void cds_t::saveSolutionState()
@@ -426,7 +425,8 @@ void cds_t::applyAVM()
     for (int is = 0; is < NSfields; is++) {
       const auto sid = scalarDigitStr(is);
 
-      if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
+      if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD",
+                                        "AVM_AVERAGED_MODAL_DECAY")) {
         nekrsCheck(mesh->N < 5,
                    platform->comm.mpiComm,
                    EXIT_FAILURE,
@@ -442,21 +442,21 @@ void cds_t::applyAVM()
 
   for (int scalarIndex = 0; scalarIndex < NSfields; scalarIndex++) {
     const auto sid = scalarDigitStr(scalarIndex);
- 
-    if (!platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY"))
-      continue; 
+
+    if (!platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD",
+                                       "AVM_AVERAGED_MODAL_DECAY")) {
+      continue;
+    }
 
     // restore inital viscosity
-    o_diff.copyFrom(o_diff0.at(scalarIndex),
-                    fieldOffset[scalarIndex],
-                    fieldOffsetScan[scalarIndex]);
- 
+    o_diff.copyFrom(o_diff0.at(scalarIndex), fieldOffset[scalarIndex], fieldOffsetScan[scalarIndex]);
+
     dfloat kappa = 1.0;
     platform->options.getArgs("SCALAR" + sid + " REGULARIZATION AVM ACTIVATION WIDTH", kappa);
- 
-    dfloat logS0 = 2.0; // threshold smoothness exponent (activate for logSk > logS0 - kappa) 
+
+    dfloat logS0 = 2.0; // threshold smoothness exponent (activate for logSk > logS0 - kappa)
     platform->options.getArgs("SCALAR" + sid + " REGULARIZATION AVM DECAY THRESHOLD", logS0);
- 
+
     dfloat scalingCoeff = 1.0;
     platform->options.getArgs("SCALAR" + sid + " REGULARIZATION AVM SCALING COEFF", scalingCoeff);
 
@@ -464,17 +464,17 @@ void cds_t::applyAVM()
     platform->options.getArgs("SCALAR" + sid + " REGULARIZATION AVM ABSOLUTE TOL", absTol);
 
     const bool makeCont = platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION AVM C0", "TRUE");
- 
+
     auto o_Si = o_S.slice(fieldOffsetScan[scalarIndex], mesh->Nlocal);
     auto o_eps = avm::viscosity(vFieldOffset, o_U, o_Si, absTol, scalingCoeff, logS0, kappa, makeCont);
- 
+
     if (verbose) {
       const dfloat maxEps = platform->linAlg->max(mesh->Nlocal, o_eps, platform->comm.mpiComm);
       const dfloat minEps = platform->linAlg->min(mesh->Nlocal, o_eps, platform->comm.mpiComm);
       occa::memory o_S_slice = o_diff + fieldOffsetScan[scalarIndex];
       const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, o_S_slice, platform->comm.mpiComm);
       const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, o_S_slice, platform->comm.mpiComm);
- 
+
       if (platform->comm.mpiRank == 0) {
         printf("applying a min/max artificial viscosity of (%f,%f) to scalar%s with min/max visc (%f,%f)\n",
                minEps,
@@ -484,14 +484,14 @@ void cds_t::applyAVM()
                maxDiff);
       }
     }
- 
+
     platform->linAlg->axpby(mesh->Nlocal, 1.0, o_eps, 1.0, o_diff, 0, fieldOffsetScan[scalarIndex]);
- 
+
     if (verbose) {
       occa::memory o_S_slice = o_diff + fieldOffsetScan[scalarIndex];
       const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, o_S_slice, platform->comm.mpiComm);
       const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, o_S_slice, platform->comm.mpiComm);
- 
+
       if (platform->comm.mpiRank == 0) {
         printf("scalar%s now has a min/max visc: (%f,%f)\n", sid.c_str(), minDiff, maxDiff);
       }

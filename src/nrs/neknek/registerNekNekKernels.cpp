@@ -1,4 +1,4 @@
-#include "bcMap.hpp"
+#include "bdryBase.hpp"
 #include "mesh.h"
 #include <nrs.hpp>
 #include <compileKernels.hpp>
@@ -21,7 +21,7 @@ void registerNekNekKernels()
 
   auto surfaceFluxKernelInfo = platform->kernelInfo;
   surfaceFluxKernelInfo += meshKernelProperties(N);
-  bcMap::addKernelConstants(surfaceFluxKernelInfo);
+  platform->solver->bc->addKernelConstants(surfaceFluxKernelInfo);
   kernelName = "computeFlux";
   fileName = oklpath + "/nrs/neknek/" + kernelName + ".okl";
   platform->kernelRequests.add(kernelName, fileName, surfaceFluxKernelInfo);

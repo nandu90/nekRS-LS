@@ -48,7 +48,8 @@ set(NRS_SRC
     src/core/printHeader.cpp
     src/core/lowPassFilter.cpp
     src/core/avm.cpp
-    src/core/bdry/bcMap.cpp
+    src/core/bdry/bdryBase.cpp
+    src/nrs/bdry/bdry.cpp
     src/core/bdry/alignment.cpp
     src/nrs/neknek/registerNekNekKernels.cpp
     src/nrs/postProcessing/registerPostProcessingKernels.cpp
@@ -58,7 +59,6 @@ set(NRS_SRC
     src/core/linAlg/registerLinAlgKernels.cpp
     src/mesh/registerMeshKernels.cpp
     src/core/LVector.cpp
-    src/core/bdry/createEToBV.cpp
     src/nrs/registerNrsKernels.cpp
     src/nrs/cfl.cpp
     src/nrs/nrs.cpp

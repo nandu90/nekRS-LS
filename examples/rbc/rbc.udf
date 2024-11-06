@@ -1,11 +1,15 @@
 #ifdef __okl__
 
-#include "rbc.oudf"
+#include "hist.okl"
+
+void udfDirichlet(bcData *bc)
+{
+  bc->s = 1 - bc->z;
+}
 
 #endif
 
 static deviceMemory<float> o_hist;
-
 
 void userf(double time)
 {

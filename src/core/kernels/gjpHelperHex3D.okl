@@ -13,7 +13,7 @@
     s_x[m][j][i] = x[idM];                                                                                   \
     s_y[m][j][i] = y[idM];                                                                                   \
     s_z[m][j][i] = z[idM];                                                                                   \
-    s_tmp1[m][j][i] = invJw * (nx * G[idM + 0*offset] + ny * G[idM + 1*offset] + nz * G[idM + 2*offset]);            \
+    s_tmp1[m][j][i] = invJw * (nx * G[idM + 0*offset] + ny * G[idM + 1*offset] + nz * G[idM + 2*offset]);    \
   }
 
 #define dist(i, j)                                                                                           \
@@ -27,7 +27,7 @@
         s_tmp2[j][i] = nx * dx + ny * dy + nz * dz;                                                          \
   }  
 
-@kernel void cjpHelperHex3D(const dlong Nelements,
+@kernel void gjpHelperHex3D(const dlong Nelements,
                              const dlong offset,
                              @ restrict const dfloat *x,
                              @ restrict const dfloat *y,

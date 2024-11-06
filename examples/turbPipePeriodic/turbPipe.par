@@ -19,7 +19,7 @@ constFlowRate = meanVelocity=1.0 + direction=Z
 residualTol = 1e-04
 
 [VELOCITY]
-boundaryTypeMap = zeroValue 
+boundaryTypeMap = zeroDirichlet
 viscosity = 1/19000
 rho = 1.0
 residualTol = 1e-06

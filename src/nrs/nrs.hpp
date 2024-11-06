@@ -9,6 +9,7 @@
 #include "randomVector.hpp"
 #include "aeroForce.hpp"
 #include "iofldFactory.hpp"
+#include "bdryBase.hpp"
 
 class nrs_t : public solver_t
 {
@@ -34,12 +35,14 @@ public:
   userVelocityImplicitLinearTerm_t userVelocityImplicitLinearTerm = nullptr;
   userScalarImplicitLinearTerm_t userScalarImplicitLinearTerm = nullptr;
 
-  void addUserCheckpointField(const std::string& name, const std::vector<deviceMemory<dfloat>>& o_fld)
+  void addUserCheckpointField(const std::string &name, const std::vector<deviceMemory<dfloat>> &o_fld)
   {
     std::vector<occa::memory> o_fld_;
-    for (const auto& entry : o_fld) o_fld_.push_back(entry);
+    for (const auto &entry : o_fld) {
+      o_fld_.push_back(entry);
+    }
 
-    userCheckpointFields.push_back( {name, o_fld_} );
+    userCheckpointFields.push_back({name, o_fld_});
   };
 
   bool multiSession = false;
@@ -47,7 +50,7 @@ public:
   int elementType = HEXAHEDRA;
 
   mesh_t *mesh = nullptr;
-  mesh_t *meshV = nullptr; 
+  mesh_t *meshV = nullptr;
 
   elliptic *uSolver = nullptr;
   elliptic *vSolver = nullptr;
@@ -123,9 +126,6 @@ public:
   occa::memory o_EToB;
   occa::memory o_EToBMeshVelocity;
 
-  occa::memory o_EToBVVelocity;
-  occa::memory o_EToBVMeshVelocity;
-
   occa::memory o_Uc, o_Pc;
   occa::memory o_prevProp;
 
@@ -188,9 +188,6 @@ public:
 
   occa::memory o_zeroNormalMaskVelocity;
   occa::memory o_zeroNormalMaskMeshVelocity;
-  occa::kernel averageNormalBcTypeKernel;
-  occa::kernel fixZeroNormalMaskKernel;
-  occa::kernel initializeZeroNormalMaskKernel;
 
   occa::kernel applyZeroNormalMaskKernel;
 
@@ -232,7 +229,7 @@ public:
 
   AeroForce *aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_ = o_NULL);
 
-  // output in row-major order 
+  // output in row-major order
   occa::memory strainRotationRate(const occa::memory &o_U, bool smooth = true);
   occa::memory strainRotationRate(bool smooth = true);
   occa::memory strainRate(const occa::memory &o_U, bool smooth = true);
@@ -243,8 +240,13 @@ public:
   occa::memory Qcriterion(const occa::memory &o_U);
   occa::memory Qcriterion();
 
-  void restartFromFile(const std::string& restartStr);
-  void writeCheckpoint(double t, int step, bool enforceOutXYZ = false, bool enforceFP64 = false, int Nout = 0, bool uniform = false);
+  void restartFromFile(const std::string &restartStr);
+  void writeCheckpoint(double t,
+                       int step,
+                       bool enforceOutXYZ = false,
+                       bool enforceFP64 = false,
+                       int Nout = 0,
+                       bool uniform = false);
 
   void finalize();
   int setLastStep(double timeNew, int tstep, double elapsedTime);
@@ -257,6 +259,96 @@ public:
   void copyFromNek();
   void getICFromNek();
 
+  void applyDirichletVelocity(double time, occa::memory &o_U, occa::memory &o_Ue, occa::memory &o_P);
+  void applyDirichletMesh(double time, occa::memory &o_UM, occa::memory &o_UMe, occa::memory &o_U);
+  void applyDirichletScalars(double time, occa::memory &o_S, occa::memory &o_Se);
+
+  void applyZeroNormalMask(mesh_t *mesh,
+                           dlong Nelements,
+                           const occa::memory &o_elementList,
+                           const occa::memory &o_EToB,
+                           const occa::memory &o_mask,
+                           occa::memory &o_x);
+
+  void applyZeroNormalMask(mesh_t *mesh,
+                           const occa::memory &o_EToB,
+                           const occa::memory &o_mask,
+                           occa::memory &o_x);
+
+  class bdry : public bdryBase
+  {
+  public:
+    bdry();
+    void setup() override;
+    int typeElliptic(int bid, std::string field) const override;
+    std::string typeText(int bid, std::string field) const override;
+    bool unalignedMixedBoundary(std::string field) const override;
+    void checkAlignment(mesh_t *mesh) const override;
+    bool useDerivedMeshBoundaryConditions();
+
+  private:
+    void setupField(std::vector<std::string> slist, std::string field);
+    void velocitySetup(std::string field, std::vector<std::string> slist);
+    void scalarSetup(std::string field, std::vector<std::string> slist);
+
+    void deriveMeshBoundaryConditions(std::vector<std::string> velocityBCs);
+    bool meshConditionsDerived = false;
+
+    const std::map<std::string, int> vBcTextToID = {
+        //    {"periodic", 0},
+        {"zerodirichlet", bdryBase::bcType_zeroDirichlet},
+        {"interpolation", bdryBase::bcType_interpolation},
+        {"udfdirichlet", bdryBase::bcType_udfDirichlet},
+        {"zeroxvalue/zeroneumann", bdryBase::bcType_zeroDirichletX_zeroNeumann},
+        {"zerodirichlety/zeroneumann", bdryBase::bcType_zeroDirichletY_zeroNeumann},
+        {"zerodirichletz/zeroneumann", bdryBase::bcType_zeroDirichletZ_zeroNeumann},
+        {"zerodirichletn/zeroneumann", bdryBase::bcType_zeroDirichletN_zeroNeumann},
+        {"zerodirichletx/udfneumann", bdryBase::bcType_zeroDirichletX_udfNeumann},
+        {"zerodirichlety/udfneumann", bdryBase::bcType_zeroDirichletY_udfNeumann},
+        {"zerodirichletz/udfneumann", bdryBase::bcType_zeroDirichletZ_udfNeumann},
+        {"zerodirichletn/udfneumann", bdryBase::bcType_zeroDirichletN_udfNeumann},
+        {"zerodirichletyz/zeroneumann", bdryBase::bcType_zeroDirichletYZ_zeroNeumann},
+        {"zerodirichletxz/zeroneumann", bdryBase::bcType_zeroDirichletXZ_zeroNeumann},
+        {"zerodirichletxy/zeroneumann", bdryBase::bcType_zeroDirichletXY_zeroNeumann},
+        // {"zerodirichlett/zeroneumann", bdryBase::bcType_zeroDirichletT_zeroNeumann},
+        {"zeroneumann", bdryBase::bcType_zeroNeumann},
+        {"none", bdryBase::bcType_none}};
+
+    const std::map<int, std::string> vBcIDToText = {
+        //    {0, "periodic"},
+        {bdryBase::bcType_zeroDirichlet, "zeroDirichlet"},
+        {bdryBase::bcType_interpolation, "interpolation"},
+        {bdryBase::bcType_udfDirichlet, "udfDirichlet"},
+        {bdryBase::bcType_zeroDirichletX_zeroNeumann, "zeroDirichletX/zeroNeumann"},
+        {bdryBase::bcType_zeroDirichletY_zeroNeumann, "zeroDirichletY/zeroNeumann"},
+        {bdryBase::bcType_zeroDirichletZ_zeroNeumann, "zeroDirichletZ/zeroNeumann"},
+        {bdryBase::bcType_zeroDirichletN_zeroNeumann, "zeroDirichletN/zeroNeumann"},
+        {bdryBase::bcType_zeroDirichletX_udfNeumann, "zeroDirichletX/udfNeumann"},
+        {bdryBase::bcType_zeroDirichletY_udfNeumann, "zeroDirichletY/udfNeumann"},
+        {bdryBase::bcType_zeroDirichletZ_udfNeumann, "zeroDirichletZ/udfNeumann"},
+        {bdryBase::bcType_zeroDirichletN_udfNeumann, "zeroDirichletN/udfNeumann"},
+        {bdryBase::bcType_zeroDirichletYZ_zeroNeumann, "zeroDirichletYZ/zeroNeumann"},
+        {bdryBase::bcType_zeroDirichletXZ_zeroNeumann, "zeroDirichletXZ/zeroNeumann"},
+        {bdryBase::bcType_zeroDirichletXY_zeroNeumann, "zeroDirichletXY/zeroNeumann"},
+        // {bdryBase::bcType_zeroDirichletT_zeroNeumann, "zeroDirichletT/zeroNeumann"},
+        {bdryBase::bcType_zeroNeumann, "zeroNeumann"},
+        {bdryBase::bcType_none, "none"}};
+
+    const std::map<std::string, int> sBcTextToID = {//    {"periodic", 0},
+                                                    {"interpolation", bdryBase::bcType_interpolation},
+                                                    {"udfdirichlet", bdryBase::bcType_udfDirichlet},
+                                                    {"zeroneumann", bdryBase::bcType_zeroNeumann},
+                                                    {"udfneumann", bdryBase::bcType_udfNeumann},
+                                                    {"none", bdryBase::bcType_none}};
+
+    const std::map<int, std::string> sBcIDToText = {//    {0, "periodic"},
+                                                    {bdryBase::bcType_interpolation, "interpolation"},
+                                                    {bdryBase::bcType_udfDirichlet, "udfDirichlet"},
+                                                    {bdryBase::bcType_zeroNeumann, "zeroNeumann"},
+                                                    {bdryBase::bcType_udfNeumann, "udfNeumann"},
+                                                    {bdryBase::bcType_none, "none"}};
+  };
+
 private:
   void initInnerStep(double time, dfloat dt, int tstep);
   bool runInnerStep(std::function<bool(int)> convergenceCheck, int stage, bool outerConverged);
@@ -265,6 +357,8 @@ private:
   void initOuterStep(double time, dfloat dt, int tstep);
   void runOuterStep(std::function<bool(int)> convergenceCheck, int stage);
   void finishOuterStep();
+
+  void setupEllipticSolvers();
 
   int tStepOuterStart;
   double timeOuterStart;
@@ -284,7 +378,7 @@ private:
   void setIC();
 
   std::vector<std::pair<std::string, std::vector<occa::memory>>> userCheckpointFields;
-
+  bdry bc;
 };
 
 void nrsSetDefaultSettings(setupAide *options);

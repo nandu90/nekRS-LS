@@ -161,6 +161,9 @@ void RANSktau::updateProperties()
   occa::memory o_mue = nrs->o_mue;
   occa::memory o_diff = cds->o_diff + cds->fieldOffsetScan[kFieldIndex];
 
+  platform->options.getArgs("VISCOSITY", mueLam);
+  platform->options.getArgs("DENSITY", rho);
+
   limitKernel(mesh->Nelements * mesh->Np, o_k, o_tau);
   mueKernel(mesh->Nelements * mesh->Np, nrs->fieldOffset, rho, mueLam, o_k, o_tau, o_mut, o_mue, o_diff);
 }
@@ -218,6 +221,9 @@ void RANSktau::setup(int ifld)
 
   nrs = dynamic_cast<nrs_t *>(platform->solver);
   kFieldIndex = ifld; // tauFieldIndex is assumed to be kFieldIndex+1
+
+  platform->options.getArgs("VISCOSITY", mueLam);
+  platform->options.getArgs("DENSITY", rho);
 
   for (int i = 0; i < 2; i++) {
     auto cds = nrs->cds;

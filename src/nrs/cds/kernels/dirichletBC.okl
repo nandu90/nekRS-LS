@@ -41,15 +41,15 @@
                          @ restrict const dfloat *diff,
                          @ restrict const dfloat *rho,
                          const dlong neknekOffset,
-                         @ restrict const dlong*  neknekPoints,
+                         @ restrict const dlong *neknekPoints,
                          const int neknekUInitialized,
-                         @ restrict const dfloat* neknekU,
-                         @ restrict const dfloat* neknekS,
-                         @ restrict const dlong* neknekScalarIndex,
+                         @ restrict const dfloat *neknekU,
+                         @ restrict const dfloat *neknekS,
+                         @ restrict const dlong *neknekScalarIndex,
                          @ restrict const dfloat *W,
                          @ restrict dfloat *S)
 {
-  for (dlong e = 0; e < Nelements; e++; @outer(0))
+  for (dlong e = 0; e < Nelements; e++; @outer(0)) {
     for (int f = 0; f < p_Nfaces; f++) {
       @barrier();
       for (int m = 0; m < p_Nfp; ++m; @inner(0)) {
@@ -59,7 +59,8 @@
         const dlong idM = vmapM[sk];
         const dlong bcType = EToB[f + p_Nfaces * e];
 
-        if (bcType == p_bcTypeS || bcType == p_bcTypeINTS) {
+        if (bcType == p_bcType_udfDirichlet || bcType == p_bcType_interpolation) {
+          _strcpy(bc.fieldName, "scalar");
           bc.id = EToBM[f + p_Nfaces * e];
           bc.idM = idM;
           bc.time = time;
@@ -94,19 +95,20 @@
           bc.vinterp = 0.0;
           bc.winterp = 0.0;
 
-          if (bcType == p_bcTypeINTS) {
+          if (bcType == p_bcType_interpolation) {
             const int neknekId = neknekPoints[idM];
             const int neknekScalarId = neknekScalarIndex[scalarId];
             bc.sinterp = neknekS[neknekId + neknekScalarId * neknekOffset];
-            if(neknekUInitialized) {
+            if (neknekUInitialized) {
               bc.uinterp = neknekU[neknekId + 0 * neknekOffset];
               bc.vinterp = neknekU[neknekId + 1 * neknekOffset];
               bc.winterp = neknekU[neknekId + 2 * neknekOffset];
             }
           }
-          codedFixedValueScalar(&bc);
+          udfDirichlet(&bc);
           S[idM] = bc.s;
         }
       }
     }
+  }
 }

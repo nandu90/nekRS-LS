@@ -1,6 +1,4 @@
 #include "nrs.hpp"
-#include "bdry.hpp"
-#include "bcMap.hpp"
 #include "nekInterfaceAdapter.hpp"
 #include "udf.hpp"
 #include "lowPassFilter.hpp"
@@ -9,9 +7,8 @@
 #include "cds.hpp"
 #include "advectionSubCycling.hpp"
 #include "elliptic.hpp"
-#include "createEToBV.hpp"
 #include "iofldFactory.hpp"
-#include "cjp.hpp"
+#include "gjp.hpp"
 
 static void computeDivUErr(nrs_t *nrs, dfloat &divUErrVolAvg, dfloat &divUErrL2)
 {
@@ -127,17 +124,8 @@ static void assignKernels(nrs_t *nrs)
     kernelName = "velocityRhs" + suffix;
     nrs->velocityRhsKernel = platform->kernelRequests.load(section + kernelName);
 
-    kernelName = "averageNormalBcType";
-    nrs->averageNormalBcTypeKernel = platform->kernelRequests.load(section + kernelName);
-
-    kernelName = "fixZeroNormalMask";
-    nrs->fixZeroNormalMaskKernel = platform->kernelRequests.load(section + kernelName);
-
     kernelName = "applyZeroNormalMask";
     nrs->applyZeroNormalMaskKernel = platform->kernelRequests.load(section + kernelName);
-
-    kernelName = "initializeZeroNormalMask";
-    nrs->initializeZeroNormalMaskKernel = platform->kernelRequests.load(section + kernelName);
 
     kernelName = "velocityDirichletBC" + suffix;
     nrs->velocityDirichletBCKernel = platform->kernelRequests.load(section + kernelName);
@@ -177,22 +165,20 @@ static void assignKernels(nrs_t *nrs)
   }
 }
 
-static void setupEllipticSolvers(nrs_t *nrs)
+void nrs_t::setupEllipticSolvers()
 {
-  auto createEToB = [](std::string field, mesh_t *mesh) {
+  auto createEToB = [this](std::string field, mesh_t *mesh) {
     std::vector<int> EToB(mesh->Nelements * mesh->Nfaces);
     for (dlong e = 0; e < mesh->Nelements; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
         const int bID = mesh->EToB[f + e * mesh->Nfaces];
-        EToB[f + e * mesh->Nfaces] = bcMap::ellipticType(bID, field);
+        EToB[f + e * mesh->Nfaces] = bc.typeElliptic(bID, field);
       }
     }
     return EToB;
   };
 
-  if (nrs->Nscalar) {
-    cds_t *cds = nrs->cds;
-
+  if (Nscalar) {
     for (int is = 0; is < cds->NSfields; is++) {
       std::string sid = scalarDigitStr(is);
 
@@ -207,9 +193,9 @@ static void setupEllipticSolvers(nrs_t *nrs)
         std::cout << "================= " << solverName << " SETUP SCALAR" << sid << " ===============\n";
       }
 
-      const int nbrBIDs = bcMap::size("scalar" + sid);
+      const int nbrBIDs = bc.size("scalar" + sid);
       for (int bID = 1; bID <= nbrBIDs; bID++) {
-        std::string bcTypeText(bcMap::text(bID, "scalar" + sid));
+        std::string bcTypeText(bc.typeText(bID, "scalar" + sid));
         if (platform->comm.mpiRank == 0 && bcTypeText.size()) {
           printf("bID %d -> bcType %s\n", bID, bcTypeText.c_str());
         }
@@ -226,13 +212,11 @@ static void setupEllipticSolvers(nrs_t *nrs)
       auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       platform->linAlg->axpby(mesh->Nlocal, *cds->g0 / cds->dt[0], o_rho_i, 0.0, o_lambda1);
 
-      cds->solver[is] = new elliptic("scalar" + sid, mesh, nrs->fieldOffset, EToB, o_lambda0, o_lambda1);
+      cds->solver[is] = new elliptic("scalar" + sid, mesh, fieldOffset, EToB, o_lambda0, o_lambda1);
     }
   }
 
-  if (nrs->flow) {
-    auto mesh = nrs->mesh;
-
+  if (flow) {
     if (platform->comm.mpiRank == 0) {
       printf("================ ELLIPTIC SETUP VELOCITY ================\n");
     }
@@ -241,23 +225,23 @@ static void setupEllipticSolvers(nrs_t *nrs)
       platform->options.setArgs("VELOCITY NFIELDS", std::to_string(mesh->dim));
     }
 
-    bool unalignedBoundary = bcMap::unalignedMixedBoundary("velocity");
+    bool unalignedBoundary = bc.unalignedMixedBoundary("velocity");
     nekrsCheck(unalignedBoundary && !platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE"),
                platform->comm.mpiComm,
                EXIT_FAILURE,
                "%s\n",
                "SHL or unaligned SYM boundaries require solver = pcg+block");
 
-    for (int bID = 1; bID <= bcMap::size("velocity"); bID++) {
-      std::string bcTypeText(bcMap::text(bID, "velocity"));
+    for (int bID = 1; bID <= bc.size("velocity"); bID++) {
+      std::string bcTypeText(bc.typeText(bID, "velocity"));
       if (platform->comm.mpiRank == 0 && bcTypeText.size()) {
         printf("bID %d -> bcType %s\n", bID, bcTypeText.c_str());
       }
     }
 
-    auto o_lambda0 = nrs->o_mue;
+    auto o_lambda0 = o_mue;
     auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->axpby(mesh->Nlocal, nrs->g0 / nrs->dt[0], nrs->o_rho, 0.0, o_lambda1);
+    platform->linAlg->axpby(mesh->Nlocal, g0 / dt[0], o_rho, 0.0, o_lambda1);
 
     auto EToBx = createEToB("x-velocity", mesh);
     auto EToBy = createEToB("y-velocity", mesh);
@@ -269,56 +253,45 @@ static void setupEllipticSolvers(nrs_t *nrs)
       EToB.insert(std::end(EToB), std::begin(EToBy), std::end(EToBy));
       EToB.insert(std::end(EToB), std::begin(EToBz), std::end(EToBz));
 
-      nrs->uvwSolver = new elliptic("velocity", mesh, nrs->fieldOffset, EToB, o_lambda0, o_lambda1);
+      uvwSolver = new elliptic("velocity", mesh, fieldOffset, EToB, o_lambda0, o_lambda1);
 
       if (unalignedBoundary) {
-        nrs->o_zeroNormalMaskVelocity =
-            platform->device.malloc<dfloat>(nrs->uvwSolver->Nfields() * nrs->uvwSolver->fieldOffset());
-        nrs->o_EToBVVelocity = platform->device.malloc<int>(nrs->mesh->Nlocal);
-        createEToBV(nrs->mesh, nrs->uvwSolver->EToB(), nrs->o_EToBVVelocity);
-        auto o_EToB = platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * nrs->uvwSolver->Nfields(),
-                                                   nrs->uvwSolver->EToB().data());
-        createZeroNormalMask(nrs, mesh, o_EToB, nrs->o_EToBVVelocity, nrs->o_zeroNormalMaskVelocity);
-
-        auto applyZeroNormalMaskLambda =
-            [nrs, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) {
-              applyZeroNormalMask(nrs,
-                                  mesh,
-                                  Nelements,
-                                  o_elementList,
-                                  nrs->uvwSolver->o_EToB(),
-                                  nrs->o_zeroNormalMaskVelocity,
-                                  o_x);
-            };
-        nrs->uvwSolver->applyZeroNormalMask(applyZeroNormalMaskLambda);
+        this->o_zeroNormalMaskVelocity = mesh->createZeroNormalMask(fieldOffset, uvwSolver->o_EToB());
+        auto f = [this](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) {
+          applyZeroNormalMask(mesh,
+                              Nelements,
+                              o_elementList,
+                              uvwSolver->o_EToB(),
+                              o_zeroNormalMaskVelocity,
+                              o_x);
+        };
+        uvwSolver->applyZeroNormalMask(f);
       }
     } else {
-      nrs->uSolver = new elliptic("velocity", mesh, nrs->fieldOffset, EToBx, o_lambda0, o_lambda1);
-      nrs->vSolver = new elliptic("velocity", mesh, nrs->fieldOffset, EToBy, o_lambda0, o_lambda1);
-      nrs->wSolver = new elliptic("velocity", mesh, nrs->fieldOffset, EToBz, o_lambda0, o_lambda1);
+      uSolver = new elliptic("velocity", mesh, fieldOffset, EToBx, o_lambda0, o_lambda1);
+      vSolver = new elliptic("velocity", mesh, fieldOffset, EToBy, o_lambda0, o_lambda1);
+      wSolver = new elliptic("velocity", mesh, fieldOffset, EToBz, o_lambda0, o_lambda1);
     }
   }
 
-  if (nrs->flow) {
-    auto mesh = nrs->mesh;
-
+  if (flow) {
     if (platform->comm.mpiRank == 0) {
       printf("================ ELLIPTIC SETUP PRESSURE ================\n");
     }
 
     auto o_lambda0 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->adyz(mesh->Nlocal, 1.0, nrs->o_rho, o_lambda0);
+    platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda0);
 
     auto EToB = createEToB("pressure", mesh);
 
-    nrs->pSolver = new elliptic("pressure", mesh, nrs->fieldOffset, EToB, o_lambda0, o_NULL);
-    if (nrs->cds) {
-      nrs->cds->dpdt = nrs->pSolver->nullSpace();
+    pSolver = new elliptic("pressure", mesh, fieldOffset, EToB, o_lambda0, o_NULL);
+    if (cds) {
+      cds->dpdt = pSolver->nullSpace();
     }
   }
 
   if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
-    auto mesh = (nrs->cht) ? nrs->cds->mesh[0] : nrs->mesh;
+    auto mesh = (cht) ? cds->mesh[0] : this->mesh;
 
     if (platform->comm.mpiRank == 0) {
       printf("================ ELLIPTIC SETUP MESH ================\n");
@@ -336,30 +309,22 @@ static void setupEllipticSolvers(nrs_t *nrs)
     auto EToBz = createEToB("z-mesh", mesh);
     EToB.insert(std::end(EToB), std::begin(EToBz), std::end(EToBz));
 
-    auto o_lambda0 = nrs->o_meshMue;
+    auto o_lambda0 = o_meshMue;
 
-    nrs->meshSolver = new elliptic("mesh", mesh, nrs->fieldOffset, EToB, o_lambda0, o_NULL);
+    meshSolver = new elliptic("mesh", mesh, fieldOffset, EToB, o_lambda0, o_NULL);
 
-    bool unalignedBoundary = bcMap::unalignedMixedBoundary("mesh");
+    bool unalignedBoundary = bc.unalignedMixedBoundary("mesh");
     if (unalignedBoundary) {
-      nrs->o_zeroNormalMaskMeshVelocity =
-          platform->device.malloc<dfloat>(nrs->meshSolver->Nfields() * nrs->meshSolver->fieldOffset());
-      nrs->o_EToBVMeshVelocity = platform->device.malloc<int>(mesh->Nlocal);
-      auto o_EToB = platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * nrs->meshSolver->Nfields(),
-                                                 nrs->meshSolver->EToB().data());
-      createEToBV(mesh, nrs->meshSolver->EToB(), nrs->o_EToBVMeshVelocity);
-      createZeroNormalMask(nrs, mesh, o_EToB, nrs->o_EToBVMeshVelocity, nrs->o_zeroNormalMaskMeshVelocity);
-      auto applyZeroNormalMaskLambda =
-          [nrs, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) {
-            applyZeroNormalMask(nrs,
-                                mesh,
-                                Nelements,
-                                o_elementList,
-                                nrs->meshSolver->o_EToB(),
-                                nrs->o_zeroNormalMaskMeshVelocity,
-                                o_x);
-          };
-      nrs->meshSolver->applyZeroNormalMask(applyZeroNormalMaskLambda);
+      this->o_zeroNormalMaskMeshVelocity = mesh->createZeroNormalMask(fieldOffset, meshSolver->o_EToB());
+      auto f = [this, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) {
+        applyZeroNormalMask(mesh,
+                            Nelements,
+                            o_elementList,
+                            meshSolver->o_EToB(),
+                            o_zeroNormalMaskMeshVelocity,
+                            o_x);
+      };
+      meshSolver->applyZeroNormalMask(f);
     }
   }
 }
@@ -546,6 +511,8 @@ nrs_t::nrs_t()
   platform->options.getArgs("MESH DIMENSION", this->NVfields);
   platform->options.getArgs("ELEMENT TYPE", this->elementType);
 
+  platform->solver->bc = &this->bc;
+  platform->solver->bc->setup();
 }
 
 void nrs_t::init()
@@ -644,16 +611,16 @@ void nrs_t::init()
 
     for (const auto &field : fields) {
       auto msh = (this->cht && (field == "scalar00" || field == "mesh")) ? meshT : mesh;
-      nekrsCheck(msh->Nbid != bcMap::size(field),
+      nekrsCheck(msh->Nbid != bc.size(field),
                  platform->comm.mpiComm,
                  EXIT_FAILURE,
                  "Size of %s boundaryTypeMap (%d) does not match number of boundary IDs in mesh (%d)!\n",
                  field.c_str(),
-                 bcMap::size(field),
+                 bc.size(field),
                  msh->Nbid);
     }
 
-    bcMap::checkBoundaryAlignment(mesh);
+    bc.checkAlignment(mesh);
   };
 
   verifyBC();
@@ -756,7 +723,7 @@ void nrs_t::init()
     int cnt = 0;
     for (int e = 0; e < mesh->Nelements; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
-        EToB[cnt] = bcMap::id(mesh->EToB[f + e * mesh->Nfaces], field);
+        EToB[cnt] = bc.typeId(mesh->EToB[f + e * mesh->Nfaces], field);
         cnt++;
       }
     }
@@ -852,7 +819,7 @@ void nrs_t::init()
     printMeshMetrics(mesh);
   }
 
-  setupEllipticSolvers(this);
+  setupEllipticSolvers();
 }
 
 void nrs_t::restartFromFile(const std::string &restartStr)
@@ -921,7 +888,6 @@ void nrs_t::restartFromFile(const std::string &restartStr)
       if (it != options.end()) {
         std::string s = *it;
         lowerCase(s);
-        std::cout << "requested field: " << s << std::endl;
         flds.push_back(s);
       }
     }
@@ -1032,7 +998,7 @@ void nrs_t::setIC()
   if (nek::usrFile()) {
     copyToNek(startTime, 0, true);
     nek::userchk();
-    copyFromNek();    
+    copyFromNek();
   }
 
   if (platform->comm.mpiRank == 0) {
@@ -1070,7 +1036,7 @@ void nrs_t::setIC()
     }
   }
 
-  copyToNek(startTime, 0, true); // in case IC was updated in udf_setup 
+  copyToNek(startTime, 0, true); // in case IC was updated in udf_setup
 
   nekrsCheck(platform->options.compareArgs("LOWMACH", "TRUE") && p0th[0] <= 1e-6,
              platform->comm.mpiComm,
@@ -1447,24 +1413,36 @@ void nrs_t::makeNLT(double time, int tstep, occa::memory &o_Usubcycling)
 
       platform->linAlg->axpby(this->NVfields * this->fieldOffset, -1.0, o_adv, 1.0, this->o_NLT);
       advectionFlops(this->mesh, this->NVfields);
+    }
 
-      if (platform->options.compareArgs("VELOCITY REGULARIZATION METHOD", "CJP")) {
-        dfloat coef;
-        platform->options.getArgs("VELOCITY REGULARIZATION CJP PENALTY FACTOR", coef);
+    if (platform->options.compareArgs("VELOCITY REGULARIZATION METHOD", "GJP")) {
+      dfloat coef;
+      platform->options.getArgs("VELOCITY REGULARIZATION GJP PENALTY FACTOR", coef);
 
-        auto o_Ux = this->o_U.slice(0 * this->fieldOffset, mesh->Nlocal);
-        auto o_Uy = this->o_U.slice(1 * this->fieldOffset, mesh->Nlocal);
-        auto o_Uz = this->o_U.slice(2 * this->fieldOffset, mesh->Nlocal);
- 
-        auto o_NLTx = this->o_NLT.slice(0 * this->fieldOffset, mesh->Nlocal);
-        auto o_NLTy = this->o_NLT.slice(1 * this->fieldOffset, mesh->Nlocal);
-        auto o_NLTz = this->o_NLT.slice(2 * this->fieldOffset, mesh->Nlocal);
- 
-        addCJP(mesh, coef, this->fieldOffset, this->o_U, o_Ux, o_NLTx);
-        addCJP(mesh, coef, this->fieldOffset, this->o_U, o_Uy, o_NLTy);
-        addCJP(mesh, coef, this->fieldOffset, this->o_U, o_Uz, o_NLTz);
-      }
+      auto o_Ux = this->o_U.slice(0 * this->fieldOffset, mesh->Nlocal);
+      auto o_Uy = this->o_U.slice(1 * this->fieldOffset, mesh->Nlocal);
+      auto o_Uz = this->o_U.slice(2 * this->fieldOffset, mesh->Nlocal);
 
+      auto o_NLTx = this->o_NLT.slice(0 * this->fieldOffset, mesh->Nlocal);
+      auto o_NLTy = this->o_NLT.slice(1 * this->fieldOffset, mesh->Nlocal);
+      auto o_NLTz = this->o_NLT.slice(2 * this->fieldOffset, mesh->Nlocal);
+
+      auto o_EToB = [&](int idx) 
+      {
+        if (platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE")) {
+          return uvwSolver->o_EToB().slice(idx * mesh->Nelements *  mesh->Nfaces);
+        }
+        if (idx == 0) 
+          return uSolver->o_EToB();
+        else if (idx == 1) 
+          return vSolver->o_EToB();
+        else 
+          return wSolver->o_EToB();
+      };
+
+      addGJP(mesh, o_EToB(0), coef, this->fieldOffset, this->o_U, o_Ux, o_NLTx);
+      addGJP(mesh, o_EToB(1), coef, this->fieldOffset, this->o_U, o_Uy, o_NLTy);
+      addGJP(mesh, o_EToB(2), coef, this->fieldOffset, this->o_U, o_Uz, o_NLTz);
     }
   }
 }

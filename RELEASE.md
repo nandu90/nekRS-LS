@@ -17,6 +17,8 @@
 * Aero forces
 * opSEM class
 * Mesh surface ops
+* Improved avm reguarlization using averaged modal decay model 
+* Gradient jump penaltiy reguarlization
 * Linear implicit velocity source term
 * Various bug fixes
 
@@ -42,8 +44,9 @@ This list provides an overview of the most significant changes in this release, 
 * use `nekrs_registerPtr` instead of common blocks NRSSCPTR / SCNRS in usr file and access them using `nek::ptr` in udf (see examples)
 
 ### Name Changes
-* `velocityDirichletConditions` -> `codedFixedValueVelocity` (same for scalars)
-* `velocityNeumannConditions` -> `codedFixedGradientVelocity` (same for scalars)
+* boundary type names: `codedFixed` -> `udf`, `value` -> `Dirichlet`, `Gradient` -> `Neumann` 
+* `velocityDirichletConditions` -> `udfDirichlet` (same for scalars)
+* `velocityNeumannConditions` -> `udfNeumann` (same for scalars)
 * `nrs->_mesh` -> `cds->mesh[0]`
 * `nek::ocopyToNek` -> `nrs->copyToNek`
 * `nek::ocopyFromNek` -> `nrs->copyFromNek`

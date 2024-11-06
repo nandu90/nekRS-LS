@@ -32,7 +32,6 @@ struct cdsConfig_t {
   bool dpdt = false;
   dfloat *dp0thdt = nullptr;
   dfloat *alpha0Ref = nullptr;
-
 };
 
 class cds_t : public solver_t

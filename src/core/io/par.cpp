@@ -174,7 +174,6 @@ static std::vector<std::string> commonKeys = {
     {"checkpointing"},
 
     // deprecated filter params
-    {"filtering"},
     {"filterWeight"},
     {"filterModes"},
     {"filterCutoffRatio"},
@@ -251,7 +250,6 @@ static std::vector<std::string> pressureKeys = {};
 
 static std::vector<std::string> deprecatedKeys = {
     // deprecated filter params
-    {"filtering"},
     {"filterWeight"},
     {"filterModes"},
     {"filterCutoffRatio"},
@@ -1468,11 +1466,12 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
       const std::vector<std::string> validValues = {
           {"none"},
           {"hpfrt"},
-          {"cjp"},
+          {"gjp"},
           {"avm"},
           {"c0"},
           {"nmodes"},
           {"cutoffratio"},
+          {"penaltyfactor"},
           {"scalingcoeff"},
           {"activationwidth"},
           {"decaythreshold"},
@@ -1487,17 +1486,11 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         options.setArgs(parPrefix + "REGULARIZATION METHOD", "NONE");
         return;
       }
-      // new command syntax
-      std::string filtering;
-      ini->extract(parSection, "filtering", filtering);
-      if (filtering == "hpfrt") {
-        append_error("cannot specify both regularization and filtering!\n");
-      }
       const bool usesAVM = std::find(list.begin(), list.end(), "avm") != list.end();
-      const bool usesCJP = std::find(list.begin(), list.end(), "cjp") != list.end();
+      const bool usesGJP = std::find(list.begin(), list.end(), "gjp") != list.end();
       const bool usesHPFRT = std::find(list.begin(), list.end(), "hpfrt") != list.end();
 
-      if (!usesAVM && !usesHPFRT && !usesCJP) {
+      if (!usesAVM && !usesHPFRT && !usesGJP) {
         append_error("unknown regularization!\n");
       }
 
@@ -1505,13 +1498,13 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         append_error("avm regularization is only enabled for scalars!\n");
       }
 
-      if (usesCJP) {
-        options.setArgs(parPrefix + "REGULARIZATION METHOD", "CJP");
-        options.setArgs(parPrefix + "REGULARIZATION CJP PENALTY FACTOR", "0.8");
+      if (usesGJP) {
+        options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP");
+        options.setArgs(parPrefix + "REGULARIZATION GJP PENALTY FACTOR", "0.8");
         for (std::string s : list) {
           const auto penaltyStr = parseValueForKey(s, "penaltyfactor");
           if (!penaltyStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION CJP PENALTY FACTOR", penaltyStr);
+            options.setArgs(parPrefix + "REGULARIZATION GJP PENALTY FACTOR", penaltyStr);
           }
         }
       }
@@ -1519,11 +1512,13 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
       if (usesHPFRT) {
         options.setArgs(parPrefix + "HPFRT MODES", "1");
         options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPFRT");
-        if (usesCJP) options.setArgs(parPrefix + "REGULARIZATION METHOD", "CJP+HPFRT");
+        if (usesGJP) options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP+HPFRT");
+
       }
 
       if (usesAVM) {
         options.setArgs(parPrefix + "REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY");
+        if (usesGJP) options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP+AVM_AVERAGED_MODAL_DECAY");
         options.setArgs(parPrefix + "REGULARIZATION AVM ACTIVATION WIDTH", to_string_f(1.0));
         options.setArgs(parPrefix + "REGULARIZATION AVM DECAY THRESHOLD", to_string_f(2.0));
         options.setArgs(parPrefix + "REGULARIZATION AVM C0", "FALSE");
@@ -1602,41 +1597,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         }
       }
       return;
-    } else if (ini->extract(parSection, "filtering", regularization)) {
-      // fall back on old command syntax
-      std::string filtering;
-      ini->extract(parSection, "filtering", filtering);
-      if (filtering == "hpfrt") {
-        options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPFRT");
-        if (ini->extract(parSection, "filterweight", sbuf)) {
-          int err = 0;
-          double weight = parseFormula(sbuf.c_str(), &err);
-          if (err) {
-            append_error("Invalid expression for filterWeight");
-          }
-          options.setArgs(parPrefix + "HPFRT STRENGTH", to_string_f(weight));
-        } else {
-          if (filtering == "hpfrt") {
-            append_error("cannot find mandatory parameter GENERAL:filterWeight");
-          }
-        }
-        double filterCutoffRatio;
-        int NFilterModes;
-        if (ini->extract(parSection, "filtercutoffratio", filterCutoffRatio)) {
-          NFilterModes = round((N + 1) * (1 - filterCutoffRatio));
-        }
-        if (ini->extract(parSection, "filtermodes", NFilterModes)) {
-          if (NFilterModes < 1) {
-            NFilterModes = 1;
-          }
-        }
-        options.setArgs(parPrefix + "HPFRT MODES", to_string_f(NFilterModes));
-      } else if (filtering == "explicit") {
-        append_error("GENERAL::filtering = explicit not supported");
-      }
-      return;
     } else {
-
       // if options already exist, don't overwrite them with defaults from general
       std::string regularizationMethod;
       if (options.getArgs(parPrefix + "REGULARIZATION METHOD", regularizationMethod)) {
@@ -1645,17 +1606,16 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
 
       // use default settings, if applicable
       std::string defaultSettings;
-      if (ini->extract("general", "filtering", defaultSettings)) {
-        options.setArgs(parPrefix + "REGULARIZATION METHOD", options.getArgs("REGULARIZATION METHOD"));
-        options.setArgs(parPrefix + "HPFRT MODES", options.getArgs("HPFRT MODES"));
-        options.setArgs(parPrefix + "HPFRT STRENGTH", options.getArgs("HPFRT STRENGTH"));
-      }
       if (ini->extract("general", "regularization", defaultSettings)) {
         options.setArgs(parPrefix + "REGULARIZATION METHOD", options.getArgs("REGULARIZATION METHOD"));
         options.setArgs(parPrefix + "HPFRT MODES", options.getArgs("HPFRT MODES"));
 
         if (defaultSettings.find("hpfrt") != std::string::npos) {
           options.setArgs(parPrefix + "HPFRT STRENGTH", options.getArgs("HPFRT STRENGTH"));
+        }
+
+        if (defaultSettings.find("gjp") != std::string::npos) {
+          options.setArgs(parPrefix + "REGULARIZATION GJP PENALTY FACTOR", options.getArgs("REGULARIZATION GJP PENALTY FACTOR"));
         }
 
         if (defaultSettings.find("avm") != std::string::npos) {

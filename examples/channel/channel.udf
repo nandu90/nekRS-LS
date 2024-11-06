@@ -6,8 +6,6 @@ static dfloat P_ROT;
 
 #ifdef __okl__
 
-#include "channel.oudf"
-
 #endif
 
 void userf(double time)

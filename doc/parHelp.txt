@@ -147,36 +147,34 @@ smootherType                Jacobi
                               +minEigenvalueBoundFactor=<float>        only for 1st Kind Chebyshev required
                               +maxEigenvalueBoundFactor=<float> 
 
-boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary type for each boundary ID
+boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary type for each boundary ID 
+                                                                       set to none in case there are no boundary IDs
 
                             none                                       no-op (internal or periodic) 
                             interpolation                              neknek boundary (int)
                                                                        assign int values in codedFixedValue
 
-                            zeroValue                                  velocity only (w, wall)
-                            codedFixedValue                            user specified Dirichlet (v, t, inlet)
-                                                                       specify okl function codedFixedValueVelocity 
-                                                                       or codedFixedValueScalar in udf
+                            zeroDirichlet                              velocity only (w, wall)
+                            udfDirichlet                               user specified Dirichlet (v, t, inlet)
 
-                            zeroGradient                               (I, o, O, insulated, outlet, outflow) 
-                            codedFixedGradient                         user specified scalar Neumann (f, flux)
-                                                                       specify okl function codedFixedGradientScalar in udf 
+                            zeroNeumann                                (I, o, O, insulated, outlet, outflow) 
+                            udfNeumann                                 user specified scalar Neumann (f, flux)
 
-                            zeroXValue/zeroGradient                    symmetry x-normal plane (slipx, symx)
-                            zeroYValue/zeroGradient                    symmetry y-normal plane (slipy, symy)
-                            zeroZValue/zeroGradient                    symmetry z-normal plane (slipz, symz)
-                            zeroNValue/zeroGradient                    unaligned symmetry (slip, sym)
-                            zeroYZValue/zeroGradient                   (onx) 
-                            zeroXZValue/zeroGradient                   (ony)
-                            zeroXYValue/zeroGradient                   (onz)
+                            zeroDirichletX/zeroNeumann                 symmetry x-normal plane (slipx, symx)
+                            zeroDirichletY/zeroNeumann                 symmetry y-normal plane (slipy, symy)
+                            zeroDirichletZ/zeroNeumann                 symmetry z-normal plane (slipz, symz)
+                            zeroDirichletN/zeroNeumann                 unaligned symmetry (slip, sym)
+                            zeroDirichletYZ/zeroNeumann                (onx) 
+                            zeroDirichletXZ/zeroNeumann                (ony)
+                            zeroDirichletXY/zeroNeumann                (onz)
 
-                            zeroXValue/codedFixedGradient              traction x-normal plane (tractionx, shlx)
+                            zeroDirichletX/udfNeumann                  traction x-normal plane (tractionx, shlx)
                                                                        specify okl function codedFixedGradientVelocity in udf 
-                            zeroYValue/codedFixedGradient              traction y-normal plane (tractiony, shly)
+                            zeroDirichletY/udfNeumann                  traction y-normal plane (tractiony, shly)
                                                                        specify okl function codedFixedGradientVelocity in udf 
-                            zeroZValue/codedFixedGradient              traction z-normal plane (tractionz, shlz)
+                            zeroDirichletZ/udfNeumann                  traction z-normal plane (tractionz, shlz)
                                                                        specify okl function codedFixedGradientVelocity in udf 
-                            zeroNValue/codedFixedGradient              unaligned traction (traction, shl)
+                            zeroDirichletN/udfNeumann                  unaligned traction (traction, shl)
                                                                        specify okl function codedFixedGradientVelocity in udf 
 
 checkpointing               true [D], false
@@ -186,7 +184,7 @@ regularization
                               +nModes=<int>                            number of modes                                 
                               +scalingCoeff=<float>                    filter strength
                             hpfrt                                       stabilization
-                            cjp                                        jump penalty stabilization
+                            gjp                                        gradient jump penalty
                               +scalingCoeff=<float>                    penalty factor
                             avm                                        artificial viscosity method
                                                                        (has to be applied manually in case user user props)

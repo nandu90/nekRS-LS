@@ -18,22 +18,22 @@ equation = navierStokes+variableViscosity
 residualTol = 1e-04
 
 [VELOCITY]
-boundaryTypeMap = zeroValue, zeroYValue/zeroGradient 
+boundaryTypeMap = zeroDirichlet, zeroDirichletY/zeroNeumann 
 residualTol = 1e-06
 rho = 1.0
 viscosity = 1/43500. 
 
 [SCALAR00]
 #solver = none
-boundaryTypeMap = codedFixedValue, zeroGradient 
+boundaryTypeMap = udfDirichlet, zeroNeumann 
 residualTol = 1e-06
 rho = 1.0
 diffusivity = 1/43500. 
 
 [SCALAR01] # k
-boundaryTypeMap = codedFixedValue, zeroGradient 
+boundaryTypeMap = udfDirichlet, zeroNeumann 
 residualTol = 1e-08
 
 [SCALAR02] # tau
-boundaryTypeMap = codedFixedValue, zeroGradient 
+boundaryTypeMap = udfDirichlet, zeroNeumann 
 residualTol = 1e-06

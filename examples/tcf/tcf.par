@@ -19,7 +19,7 @@ regularization = hpfrt + nModes=1 + scalingCoeff=5
 residualTol = 1e-04
 
 [VELOCITY]
-boundaryTypeMap = codedFixedValue, zeroValue, none, none
+boundaryTypeMap = udfDirichlet, zeroDirichlet, none, none
 viscosity = 1/2500.0 # Re = U0 * d / nu
 rho = 1.0
 residualTol = 1e-06

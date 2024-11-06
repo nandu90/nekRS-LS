@@ -10,9 +10,9 @@ checkpointInterval = 100
 residualTol = 1e-06
 
 [VELOCITY]
-boundaryTypeMap = codedFixedValue, zeroGradient, zeroValue 
+boundaryTypeMap = udfDirichlet, zeroNeumann, zeroDirichlet 
 residualTol = 1e-08
 
 [TEMPERATURE]
-boundaryTypeMap = codedFixedValue, zeroGradient, zeroGradient 
+boundaryTypeMap = udfDirichlet, zeroNeumann, zeroNeumann 
 residualTol = 1e-08

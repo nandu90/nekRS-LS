@@ -17,13 +17,13 @@ regularization = hpfrt + nModes = 1 + scalingCoeff = 15
 residualTol = 1e-04
 
 [VELOCITY]
-boundaryTypeMap = zeroValue, zeroValue 
+boundaryTypeMap = zeroDirichlet, zeroDirichlet 
 rho = 1.0
 viscosity = sqrt(7/1e8) # sqrt(PRA/RA) 
 residualTol = 1e-06
 
 [SCALAR00]
-boundaryTypeMap = codedFixedValue, zeroGradient 
+boundaryTypeMap = udfDirichlet, zeroNeumann 
 diffusivity = 1/sqrt(7*1e8) # 1/sqrt(RA*PRA)
 rho = 1.0
 residualTol = 1e-06

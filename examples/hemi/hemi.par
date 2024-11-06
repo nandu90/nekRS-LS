@@ -1,5 +1,5 @@
 [GENERAL] 
-polynomialOrder = 9
+polynomialOrder = 7
 #startFrom = "restart.fld"
 stopAt = endTime
 endTime = 50 
@@ -17,7 +17,7 @@ regularization = hpfrt + nModes = 1 + scalingCoeff = 8
 residualTol = 1e-04
 
 [VELOCITY]
-boundaryTypeMap = codedFixedValue, zeroGradient, zeroValue, zeroYValue/zeroGradient, zeroZValue/zeroGradient 
+boundaryTypeMap = udfDirichlet, zeroNeumann, zeroDirichlet, zeroDirichletY/zeroNeumann, zeroDirichletZ/zeroNeumann 
 residualTol = 1e-06
 rho = 1.0
 viscosity = 1/1400

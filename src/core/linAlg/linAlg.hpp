@@ -168,7 +168,7 @@ public:
                   const occa::memory &o_x,
                   occa::memory &o_y);
 
-  // o_z[n] = alpha*o_x[n]*o_y[n] (new)
+  // o_z[n] = alpha*o_x[n]*o_y[n]
   void axmyz(const dlong N,
              const dfloat alpha,
              const occa::memory &o_x,

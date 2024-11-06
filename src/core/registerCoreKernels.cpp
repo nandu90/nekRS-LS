@@ -96,11 +96,11 @@ void registerCoreKernels()
   fileName = oklpath + "/core/" + kernelName + ".okl";
   platform->kernelRequests.add(kernelName, fileName, meshProps);
 
-  kernelName = "cjp" + suffix;
+  kernelName = "gjp" + suffix;
   fileName = oklpath + "/core/" + kernelName + ".okl"; 
   platform->kernelRequests.add(kernelName, fileName, meshProps);
   
-  kernelName = "cjpHelper" + suffix;
+  kernelName = "gjpHelper" + suffix;
   fileName = oklpath + "/core/" + kernelName + ".okl";
   platform->kernelRequests.add(kernelName, fileName, meshProps);
 

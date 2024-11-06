@@ -3,9 +3,6 @@
 #include "nekInterfaceAdapter.hpp"
 #include "tombo.hpp"
 #include "udf.hpp"
-#include "bcMap.hpp"
-#include "applyDirichlet.hpp"
-#include "bdry.hpp"
 
 static void lagFields(nrs_t *nrs)
 {
@@ -480,22 +477,16 @@ void nrs_t::initInnerStep(double time, dfloat _dt, int tstep)
     }
 
     if (this->flow) {
-      if (bcMap::unalignedMixedBoundary("velocity")) {
-        createZeroNormalMask(this,
-                             this->mesh,
-                             this->uvwSolver->o_EToB(),
-                             this->o_EToBVVelocity,
-                             this->o_zeroNormalMaskVelocity);
+      if (bc.unalignedMixedBoundary("velocity")) {
+        this->o_zeroNormalMaskVelocity =
+            this->mesh->createZeroNormalMask(fieldOffset, this->uvwSolver->o_EToB());
       }
     }
 
     if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
-      if (bcMap::unalignedMixedBoundary("mesh")) {
-        createZeroNormalMask(this,
-                             mesh,
-                             this->meshSolver->o_EToB(),
-                             this->o_EToBVMeshVelocity,
-                             this->o_zeroNormalMaskMeshVelocity);
+      if (bc.unalignedMixedBoundary("mesh")) {
+        this->o_zeroNormalMaskMeshVelocity =
+            this->mesh->createZeroNormalMask(fieldOffset, this->meshSolver->o_EToB());
       }
     }
   }
@@ -556,16 +547,16 @@ bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter, bo
 
   {
     if (this->flow) {
-      applyDirichletVelocity(this, timeNew, this->o_U, this->o_Ue, this->o_P);
+      applyDirichletVelocity(timeNew, this->o_U, this->o_Ue, this->o_P);
     }
 
     if (this->Nscalar) {
-      applyDirichletScalars(this, timeNew, this->cds->o_S, this->cds->o_Se);
+      applyDirichletScalars(timeNew, this->cds->o_S, this->cds->o_Se);
     }
 
     if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
       auto mesh = (cht) ? cds->mesh[0] : this->mesh;
-      applyDirichletMesh(this, timeNew, mesh->o_U, mesh->o_Ue, this->o_U);
+      applyDirichletMesh(timeNew, mesh->o_U, mesh->o_Ue, this->o_U);
     }
 
     if (this->neknek) {

@@ -3,6 +3,7 @@
 
 #include "nekrsSys.hpp"
 #include "mesh3D.h"
+#include "bdryBase.hpp"
 
 class solver_t {
   public:
@@ -13,6 +14,8 @@ class solver_t {
 
     virtual void printMinMax() {};
     virtual void printRunStat(int step) {};
+
+    bdryBase* bc;
 };
 
 #endif

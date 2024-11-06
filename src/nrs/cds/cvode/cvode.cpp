@@ -7,7 +7,6 @@
 #include "udf.hpp"
 
 #include "plugins/lowMach.hpp"
-#include "bdry.hpp"
 #include "tabularPrinter.hpp"
 
 #ifdef ENABLE_CVODE
@@ -707,7 +706,7 @@ void cvode_t::setupDirichletMask()
     for (dlong e = 0; e < NelemT; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
         const int bID = mesh->EToB[f + e * mesh->Nfaces];
-        EToB[f + e * mesh->Nfaces + fOffset] = bcMap::ellipticType(bID, "scalar" + sid);
+        EToB[f + e * mesh->Nfaces + fOffset] = platform->solver->bc->typeElliptic(bID, "scalar" + sid);
 
         // Since EToB must include all of the faces on the T-mesh, we need to explicitly
         // mark the faces on the V-mesh as not having a boundary

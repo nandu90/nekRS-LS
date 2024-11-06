@@ -1,4 +1,3 @@
-#include "bcMap.hpp"
 #include "neknek.hpp"
 #include "nrs.hpp"
 #include <array>
@@ -9,9 +8,11 @@ static bool findOutlet(mesh_t *mesh)
   for (dlong e = 0; e < mesh->Nelements; e++) {
     for (dlong f = 0; f < mesh->Nfaces; f++) {
       auto bID = mesh->EToB[f + mesh->Nfaces * e];
-      auto bcType = bcMap::id(bID, "velocity");
-      if (bcType == bcMap::bcTypeONX || bcType == bcMap::bcTypeONY || bcType == bcMap::bcTypeONZ ||
-          bcType == bcMap::bcTypeON || bcType == bcMap::bcTypeO) {
+      auto bcType = platform->solver->bc->typeId(bID, "velocity");
+      if (bcType == bdryBase::bcType_zeroDirichletYZ_zeroNeumann ||
+          bcType == bdryBase::bcType_zeroDirichletXZ_zeroNeumann ||
+          bcType == bdryBase::bcType_zeroDirichletXY_zeroNeumann ||
+          bcType == bdryBase::bcType_zeroDirichletT_zeroNeumann || bcType == bdryBase::bcType_zeroNeumann) {
         numOutlet++;
       }
     }

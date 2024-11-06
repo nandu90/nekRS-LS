@@ -1,6 +1,7 @@
 #include "platform.hpp"
 #include "compileKernels.hpp"
 #include "mesh.h"
+#include "ellipticBcTypes.h"
 
 void registerMeshKernels(occa::properties kernelInfoBC)
 {
@@ -164,6 +165,22 @@ void registerMeshKernels(occa::properties kernelInfoBC)
         fileName = oklpath + "/mesh/" + kernelName + ".okl";
         platform->kernelRequests.add(kernelName, fileName, props);
       }
+
+      auto zeroNormalProps = kernelInfo;
+      zeroNormalProps["defines/p_ZERO_NORMAL"] = ellipticBcType::ZERO_NORMAL;
+      zeroNormalProps["defines/p_NO_OP"] = ellipticBcType::NO_OP;
+ 
+      kernelName = "averageNormalBcType";
+      fileName = oklpath + "/mesh/" + kernelName + ".okl";
+      platform->kernelRequests.add(meshPrefix + kernelName, fileName, zeroNormalProps);
+ 
+      kernelName = "fixZeroNormalMask";
+      fileName = oklpath + "/mesh/" + kernelName + ".okl";
+      platform->kernelRequests.add(meshPrefix + kernelName, fileName, zeroNormalProps);
+ 
+      kernelName = "initializeZeroNormalMask";
+      fileName = oklpath + "/mesh/" + kernelName + ".okl";
+      platform->kernelRequests.add(meshPrefix + kernelName, fileName, zeroNormalProps);
     }
   }
 }

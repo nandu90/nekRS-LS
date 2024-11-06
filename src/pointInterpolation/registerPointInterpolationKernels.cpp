@@ -1,4 +1,3 @@
-#include "bcMap.hpp"
 #include "mesh.h"
 #include <compileKernels.hpp>
 #include <limits>

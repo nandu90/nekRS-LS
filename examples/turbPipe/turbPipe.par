@@ -25,7 +25,7 @@ residualTol = 1e-04
 #initialGuess = projectionAconj+nVector=10
 
 [VELOCITY]
-boundaryTypeMap = inlet, outlet, wall
+boundaryTypeMap = udfDirichlet, zeroNeumann,zeroDirichlet 
 rho = 1.0
 viscosity = 1/19000
 residualTol = 1e-06
@@ -33,7 +33,7 @@ residualTol = 1e-06
 [SCALAR00]
 rho = 1.0
 diffusivity = 1/19000
-boundaryTypeMap = codedFixedValue, zeroFlux, codedFixedValue
+boundaryTypeMap = udfDirichlet, zeroNeumann, udfDirichlet 
 residualTol = 1e-06
 regularization = avm+noiseThreshold=1e-3
 

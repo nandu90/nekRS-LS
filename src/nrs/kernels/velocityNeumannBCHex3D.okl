@@ -54,17 +54,21 @@
     dfloat TRy = 0;                                                                                          \
     dfloat TRz = 0;                                                                                          \
     const dlong bcType = EToB[face + p_Nfaces * e];                                                          \
-    if (bcType == p_bcTypeONX || bcType == p_bcTypeONY || bcType == p_bcTypeONZ || bcType == p_bcTypeON || bcType == p_bcTypeO) { \
+    if (bcType == p_bcType_zeroDirichletYZ_zeroNeumann || bcType == p_bcType_zeroDirichletXZ_zeroNeumann ||  \
+        bcType == p_bcType_zeroDirichletXY_zeroNeumann || bcType == p_bcType_zeroDirichletN_udfNeumann ||    \
+        bcType == p_bcType_zeroNeumann) {                                                                    \
+      _strcpy(bc.fieldName, "pressure");                                                                     \
       bc.p = 0;                                                                                              \
-      codedFixedValuePressure(&bc);                                                                          \
+      udfDirichlet(&bc);                                                                                     \
       TRx = -bc.p * bc.nx;                                                                                   \
       TRy = -bc.p * bc.ny;                                                                                   \
       TRz = -bc.p * bc.nz;                                                                                   \
     }                                                                                                        \
-    if (bcType == p_bcTypeSHL) {                                                                             \
+    if (bcType == p_bcType_zeroDirichletN_udfNeumann) {                                                      \
+      _strcpy(bc.fieldName, "velocity");                                                                     \
       bc.tr1 = 0;                                                                                            \
       bc.tr2 = 0;                                                                                            \
-      codedFixedGradientVelocity(&bc);                                                                       \
+      udfNeumann(&bc);                                                                                       \
       TRx = bc.t1x * bc.tr1 + bc.t2x * bc.tr2;                                                               \
       TRy = bc.t1y * bc.tr1 + bc.t2y * bc.tr2;                                                               \
       TRz = bc.t1z * bc.tr1 + bc.t2z * bc.tr2;                                                               \
@@ -116,7 +120,7 @@
     @barrier();
 
     // face 0
-    for (int j = 0; j < p_Nq; ++j; @inner(1))
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
       for (int i = 0; i < p_Nq; ++i; @inner(0)) {
         // face 0
         if (EToBM[e * p_Nfaces + 0] > 0) {
@@ -125,20 +129,22 @@
           r_rhsW[0] += s_ndW[j][i];
         }
       }
+    }
 
     @barrier();
 
     // face 5
-    for (int j = 0; j < p_Nq; ++j; @inner(1))
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
       for (int i = 0; i < p_Nq; ++i; @inner(0)) {
         const dlong sk5 = e * p_Nfp * p_Nfaces + 5 * p_Nfp + i + j * p_Nq;
         surfaceTerms(sk5, 5, i, j);
       }
+    }
 
     @barrier();
 
     // face 5
-    for (int j = 0; j < p_Nq; ++j; @inner(1))
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
       for (int i = 0; i < p_Nq; ++i; @inner(0)) {
         // face 5
         if (EToBM[e * p_Nfaces + 5] > 0) {
@@ -147,15 +153,17 @@
           r_rhsW[p_Nq - 1] += s_ndW[j][i];
         }
       }
+    }
 
     @barrier();
 
     // face 1
-    for (int k = 0; k < p_Nq; ++k; @inner(1))
+    for (int k = 0; k < p_Nq; ++k; @inner(1)) {
       for (int i = 0; i < p_Nq; ++i; @inner(0)) {
         const dlong sk1 = e * p_Nfp * p_Nfaces + 1 * p_Nfp + i + k * p_Nq;
         surfaceTerms(sk1, 1, i, k);
       }
+    }
 
     @barrier();
 
@@ -178,11 +186,12 @@
     @barrier();
 
     // face 3
-    for (int k = 0; k < p_Nq; ++k; @inner(1))
+    for (int k = 0; k < p_Nq; ++k; @inner(1)) {
       for (int i = 0; i < p_Nq; ++i; @inner(0)) {
         const dlong sk3 = e * p_Nfp * p_Nfaces + 3 * p_Nfp + i + k * p_Nq;
         surfaceTerms(sk3, 3, i, k);
       }
+    }
 
     @barrier();
 
@@ -205,11 +214,12 @@
     @barrier();
 
     // face 2
-    for (int k = 0; k < p_Nq; ++k; @inner(1))
+    for (int k = 0; k < p_Nq; ++k; @inner(1)) {
       for (int j = 0; j < p_Nq; ++j; @inner(0)) {
         const dlong sk2 = e * p_Nfp * p_Nfaces + 2 * p_Nfp + j + k * p_Nq;
         surfaceTerms(sk2, 2, j, k);
       }
+    }
 
     @barrier();
 
@@ -232,11 +242,12 @@
     @barrier();
 
     // face 4
-    for (int k = 0; k < p_Nq; ++k; @inner(1))
+    for (int k = 0; k < p_Nq; ++k; @inner(1)) {
       for (int j = 0; j < p_Nq; ++j; @inner(0)) {
         const dlong sk4 = e * p_Nfp * p_Nfaces + 4 * p_Nfp + j + k * p_Nq;
         surfaceTerms(sk4, 4, j, k);
       }
+    }
 
     @barrier();
 

@@ -156,6 +156,7 @@ void UDF_Setup()
     nrs->o_U.copyFrom(U.data(), U.size());
   }
   o_qcriterion.resize(mesh->Nlocal);
+  nrs->addUserCheckpointField("scalar00", std::vector<deviceMemory<dfloat>>{o_qcriterion});
 }
 
 void UDF_ExecuteStep(double time, int tstep)

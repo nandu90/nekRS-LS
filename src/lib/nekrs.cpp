@@ -3,7 +3,6 @@
 #include "nekInterfaceAdapter.hpp"
 #include "printHeader.hpp"
 #include "udf.hpp"
-#include "bcMap.hpp"
 #include "par.hpp"
 #include "re2Reader.hpp"
 #include "configReader.hpp"
@@ -214,8 +213,6 @@ void setup(MPI_Comm commg_in,
     re2::nelg(platform->options.getArgs("MESH FILE"), nelgt, nelgv, comm);
     nekrsCheck(size > nelgv, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "MPI tasks > number of elements!");
   }
-
-  bcMap::setup();
 
   setenv("PARRSB_FIND_DISCONNECTED_COMPONENTS", "0", 1);
   if (debug) {

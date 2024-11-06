@@ -9,53 +9,54 @@
 #include "fileUtils.hpp"
 #include "fileBcast.hpp"
 #include "platform.hpp"
-#include "bcMap.hpp"
-#include "bcType.h"
+#include "bdryBase.hpp"
 #include "sha1.hpp"
 
 #include "udfMake.hpp"
 
 UDF udf = {NULL, NULL, NULL, NULL};
 
-static int velocityDirichletConditions = 0;
-static int meshVelocityDirichletConditions = 0;
-static int velocityNeumannConditions = 0;
-static int pressureDirichletConditions = 0;
-static int scalarDirichletConditions = 0;
-static int scalarNeumannConditions = 0;
+static int dirichletConditions = 0;
+static int neumannConditions = 0;
 
 static void *libudfHandle = nullptr;
 static std::string udfFile;
 
 static void verifyOudf()
 {
-  for (auto &[key, value] : bcMap::map()) {
+  for (auto &[key, value] : platform->solver->bc->bIdToTypeId()) {
     auto field = key.first;
-    const int bcID = value;
+    const int typeId = value;
 
-    if (field.compare("velocity") == 0 && (bcID == bcMap::bcTypeV || bcID == bcMap::bcTypeINT)) {
+    if (field.compare("velocity") == 0 &&
+        (typeId == bdryBase::bcType_udfDirichlet || typeId == bdryBase::bcType_interpolation)) {
       oudfFindDirichlet(field);
     }
-    if (field.compare("mesh") == 0 && bcID == bcMap::bcTypeV) {
+    if (field.compare("mesh") == 0 && typeId == bdryBase::bcType_udfDirichlet) {
       oudfFindDirichlet(field);
     }
     if (field.compare("pressure") == 0 &&
-        (bcID == bcMap::bcTypeONX || bcID == bcMap::bcTypeONY || bcID == bcMap::bcTypeONZ ||
-         bcID == bcMap::bcTypeON || bcID == bcMap::bcTypeO)) {
+        (typeId == bdryBase::bcType_zeroDirichletYZ_zeroNeumann ||
+         typeId == bdryBase::bcType_zeroDirichletXZ_zeroNeumann ||
+         typeId == bdryBase::bcType_zeroDirichletXY_zeroNeumann ||
+         typeId == bdryBase::bcType_zeroDirichletT_zeroNeumann || typeId == bdryBase::bcType_zeroNeumann)) {
       oudfFindDirichlet(field);
     }
-    if (field.compare(0, 6, "scalar") == 0 && (bcID == bcMap::bcTypeS || bcID == bcMap::bcTypeINTS)) {
+    if (field.compare(0, 6, "scalar") == 0 &&
+        (typeId == bdryBase::bcType_udfDirichlet || typeId == bdryBase::bcType_interpolation)) {
       oudfFindDirichlet(field);
     }
 
-    if (field.compare("velocity") == 0 && (bcID == bcMap::bcTypeSHLX || bcID == bcMap::bcTypeSHLY ||
-                                           bcID == bcMap::bcTypeSHLZ || bcID == bcMap::bcTypeSHL)) {
+    if (field.compare("velocity") == 0 && (typeId == bdryBase::bcType_zeroDirichletX_udfNeumann ||
+                                           typeId == bdryBase::bcType_zeroDirichletY_udfNeumann ||
+                                           typeId == bdryBase::bcType_zeroDirichletZ_udfNeumann ||
+                                           typeId == bdryBase::bcType_zeroDirichletN_udfNeumann)) {
       oudfFindNeumann(field);
     }
-    if (field.compare("mesh") == 0 && bcID == bcMap::bcTypeSHL) {
+    if (field.compare("mesh") == 0 && typeId == bdryBase::bcType_zeroDirichletN_udfNeumann) {
       oudfFindNeumann(field);
     }
-    if (field.compare(0, 6, "scalar") == 0 && bcID == bcMap::bcTypeF) {
+    if (field.compare(0, 6, "scalar") == 0 && typeId == bdryBase::bcType_udfNeumann) {
       oudfFindNeumann(field);
     }
   }
@@ -63,54 +64,20 @@ static void verifyOudf()
 
 void oudfFindDirichlet(std::string &field)
 {
-  nekrsCheck(field.find("velocity") != std::string::npos && !velocityDirichletConditions,
+  nekrsCheck(!dirichletConditions,
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "%s\n",
-             "Cannot find okl function codedFixedValueVelocity!");
-
-  nekrsCheck(field.find("scalar") != std::string::npos && !scalarDirichletConditions,
-             MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "%s\n",
-             "Cannot find okl function codedFixedValueScalar!");
-
-  if (field == "pressure" && !pressureDirichletConditions) {
-    if (platform->comm.mpiRank == 0) {
-      std::cout << "WARNING: Cannot find okl function codedFixedValuePressure => fallback to zero value!\n";
-    }
-  }
-
-  if (field.find("mesh") != std::string::npos) {
-    if (bcMap::useDerivedMeshBoundaryConditions()) {
-      nekrsCheck(
-          meshVelocityDirichletConditions,
-          MPI_COMM_SELF,
-          EXIT_FAILURE,
-          "%s\n",
-          "okl function codedFixedValueMesh is defined although derived mesh boundary conditions are used!");
-    } else {
-      nekrsCheck(!meshVelocityDirichletConditions,
-                 MPI_COMM_SELF,
-                 EXIT_FAILURE,
-                 "%s\n",
-                 "Cannot find okl function codedFixedValueMesh!");
-    }
-  }
+             "Cannot find required okl function udfDirichlet!");
 }
 
 void oudfFindNeumann(std::string &field)
 {
-  nekrsCheck(field.find("velocity") != std::string::npos && !velocityNeumannConditions,
+  nekrsCheck(!neumannConditions,
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "%s\n",
-             "Cannot find codedFixedGradientVelocity!");
-  nekrsCheck(field.find("scalar") != std::string::npos && !scalarNeumannConditions,
-             MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "%s\n",
-             "Cannot find codedFixedGradientScalar!");
+             "Cannot find required okl function udfNeumann!");
 }
 
 void adjustOudf(bool buildRequired, const std::string &postOklSource, const std::string &filePath)
@@ -130,51 +97,14 @@ void adjustOudf(bool buildRequired, const std::string &postOklSource, const std:
     f << "#ifdef __okl__\n";
   }
 
-  bool found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+codedFixedValueVelocity)"));
-  velocityDirichletConditions = found;
-  if (!found && buildRequired) {
-    f << "void codedFixedValueVelocity(bcData *bc){}\n";
+  dirichletConditions = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+udfDirichlet)"));
+  if (!dirichletConditions && buildRequired) {
+    f << "void udfDirichlet(bcData *bc){}\n";
   }
 
-  found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+codedFixedValueMesh)"));
-  meshVelocityDirichletConditions = found;
-
-  if (buildRequired) {
-    if (bcMap::useDerivedMeshBoundaryConditions()) {
-      f << "void codedFixedValueMesh(bcData *bc){\n"
-           "  codedFixedValueVelocity(bc);\n"
-           "}\n";
-    } else if (!meshVelocityDirichletConditions) {
-      if (platform->options.getArgs("MESH SOLVER").empty() ||
-          platform->options.compareArgs("MESH SOLVER", "NONE")) {
-        f << "void codedFixedValueMesh(bcData *bc){}\n";
-      }
-    }
-  }
-
-  found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+codedFixedGradientVelocity)"));
-  velocityNeumannConditions = found;
-  if (!found && buildRequired) {
-    f << "void codedFixedGradientVelocity(bcData *bc){}\n";
-  }
-
-  found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+codedFixedValuePressure)"));
-  pressureDirichletConditions = found;
-  if (!found && buildRequired) {
-    f << "void codedFixedValuePressure(bcData *bc){}\n";
-  }
-
-  found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+codedFixedGradientScalar)"));
-  scalarNeumannConditions = found;
-  if (!found && buildRequired) {
-    f << "void codedFixedGradientScalar(bcData *bc){}\n";
-  }
-
-  found = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+codedFixedValueScalar)"));
-  scalarDirichletConditions = found;
-
-  if (!found && buildRequired) {
-    f << "void codedFixedValueScalar(bcData *bc){}\n";
+  neumannConditions = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+udfNeumann)"));
+  if (!neumannConditions && buildRequired) {
+    f << "void udfNeumann(bcData *bc){}\n";
   }
 
   if (buildRequired) {
@@ -283,7 +213,9 @@ void udfBuild(setupAide &options)
     }
   }
 
-  const auto err = (buildRank == 0 && buildRequired) ? udfMake(options, platform->solver->id(), platform->comm.mpiRank) : 0;
+  const auto err = (buildRank == 0 && buildRequired)
+                       ? udfMake(options, platform->solver->id(), platform->comm.mpiRank)
+                       : 0;
   nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "see above and cmake.log for more details");
 
   if (platform->cacheBcast || platform->cacheLocal) {
@@ -309,12 +241,8 @@ void udfBuild(setupAide &options)
     options.setArgs("OKL FILE CACHE", std::string(platform->tmpDir + "/udf/udf.okl"));
   }
 
-  MPI_Bcast(&velocityDirichletConditions, 1, MPI_INT, 0, comm);
-  MPI_Bcast(&meshVelocityDirichletConditions, 1, MPI_INT, 0, comm);
-  MPI_Bcast(&velocityNeumannConditions, 1, MPI_INT, 0, comm);
-  MPI_Bcast(&pressureDirichletConditions, 1, MPI_INT, 0, comm);
-  MPI_Bcast(&scalarNeumannConditions, 1, MPI_INT, 0, comm);
-  MPI_Bcast(&scalarDirichletConditions, 1, MPI_INT, 0, comm);
+  MPI_Bcast(&dirichletConditions, 1, MPI_INT, 0, comm);
+  MPI_Bcast(&neumannConditions, 1, MPI_INT, 0, comm);
 }
 
 void *udfLoadFunction(const char *fname, int errchk)

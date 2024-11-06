@@ -55,6 +55,9 @@ struct mesh_t {
   occa::memory minDistance(int nbID, const occa::memory &o_bID, std::string type, int maxIter = 10000);
   std::vector<dfloat> minDistance(const std::vector<dlong> &bID, std::string type, int maxIter = 10000);
 
+  occa::memory createZeroNormalMask(dlong fieldOffset,
+                                    const occa::memory &o_EToB);
+
   occa::memory intpMatrix(std::vector<dfloat> M);
   void interpolate(const occa::memory& o_z, mesh_t *meshC, occa::memory& o_zC, bool uniform = false, dlong nel = 0);
 

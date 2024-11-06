@@ -3,7 +3,6 @@
 
 #include "platform.hpp"
 #include "nekInterfaceAdapter.hpp"
-#include "bcMap.hpp"
 #include "iofldFactory.hpp"
 #include "opSEM.hpp" 
 #include "tinyexpr.h"

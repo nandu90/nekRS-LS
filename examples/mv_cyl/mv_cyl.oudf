@@ -1,10 +1,19 @@
-void codedFixedValueVelocity(bcData *bc)
+
+#include <iostream>
+
+void udfDirichlet(bcData *bc)
 {
   const dfloat vPiston = p_AMP * sin(p_OMEGA * bc->time);
 
-  bc->u = -vPiston * bc->nx;
-  bc->v = -vPiston * bc->ny;
-  bc->w = -vPiston * bc->nz;
+  if (strCompare(bc->fieldName, "velocity") == 0) {
+    bc->u = -vPiston * bc->nx;
+    bc->v = -vPiston * bc->ny;
+    bc->w = -vPiston * bc->nz;
+  } else if (strCompare(bc->fieldName, "mesh") == 0) {
+    bc->meshu = -vPiston * bc->nx;
+    bc->meshv = -vPiston * bc->ny;
+    bc->meshw = -vPiston * bc->nz;
+  }
 }
 
 @kernel void fillProp(const dlong Nelements,

@@ -1,6 +1,5 @@
 #include <cfloat>
 #include "platform.hpp"
-#include "bcMap.hpp"
 #include "neknek.hpp"
 #include "nrs.hpp"
 #include "nekInterfaceAdapter.hpp"
@@ -13,10 +12,10 @@ namespace
 
 bool isIntBc(int bcType, std::string field)
 {
-  bool isInt = bcType == bcMap::bcTypeINT;
+  bool isInt = bcType == bdryBase::bcType_interpolation;
 
   if (field.find("scalar") != std::string::npos) {
-    isInt = bcType == bcMap::bcTypeINTS;
+    isInt = bcType == bdryBase::bcType_interpolation;
   }
 
   return isInt;
@@ -28,8 +27,8 @@ bool neknekCoupled()
 {
   int intFound = 0;
   for (auto &&field : nrsFieldsToSolve(platform->options)) {
-    for (int bID = 1; bID <= bcMap::size(field); ++bID) {
-      auto bcType = bcMap::id(bID, field);
+    for (int bID = 1; bID <= platform->solver->bc->size(field); ++bID) {
+      auto bcType = platform->solver->bc->typeId(bID, field);
       bool isInt = isIntBc(bcType, field);
 
       if (isInt) {
@@ -113,7 +112,7 @@ void neknek_t::findIntPoints()
   for (dlong e = 0; e < mesh->Nelements; ++e) {
     for (dlong f = 0; f < mesh->Nfaces; ++f) {
       auto bID = mesh->EToB[f + mesh->Nfaces * e];
-      auto bcType = bcMap::id(bID, this->fields[0]);
+      auto bcType = platform->solver->bc->typeId(bID, this->fields[0]);
       numInterpFaces += (isIntBc(bcType, this->fields[0]));
     }
   }
@@ -141,7 +140,7 @@ void neknek_t::findIntPoints()
           dlong idM = mesh->vmapM[id];
 
           auto bID = mesh->EToB[f + mesh->Nfaces * e];
-          auto bcType = bcMap::id(bID, this->fields[0]);
+          auto bcType = platform->solver->bc->typeId(bID, this->fields[0]);
 
           if (isIntBc(bcType, this->fields[0])) {
             neknekX[ip] = x[idM];
@@ -206,12 +205,12 @@ void neknek_t::setup()
   this->fields = [&]() {
     std::vector<std::string> list;
     for (auto &&field : nrsFieldsToSolve(platform->options)) {
-      auto mesh = (field == "scalar00") ?  nrs->cds->mesh[0] : nrs->mesh;
+      auto mesh = (field == "scalar00") ? nrs->cds->mesh[0] : nrs->mesh;
 
       int intFound = 0;
       for (dlong e = 0; e < mesh->Nelements; ++e) {
         for (dlong f = 0; f < mesh->Nfaces; ++f) {
-          if (isIntBc(bcMap::id(mesh->EToB[f + mesh->Nfaces * e], field), field)) {
+          if (isIntBc(platform->solver->bc->typeId(mesh->EToB[f + mesh->Nfaces * e], field), field)) {
             intFound = 1;
           }
         }
@@ -229,8 +228,8 @@ void neknek_t::setup()
   std::ostringstream errorLogger;
   std::set<int> intBIDFields;
   for (auto &&field : this->fields) {
-    for (int bID = 1; bID <= bcMap::size(field); ++bID) {
-      const auto isInt = isIntBc(bcMap::id(bID, field), field);
+    for (int bID = 1; bID <= platform->solver->bc->size(field); ++bID) {
+      const auto isInt = isIntBc(platform->solver->bc->typeId(bID, field), field);
 
       if (isInt) {
         intBIDFields.insert(bID);
@@ -258,8 +257,8 @@ void neknek_t::setup()
 
   this->o_scalarIndices_ = platform->device.malloc<int>(nrs->Nscalar, scalarIndices.data());
 
-  for (int bID = 1; bID <= bcMap::size(this->fields[0]); ++bID) {
-    if (isIntBc(bcMap::id(bID, this->fields[0]), this->fields[0])) {
+  for (int bID = 1; bID <= platform->solver->bc->size(this->fields[0]); ++bID) {
+    if (isIntBc(platform->solver->bc->typeId(bID, this->fields[0]), this->fields[0])) {
       intBIDs.push_back(bID);
     }
   }

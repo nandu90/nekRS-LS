@@ -148,19 +148,8 @@ void registerNrsKernels(occa::properties kernelInfoBC)
     auto zeroNormalProps = kernelInfoBC;
     zeroNormalProps["defines/p_ZERO_NORMAL"] = ellipticBcType::ZERO_NORMAL;
     zeroNormalProps["defines/p_NO_OP"] = ellipticBcType::NO_OP;
-    kernelName = "averageNormalBcType";
-    fileName = oklpath + "/nrs/" + kernelName + ".okl";
-    platform->kernelRequests.add(section + kernelName, fileName, zeroNormalProps);
-
-    kernelName = "fixZeroNormalMask";
-    fileName = oklpath + "/nrs/" + kernelName + ".okl";
-    platform->kernelRequests.add(section + kernelName, fileName, zeroNormalProps);
 
     kernelName = "applyZeroNormalMask";
-    fileName = oklpath + "/nrs/" + kernelName + ".okl";
-    platform->kernelRequests.add(section + kernelName, fileName, zeroNormalProps);
-
-    kernelName = "initializeZeroNormalMask";
     fileName = oklpath + "/nrs/" + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, zeroNormalProps);
 

@@ -38,8 +38,8 @@
                                       @ restrict const dfloat *rho,
                                       @ restrict const dfloat *mue,
                                       const dlong neknekOffset,
-                                      @ restrict const dlong* neknekPoints,
-                                      @ restrict const dfloat* neknekU,
+                                      @ restrict const dlong *neknekPoints,
+                                      @ restrict const dfloat *neknekU,
                                       @ restrict const dfloat *W,
                                       @ restrict const dfloat *U,
                                       @ restrict dfloat *UH)
@@ -54,31 +54,28 @@
         const dlong bcType = EToB[f + p_Nfaces * e];
 
         if (bcType > 0) {
-          if (bcType == p_bcTypeONX) {
+          if (bcType == p_bcType_zeroDirichletYZ_zeroNeumann) {
             UH[idM + 1 * offset] = 0.0;
             UH[idM + 2 * offset] = 0.0;
-          }
-          else if (bcType == p_bcTypeONY) {
+          } else if (bcType == p_bcType_zeroDirichletXZ_zeroNeumann) {
             UH[idM + 0 * offset] = 0.0;
             UH[idM + 2 * offset] = 0.0;
-          }
-          else if (bcType == p_bcTypeONZ) {
+          } else if (bcType == p_bcType_zeroDirichletXY_zeroNeumann) {
             UH[idM + 0 * offset] = 0.0;
             UH[idM + 1 * offset] = 0.0;
-          }
-          else if (bcType == p_bcTypeON) {
+          } else if (bcType == p_bcType_zeroDirichletN_udfNeumann) {
             // handled in ellipticApplyMask
-          }
-          else if (bcType == p_bcTypeSYMX || bcType == p_bcTypeSHLX) {
+          } else if (bcType == p_bcType_zeroDirichletX_zeroNeumann ||
+                     bcType == p_bcType_zeroDirichletX_udfNeumann) {
             UH[idM + 0 * offset] = 0.0;
-          }
-          else if (bcType == p_bcTypeSYMY || bcType == p_bcTypeSHLY) {
+          } else if (bcType == p_bcType_zeroDirichletY_zeroNeumann ||
+                     bcType == p_bcType_zeroDirichletY_udfNeumann) {
             UH[idM + 1 * offset] = 0.0;
-          }
-          else if (bcType == p_bcTypeSYMZ || bcType == p_bcTypeSHLZ) {
+          } else if (bcType == p_bcType_zeroDirichletZ_zeroNeumann ||
+                     bcType == p_bcType_zeroDirichletZ_udfNeumann) {
             UH[idM + 2 * offset] = 0.0;
-          }
-          else if (bcType == p_bcTypeSYM || bcType == p_bcTypeSHL) {
+          } else if (bcType == p_bcType_zeroDirichletN_zeroNeumann ||
+                     bcType == p_bcType_zeroDirichletN_udfNeumann) {
             // handled in ellipticApplyMask
           }
         }
@@ -95,7 +92,8 @@
         const dlong idM = vmapM[sk];
         const dlong bcType = EToB[f + p_Nfaces * e];
 
-        if (bcType == p_bcTypeV || bcType == p_bcTypeINT) {
+        if (bcType == p_bcType_udfDirichlet || bcType == p_bcType_interpolation) {
+          _strcpy(bc.fieldName, "velocity");
           bc.id = EToBM[f + p_Nfaces * e];
           bc.idM = idM;
           bc.time = time;
@@ -129,14 +127,14 @@
           bc.usrwrk = W;
           bc.fieldOffset = offset;
 
-          if (bcType == p_bcTypeINT) {
+          if (bcType == p_bcType_interpolation) {
             const int neknekId = neknekPoints[idM];
             bc.uinterp = neknekU[neknekId + 0 * neknekOffset];
             bc.vinterp = neknekU[neknekId + 1 * neknekOffset];
             bc.winterp = neknekU[neknekId + 2 * neknekOffset];
           }
 
-          codedFixedValueVelocity(&bc);
+          udfDirichlet(&bc);
 
           UH[idM + 0 * offset] = bc.u;
           UH[idM + 1 * offset] = bc.v;
@@ -154,7 +152,7 @@
         const dlong bcType = EToB[f + p_Nfaces * e];
 
         if (bcType > 0) {
-          if (bcType == p_bcTypeW) {
+          if (bcType == p_bcType_zeroDirichlet) {
             UH[idM + 0 * offset] = 0.0;
             UH[idM + 1 * offset] = 0.0;
             UH[idM + 2 * offset] = 0.0;

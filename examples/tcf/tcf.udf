@@ -2,7 +2,7 @@ deviceMemory<dfloat> o_qcriterion;
 
 #ifdef __okl__
 
-void codedFixedValueVelocity(bcData *bc)
+void udfDirichlet(bcData *bc)
 {
   // U = omega x r
   bc->u = -bc->y;
@@ -10,8 +10,7 @@ void codedFixedValueVelocity(bcData *bc)
   bc->w = 0.0;
 }
 
-@kernel void
-magSqr(const dlong Ntotal, const dlong offset, @ restrict const dfloat *U, @ restrict dfloat *uSqr)
+@kernel void magSqr(const dlong Ntotal, const dlong offset, @ restrict const dfloat *U, @ restrict dfloat *uSqr)
 {
   for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
     if (n < Ntotal) {

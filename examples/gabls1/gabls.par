@@ -25,13 +25,13 @@ preconditioner = multigrid
 smootherType = JAC+Chebyshev
 
 [VELOCITY]
-boundaryTypeMap = codedFixedValue, zeroNValue/codedFixedGradient 
+boundaryTypeMap = udfDirichlet, zeroDirichletN/udfNeumann 
 residualTol = 1e-06
 rho = 1.0
 viscosity = 1/50e6
 
 [SCALAR00]
-boundaryTypeMap = codedFixedGradient, codedFixedGradient 
+boundaryTypeMap = udfNeumann, udfNeumann 
 residualTol = 1e-06
 rho = 1.0
 diffusivity = 1/50e6

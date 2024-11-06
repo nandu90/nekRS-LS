@@ -75,10 +75,10 @@ void lowMach::setup(dfloat alpha_, const occa::memory &o_beta_, const occa::memo
   nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "requires solving for temperature!");
 
   std::vector<int> bID;
-  for (auto &[key, bcID] : bcMap::map()) {
+  for (auto &[key, bcID] : platform->solver->bc->bIdToTypeId()) {
     const auto field = key.first;
     if (field == "velocity") {
-      if (bcID == bcMap::bcTypeV || bcID == bcMap::bcTypeINT) {
+      if (bcID == bdryBase::bcType_udfDirichlet || bcID == bdryBase::bcType_interpolation) {
         bID.push_back(key.second + 1);
       }
     }
