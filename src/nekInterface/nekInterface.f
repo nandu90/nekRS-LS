@@ -955,7 +955,8 @@ c
 
       do iel = 1,nelv
       do ifc = 1,2*ndim
-        boundaryID(ifc,iel) = map2bID(bcType(ifc,iel,ifldMax,ierr)) 
+        i = bcType(ifc,iel,ifldMax,ierr)
+        if (i > 0) boundaryID(ifc,iel) = map2bID(i)
       enddo
       enddo
 
@@ -995,13 +996,14 @@ c
           endif 
         enddo
  
-        do iel = 1,nelv
+        do iel = 1,nelt
         do ifc = 1,2*ndim
-          boundaryIDt(ifc,iel) = map2bID(bcType(ifc,iel,ifldMax,ierr)) 
+          i = bcType(ifc,iel,ifldMax,ierr)
+          if (i > 0) boundaryIDt(ifc,iel) = map2bID(i)
         enddo
         enddo
 
-        do iel = 1,nelv
+        do iel = 1,nelt
         do ifc = 1,2*ndim
           cbc_bmap(boundaryIDt(ifc,iel),ifld) = cbc(ifc,iel,ifld) 
         enddo
