@@ -99,10 +99,25 @@ void registerCoreKernels()
   kernelName = "gjp" + suffix;
   fileName = oklpath + "/core/" + kernelName + ".okl"; 
   platform->kernelRequests.add(kernelName, fileName, meshProps);
-  
-  kernelName = "gjpHelper" + suffix;
-  fileName = oklpath + "/core/" + kernelName + ".okl";
-  platform->kernelRequests.add(kernelName, fileName, meshProps);
+ 
+  {
+    int N;
+    platform->options.getArgs("POLYNOMIAL DEGREE", N);
+    const int Nq = N + 1;
+
+    auto props = meshProps;
+    props["defines/p_invNqNq"] = 1. / (Nq * Nq);
+    kernelName = "gjpHelper" + suffix;
+    fileName = oklpath + "/core/" + kernelName + ".okl";
+    platform->kernelRequests.add(kernelName, fileName, props);
+
+    nekrsCheck(BLOCKSIZE < Nq * Nq,
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "gjpHelper kernel requires BLOCKSIZE >= Nq * Nq\nBLOCKSIZE = %d, Nq*Nq = %d\n",
+               BLOCKSIZE,
+               Nq * Nq);
+  }
 
   {
     auto prop = meshProps;

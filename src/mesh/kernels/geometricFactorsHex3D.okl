@@ -104,7 +104,6 @@ SOFTWARE.
                        tz = (xr * ys - yr * xs) * Jinv;
           const dlong n = i + j * p_Nq + k * p_Nq * p_Nq;
 
-          // store mesh quality metrics
           Jacobians[e * p_Np + n] = J;
 
           vgeo[p_Nvgeo * p_Np * e + n + p_Np * p_RXID] = rx;
@@ -122,7 +121,6 @@ SOFTWARE.
           vgeo[p_Nvgeo * p_Np * e + n + p_Np * p_JID] = J;
           vgeo[p_Nvgeo * p_Np * e + n + p_Np * p_JWID] = JW;
 
-          /** update the mass matrix **/
           massMatrix[p_Np * e + n] = JW;
           vgeo[p_Nvgeo * p_Np * e + n + p_Np * p_IJWID] = 1. / JW;
 

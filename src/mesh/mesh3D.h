@@ -98,9 +98,11 @@ void meshBuildFaceNodesHex3D(mesh_t *mesh);
 #define T2ZID 8
 
 #define SJID 9
-#define IJID 10
-#define WIJID 11
-#define WSJID 12
+#define WSJID 10
+//#define IJWID 11
+#define NDOTR 12
+#define NDOTS 13
+#define NDOTT 14
 
 // Mesh generation
 void NodesHex3D(int _N, dfloat* _r, dfloat* _s, dfloat* _t);

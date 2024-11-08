@@ -9,8 +9,9 @@ static void addGJP(mesh_t *mesh, const occa::memory& o_EToB, const occa::memory&
 {
    // (n * o_grad)
    auto o_grad = opSEM::strongGrad(mesh, fieldOffset, o_S);
+
    auto o_jump = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements * mesh->Nfaces * mesh->Nfp);
-   auto o_h2 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements * mesh->Nfaces * mesh->Nfp);
+   auto o_h = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements * mesh->Nfaces);
 
    static occa::kernel gjpHelperKernel;
    if (!gjpHelperKernel.isInitialized()) gjpHelperKernel = platform->kernelRequests.load("gjpHelperHex3D"); 
@@ -20,10 +21,9 @@ static void addGJP(mesh_t *mesh, const occa::memory& o_EToB, const occa::memory&
                    mesh->o_y, 
                    mesh->o_z, 
                    mesh->o_vmapM,
-                   mesh->o_Jw,
                    mesh->o_sgeo, 
                    o_grad,
-                   o_h2,
+                   o_h,
                    o_jump);
 
    static oogs_t* gshFace = nullptr;
@@ -39,14 +39,12 @@ static void addGJP(mesh_t *mesh, const occa::memory& o_EToB, const occa::memory&
                            NULL,
                            OOGS_AUTO);
    }
-
    oogs::startFinish(o_jump, 1, 0, ogsDfloat, ogsAdd, gshFace);
 
-   const dfloat NscalingFactor = std::pow(static_cast<dfloat>(mesh->Nq), static_cast<dfloat>(-4));
+   const dfloat NscalingFactor = 1. / std::pow(mesh->Nq, 4);
 
    static occa::kernel gjpKernel;
    if (!gjpKernel.isInitialized()) gjpKernel = platform->kernelRequests.load("gjpHex3D"); 
-
    gjpKernel(mesh->Nelements,
              fieldOffset, 
              NscalingFactor,
@@ -56,7 +54,7 @@ static void addGJP(mesh_t *mesh, const occa::memory& o_EToB, const occa::memory&
              mesh->o_sgeo,
              o_EToB,
              o_coef,
-             o_h2,
+             o_h,
              o_U,
              o_jump,
              o_out);

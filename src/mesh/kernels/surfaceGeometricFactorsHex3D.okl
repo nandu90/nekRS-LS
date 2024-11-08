@@ -97,14 +97,15 @@ SOFTWARE.
         /* output index */
         const dlong sgid = p_Nsgeo * (p_Nfaces * p_Nfp * e + p_Nfp * f + n);
 
-        /* store normal, surface Jacobian, and reciprocal of volume Jacobian */
         sgeo[sgid + p_NXID] = nx;
         sgeo[sgid + p_NYID] = ny;
         sgeo[sgid + p_NZID] = nz;
         sgeo[sgid + p_SJID] = sJ;
-        sgeo[sgid + p_IJID] = 1.0 / J;
-        sgeo[sgid + p_WIJID] = 1.0 / (J * w[0]);
         sgeo[sgid + p_WSJID] = sJ * w[n % p_Nq] * w[n / p_Nq];
+        sgeo[sgid + p_IJWID] = vgeo[vgid + p_IJWID * p_Np];
+        sgeo[sgid + p_NDOTRID] = (nx * rx + ny * ry + nz * rz);
+        sgeo[sgid + p_NDOTSID] = (nx * sx + ny * sy + nz * sz);
+        sgeo[sgid + p_NDOTTID] = (nx * tx + ny * ty + nz * tz);
 
         const dfloat tol = 1e-4;
         dfloat vt1x = 0, vt1y = 0, vt1z = 0;

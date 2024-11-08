@@ -625,7 +625,7 @@ c-----------------------------------------------------------------------
       integer bID, ifld, ismesh
       character*3 c
 
-      if (bID < 1) then ! not a boundary
+      if (bID.lt.1) then ! not a boundary
         nekf_bcmap = 0
         return 
       endif 
@@ -887,10 +887,10 @@ c
       include 'TOTAL'
 
       integer map2bID(p_NBcType)
-      integer cnt(p_NBcType, 100)
+      integer cnt(p_NBcType, ldimt1)
 
       integer bcType
-
+      integer bID
       integer bIDcnt
       character*3 cb 
 
@@ -938,7 +938,7 @@ c
           cnt(i, ifld) = iglmax(cnt(i, ifld),1)
           if(cnt(i, ifld).gt.0) icnt = icnt + 1 
         enddo 
-        if (icnt > icntMax) then 
+        if (icnt.gt.icntMax) then 
           ifldMax = ifld
           icntMax = icnt 
         endif 
@@ -956,20 +956,30 @@ c
       do iel = 1,nelv
       do ifc = 1,2*ndim
         i = bcType(ifc,iel,ifldMax,ierr)
-        if (i > 0) boundaryID(ifc,iel) = map2bID(i)
+        if (i.gt.0) boundaryID(ifc,iel) = map2bID(i)
       enddo
       enddo
 
       do ifld = ifldStart,nfield
+        ierr = 0
         if(idpss(ifld-1).lt.0 .or. iftmsh(ifld)) goto 51 
 
         do iel = 1,nelv
         do ifc = 1,2*ndim
-          cbc_bmap(boundaryID(ifc,iel),ifld) = cbc(ifc,iel,ifld) 
+          bID = boundaryID(ifc,iel)
+          if (bID.gt.0) then
+            if(cbc_bmap(bID,ifld).ne.'  ' .and. 
+     $         cbc_bmap(bID,ifld).ne.cbc(ifc,iel,ifld)) then 
+              ierr = 1
+              goto 52
+            endif
+            cbc_bmap(bID,ifld) = cbc(ifc,iel,ifld)
+          endif 
         enddo
         enddo
 
  51     continue
+ 52     call err_chk(ierr, 'Found ambiguous boundary id!$')
       enddo
 
       ! cht
@@ -999,7 +1009,7 @@ c
         do iel = 1,nelt
         do ifc = 1,2*ndim
           i = bcType(ifc,iel,ifldMax,ierr)
-          if (i > 0) boundaryIDt(ifc,iel) = map2bID(i)
+          if (i.gt.0) boundaryIDt(ifc,iel) = map2bID(i)
         enddo
         enddo
 

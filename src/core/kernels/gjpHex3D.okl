@@ -1,48 +1,38 @@
-#define surfaceTerms(vgid, sk, face, m, i, j)                                                                \
+#define surfaceTerms(sk, face, m, i, j)                                                                      \
   {                                                                                                          \
     const dlong idM = vmapM[sk];                                                                             \
     const dfloat nx = sgeo[sk * p_Nsgeo + p_NXID];                                                           \
     const dfloat ny = sgeo[sk * p_Nsgeo + p_NYID];                                                           \
     const dfloat nz = sgeo[sk * p_Nsgeo + p_NZID];                                                           \
-    const dfloat rx = vgeo[vgid + p_RXID * p_Np];                                                            \
-    const dfloat ry = vgeo[vgid + p_RYID * p_Np];                                                            \
-    const dfloat rz = vgeo[vgid + p_RZID * p_Np];                                                            \
-    const dfloat sx = vgeo[vgid + p_SXID * p_Np];                                                            \
-    const dfloat sy = vgeo[vgid + p_SYID * p_Np];                                                            \
-    const dfloat sz = vgeo[vgid + p_SZID * p_Np];                                                            \
-    const dfloat tx = vgeo[vgid + p_TXID * p_Np];                                                            \
-    const dfloat ty = vgeo[vgid + p_TYID * p_Np];                                                            \
-    const dfloat tz = vgeo[vgid + p_TZID * p_Np];                                                            \
-    const dfloat ndotdr = (nx * rx + ny * ry + nz * rz);                                                     \
-    const dfloat ndotds = (nx * sx + ny * sy + nz * sz);                                                     \
-    const dfloat ndotdt = (nx * tx + ny * ty + nz * tz);                                                     \
     if (face == 0 || face == 5) {                                                                            \
-      s_flux2[m][j][i] = ndotdt;                                                                             \
+      s_flux2[m][j][i] = sgeo[sk * p_Nsgeo + p_NDOTTID];                                                     \
     }                                                                                                        \
     if (face == 1 || face == 3) {                                                                            \
-      s_flux2[m][j][i] = ndotds;                                                                             \
+      s_flux2[m][j][i] = sgeo[sk * p_Nsgeo + p_NDOTSID];                                                     \
     }                                                                                                        \
     if (face == 2 || face == 4) {                                                                            \
-      s_flux2[m][j][i] = ndotdr;                                                                             \
+      s_flux2[m][j][i] = sgeo[sk * p_Nsgeo + p_NDOTRID];                                                     \
     }                                                                                                        \
-    const dfloat udotn = nx * U[idM + 0*offset] + ny * U[idM + 1*offset] + nz * U[idM + 2*offset];           \
-    s_flux2[m][j][i] *= (EToB[face + p_Nfaces * e] > 0) ?                                                    \
-      0 : fabs(udotn) * h2Face[sk] * gFace[sk] * sgeo[sk * p_Nsgeo + p_WSJID];                               \
+    const dfloat udotn = (nx * U[idM + 0 * offset] + ny * U[idM + 1 * offset] + nz * U[idM + 2 * offset]);   \
+    const dfloat hFace = h[face + p_Nfaces * e];                                                             \
+    s_flux2[m][j][i] *= (EToB[face + p_Nfaces * e] < 1)                                                      \
+      ? fabs(udotn) * hFace * hFace * G[sk] * sgeo[sk * p_Nsgeo + p_WSJID]                                   \
+      : 0;                                                                                                   \
   }
 
 @kernel void gjpHex3D(const dlong Nelements,
-                       const dlong offset,
-                       const dfloat NscalingFactor,
-                       @ restrict const dfloat *D,
-                       @ restrict const dlong *vmapM,
-                       @ restrict const dfloat *vgeo,
-                       @ restrict const dfloat *sgeo,
-                       @ restrict const int *EToB,
-                       @ restrict const dfloat *coef,
-                       @ restrict const dfloat *h2Face,
-                       @ restrict const dfloat *U,
-                       @ restrict const dfloat *gFace,
-                       @ restrict dfloat *out)
+                      const dlong offset,
+                      const dfloat NscalingFactor,
+                      @ restrict const dfloat *D,
+                      @ restrict const dlong *vmapM,
+                      @ restrict const dfloat *vgeo,
+                      @ restrict const dfloat *sgeo,
+                      @ restrict const int *EToB,
+                      @ restrict const dfloat *coef,
+                      @ restrict const dfloat *h,
+                      @ restrict const dfloat *U,
+                      @ restrict const dfloat *G,
+                      @ restrict dfloat *out)
 {
   for (dlong e = 0; e < Nelements; e++; @outer(0)) {
     @shared dfloat s_flux2[2][p_Nq][p_Nq];
@@ -67,12 +57,9 @@
         }
 
         const dlong sk0 = e * p_Nfp * p_Nfaces + 0 * p_Nfp + i + j * p_Nq;
-        const dlong gid0 = e * p_Np * p_Nvgeo + 0 * p_Nq * p_Nq + j * p_Nq + i;
-        surfaceTerms(gid0, sk0, 0, 0, i, j);
-
         const dlong sk5 = e * p_Nfp * p_Nfaces + 5 * p_Nfp + i + j * p_Nq;
-        const dlong gid5 = e * p_Np * p_Nvgeo + (p_Nq - 1) * p_Nq * p_Nq + j * p_Nq + i;
-        surfaceTerms(gid5, sk5, 5, 1, i, j);
+        surfaceTerms(sk5, 5, 1, i, j);
+        surfaceTerms(sk0, 0, 0, i, j);
       }
     }
 
@@ -94,12 +81,10 @@
     for (int k = 0; k < p_Nq; ++k; @inner(1)) {
       for (int i = 0; i < p_Nq; ++i; @inner(0)) {
         const dlong sk1 = e * p_Nfp * p_Nfaces + 1 * p_Nfp + i + k * p_Nq;
-        const dlong gid1 = e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + 0 * p_Nq + i;
-        surfaceTerms(gid1, sk1, 1, 0, i, k);
-
         const dlong sk3 = e * p_Nfp * p_Nfaces + 3 * p_Nfp + i + k * p_Nq;
-        const dlong gid3 = e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + (p_Nq - 1) * p_Nq + i;
-        surfaceTerms(gid3, sk3, 3, 1, i, k);
+
+        surfaceTerms(sk1, 1, 0, i, k);
+        surfaceTerms(sk3, 3, 1, i, k);
       }
     }
 
@@ -121,12 +106,10 @@
     for (int k = 0; k < p_Nq; ++k; @inner(1)) {
       for (int j = 0; j < p_Nq; ++j; @inner(0)) {
         const dlong sk2 = e * p_Nfp * p_Nfaces + 2 * p_Nfp + j + k * p_Nq;
-        const dlong gid2 = e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + j * p_Nq + (p_Nq - 1);
-        surfaceTerms(gid2, sk2, 2, 0, j, k);
-
         const dlong sk4 = e * p_Nfp * p_Nfaces + 4 * p_Nfp + j + k * p_Nq;
-        const dlong gid4 = e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + j * p_Nq + 0;
-        surfaceTerms(gid4, sk4, 4, 1, j, k);
+
+        surfaceTerms(sk2, 2, 0, j, k);
+        surfaceTerms(sk4, 4, 1, j, k);
       }
     }
 

@@ -53,7 +53,7 @@ occa::properties meshKernelProperties(int N)
 
   constexpr int Nvgeo{12};
   constexpr int Nggeo{7};
-  constexpr int Nsgeo{13};
+  constexpr int Nsgeo{15};
 
   nekrsCheck(BLOCKSIZE < Nq * Nq,
              MPI_COMM_SELF,
@@ -101,11 +101,8 @@ occa::properties meshKernelProperties(int N)
   meshProperties["defines/"
                  "p_SJID"] = SJID;
   meshProperties["defines/"
-                 "p_IJID"] = IJID;
-  meshProperties["defines/"
-                 "p_WIJID"] = WIJID;
-  meshProperties["defines/"
                  "p_WSJID"] = WSJID;
+
   meshProperties["defines/"
                  "p_T1XID"] = T1XID;
   meshProperties["defines/"
@@ -118,6 +115,13 @@ occa::properties meshKernelProperties(int N)
                  "p_T2YID"] = T2YID;
   meshProperties["defines/"
                  "p_T2ZID"] = T2ZID;
+
+  meshProperties["defines/"
+                 "p_NDOTRID"] = NDOTR;
+  meshProperties["defines/"
+                 "p_NDOTSID"] = NDOTS;
+  meshProperties["defines/"
+                 "p_NDOTTID"] = NDOTT;
 
   meshProperties["defines/"
                  "p_G00ID"] = G00ID;
