@@ -296,23 +296,13 @@ void udfEcho()
 
   std::ifstream fudf(tmpFile);
   std::string text;
-
-  std::cout << std::endl;
-  while (!fudf.eof()) {
-    getline(fudf, text);
+  while (std::getline(fudf, text))
     std::cout << "<<< " << text << "\n";
-  }
-  fudf.close();
+  std::cout << std::endl;
   fs::remove(tmpFile);
 
   std::ifstream foudf(oudfFileCache);
-
-  std::cout << std::endl;
-  while (!foudf.eof()) {
-    getline(foudf, text);
+  while (std::getline(foudf, text))
     std::cout << "<<< " << text << "\n";
-  }
   std::cout << std::endl;
-
-  foudf.close();
 }

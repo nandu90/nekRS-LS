@@ -35,14 +35,11 @@ std::string outputMeshSave;
 void printFileStdout(std::string file)
 {
   std::ifstream f(file);
+  std::cout << std::endl;
   std::string text;
-  std::cout << std::endl;
-  while (!f.eof()) {
-    getline(f, text);
+  while (std::getline(f, text))
     std::cout << "<<< " << text << "\n";
-  }
   std::cout << std::endl;
-  f.close();
 }
 
 setupAide *setDefaultSettings(std::string casename)
