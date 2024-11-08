@@ -582,7 +582,7 @@ template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::str
     return 1; // variable not found
   }
 
-  if (varStep > adiosVariable.Steps()) {
+  if (varStep >= adiosVariable.Steps()) {
     return 1; // step not found
   }
 
