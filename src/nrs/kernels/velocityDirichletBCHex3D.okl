@@ -113,13 +113,13 @@
           bc.t2y = sgeo[sid * p_Nsgeo + p_T2YID];
           bc.t2z = sgeo[sid * p_Nsgeo + p_T2ZID];
 
-          bc.u = U[idM + 0 * offset];
-          bc.v = U[idM + 1 * offset];
-          bc.w = U[idM + 2 * offset];
+          bc.u = NAN;
+          bc.v = NAN;
+          bc.w = NAN;
 
-          bc.uinterp = 0.0;
-          bc.vinterp = 0.0;
-          bc.winterp = 0.0;
+          bc.uinterp = NAN;
+          bc.vinterp = NAN;
+          bc.winterp = NAN;
 
           bc.trans = rho[idM];
           bc.diff = mue[idM];

@@ -6,11 +6,11 @@ static int updateProperties = 1;
 
 void udfDirichlet(bcData *bc)
 {
-  if (strCompare(bc->fieldName, "velocity") == 0) {
+  if (bcDataField("velocity")) {
   bc->u = 4.0 * bc->y * (1. - bc->y);
   bc->v = 0.0;
   bc->w = 0.0;
-  } else if (strCompare(bc->fieldName, "scalar") == 0) {
+  } else if (bcDataField("scalar")) {
     bc->s = 0.0;
   }
 }

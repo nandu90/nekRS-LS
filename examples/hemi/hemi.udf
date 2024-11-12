@@ -20,7 +20,7 @@ static lpm_t *particles = nullptr;
 
 void udfDirichlet(bcData *bc)
 {
-  if (strCompare(bc->fieldName, "velocity") == 0) {
+  if (bcDataField("velocity")) {
     const dfloat arg = bc->z * M_PI * 0.5 / 0.6;
     if (arg > 0.5 * M_PI) {
       bc->u = 1.0;
@@ -30,7 +30,7 @@ void udfDirichlet(bcData *bc)
  
     bc->v = 0.0;
     bc->w = 0.0;
-  } if (strCompare(bc->fieldName, "pressure") == 0) {
+  } if (bcDataField("pressure")) {
     const dfloat iU0delta = 10.0;
     const dfloat un = bc->u * bc->nx + bc->v * bc->ny + bc->w * bc->nz;
     const dfloat s0 = 0.5 * (1.0 - tanh(un * iU0delta));

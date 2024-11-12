@@ -2,16 +2,16 @@
 
 void udfDirichlet(bcData *bc)
 {
-  if (strCompare(bc->fieldName, "velocity") == 0) {
+  if (bcDataField("velocity")) {
     bc->u = 0.0;
     bc->v = 0.0;
     bc->w = 1.0;
-  } else if (strCompare(bc->fieldName, "pressure") == 0) {
+  } else if (bcDataField("pressure")) {
     const dfloat iU0delta = 20.0;
     const dfloat un = bc->u * bc->nx + bc->v * bc->ny + bc->w * bc->nz;
     const dfloat s0 = 0.5 * (1.0 - tanh(un * iU0delta));
     bc->p = -0.5 * (bc->u * bc->u + bc->v * bc->v + bc->w * bc->w) * s0;
-  } else if (strCompare(bc->fieldName, "scalar") == 0) {
+  } else if (bcDataField("scalar")) {
     bc->s = 0.0;
   }
 }

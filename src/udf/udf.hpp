@@ -36,6 +36,7 @@ extern UDF udf;
 
 void oudfFindDirichlet(std::string &field);
 void oudfFindNeumann(std::string &field);
+void oudfFindRobin(std::string &field);
 void oudfInit(setupAide &options);
 void udfBuild(setupAide &options);
 void udfLoad();

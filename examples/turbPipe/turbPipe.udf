@@ -21,16 +21,16 @@ volatile sig_atomic_t processAscentYaml = 0;
 // Boundary conditions
 void udfDirichlet(bcData *bc)
 {  
-  if (strCompare(bc->fieldName, "velocity") == 0) { 
+  if (bcDataField("velocity")) { 
     bc->u = bc->usrwrk[bc->idM + 0 * bc->fieldOffset];
     bc->v = bc->usrwrk[bc->idM + 1 * bc->fieldOffset];
     bc->w = bc->usrwrk[bc->idM + 2 * bc->fieldOffset];
-  } else if (strCompare(bc->fieldName, "pressure") == 0) {
+  } else if (bcDataField("pressure")) {
     const dfloat iU0delta = 20.0;
     const dfloat un = bc->u * bc->nx + bc->v * bc->ny + bc->w * bc->nz;
     const dfloat s0 = 0.5 * (1.0 - tanh(un * iU0delta));
     bc->p = -0.5 * (bc->u * bc->u + bc->v * bc->v + bc->w * bc->w) * s0;
-  } else if (strCompare(bc->fieldName, "scalar") == 0) {
+  } else if (bcDataField("scalar")) {
     if (bc->id == 1) {
       bc->s = 0;
     } else {

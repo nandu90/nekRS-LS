@@ -18,6 +18,7 @@ UDF udf = {NULL, NULL, NULL, NULL};
 
 static int dirichletConditions = 0;
 static int neumannConditions = 0;
+static int RobinConditions = 0;
 
 static void *libudfHandle = nullptr;
 static std::string udfFile;
@@ -59,6 +60,9 @@ static void verifyOudf()
     if (field.compare(0, 6, "scalar") == 0 && typeId == bdryBase::bcType_udfNeumann) {
       oudfFindNeumann(field);
     }
+    if (field.compare(0, 6, "scalar") == 0 && typeId == bdryBase::bcType_udfRobin) {
+      oudfFindRobin(field);
+    }
   }
 }
 
@@ -78,6 +82,15 @@ void oudfFindNeumann(std::string &field)
              EXIT_FAILURE,
              "%s\n",
              "Cannot find required okl function udfNeumann!");
+}
+
+void oudfFindRobin(std::string &field)
+{
+  nekrsCheck(!RobinConditions,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "Cannot find required okl function udfRobin!");
 }
 
 void adjustOudf(bool buildRequired, const std::string &postOklSource, const std::string &filePath)
@@ -105,6 +118,11 @@ void adjustOudf(bool buildRequired, const std::string &postOklSource, const std:
   neumannConditions = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+udfNeumann)"));
   if (!neumannConditions && buildRequired) {
     f << "void udfNeumann(bcData *bc){}\n";
+  }
+
+  RobinConditions = std::regex_search(buffer.str(), std::regex(R"(\s*void\s+udfRobin)"));
+  if (!RobinConditions && buildRequired) {
+    f << "void udfRobin(bcData *bc){}\n";
   }
 
   if (buildRequired) {
@@ -243,6 +261,7 @@ void udfBuild(setupAide &options)
 
   MPI_Bcast(&dirichletConditions, 1, MPI_INT, 0, comm);
   MPI_Bcast(&neumannConditions, 1, MPI_INT, 0, comm);
+  MPI_Bcast(&RobinConditions, 1, MPI_INT, 0, comm);
 }
 
 void *udfLoadFunction(const char *fname, int errchk)

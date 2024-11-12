@@ -18,6 +18,8 @@ void cds_t::solve(double time, int stage)
     auto o_rhs = platform->deviceMemoryPool.reserve<dfloat>(this->fieldOffset[is]);
     o_rhs.copyFrom(this->o_JwF, this->fieldOffset[is], 0, this->fieldOffsetScan[is]);
 
+    auto o_lhs = platform->deviceMemoryPool.reserve<dfloat>(this->fieldOffset[is]);
+
     this->neumannBCKernel(mesh->Nelements,
                           1,
                           mesh->o_sgeo,
@@ -37,6 +39,7 @@ void cds_t::solve(double time, int stage)
                           this->o_diff,
                           this->o_rho,
                           *(this->o_usrwrk),
+                          o_lhs, 
                           o_rhs);
 
     platform->timer.toc("scalar rhs");
@@ -44,19 +47,23 @@ void cds_t::solve(double time, int stage)
     const auto o_diff_i = this->o_diff.slice(this->fieldOffsetScan[is], mesh->Nlocal);
 
     const auto o_lambda0 = o_diff_i;
-    const auto o_lambda1 = [&]() {
+    const auto o_lambda1 = [&]() 
+    {
       const auto o_rho_i = this->o_rho.slice(this->fieldOffsetScan[is], mesh->Nlocal);
       auto o_l = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 0.0, o_l);
+
       if (this->userImplicitLinearTerm) {
         auto o_implicitLT = this->userImplicitLinearTerm(time, is);
         if (o_implicitLT.isInitialized()) {
-          platform->linAlg->axpbyz(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 1.0, o_implicitLT, o_l);
-        } else {
-          platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 0.0, o_l);
+          platform->linAlg->axpby(mesh->Nlocal, 1.0, o_implicitLT, 1.0, o_l); 
         }
-      } else {
-        platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 0.0, o_l);
       }
+
+      if (platform->solver->bc->hasRobin("SCALAR" + sid)) {
+        platform->linAlg->axpby(mesh->Nlocal, 1.0, o_lhs, 1.0, o_l); 
+      }
+
       return o_l;
     }();
 

@@ -282,7 +282,6 @@ public:
     void setup() override;
     int typeElliptic(int bid, std::string field) const override;
     std::string typeText(int bid, std::string field) const override;
-    bool unalignedMixedBoundary(std::string field) const override;
     void checkAlignment(mesh_t *mesh) const override;
     bool useDerivedMeshBoundaryConditions();
 
@@ -329,7 +328,6 @@ public:
         {bdryBase::bcType_zeroDirichletN_udfNeumann, "zeroDirichletN/udfNeumann"},
         {bdryBase::bcType_zeroDirichletYZ_zeroNeumann, "zeroDirichletYZ/zeroNeumann"},
         {bdryBase::bcType_zeroDirichletXZ_zeroNeumann, "zeroDirichletXZ/zeroNeumann"},
-        {bdryBase::bcType_zeroDirichletXY_zeroNeumann, "zeroDirichletXY/zeroNeumann"},
         // {bdryBase::bcType_zeroDirichletT_zeroNeumann, "zeroDirichletT/zeroNeumann"},
         {bdryBase::bcType_zeroNeumann, "zeroNeumann"},
         {bdryBase::bcType_none, "none"}};
@@ -337,6 +335,7 @@ public:
     const std::map<std::string, int> sBcTextToID = {//    {"periodic", 0},
                                                     {"interpolation", bdryBase::bcType_interpolation},
                                                     {"udfdirichlet", bdryBase::bcType_udfDirichlet},
+                                                    {"udfrobin", bdryBase::bcType_udfRobin},
                                                     {"zeroneumann", bdryBase::bcType_zeroNeumann},
                                                     {"udfneumann", bdryBase::bcType_udfNeumann},
                                                     {"none", bdryBase::bcType_none}};
@@ -344,6 +343,7 @@ public:
     const std::map<int, std::string> sBcIDToText = {//    {0, "periodic"},
                                                     {bdryBase::bcType_interpolation, "interpolation"},
                                                     {bdryBase::bcType_udfDirichlet, "udfDirichlet"},
+                                                    {bdryBase::bcType_udfRobin, "udfRobin"},
                                                     {bdryBase::bcType_zeroNeumann, "zeroNeumann"},
                                                     {bdryBase::bcType_udfNeumann, "udfNeumann"},
                                                     {bdryBase::bcType_none, "none"}};

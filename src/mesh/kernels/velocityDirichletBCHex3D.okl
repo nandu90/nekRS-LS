@@ -110,6 +110,10 @@
             bc.usrwrk = work;
             bc.fieldOffset = offset;
 
+            bc.meshu = NAN;
+            bc.meshv = NAN;
+            bc.meshw = NAN;
+
             udfDirichlet(&bc);
 
             W[idM + 0 * offset] = bc.meshu;

@@ -67,7 +67,6 @@
           bc.x = x[idM];
           bc.y = y[idM];
           bc.z = z[idM];
-          bc.s = S[idM];
           bc.u = U[idM + 0 * offset];
           bc.v = U[idM + 1 * offset];
           bc.w = U[idM + 2 * offset];
@@ -90,10 +89,12 @@
           bc.t2y = sgeo[sk * p_Nsgeo + p_T2YID];
           bc.t2z = sgeo[sk * p_Nsgeo + p_T2ZID];
 
-          bc.sinterp = 0.0;
-          bc.uinterp = 0.0;
-          bc.vinterp = 0.0;
-          bc.winterp = 0.0;
+          bc.s = NAN;
+
+          bc.sinterp = NAN;
+          bc.uinterp = NAN;
+          bc.vinterp = NAN;
+          bc.winterp = NAN;
 
           if (bcType == p_bcType_interpolation) {
             const int neknekId = neknekPoints[idM];

@@ -225,7 +225,7 @@ void nrs_t::setupEllipticSolvers()
       platform->options.setArgs("VELOCITY NFIELDS", std::to_string(mesh->dim));
     }
 
-    bool unalignedBoundary = bc.unalignedMixedBoundary("velocity");
+    bool unalignedBoundary = bc.hasUnalignedMixed("velocity");
     nekrsCheck(unalignedBoundary && !platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE"),
                platform->comm.mpiComm,
                EXIT_FAILURE,
@@ -313,7 +313,7 @@ void nrs_t::setupEllipticSolvers()
 
     meshSolver = new elliptic("mesh", mesh, fieldOffset, EToB, o_lambda0, o_NULL);
 
-    bool unalignedBoundary = bc.unalignedMixedBoundary("mesh");
+    bool unalignedBoundary = bc.hasUnalignedMixed("mesh");
     if (unalignedBoundary) {
       this->o_zeroNormalMaskMeshVelocity = mesh->createZeroNormalMask(fieldOffset, meshSolver->o_EToB());
       auto f = [this, mesh](dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x) {

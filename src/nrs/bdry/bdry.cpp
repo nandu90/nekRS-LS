@@ -223,6 +223,14 @@ void nrs_t::bdry::scalarSetup(std::string field, std::vector<std::string> slist)
       key = "zeroneumann";
     }
 
+    if (key.compare("robin") == 0) {
+      key = "udfdirichlet/udfneumann";
+    }
+
+    if (key.compare("convective") == 0) {
+      key = "udfdirichlet/udfneumann";
+    }
+
     lowerCase(key);
 
     nekrsCheck(sBcTextToID.find(key) == sBcTextToID.end(),
@@ -687,24 +695,4 @@ void nrs_t::bdry::checkAlignment(mesh_t *mesh) const
   }
 
   nekrsCheck(bail, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "");
-}
-
-bool nrs_t::bdry::unalignedMixedBoundary(std::string field) const
-{
-  const auto nid = size(field);
-
-  for (int bid = 1; bid <= nid; bid++) {
-    const auto bcType = typeId(bid, field);
-    if (bcType == bdryBase::bcType_zeroDirichletN_zeroNeumann) {
-      return true;
-    }
-    if (bcType == bdryBase::bcType_zeroDirichletN_udfNeumann) {
-      return true;
-    }
-    if (bcType == bdryBase::bcType_zeroDirichletT_zeroNeumann) {
-      return true;
-    }
-  }
-
-  return false;
 }

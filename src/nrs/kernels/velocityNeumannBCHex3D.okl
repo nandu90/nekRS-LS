@@ -66,8 +66,8 @@
     }                                                                                                        \
     if (bcType == p_bcType_zeroDirichletN_udfNeumann) {                                                      \
       _strcpy(bc.fieldName, "velocity");                                                                     \
-      bc.tr1 = 0;                                                                                            \
-      bc.tr2 = 0;                                                                                            \
+      bc.tr1 = NAN;                                                                                          \
+      bc.tr2 = NAN;                                                                                          \
       udfNeumann(&bc);                                                                                       \
       TRx = bc.t1x * bc.tr1 + bc.t2x * bc.tr2;                                                               \
       TRy = bc.t1y * bc.tr1 + bc.t2y * bc.tr2;                                                               \

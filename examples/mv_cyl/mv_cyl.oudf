@@ -5,11 +5,11 @@ void udfDirichlet(bcData *bc)
 {
   const dfloat vPiston = p_AMP * sin(p_OMEGA * bc->time);
 
-  if (strCompare(bc->fieldName, "velocity") == 0) {
+  if (bcDataField("velocity")) {
     bc->u = -vPiston * bc->nx;
     bc->v = -vPiston * bc->ny;
     bc->w = -vPiston * bc->nz;
-  } else if (strCompare(bc->fieldName, "mesh") == 0) {
+  } else if (bcDataField("mesh")) {
     bc->meshu = -vPiston * bc->nx;
     bc->meshv = -vPiston * bc->ny;
     bc->meshw = -vPiston * bc->nz;

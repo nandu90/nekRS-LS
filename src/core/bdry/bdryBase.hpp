@@ -27,6 +27,7 @@ public:
   static constexpr int bcType_zeroDirichletT_zeroNeumann = p_bcType_zeroDirichletT_zeroNeumann;
   static constexpr int bcType_zeroNeumann = p_bcType_zeroNeumann;
   static constexpr int bcType_udfNeumann = p_bcType_udfNeumann;
+  static constexpr int bcType_udfRobin = p_bcType_udfRobin;
   static constexpr int bcType_none = p_bcType_none;
 
   virtual ~bdryBase() = default;
@@ -45,6 +46,7 @@ public:
     }
 
     try {
+      lowerCase(field);
       return bToBc.at({field, bid - 1});
     } catch (const std::out_of_range &oor) {
       nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "lookup of bid %d field %s failed!\n", bid, field.c_str());
@@ -85,13 +87,45 @@ public:
 
   virtual void checkAlignment(mesh_t *mesh) const = 0;
 
-  virtual bool unalignedMixedBoundary(std::string field) const = 0;
-
   virtual void addKernelConstants(occa::properties &kernelInfo)
   {
     const std::string installDir = getenv("NEKRS_HOME");
     kernelInfo["includes"].asArray();
     kernelInfo["includes"] += installDir + "/include/core/bdry/bcType.h";
+  };
+
+  bool hasRobin(std::string field) const
+  {
+    const auto nid = size(field);
+ 
+    for (int bid = 1; bid <= nid; bid++) {
+      const auto bcType = typeId(bid, field);
+      if (bcType == bdryBase::bcType_udfRobin) {
+        return true;
+      }
+    }
+ 
+    return false;
+  };
+
+  bool hasUnalignedMixed(std::string field) const
+  {
+    const auto nid = size(field);
+ 
+    for (int bid = 1; bid <= nid; bid++) {
+      const auto bcType = typeId(bid, field);
+      if (bcType == bdryBase::bcType_zeroDirichletN_zeroNeumann) {
+        return true;
+      }
+      if (bcType == bdryBase::bcType_zeroDirichletN_udfNeumann) {
+        return true;
+      }
+      if (bcType == bdryBase::bcType_zeroDirichletT_zeroNeumann) {
+        return true;
+      }
+    }
+ 
+    return false;
   };
 
 protected:

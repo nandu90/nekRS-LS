@@ -173,7 +173,7 @@ void grad_u(dfloat *grad_u_x,
 
 void udfDirichlet(bcData *bc)
 {
-  if (strCompare(bc->fieldName, "velocity") == 0) {
+  if (bcDataField("velocity")) {
     dfloat u, v, w, p;
     exact(&u, &v, &w, &p, bc->x, bc->y, bc->z, bc->time, p_nu);
     bc->u = u;
@@ -181,7 +181,7 @@ void udfDirichlet(bcData *bc)
     bc->w = w;
   }
 
-  if (strCompare(bc->fieldName, "scalar") == 0) {
+  if (bcDataField("scalar")) {
     dfloat u, v, w, p;
     exact(&u, &v, &w, &p, bc->x, bc->y, bc->z, bc->time, p_nu);
     bc->s = u;

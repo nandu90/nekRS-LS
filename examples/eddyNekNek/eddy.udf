@@ -82,11 +82,11 @@ void exact(dfloat *uu, dfloat *vv, dfloat *ww, dfloat xx, dfloat yy, dfloat zz, 
 // Boundary conditions
 void udfDirichlet(bcData *bc)
 {
-  if (strCompare(bc->fieldName, "velocity") == 0) {
+  if (bcDataField("velocity")) {
     bc->u = bc->uinterp;
     bc->v = bc->vinterp;
     bc->w = bc->winterp;
-  } else if (strCompare(bc->fieldName, "scalar") == 0) { 
+  } else if (bcDataField("scalar")) { 
     if(bc->scalarId == 0){
       bc->s = bc->sinterp;
     } else {

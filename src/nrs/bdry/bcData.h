@@ -1,3 +1,6 @@
+#define bcDataField(a) (nekrs_strcmp(bc->fieldName, a) == 0)
+#define strcmp nekrs_strcmp
+
 inline char *_strcpy(char *destination, const char *source)
 {
   char *original_dest = destination;
@@ -19,7 +22,7 @@ inline char _toLower(char c)
   return c;
 }
 
-inline int strCompare(const char *str1, const char *str2)
+inline int nekrs_strcmp(const char *str1, const char *str2)
 {
   while (*str1 != '\0' && *str2 != '\0' && (_toLower(*str1) == _toLower(*str2))) {
     str1++;
@@ -55,13 +58,14 @@ struct bcData {
 
   int scalarId;
   dfloat s, flux;
+  dfloat sInf;
 
-  // interpolated scalar value
+  dfloat h;
+
   dfloat sinterp;
 
   dfloat meshu, meshv, meshw;
 
-  // properties
   dfloat trans, diff;
 
   @globalPtr const dfloat *usrwrk;

@@ -477,14 +477,14 @@ void nrs_t::initInnerStep(double time, dfloat _dt, int tstep)
     }
 
     if (this->flow) {
-      if (bc.unalignedMixedBoundary("velocity")) {
+      if (bc.hasUnalignedMixed("velocity")) {
         this->o_zeroNormalMaskVelocity =
             this->mesh->createZeroNormalMask(fieldOffset, this->uvwSolver->o_EToB());
       }
     }
 
     if (!platform->options.compareArgs("MESH SOLVER", "NONE")) {
-      if (bc.unalignedMixedBoundary("mesh")) {
+      if (bc.hasUnalignedMixed("mesh")) {
         this->o_zeroNormalMaskMeshVelocity =
             this->mesh->createZeroNormalMask(fieldOffset, this->meshSolver->o_EToB());
       }

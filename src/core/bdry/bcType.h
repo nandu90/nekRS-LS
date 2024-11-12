@@ -27,11 +27,13 @@
 #define p_bcType_zeroDirichletXY_zeroNeumann 14
 #define p_bcType_zeroDirichletT_zeroNeumann 15
 
-#define p_bcType_zeroNeumann 16
-#define p_bcType_udfNeumann 17
+#define p_bcType_udfRobin 16
 
-#define p_bcType_none 18 
+#define p_bcType_zeroNeumann 17
+#define p_bcType_udfNeumann 18
 
-#define p_NBcType 18
+#define p_bcType_none 19 
+
+#define p_NBcType 19
 
 #endif

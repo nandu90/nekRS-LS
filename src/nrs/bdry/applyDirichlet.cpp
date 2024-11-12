@@ -41,7 +41,7 @@ void nrs_t::applyZeroNormalMask(mesh_t *mesh,
 
 void nrs_t::applyDirichletVelocity(double time, occa::memory &o_U, occa::memory &o_Ue, occa::memory &o_P)
 {
-  if (bc.unalignedMixedBoundary("velocity")) {
+  if (bc.hasUnalignedMixed("velocity")) {
     applyZeroNormalMask(mesh, uvwSolver->o_EToB(), o_zeroNormalMaskVelocity, o_U);
     applyZeroNormalMask(mesh, uvwSolver->o_EToB(), o_zeroNormalMaskVelocity, o_Ue);
   }
@@ -208,7 +208,7 @@ void nrs_t::applyDirichletScalars(double time, occa::memory &o_S, occa::memory &
 void nrs_t::applyDirichletMesh(double time, occa::memory &o_UM, occa::memory &o_UMe, occa::memory &o_U)
 {
   auto mesh = (cht) ? cds->mesh[0] : this->mesh;
-  if (bc.unalignedMixedBoundary("mesh")) {
+  if (bc.hasUnalignedMixed("mesh")) {
     applyZeroNormalMask(mesh, meshSolver->o_EToB(), o_zeroNormalMaskMeshVelocity, o_UM);
     applyZeroNormalMask(mesh, meshSolver->o_EToB(), o_zeroNormalMaskMeshVelocity, o_UMe);
   }

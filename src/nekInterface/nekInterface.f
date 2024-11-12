@@ -708,6 +708,8 @@ c-----------------------------------------------------------------------
           ibc = p_bcType_zeroNeumann 
         else if (c.eq.'f  ') then 
           ibc = p_bcType_udfNeumann 
+        else if (c.eq.'c  ') then 
+          ibc = p_bcType_udfRobin 
         endif
       endif
 
@@ -870,6 +872,8 @@ c-----------------------------------------------------------------------
           bcType = p_bcType_zeroNeumann
       else if(cb.eq.'f  ') then 
           bcType = p_bcType_udfNeumann
+      else if(cb.eq.'c  ') then 
+          bcType = p_bcType_udfRobin
       endif
 
       if (bcType.eq.-1 .and. (cb.ne.'E  ' .and. cb.ne.'P  ')) then

@@ -27,7 +27,8 @@
 #define surfaceTerms(sk, face, i, j)                                                                         \
   {                                                                                                          \
     const dlong bcType = EToB[face + p_Nfaces * e + scalarId * EToBOffset];                                  \
-    if (bcType == p_bcType_udfNeumann) {                                                                     \
+    s_ndU[j][i] = 0;                                                                                         \
+    if (bcType == p_bcType_udfNeumann || bcType == p_bcType_udfRobin) {                                      \
       struct bcData bc;                                                                                      \
       _strcpy(bc.fieldName, "scalar");                                                                       \
       bc.idM = vmapM[sk];                                                                                    \
@@ -55,11 +56,16 @@
       bc.usrwrk = W;                                                                                         \
       const dfloat WsJ = sgeo[sk * p_Nsgeo + p_WSJID];                                                       \
       bc.scalarId = scalarId;                                                                                \
-      bc.flux = 0;                                                                                           \
+      bc.flux = NAN;                                                                                         \
+      if (bcType == p_bcType_udfRobin) {                                                                     \
+        bc.sInf = NAN;                                                                                       \
+        bc.h = NAN;                                                                                          \
+        udfRobin(&bc);                                                                                       \
+        bc.flux = bc.h * bc.sInf;                                                                            \
+        s_lhsU[j][i] = bc.h * WsJ * sgeo[sk * p_Nsgeo + p_IJWID];                                            \
+      }                                                                                                      \
       udfNeumann(&bc);                                                                                       \
-      s_ndU[j][i] = -WsJ * (bc.flux);                                                                        \
-    } else {                                                                                                 \
-      s_ndU[j][i] = 0;                                                                                       \
+      s_ndU[j][i] = -WsJ * bc.flux;                                                                          \
     }                                                                                                        \
   }
 
@@ -83,13 +89,16 @@
                             @ restrict const dfloat *diff,
                             @ restrict const dfloat *rho,
                             @ restrict const dfloat *W,
+                            @ restrict dfloat *lhsU,
                             @ restrict dfloat *rhsU)
 {
   for (dlong scalarId = startScalar; scalarId < (startScalar + Nscalars); ++scalarId; @outer(1)) {
     for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
       @shared dfloat s_ndU[p_Nq][p_Nq];
+      @shared dfloat s_lhsU[p_Nq][p_Nq];
 
-      @exclusive dfloat r_rhsU[p_Nq]; // array  for results Au(i,j,0:N)
+      @exclusive dfloat r_rhsU[p_Nq];
+      @exclusive dfloat r_lhsU[p_Nq];
 
       // for all face nodes of all elements
       // face 0
@@ -98,7 +107,8 @@
 
 #pragma unroll p_Nq
           for (int k = 0; k < p_Nq; ++k) {
-            r_rhsU[k] = 0.f;
+            r_rhsU[k] = 0;
+            r_lhsU[k] = 0;
           }
 
           const dlong sk0 = e * p_Nfp * p_Nfaces + 0 * p_Nfp + i + j * p_Nq;
@@ -114,6 +124,7 @@
           // face 0
           if (EToBM[e * p_Nfaces + 0] > 0) {
             r_rhsU[0] += s_ndU[j][i];
+            r_lhsU[0] += s_lhsU[j][i];
           }
         }
       }
@@ -136,6 +147,7 @@
           // face 5
           if (EToBM[e * p_Nfaces + 5] > 0) {
             r_rhsU[p_Nq - 1] += s_ndU[j][i];
+            r_lhsU[p_Nq - 1] += s_lhsU[j][i];
           }
         }
       }
@@ -160,6 +172,7 @@
             for (int k = 0; k < p_Nq; k++) {
               if (EToBM[e * p_Nfaces + 1] > 0) {
                 r_rhsU[k] += s_ndU[k][i];
+                r_lhsU[k] += s_lhsU[k][i];
               }
             }
           }
@@ -186,6 +199,7 @@
             for (int k = 0; k < p_Nq; k++) {
               if (EToBM[e * p_Nfaces + 3] > 0) {
                 r_rhsU[k] += s_ndU[k][i];
+                r_lhsU[k] += s_lhsU[k][i];
               }
             }
           }
@@ -212,6 +226,7 @@
             for (int k = 0; k < p_Nq; k++) {
               if (EToBM[e * p_Nfaces + 2] > 0) {
                 r_rhsU[k] += s_ndU[k][j];
+                r_lhsU[k] += s_lhsU[k][j];
               }
             }
           }
@@ -238,6 +253,7 @@
             for (int k = 0; k < p_Nq; k++) {
               if (EToBM[e * p_Nfaces + 4] > 0) {
                 r_rhsU[k] += s_ndU[k][j];
+                r_lhsU[k] += s_lhsU[k][j];
               }
             }
           }
@@ -252,6 +268,7 @@
           for (int k = 0; k < p_Nq; k++) {
             const dlong id = e * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
             rhsU[id + scalarId * outputOffset] -= r_rhsU[k];
+            lhsU[id + scalarId * outputOffset] = r_lhsU[k];
           }
         }
       }
