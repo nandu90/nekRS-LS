@@ -28,6 +28,7 @@
   {                                                                                                          \
     const dlong bcType = EToB[face + p_Nfaces * e + scalarId * EToBOffset];                                  \
     s_ndU[j][i] = 0;                                                                                         \
+    s_lhsU[j][i] = 0;                                                                                        \
     if (bcType == p_bcType_udfNeumann || bcType == p_bcType_udfRobin) {                                      \
       struct bcData bc;                                                                                      \
       _strcpy(bc.fieldName, "scalar");                                                                       \
