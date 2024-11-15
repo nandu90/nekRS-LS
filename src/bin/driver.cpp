@@ -314,6 +314,7 @@ int main(int argc, char** argv)
       if (nekrs::printStepInfoFreq()) {
         if (tStep % nekrs::printStepInfoFreq() == 0) {
           nekrs::printStepInfo(timeNew, tStep, true, false);
+          if (rank == 0) std::cout << "::" << std::endl; 
         }
       }
  

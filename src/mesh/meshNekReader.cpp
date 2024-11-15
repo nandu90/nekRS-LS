@@ -24,14 +24,14 @@ void meshNekReaderHex3D(int N, mesh_t *mesh)
     mesh->Nelements = nekData.nelv;
   }
 
+  // mapping from nek5000
+  const int vtxMap[] = {0, 1, 3, 2, 4, 5, 7, 6};
+  const int faceMap[] = {1, 2, 3, 4, 0, 5};
+
   const int faceVertices[6][4] =
       {{0, 1, 2, 3}, {0, 1, 5, 4}, {1, 2, 6, 5}, {2, 3, 7, 6}, {3, 0, 4, 7}, {4, 5, 6, 7}};
   mesh->faceVertices = (int *)calloc(mesh->NfaceVertices * mesh->Nfaces, sizeof(int));
   memcpy(mesh->faceVertices, faceVertices[0], mesh->NfaceVertices * mesh->Nfaces * sizeof(int));
-
-  // pre-processor maps
-  const int vtxMap[] = {0, 1, 3, 2, 4, 5, 7, 6};
-  const int faceMap[] = {1, 2, 3, 4, 0, 5};
 
   // generate element vertex numbering
   mesh->Nnodes = nek::set_glo_num(2, mesh->cht);

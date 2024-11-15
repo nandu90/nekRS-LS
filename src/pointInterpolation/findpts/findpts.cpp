@@ -45,7 +45,9 @@ template <int N> struct evalOutPt_t {
   int index, proc;
 };
 
+// define some internal structs to avoid including headers (ensure definitions match)
 extern "C" {
+
 struct hash_data_3 {
   ulong hash_n;
   struct dbl_range bnd[findpts::dim];
@@ -67,18 +69,32 @@ struct findpts_data_3 {
   uint fevsetup;
 };
 
-auto *gslibFindptsSetup(MPI_Comm mpi_comm,
-                        const dfloat *const _elx[findpts::dim],
-                        const dlong n[findpts::dim],
-                        const dlong nel,
-                        const dlong m[findpts::dim],
-                        const dfloat bbox_tol,
-                        const dlong local_hash_size,
-                        const dlong global_hash_size,
-                        const dlong npt_max,
-                        const dfloat newt_tol,
-                        const dlong nsid,
-                        const dfloat *const _distfint)
+uint hash_opt_size_3(struct findpts_local_hash_data_3 *p,
+                     const struct obbox_3 *const obb,
+                     const uint nel,
+                     const uint max_size);
+} // extern "C"
+
+static dlong getHashSize(const struct findpts_data_3 *fd, dlong nel, dlong max_hash_size)
+{
+  const findpts_local_data_3 *fd_local = &fd->local;
+  auto hash_data_copy = fd_local->hd;
+  return hash_opt_size_3(&hash_data_copy, fd_local->obb, nel, max_hash_size);
+};
+
+// wrapper using gslib
+static auto gslibFindptsSetup(MPI_Comm mpi_comm,
+                              const dfloat *const _elx[findpts::dim],
+                              const dlong n[findpts::dim],
+                              const dlong nel,
+                              const dlong m[findpts::dim],
+                              const dfloat bbox_tol,
+                              const dlong local_hash_size,
+                              const dlong global_hash_size,
+                              const dlong npt_max,
+                              const dfloat newt_tol,
+                              const dlong nsid,
+                              const dfloat *const _distfint)
 {
 
   bool useMultiSessionSupport = _distfint != nullptr;
@@ -141,7 +157,6 @@ auto *gslibFindptsSetup(MPI_Comm mpi_comm,
   comm_free(&gs_comm);
   return h;
 }
-} // extern "C"
 
 namespace findpts
 {
@@ -555,20 +570,6 @@ void findpts_t::findptsEvalImpl(occa::memory &o_out,
   }
 }
 
-extern "C" {
-uint hash_opt_size_3(struct findpts_local_hash_data_3 *p,
-                     const struct obbox_3 *const obb,
-                     const uint nel,
-                     const uint max_size);
-}
-
-dlong getHashSize(const struct findpts_data_3 *fd, dlong nel, dlong max_hash_size)
-{
-  const findpts_local_data_3 *fd_local = &fd->local;
-  auto hash_data_copy = fd_local->hd;
-  return hash_opt_size_3(&hash_data_copy, fd_local->obb, nel, max_hash_size);
-}
-
 findpts_t::findpts_t(MPI_Comm comm,
                      const dfloat *const x,
                      const dfloat *const y,
@@ -701,19 +702,6 @@ findpts_t::findpts_t(MPI_Comm comm,
     this->o_max.copyFrom(maxBound.data(), maxBound.size());
   }
 
-  auto hash = findptsData->local.hd;
-  dfloat hashMin[dim];
-  dfloat hashFac[dim];
-  for (int d = 0; d < dim; ++d) {
-    hashMin[d] = hash.bnd[d].min;
-    hashFac[d] = hash.fac[d];
-  }
-  this->hash_n = hash.hash_n;
-  this->o_hashMin = platform->device.malloc<dfloat>(dim);
-  this->o_hashFac = platform->device.malloc<dfloat>(dim);
-  this->o_hashMin.copyFrom(hashMin, dim);
-  this->o_hashFac.copyFrom(hashFac, dim);
-
   std::string orderSuffix = "_" + std::to_string(Nq - 1);
 
   this->localEvalKernel = platform->kernelRequests.load("findptsLocalEval" + orderSuffix);
@@ -727,11 +715,23 @@ findpts_t::findpts_t(MPI_Comm comm,
   this->o_wtend_y.copyFrom(findptsData->local.fed.wtend[1], 6 * Nq);
   this->o_wtend_z.copyFrom(findptsData->local.fed.wtend[2], 6 * Nq);
 
-  const auto hd_d_size = getHashSize(findptsData, Nelements, local_hash_size);
+  auto hash = findptsData->local.hd;
+  dfloat hashMin[dim];
+  dfloat hashFac[dim];
+  for (int d = 0; d < dim; ++d) {
+    hashMin[d] = hash.bnd[d].min;
+    hashFac[d] = hash.fac[d];
+  }
+  this->hash_n = hash.hash_n;
+  this->o_hashMin = platform->device.malloc<dfloat>(dim);
+  this->o_hashFac = platform->device.malloc<dfloat>(dim);
+  this->o_hashMin.copyFrom(hashMin, dim);
+  this->o_hashFac.copyFrom(hashFac, dim);
 
+  const auto hd_d_size = getHashSize(findptsData, Nelements, local_hash_size);
   std::vector<dlong> offsets(hd_d_size, 0);
   for (dlong i = 0; i < hd_d_size; ++i) {
-    offsets[i] = findptsData->local.hd.offset[i];
+    offsets[i] = hash.offset[i];
   }
   this->o_offset = platform->device.malloc<dlong>(offsets.size());
   this->o_offset.copyFrom(offsets.data(), offsets.size());

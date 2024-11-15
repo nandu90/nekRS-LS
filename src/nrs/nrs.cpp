@@ -1461,11 +1461,12 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool print
     computeDivUErr(this, divUErrVolAvg, divUErrL2);
   }
 
-  auto printSolverInfo = [](elliptic *solver, const std::string &name) {
+  auto printSolverInfo = [tstep](elliptic *solver, const std::string &name) {
     const auto [prevProjVecs, nProjVecs] = solver->projectionCounters();
     if (nProjVecs > 0) {
       if (prevProjVecs > 0) {
-        printf("%-10s: resNorm0 %.2e  resNorm %.2e  ratio = %.3e  %d/%d\n",
+        printf("step=%-8d %-10s: resNorm0 %.2e  resNorm %.2e  ratio = %.3e  %d/%d\n",
+               tstep,
                std::string("proj" + name).c_str(),
                solver->initialResidual(),
                solver->initialGuessResidual(),
@@ -1474,7 +1475,8 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool print
                nProjVecs);
       }
     }
-    printf("%-10s: iter %03d  resNorm0 %.2e  resNorm %.2e\n",
+    printf("step=%-8d %-10s: iter %03d  resNorm0 %.2e  resNorm %.2e\n",
+           tstep,
            name.c_str(),
            solver->Niter(),
            solver->initialGuessResidual(),
@@ -1495,7 +1497,7 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool print
       }
 
       if (this->neknek) {
-        printf("%-10s: sync %.2e  exchange %.2e\n", "neknek", this->neknek->tSync(), this->neknek->tExch());
+        printf("step=%-8d %-10s: sync %.2e  exchange %.2e\n", tstep, "neknek", this->neknek->tSync(), this->neknek->tExch());
       }
 
       if (this->flow) {
@@ -1509,7 +1511,7 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool print
           printSolverInfo(this->vSolver, "V");
           printSolverInfo(this->wSolver, "W");
         }
-        printf("%-10s: %.2e  %.2e\n", "divUErr", divUErrVolAvg, divUErrL2);
+        printf("step=%-8d %-10s: %.2e  %.2e\n", tstep, "divUErr", divUErrVolAvg, divUErrL2);
       }
 
       if (this->meshSolver) {
@@ -1524,14 +1526,11 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool print
     const auto printTimers = printStepInfo && this->timeStepConverged;
 
     if (printStepInfo) {
-      printf("step= %d  t= %.8e  dt=%.1e  C= %.3f", tstep, time, this->dt[0], cfl);
-      if (!printTimers) {
-        std::cout << std::endl;
-      }
+      printf("step=%-8d t= %.8e  dt=%.1e  C= %.3f\n", tstep, time, this->dt[0], cfl);
     }
 
     if (printTimers) {
-      printf("  elapsedStep= %.2es  elapsedStepSum= %.5es\n", elapsedStep, elapsedStepSum);
+      printf("step=%-8d elapsedStep= %.2es  elapsedStepSum= %.5es\n", tstep, elapsedStep, elapsedStepSum);
     }
   }
 

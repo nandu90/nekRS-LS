@@ -53,7 +53,7 @@ fi
 
 if [ $nsessions -gt 1 ]; then
   if [ $nodes -lt $nsessions ]; then
-    echo "ERROR: number of nodes is smaller than number of sessions!"
+    echo "ERROR: number of ranks in $case.sess is larger than job size"
     exit 1
   fi
 fi
