@@ -1,5 +1,7 @@
+userSections = CASEDATA
+
 [GENERAL]
-#verbose = true 
+verbose = false 
 polynomialOrder = 9
 #startFrom = "restart.fld"
 stopAt = numSteps
@@ -8,27 +10,28 @@ dt = 2e-03
 timeStepper = tombo3
 checkpointControl = simulationTime 
 checkpointInterval = 0.1
+scalars = VELX_DIR, VELX_NEU
 
-[PRESSURE]
+[FLUID PRESSURE]
 residualTol = 1e-08
 
-[VELOCITY]
+[FLUID VELOCITY]
 boundaryTypeMap = udfDirichlet 
 residualTol = 1e-12
 rho = 1.0
 viscosity = 1/100
 
-[SCALAR00]
+[SCALAR VELX_DIR]
 boundaryTypeMap = udfDirichlet 
 residualTol = 1e-12
-rho = 1.0
-diffusivity = 1/100
+transportCoeff = 1.0
+diffusionCoeff = 1/100
 
-[SCALAR01]
+[SCALAR VELX_NEU]
 boundaryTypeMap = udfNeumann
 residualTol = 1e-12
-rho = 1.0
-diffusivity = 1/100
+transportCoeff = 1.0
+diffusionCoeff = 1/100
 
 [CASEDATA]
 P_U0 = 0.5

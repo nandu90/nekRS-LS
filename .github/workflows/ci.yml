@@ -24,7 +24,7 @@ defaults:
 jobs:
 
   install:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
 
     - uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
 
   ethier:
     needs: install
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
 
     - uses: actions/checkout@v4
@@ -91,7 +91,7 @@ jobs:
 
   lowMach:
     needs: install
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
 
     - uses: actions/checkout@v4
@@ -118,7 +118,7 @@ jobs:
 
   mv_cyl:
     needs: install
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
 
     - uses: actions/checkout@v4
@@ -149,7 +149,7 @@ jobs:
 
   conj_ht:
     needs: install
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
 
     - uses: actions/checkout@v4
@@ -176,7 +176,7 @@ jobs:
 
   channel:
     needs: install
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
 
     - uses: actions/checkout@v4
@@ -203,7 +203,7 @@ jobs:
 
   shlChannel:
     needs: install
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
 
     - uses: actions/checkout@v4
@@ -230,7 +230,7 @@ jobs:
 
   eddyNekNek:
     needs: install
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
 
     - uses: actions/checkout@v4
@@ -261,7 +261,7 @@ jobs:
 
   ktauChannel:
     needs: install
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
 
     - uses: actions/checkout@v4

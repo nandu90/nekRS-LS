@@ -13,14 +13,14 @@ static dfloat visc;
 
 void userf(double time)
 {
-  auto mesh = nrs->mesh;
+  auto mesh = nrs->meshV;
   const dfloat DP = 3.0 * visc;
-  cfill(mesh->Nlocal, nrs->fieldOffset, P_ROT, DP, nrs->o_NLT);
+  cfill(mesh->Nlocal, nrs->fieldOffset, P_ROT, DP, nrs->fluid->o_EXT);
 }
 
 void UDF_LoadKernels(deviceKernelProperties &kernelInfo)
 {
-  platform->options.getArgs("VISCOSITY", visc);
+  platform->options.getArgs("FLUID VISCOSITY", visc);
   kernelInfo.define("p_visc") = visc;
 }
 
@@ -38,7 +38,7 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 
 void UDF_Setup()
 {
-  nrs->userVelocitySource = &userf;
+  nrs->userSource = &userf;
 }
 
 void UDF_ExecuteStep(double time, int tstep)

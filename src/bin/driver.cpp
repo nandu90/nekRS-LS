@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------*\
-   Copyright (c) 2019-2024, UCHICAGO ARGONNE, LLC.
+   Copyright (c) 2019-2025, UCHICAGO ARGONNE, LLC.
 
    The UChicago Argonne, LLC as Operator of Argonne National
    Laboratory holds copyright in the Software. The copyright holder

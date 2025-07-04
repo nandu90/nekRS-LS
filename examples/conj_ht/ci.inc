@@ -52,7 +52,8 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, int tstep)
     return;
   }
 
-  auto interp = pointInterpolation_t(nrs->cds->mesh[0], platform->comm.mpiComm);
+  auto& scalar = nrs->scalar;
+  auto interp = pointInterpolation_t(scalar->mesh(1), platform->comm.mpiComm);
 
   std::vector<dfloat> x = {4, 4, 4};
   std::vector<dfloat> y = {-0.25, 0.25, 1.0};
@@ -64,7 +65,7 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, int tstep)
   interp.find(verbosity);
 
   auto o_Tint = platform->device.malloc<dfloat>(nPoints);
-  interp.eval(1, nrs->fieldOffset, nrs->cds->o_S, nPoints, o_Tint);
+  interp.eval(1, scalar->fieldOffset(), scalar->o_solution("temperature"), nPoints, o_Tint);
   std::vector<dfloat> Tint(nPoints);
   o_Tint.copyTo(Tint.data(), nPoints);
 
@@ -98,9 +99,11 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, int tstep)
 
 void ciTestErrors(nrs_t *nrs, double time, int tstep)
 {
-  if (nrs->cds->cvode) {
-    numCVODERHS += nrs->cds->cvode->numRHSEvals();
-    numCVODERHS += nrs->cds->cvode->numLinIters();
+  auto& scalar = nrs->scalar;
+
+  if (scalar->cvode) {
+    numCVODERHS += scalar->cvode->numRHSEvals();
+    numCVODERHS += scalar->cvode->numLinIters();
   }
 
   if (!nrs->lastStep) {
@@ -128,7 +131,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
 
   (vxErr < EPS && sErr < EPS) ? (CiPassTest()) : (CiFailTest());
 
-  if (nrs->cds->cvode) {
+  if (scalar->cvode) {
     dfloat expectedCVODERHS = 13.11;
     if (rank == 0) {
       printf("CVODE RHS evaluations per timestep: expected = %g, actual = %g\n",

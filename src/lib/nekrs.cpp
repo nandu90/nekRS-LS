@@ -12,7 +12,7 @@
 #include "AMGX.hpp"
 #include "hypreWrapper.hpp"
 #include "hypreWrapperDevice.hpp"
-#include "compileKernels.hpp"
+#include "registerKernels.hpp"
 #include "tavg.hpp"
 
 // define extern variable from nekrsSys.hpp
@@ -21,8 +21,6 @@ platform_t *platform;
 namespace
 {
 
-static nrs_t *nrs = nullptr;
-
 static int rank, size;
 static MPI_Comm commg, comm;
 
@@ -30,7 +28,6 @@ static double currDt;
 static int enforceLastStep = 0;
 static int enforceCheckpointStep = 0;
 static bool initialized = false;
-std::string outputMeshSave;
 
 void printFileStdout(std::string file)
 {
@@ -48,9 +45,7 @@ setupAide *setDefaultSettings(std::string casename)
 
   options->setArgs("FORMAT", std::string("1.0"));
 
-  options->setArgs("VERBOSE SOLVER INFO", "TRUE");
-
-  options->setArgs("EQUATION TYPE", "NAVIERSTOKES");
+  options->setArgs("APPLICATION", "NRS");
 
   options->setArgs("ELEMENT TYPE", std::string("12")); /* HEX */
   options->setArgs("ELEMENT MAP", std::string("ISOPARAMETRIC"));
@@ -79,15 +74,11 @@ setupAide *setDefaultSettings(std::string casename)
 
   options->setArgs("ENABLE GS COMM OVERLAP", "TRUE");
 
+#if 1
   options->setArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "L2_RESIDUAL");
-
-  const auto dropTol = 5.0 * std::numeric_limits<pfloat>::epsilon();
-  options->setArgs("AMG DROP TOLERANCE", to_string_f(setPrecision(dropTol, 2)));
-
-  if (options->compareArgs("EQUATION TYPE", "NAVIERSTOKES") ||
-      options->compareArgs("EQUATION TYPE", "STOKES")) {
-    nrsSetDefaultSettings(options);
-  }
+#else
+  options->setArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "LEGACY");
+#endif
 
   return options;
 }
@@ -173,13 +164,11 @@ void setup(MPI_Comm commg_in,
   // precedence: cmd arg, par, env-var
   if (options->getArgs("THREAD MODEL").length() == 0) {
     std::string value(getenv("NEKRS_OCCA_MODE_DEFAULT"));
-    upperCase(value);
-    options->setArgs("THREAD MODEL", value);
+    options->setArgs("THREAD MODEL", upperCase(value));
   }
   if (!_backend.empty()) {
     std::string value(_backend);
-    upperCase(value);
-    options->setArgs("THREAD MODEL", value);
+    options->setArgs("THREAD MODEL", upperCase(value));
   }
   if (!_deviceID.empty()) {
     options->setArgs("DEVICE NUMBER", _deviceID);
@@ -189,15 +178,29 @@ void setup(MPI_Comm commg_in,
   platform = platform_t::getInstance(*options, commg, comm);
   platform->par = par;
 
-  if (options->compareArgs("EQUATION TYPE", "NAVIERSTOKES") ||
-      options->compareArgs("EQUATION TYPE", "STOKES")) {
-    nrs = new nrs_t();
+  if (options->compareArgs("APPLICATION", "NRS")) {
+    static auto nrs = new nrs_t();
+    platform->solver = nrs;
+    platform->solver->bc = &nrs->bc;
   }
+
+  nekrsCheck(platform->solver == nullptr, 
+             platform->comm.mpiComm, 
+             EXIT_FAILURE, 
+             "%s\n", 
+             "Invalid platform->solver!");
 
   if (rank == 0) {
     std::cout << "using NEKRS_HOME: " << getenv("NEKRS_HOME") << std::endl;
     std::cout << "using NEKRS_CACHE_DIR: " << getenv("NEKRS_CACHE_DIR") << std::endl;
     std::cout << "using OCCA_CACHE_DIR: " << occa::env::OCCA_CACHE_DIR << std::endl << std::endl;
+
+    if (debug) {
+      std::cout << "Options:\n";
+      std::cout << "====================\n";
+      std::cout << platform->options << "\n";
+      std::cout << "====================\n";
+    }
   }
 
   platform->options.setArgs("CI-MODE", std::to_string(ciMode));
@@ -217,7 +220,9 @@ void setup(MPI_Comm commg_in,
     setenv("PARRSB_FIND_DISCONNECTED_COMPONENTS", "1", 1);
   }
 
-  nek::bootstrap();
+  platform->solver->bc->setup(); 
+
+  nek::bootstrap(); // call here because udf.setup0 might use nek varibales
 
   // jit compile udf
   std::string udfFile;
@@ -232,7 +237,6 @@ void setup(MPI_Comm commg_in,
 
   if (!udfFile.empty()) {
     udfLoad();
-    // nek variables might be accessed
     if (udf.setup0) {
       udf.setup0(comm, platform->options);
     }
@@ -255,12 +259,8 @@ void setup(MPI_Comm commg_in,
       kernelInfoUDF = props;
     }
 
-    registerCoreKernels();
-    registerPointInterpolationKernels();
-    registerMeshKernels(kernelInfoUDF);
-    if (platform->solver->id() == "nrs") {
-      registerNrsKernels(kernelInfoUDF);
-    }
+    registerCoreKernels(kernelInfoUDF);
+    platform->solver->registerKernels(kernelInfoUDF);
 
     platform->options.removeArgs("REGISTER ONLY");
   };
@@ -314,15 +314,13 @@ void setup(MPI_Comm commg_in,
     return;
   }
 
-  // now just load
+  // now just load compiled kernels
   loadComponents(false);
 
-  if (nrs) {
-    nrs->init();
+  platform->linAlg = linAlg_t::getInstance();
 
-    if (neknekCoupled()) {
-      new neknek_t(nrs, nSessions, sessionID);
-    }
+  if (platform->solver) {
+    platform->solver->init();
   }
 
   platform->options.removeArgs("REGISTER ONLY"); // not required anymore
@@ -336,12 +334,8 @@ void setup(MPI_Comm commg_in,
 
   platform->flopCounter->clear();
 
-  if (rank == 0) {
-    std::cout << std::endl;
-  }
-  if (nrs) {
-    nrs->printMinMax();
-  }
+  platform->solver->printSolutionMinMax();
+
   if (rank == 0) {
     std::cout << std::endl;
   }
@@ -352,8 +346,8 @@ void setup(MPI_Comm commg_in,
 
 void udfExecuteStep(double time, int tstep, int checkpointStep)
 {
-  nrs->checkpointStep = checkpointStep;
-  if (nrs->checkpointStep) {
+  platform->solver->checkpointStep = checkpointStep;
+  if (platform->solver->checkpointStep) {
     nek::ifoutfld(1);
   }
 
@@ -365,12 +359,7 @@ void udfExecuteStep(double time, int tstep, int checkpointStep)
 
   // reset
   nek::ifoutfld(0);
-  nrs->checkpointStep = 0;
-}
-
-void nekUserchk(void)
-{
-  nek::userchk();
+  platform->solver->checkpointStep = 0;
 }
 
 std::tuple<double, double> dt(int tstep)
@@ -380,7 +369,7 @@ std::tuple<double, double> dt(int tstep)
 
   if (platform->options.compareArgs("VARIABLE DT", "TRUE")) {
     if (platform->options.getArgs("DT").empty() && tstep == 1 || tstep > 1) {
-      dt_ = nrs->adjustDt(tstep);
+      dt_ = platform->solver->adjustDt(tstep);
 
       // limit dt change
       dfloat maxAdjustDtRatio = 1;
@@ -389,10 +378,10 @@ std::tuple<double, double> dt(int tstep)
       platform->options.getArgs("MIN ADJUST DT RATIO", minAdjustDtRatio);
 
       if (tstep > 1) {
-        dt_ = std::max(dt_, minAdjustDtRatio * nrs->dt[0]);
+        dt_ = std::max(dt_, minAdjustDtRatio * platform->solver->dt[0]);
       }
       if (tstep > 1) {
-        dt_ = std::min(dt_, maxAdjustDtRatio * nrs->dt[0]);
+        dt_ = std::min(dt_, maxAdjustDtRatio * platform->solver->dt[0]);
       }
 
       dfloat maxDt = 0;
@@ -406,10 +395,10 @@ std::tuple<double, double> dt(int tstep)
   // limit dt to 5 significant digits
   dt_ = setPrecision(dt_, 5);
 
-  if (nrs->neknek) {
+  if (platform->solver->neknek) {
     // call only once as neknek doesn't support variable dt
     if (tstep == 1) {
-      dt_ = nrs->neknek->adjustDt(dt_);
+      dt_ = platform->solver->neknek->adjustDt(dt_);
     }
   }
 
@@ -468,12 +457,12 @@ int checkpointStep(double time, int tStep)
 
 void checkpointStep(int val)
 {
-  nrs->checkpointStep = val;
+  platform->solver->checkpointStep = val;
 }
 
 void writeCheckpoint(double time, int step)
 {
-  nrs->writeCheckpoint(time, step);
+  platform->solver->writeCheckpoint(time, step);
 }
 
 double endTime(void)
@@ -492,17 +481,17 @@ int numSteps(void)
 
 void lastStep(int val)
 {
-  nrs->lastStep = val;
+  platform->solver->lastStep = val;
 }
 
 int lastStep(double timeNew, int tstep, double elapsedTime)
 {
-  int last = nrs->setLastStep(timeNew, tstep, elapsedTime);
+  int last = platform->solver->setLastStep(timeNew, tstep, elapsedTime);
   if (enforceLastStep) {
     last = 1;
   }
-  nrs->lastStep = last;
-  return nrs->lastStep;
+  platform->solver->lastStep = last;
+  return platform->solver->lastStep;
 }
 
 int runTimeStatFreq()
@@ -608,7 +597,7 @@ void processUpdFile()
 
 void printStepInfo(double time, int tstep, bool printStepInfo, bool printVerboseInfo)
 {
-  nrs->printStepInfo(time, tstep, printStepInfo, printVerboseInfo);
+  platform->solver->printStepInfo(time, tstep, printStepInfo, printVerboseInfo);
 }
 
 void updateTimer(const std::string &key, double time)
@@ -628,31 +617,31 @@ int exitValue()
 
 void initStep(double time, double dt, int tstep)
 {
-  nrs->initStep(time, dt, tstep);
+  platform->solver->initStep(time, dt, tstep);
   currDt = dt;
 }
 
 bool runStep(std::function<bool(int)> convergenceCheck, int corrector)
 {
-  return nrs->runStep(convergenceCheck, corrector);
+  return platform->solver->runStep(convergenceCheck, corrector);
 }
 
 bool runStep(int corrector)
 {
   std::function<bool(int)> check = [](int corrector) -> bool {
-    if (nrs->userConvergenceCheck) {
-      return nrs->userConvergenceCheck(corrector);
+    if (platform->solver->userConvergenceCheck) {
+      return platform->solver->userConvergenceCheck(corrector);
     } else {
       return true;
     }
   };
 
-  return nrs->runStep(check, corrector);
+  return platform->solver->runStep(check, corrector);
 }
 
 int timeStep()
 {
-  return nrs->tstep;
+  return platform->solver->tstep;
 }
 
 double finalTimeStepSize(double time)
@@ -665,21 +654,19 @@ double finalTimeStepSize(double time)
 
 void finishStep()
 {
-  nrs->finishStep();
+  platform->solver->finishStep();
 }
 
 bool stepConverged()
 {
-  return nrs->timeStepConverged;
+  return platform->solver->timeStepConverged;
 }
 
 int finalize()
 {
   int exitValue = nekrs::exitValue();
   if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
-    nrs->finalize();
-
-    tavg::free();
+    platform->solver->finalize();
 
     hypreWrapper::finalize();
     hypreWrapperDevice::finalize();

@@ -28,7 +28,6 @@ void writeCheckpoint(double time, int step);
 int checkpointStep(double time, int tStep);
 void checkpointStep(int val);
 int finalize();
-void nekUserchk(void);
 int runTimeStatFreq();
 int printStepInfoFreq();
 int updateFileCheckFreq();

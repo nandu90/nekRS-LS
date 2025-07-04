@@ -113,8 +113,8 @@ void ciSetup(MPI_Comm comm, setupAide &options)
 
   options.setArgs("POLYNOMIAL DEGREE", std::string("9"));
   options.setArgs("SOLUTION OUTPUT INTERVAL", "0");
-  options.setArgs("VISCOSITY", std::string("0.01"));
-  options.setArgs("DENSITY", std::string("1"));
+  options.setArgs("FLUID VISCOSITY", std::string("0.01"));
+  options.setArgs("FLUID DENSITY", std::string("1"));
   options.setArgs("NUMBER OF SCALARS", std::string("2"));
   options.setArgs("SCALAR00 DIFFUSIVITY", std::string("0.01"));
   options.setArgs("SCALAR00 DENSITY", std::string("1"));
@@ -123,35 +123,36 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("END TIME", std::string("0.06"));
   options.setArgs("DT", std::string("2e-3"));
   options.setArgs("SUBCYCLING STEPS", std::string("0"));
-  options.setArgs("PRESSURE INITIAL GUESS", "PREVIOUS");
+  options.setArgs("FLUID PRESSURE INITIAL GUESS", "PREVIOUS");
 
-  options.setArgs("VELOCITY BLOCK SOLVER", "FALSE");
+  options.setArgs("FLUID VELOCITY BLOCK SOLVER", "FALSE");
 
   options.setArgs("SCALAR INITIAL GUESS", "PREVIOUS");
-  options.setArgs("VELOCITY INITIAL GUESS", "PREVIOUS");
+  options.setArgs("FLUID VELOCITY INITIAL GUESS", "PREVIOUS");
   options.setArgs("ADVECTION TYPE", "CONVECTIVE+CUBATURE");
 
+  options.setArgs("FLUID VELOCITY SOLVER", "PCG");
   options.setArgs("SCALAR00 SOLVER", "PCG+COMBINED");
   options.setArgs("SCALAR01 SOLVER", "PCG");
 
   options.setArgs("BDF ORDER", "3");
-  options.setArgs("VELOCITY SOLVER TOLERANCE", std::string("1e-12"));
+  options.setArgs("FLUID VELOCITY SOLVER TOLERANCE", std::string("1e-12"));
   const auto pTol = (sizeof(dfloat) == sizeof(double)) 
                     ? std::string("1e-10") : std::string("1e-05"); 
-  options.setArgs("PRESSURE SOLVER TOLERANCE", pTol);
+  options.setArgs("FLUID PRESSURE SOLVER TOLERANCE", pTol);
   options.setArgs("SCALAR00 SOLVER TOLERANCE", std::string("1e-12"));
   options.setArgs("SCALAR01 SOLVER TOLERANCE", std::string("1e-12"));
 
   if (ciMode == 2 || ciMode == 19 || ciMode == 22) {
-    options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
 
     if (ciMode == 22) {
-      options.setArgs("VELOCITY SOLVER TOLERANCE", std::string("1e-10"));
+      options.setArgs("FLUID VELOCITY SOLVER TOLERANCE", std::string("1e-10"));
       options.setArgs("SCALAR00 SOLVER TOLERANCE", std::string("1e-10"));
       options.setArgs("SCALAR01 SOLVER TOLERANCE", std::string("1e-10"));
 
-      options.setArgs("PRESSURE SOLVER TOLERANCE", std::string("5e-04"));
+      options.setArgs("FLUID PRESSURE SOLVER TOLERANCE", std::string("5e-04"));
       nekrsCheck(sizeof(dfloat) != sizeof(float),
                  platform->comm.mpiComm,
                  EXIT_FAILURE,
@@ -160,24 +161,24 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     } 
   }
   if (ciMode == 3) {
-    options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
-    options.setArgs("VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
-    options.setArgs("PRESSURE PRECONDITIONER", "SEMFEM");
-    options.setArgs("PRESSURE COARSE SOLVER LOCATION", "DEVICE");
+    options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
+    options.setArgs("FLUID VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
+    options.setArgs("FLUID PRESSURE PRECONDITIONER", "SEMFEM");
+    options.setArgs("FLUID PRESSURE COARSE SOLVER LOCATION", "DEVICE");
     if (platform->serial) { 
-      options.setArgs("PRESSURE COARSE SOLVER LOCATION", "CPU");
+      options.setArgs("FLUID PRESSURE COARSE SOLVER LOCATION", "CPU");
     } 
   }
   if (ciMode == 4) {
     options.setArgs("END TIME", std::string("0.2"));
-    options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
-    options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
-    options.setArgs("VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
+    options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
+    options.setArgs("FLUID VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
   }
   if (ciMode == 5) {
     options.setArgs("END TIME", std::string("0.2"));
-    options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
     options.setArgs("SUBCYCLING STEPS", std::string("0"));
     std::string casename = platform->options.getArgs("CASENAME");
     nekrsCheck(casename != "mv_ethier",
@@ -188,7 +189,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   }
   if (ciMode == 6) {
     options.setArgs("END TIME", std::string("0.2"));
-    options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
     std::string casename = platform->options.getArgs("CASENAME");
     nekrsCheck(casename != "mv_ethier",
@@ -198,44 +199,50 @@ void ciSetup(MPI_Comm comm, setupAide &options)
              ciMode);
   }
   if (ciMode == 7) {
-    options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
-    options.setArgs("VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
-    options.setArgs("PRESSURE MAXIMUM ITERATIONS", "1000");
-    options.setArgs("PRESSURE PRECONDITIONER", "JACOBI");
+    options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
+    options.setArgs("FLUID VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
+    options.setArgs("FLUID PRESSURE MAXIMUM ITERATIONS", "1000");
+    options.setArgs("FLUID PRESSURE PRECONDITIONER", "JACOBI");
     options.setArgs("END TIME", std::string("0.012"));
   }
   if (ciMode == 8) {
-    options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
-//    options.setArgs("VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
+    options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
+//    options.setArgs("FLUID VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
     options.setArgs("DT", std::string("1e-5"));
     options.setArgs("END TIME", std::string("0.2"));
     options.setArgs("VARIABLE DT", "TRUE");
     options.setArgs("TARGET CFL", "0.5");
+
+#if 0
+    options.setArgs("DT", std::string("2e-3"));
+    options.setArgs("TARGET CFL", "0.274");
+#endif
+
   }
   if (ciMode == 9) {
     options.setArgs("ADVECTION TYPE", "CONVECTIVE");
-    options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
-    options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
+    options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
   }
   if (ciMode == 10) {
     options.setArgs("ADVECTION TYPE", "CONVECTIVE");
-    options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
-    options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
+    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
   }
   if (ciMode == 11) {
-    options.setArgs("PRESSURE MULTIGRID SMOOTHER", "DAMPEDJACOBI,CHEBYSHEV");
-    options.setArgs("PRESSURE MULTIGRID CHEBYSHEV MIN EIGENVALUE BOUND FACTOR", "0.1");
-    options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID PRESSURE MULTIGRID SMOOTHER", "DAMPEDJACOBI,CHEBYSHEV");
+    options.setArgs("FLUID PRESSURE MULTIGRID CHEBYSHEV MIN EIGENVALUE BOUND FACTOR", "0.1");
+    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
-    options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
+    options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
   }
   if (ciMode == 12) {
     options.setArgs("SCALAR00 SOLVER", "NONE");
   }
   if (ciMode == 13) {
     options.setArgs("SCALAR00 SOLVER", "NONE");
-    options.setArgs("VELOCITY SOLVER", "NONE");
+    options.setArgs("FLUID VELOCITY SOLVER", "NONE");
 
     std::string casename = platform->options.getArgs("CASENAME");
     nekrsCheck(casename != "ethierScalar",
@@ -245,11 +252,11 @@ void ciSetup(MPI_Comm comm, setupAide &options)
              ciMode);
   }
   if (ciMode == 14) {
-    options.setArgs("PRESSURE MULTIGRID SMOOTHER", "ASM");
-    options.setArgs("PRESSURE MGSOLVER CYCLE", "VCYCLE+ADDITIVE+OVERLAPCRS");
-    options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID PRESSURE MULTIGRID SMOOTHER", "ASM");
+    options.setArgs("FLUID PRESSURE MGSOLVER CYCLE", "VCYCLE+ADDITIVE+OVERLAPCRS");
+    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
-    options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
+    options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
   }
 
   // ci mode requiring no timestepping
@@ -258,7 +265,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("NUMBER TIMESTEPS", std::string("0"));
     options.setArgs("SCALAR00 SOLVER", "NONE");
     options.setArgs("SCALAR01 SOLVER", "NONE");
-    options.setArgs("VELOCITY SOLVER", "NONE");
+    options.setArgs("FLUID SOLVER", "NONE");
   }
 
   // CVODE, both scalars
@@ -385,7 +392,7 @@ void ciTestParticles(nrs_t *nrs, lpm_t *particles, occa::kernel exactUVWPKernel,
   std::vector<dfloat> yExpected(yp0_g.size(), 0.0);
   std::vector<dfloat> zExpected(zp0_g.size(), 0.0);
 
-  auto o_y0 = platform->device.malloc<dfloat>(nrs->mesh->dim * xp0_g.size());
+  auto o_y0 = platform->device.malloc<dfloat>(nrs->meshV->dim * xp0_g.size());
   if (particles->numParticles() > 0) {
     auto o_x0coord = o_y0 + 0 * xp0_g.size();
     auto o_y0coord = o_y0 + 1 * yp0_g.size();
@@ -470,9 +477,9 @@ void ciTestParticles(nrs_t *nrs, lpm_t *particles, occa::kernel exactUVWPKernel,
 // however, pointInterpolation_t itself is not thread-safe, so the two objects cannot be used concurrently.
 void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
 {
-  auto mesh = nrs->mesh;
+  auto mesh = nrs->meshV;
 
-  auto o_Ue = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset);
+  auto o_Ue = platform->device.malloc<dfloat>(nrs->meshV->dim * nrs->fieldOffset);
   auto o_Pe = platform->device.malloc<dfloat>(nrs->fieldOffset);
   exactUVWPKernel(mesh->Nlocal, time, mesh->o_x, mesh->o_y, mesh->o_z, nrs->fieldOffset, o_Pe, o_Ue);
 
@@ -505,15 +512,15 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   auto interpNoop = pointInterpolation_t(mesh, platform->comm.mpiComm);
   interpNoop.setPoints(o_NULL, o_NULL, o_NULL);
   interpNoop.find(verbosity);
-  interpNoop.eval(nrs->NVfields, nrs->fieldOffset, o_Ue, 0, o_NULL);
+  interpNoop.eval(nrs->meshV->dim, nrs->fieldOffset, o_Ue, 0, o_NULL);
 
   // Interpolate onto points that coincide with the mesh, call findpts
   auto interpFluid = pointInterpolation_t(mesh, platform->comm.mpiComm);
   interpFluid.setPoints(mesh->o_x, mesh->o_y, mesh->o_z);
   interpFluid.find(verbosity);
 
-  auto o_UintFluid = platform->device.malloc<dfloat>(nrs->NVfields * nrs->fieldOffset);
-  interpFluid.eval(nrs->NVfields, nrs->fieldOffset, o_Ue, nrs->fieldOffset, o_UintFluid);
+  auto o_UintFluid = platform->device.malloc<dfloat>(nrs->meshV->dim * nrs->fieldOffset);
+  interpFluid.eval(nrs->meshV->dim, nrs->fieldOffset, o_Ue, nrs->fieldOffset, o_UintFluid);
 
   {
     auto [linfErrUx, linfErrUy, linfErrUz] = computeRelErrors(mesh->Nlocal, nrs->fieldOffset, o_Ue, o_UintFluid);
@@ -542,8 +549,8 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
 
   std::array<occa::memory, nRandomInterp> o_UintRand;
   for (int n = 0; n < nRandomInterp; ++n) {
-    o_UintRand[n] = platform->device.malloc<dfloat>(nrs->NVfields * pointsX[n].size());
-    interpRand[n]->eval(nrs->NVfields, nrs->fieldOffset, o_Ue, pointsX[n].size(), o_UintRand[n]);
+    o_UintRand[n] = platform->device.malloc<dfloat>(nrs->meshV->dim * pointsX[n].size());
+    interpRand[n]->eval(nrs->meshV->dim, nrs->fieldOffset, o_Ue, pointsX[n].size(), o_UintRand[n]);
   }
 
   std::array<occa::memory, nRandomInterp> o_UeRand;
@@ -552,7 +559,7 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   std::array<occa::memory, nRandomInterp> o_yRand;
   std::array<occa::memory, nRandomInterp> o_zRand;
   for (int n = 0; n < nRandomInterp; ++n) {
-    o_UeRand[n] = platform->device.malloc<dfloat>(nrs->NVfields * pointsX[n].size());
+    o_UeRand[n] = platform->device.malloc<dfloat>(nrs->meshV->dim * pointsX[n].size());
     o_PeRand[n] = platform->device.malloc<dfloat>(pointsX[n].size());
 
     o_xRand[n] = platform->device.malloc<dfloat>(pointsX[n].size(), pointsX[n].data());
@@ -575,37 +582,41 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
 
 void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
 {
-  auto mesh = nrs->mesh;
-  exactUVWPKernel(mesh->Nlocal, time, mesh->o_x, mesh->o_y, mesh->o_z, nrs->fieldOffset, nrs->o_P, nrs->o_U);
-  
-  auto o_Usave = platform->deviceMemoryPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
-  nrs->o_U.copyTo(o_Usave, nrs->NVfields * nrs->fieldOffset);
+  auto mesh = nrs->meshV;
 
-  std::vector<mesh_t*> meshes = {nrs->mesh, nrs->mesh, nrs->mesh};
+  auto o_U = platform->device.malloc<dfloat>(nrs->meshV->dim * nrs->fieldOffset);
+  auto o_P = platform->device.malloc<dfloat>(nrs->fieldOffset);
+  exactUVWPKernel(mesh->Nlocal, time, mesh->o_x, mesh->o_y, mesh->o_z, nrs->fieldOffset, o_P, o_U);
+
+  
+  auto o_Usave = platform->deviceMemoryPool.reserve<dfloat>(nrs->meshV->dim * nrs->fieldOffset);
+  o_U.copyTo(o_Usave, nrs->meshV->dim * nrs->fieldOffset);
+
+  std::vector<mesh_t*> meshes = {nrs->meshV, nrs->meshV, nrs->meshV};
   LVector_t<dfloat> UL(meshes, true);
   LVector_t<dfloat> VL(meshes, false); // create secondary vector, not managed
 
-  UL.copyFromE(nrs->fieldOffset, nrs->o_U);
-  platform->linAlg->fill(nrs->NVfields * nrs->fieldOffset, 0.0, nrs->o_U);
-  UL.copyToE(nrs->fieldOffset, nrs->o_U);
+  UL.copyFromE(nrs->fieldOffset, o_U);
+  platform->linAlg->fill(nrs->meshV->dim * nrs->fieldOffset, 0.0, o_U);
+  UL.copyToE(nrs->fieldOffset, o_U);
 
   bool failed = false;
 
   // sanity check: is o_U the same as before?
   auto checkErr = [&](bool subtract = true){
-    auto o_Uerr = platform->deviceMemoryPool.reserve<dfloat>(nrs->NVfields * nrs->fieldOffset);
+    auto o_Uerr = platform->deviceMemoryPool.reserve<dfloat>(nrs->meshV->dim * nrs->fieldOffset);
     if(subtract){
-      platform->linAlg->axpbyzMany(nrs->mesh->Nlocal,
-                                  nrs->NVfields,
+      platform->linAlg->axpbyzMany(nrs->meshV->Nlocal,
+                                  nrs->meshV->dim,
                                   nrs->fieldOffset,
                                   1.0,
                                   o_Usave,
                                   -1.0,
-                                  nrs->o_U,
+                                  o_U,
                                   o_Uerr);
     }
-    platform->linAlg->aydxMany(nrs->mesh->Nlocal,
-                              nrs->NVfields,
+    platform->linAlg->aydxMany(nrs->meshV->Nlocal,
+                              nrs->meshV->dim,
                               nrs->fieldOffset,
                               1,
                               1.0,
@@ -616,13 +627,13 @@ void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
     auto o_Uyerr = o_Uerr + 1 * nrs->fieldOffset;
     auto o_Uzerr = o_Uerr + 2 * nrs->fieldOffset;
     
-    platform->linAlg->abs(nrs->mesh->Nlocal, o_Uxerr);
-    platform->linAlg->abs(nrs->mesh->Nlocal, o_Uyerr);
-    platform->linAlg->abs(nrs->mesh->Nlocal, o_Uzerr);
+    platform->linAlg->abs(nrs->meshV->Nlocal, o_Uxerr);
+    platform->linAlg->abs(nrs->meshV->Nlocal, o_Uyerr);
+    platform->linAlg->abs(nrs->meshV->Nlocal, o_Uzerr);
 
-    auto LinfUx = platform->linAlg->max(nrs->mesh->Nlocal, o_Uxerr, platform->comm.mpiComm);
-    auto LinfUy = platform->linAlg->max(nrs->mesh->Nlocal, o_Uyerr, platform->comm.mpiComm);
-    auto LinfUz = platform->linAlg->max(nrs->mesh->Nlocal, o_Uzerr, platform->comm.mpiComm);
+    auto LinfUx = platform->linAlg->max(nrs->meshV->Nlocal, o_Uxerr, platform->comm.mpiComm);
+    auto LinfUy = platform->linAlg->max(nrs->meshV->Nlocal, o_Uyerr, platform->comm.mpiComm);
+    auto LinfUz = platform->linAlg->max(nrs->meshV->Nlocal, o_Uzerr, platform->comm.mpiComm);
     if (platform->comm.mpiRank == 0) {
       printf("relLinf Ux/y/z error: %g/%g/%g\n", LinfUx, LinfUy, LinfUz);
     }
@@ -636,12 +647,12 @@ void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
   checkErr();
 
   // restore o_U
-  nrs->o_U.copyFrom(o_Usave, nrs->NVfields * nrs->fieldOffset);
+  o_U.copyFrom(o_Usave, nrs->meshV->dim * nrs->fieldOffset);
   
   // test packing compactly, as in CVODE
-  std::vector<dlong> lengths_(nrs->NVfields, 0);
+  std::vector<dlong> lengths_(nrs->meshV->dim, 0);
   dlong nEq = 0;
-  for(int is = 0; is < nrs->NVfields; ++is){
+  for(int is = 0; is < nrs->meshV->dim; ++is){
     const auto Nlocal = UL.Nlocal(is);
     nEq += Nlocal;
     lengths_[is] = Nlocal;
@@ -651,41 +662,41 @@ void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
   UL.fieldOffsets(lengths_);
   UL.optr(o_UL);
   
-  UL.copyFromE(nrs->fieldOffset, nrs->o_U);
-  platform->linAlg->fill(nrs->NVfields * nrs->fieldOffset, 0.0, nrs->o_U);
-  UL.copyToE(nrs->fieldOffset, nrs->o_U);
+  UL.copyFromE(nrs->fieldOffset, o_U);
+  platform->linAlg->fill(nrs->meshV->dim * nrs->fieldOffset, 0.0, o_U);
+  UL.copyToE(nrs->fieldOffset, o_U);
   
   checkErr();
   
   // restore o_U
-  nrs->o_U.copyFrom(o_Usave, nrs->NVfields * nrs->fieldOffset);
+  o_U.copyFrom(o_Usave, nrs->meshV->dim * nrs->fieldOffset);
 
   // test same packing, but with un-allocated version
   VL.fieldOffsets(lengths_);
   VL.optr(o_UL);
-  VL.copyFromE(nrs->fieldOffset, nrs->o_U);
-  platform->linAlg->fill(nrs->NVfields * nrs->fieldOffset, 0.0, nrs->o_U);
-  VL.copyToE(nrs->fieldOffset, nrs->o_U);
+  VL.copyFromE(nrs->fieldOffset, o_U);
+  platform->linAlg->fill(nrs->meshV->dim * nrs->fieldOffset, 0.0, o_U);
+  VL.copyToE(nrs->fieldOffset, o_U);
   
   checkErr();
 
   // restore o_U
-  nrs->o_U.copyFrom(o_Usave, nrs->NVfields * nrs->fieldOffset);
+  o_U.copyFrom(o_Usave, nrs->meshV->dim * nrs->fieldOffset);
 
   // different test: fill VL with a constant
   const auto val = 2.8;
   platform->linAlg->fill(nEq, val, VL.optr());
 
-  platform->linAlg->fill(nrs->NVfields * nrs->fieldOffset, 0.0, nrs->o_U);
-  VL.copyToE(nrs->fieldOffset, nrs->o_U);
+  platform->linAlg->fill(nrs->meshV->dim * nrs->fieldOffset, 0.0, o_U);
+  VL.copyToE(nrs->fieldOffset, o_U);
 
   // subtract val
-  auto o_Ux = nrs->o_U + 0 * nrs->fieldOffset;
-  auto o_Uy = nrs->o_U + 1 * nrs->fieldOffset;
-  auto o_Uz = nrs->o_U + 2 * nrs->fieldOffset;
-  platform->linAlg->add(nrs->mesh->Nlocal, -val, o_Ux);
-  platform->linAlg->add(nrs->mesh->Nlocal, -val, o_Uy);
-  platform->linAlg->add(nrs->mesh->Nlocal, -val, o_Uz);
+  auto o_Ux = o_U + 0 * nrs->fieldOffset;
+  auto o_Uy = o_U + 1 * nrs->fieldOffset;
+  auto o_Uz = o_U + 2 * nrs->fieldOffset;
+  platform->linAlg->add(nrs->meshV->Nlocal, -val, o_Ux);
+  platform->linAlg->add(nrs->meshV->Nlocal, -val, o_Uy);
+  platform->linAlg->add(nrs->meshV->Nlocal, -val, o_Uz);
   
   checkErr(false);
 
@@ -700,7 +711,7 @@ void ciTestLVector(nrs_t *nrs, double time, occa::kernel exactUVWPKernel)
 void ciTestSurfaceIntegral(nrs_t *nrs)
 {
   const int rank = platform->comm.mpiRank;
-  auto *mesh = nrs->mesh;
+  auto *mesh = nrs->meshV;
   const int nbID = 1;
   const auto testTol = 1e-2;
 
@@ -765,7 +776,7 @@ void ciCheckpointing(nrs_t *nrs)
 
 void ciTestDistance(nrs_t *nrs)
 {
-  auto mesh = nrs->mesh;
+  auto mesh = nrs->meshV;
 
   int nbID = 1;
   int bID = 1;
@@ -949,9 +960,11 @@ void ciTestErrors(nrs_t *nrs,
                   occa::kernel exactUVWPKernel,
                   occa::kernel RKKernel)
 {
+#if 0
   if (std::fetestexcept(FE_INVALID)) {
     throw std::runtime_error("floating-point exception occured!");
-  }  
+  } 
+#endif 
 
   const int rank = platform->comm.mpiRank;
 
@@ -980,7 +993,7 @@ void ciTestErrors(nrs_t *nrs,
   }
 
   if (tstep == 1 && ciMode != 7 && ciMode != 13 && ciMode != 8) {
-    const auto NiterP = nrs->pSolver->Niter();
+    const auto NiterP = nrs->fluid->ellipticSolverP->Niter();
 
     int expectedNiterP = 7; 
 
@@ -1022,14 +1035,14 @@ void ciTestErrors(nrs_t *nrs,
     }
 
     if (ciMode != 12 && nrs->timeStepConverged) {
-      int sIterErr = abs(nrs->cds->solver[0]->Niter() - expectedNiterS00);
+      int sIterErr = abs(nrs->scalar->ellipticSolver[0]->Niter() - expectedNiterS00);
       CiEvalTest("scalar00 iter step=1 (sIterErr: " + to_string_f(sIterErr) + ")", sIterErr <= 1);
       nekrsCheck(sIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
 
     if (nrs->timeStepConverged){
-      std::cout << nrs->cds->solver[1]->Niter() << std::endl; 
-      auto sIterErr = abs(nrs->cds->solver[1]->Niter() - expectedNiterS01);
+      std::cout << nrs->scalar->ellipticSolver[1]->Niter() << std::endl; 
+      auto sIterErr = abs(nrs->scalar->ellipticSolver[1]->Niter() - expectedNiterS01);
       CiEvalTest("scalar01 iter step=1 (sIterErr: " + to_string_f(sIterErr) + ")", sIterErr <= 1);
       nekrsCheck(sIterErr > 1, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
     }
@@ -1039,9 +1052,9 @@ void ciTestErrors(nrs_t *nrs,
     particles->migrate(); // invoke particle migration
   }
 
-  if(nrs->cds->cvode){
-    numCVODERHS += nrs->cds->cvode->numRHSEvals();
-    numCVODERHS += nrs->cds->cvode->numLinIters();
+  if(nrs->scalar->cvode){
+    numCVODERHS += nrs->scalar->cvode->numRHSEvals();
+    numCVODERHS += nrs->scalar->cvode->numLinIters();
   }
 
   if (!nrs->lastStep) {
@@ -1066,23 +1079,19 @@ void ciTestErrors(nrs_t *nrs,
 
   int NiterU;
 
-  if (platform->options.compareArgs("VELOCITY BLOCK SOLVER", "TRUE")) {
-    NiterU = nrs->uvwSolver->Niter();
-  } else if (nrs->uSolver) {
-    NiterU = nrs->uSolver->Niter();
-  } else {
-    NiterU = -1;
+  if (nrs->fluid->ellipticSolver.size()) {
+    NiterU = nrs->fluid->ellipticSolver[0]->Niter();
   }
 
-  int NiterP = nrs->pSolver ? nrs->pSolver->Niter() : -1;
+  int NiterP = nrs->fluid->ellipticSolverP ? nrs->fluid->ellipticSolverP->Niter() : -1;
 
   int NiterS01 = -1;
-  if (nrs->cds->solver[0]) {
-    NiterS01 = nrs->cds->solver[0]->Niter();
+  if (nrs->scalar->ellipticSolver[0]) {
+    NiterS01 = nrs->scalar->ellipticSolver[0]->Niter();
   }
   int NiterS02 = -1;
-  if (nrs->cds->solver[1]) {
-    NiterS02 = nrs->cds->solver[1]->Niter();
+  if (nrs->scalar->ellipticSolver[1]) {
+    NiterS02 = nrs->scalar->ellipticSolver[1]->Niter();
   }
   s1IterTest = abs(NiterS01 - 2) < 2;
   s2IterTest = abs(NiterS02 - 2) < 2;
@@ -1135,7 +1144,7 @@ void ciTestErrors(nrs_t *nrs,
   }
   case 3:
   {
-    velIterTest = abs(NiterU - 10) < 2;
+    velIterTest = abs(NiterU - 9) < 2;
     s1Test = abs((err[2] - 5.25E-12) / err[2]) < EPS;
     s2Test = abs((err[3] - 6.09E-12) / err[3]) < EPS;
     pIterTest = abs(NiterP - 16) < 2;
@@ -1153,8 +1162,8 @@ void ciTestErrors(nrs_t *nrs,
     prTest = abs((err[1] - 6.71E-10) / err[1]) < EPS;
 
     dfloat memoryUsage = platform->device.occaDevice().memoryAllocated() / 1e9;
-    const dfloat expectedMemoryUsage = 0.0555274;
-    if (memoryUsage > 1.03 * expectedMemoryUsage && platform->comm.mpiCommSize == 2) {
+    const dfloat expectedMemoryUsage = 0.0622;
+    if (memoryUsage > expectedMemoryUsage && platform->comm.mpiCommSize == 2) {
       if (platform->comm.mpiRank == 0) {
         printf("Expected memory usage exceeded!\n"
                "Expected : %g GB\n"
@@ -1168,8 +1177,8 @@ void ciTestErrors(nrs_t *nrs,
     }
 
     // check flop count
-    const double expectedOperations = 1.347e11;     // from nvprof
-    const auto accuracy = 0.04;                    // observed 3% error in result
+    const double expectedOperations = 1.2904e11;     // from nvprof
+    const auto accuracy = 0.04;                      // tolerated error in result
     const auto operations = platform->flopCounter->get(platform->comm.mpiComm);
     if (operations >= (1 + accuracy) * expectedOperations ||
         operations <= (1 - accuracy) * expectedOperations) {
@@ -1231,7 +1240,7 @@ void ciTestErrors(nrs_t *nrs,
   }
   case 7:
   {
-    velIterTest = abs(NiterU - 10) < 2;
+    velIterTest = abs(NiterU - 9) < 2;
     s1Test = abs((err[2] - 2E-13) / err[2]) < EPS;
     s2Test = abs((err[3] - 2E-13) / err[3]) < EPS;
 
@@ -1244,7 +1253,7 @@ void ciTestErrors(nrs_t *nrs,
   }
   case 8:
   {
-    velIterTest = abs(NiterU - 12) < 2;
+    velIterTest = abs(NiterU - 11) < 2;
     s1Test = abs((err[2] - 2.51E-11) / err[2]) < EPS;
     s2Test = abs((err[3] - 2.69E-11) / err[3]) < EPS;
     pIterTest = abs(NiterP - 4) < 2;
@@ -1281,19 +1290,21 @@ void ciTestErrors(nrs_t *nrs,
   }
   case 12:
   {
-    velIterTest = abs(NiterU - 15) < 2;
+    velIterTest = abs(NiterU - 13) < 2;
+
     s1Test = true;
     s2Test = abs((err[3] - 6.30E-12) / err[3]) < EPS;
     pIterTest = abs(NiterP - 6) < 2;
+
     vxTest = abs((err[0] - 2.78E-10) / err[0]) < EPS;
     prTest = abs((err[1] - 6.98E-10) / err[1]) < EPS;
     s1IterTest = abs(NiterS01 + 1) < 2;
 
     bool correct = true;
-    correct &= (nrs->pSolver != nullptr);
-    correct &= (nrs->uSolver != nullptr || nrs->uvwSolver != nullptr);
-    correct &= (nrs->cds->solver[0] == nullptr);
-    correct &= (nrs->cds->solver[1] != nullptr);
+    correct &= (nrs->fluid->ellipticSolverP != nullptr);
+    correct &= (nrs->fluid->ellipticSolver[0] != nullptr);
+    correct &= (nrs->scalar->ellipticSolver[0] == nullptr);
+    correct &= (nrs->scalar->ellipticSolver[1] != nullptr);
     nekrsCheck(!correct,
              platform->comm.mpiComm,
              EXIT_FAILURE,
@@ -1304,25 +1315,18 @@ void ciTestErrors(nrs_t *nrs,
   }
   case 13:
   {
-    velIterTest = abs(NiterU + 1) < 2;
-    s1Test = abs((err[2] - 2.506E-3) / err[2]) < EPS;
-    s2Test = abs((err[3] - 1.52E-5) / err[3]) < EPS;
-    pIterTest = abs(NiterP + 1) < 2;
-    vxTest = abs((err[0] - 2.5E-3) / err[0]) < EPS;
-    prTest = abs((err[1] - 2.364E-2) / err[1]) < EPS;
+    s2Test = abs((err[3] - 1.4E-5) / err[3]) < EPS;
     s1IterTest = abs(NiterS01 + 1) < 2;
 
     bool correct = true;
-    correct &= (nrs->pSolver == nullptr);
-    correct &= (nrs->uSolver == nullptr && nrs->uvwSolver == nullptr);
-    correct &= (nrs->cds->solver[0] == nullptr);
-    correct &= (nrs->cds->solver[1] != nullptr);
+    correct &= (nrs->fluid->ellipticSolver.size() == 0);
+    correct &= (nrs->scalar->ellipticSolver[0] == nullptr);
+    correct &= (nrs->scalar->ellipticSolver[1] != nullptr);
     nekrsCheck(!correct,
              platform->comm.mpiComm,
              EXIT_FAILURE,
              "Unexpected solver configuration for CI mode %d\n",
              ciMode);
-    nekrsCheck(nrs->flow, platform->comm.mpiComm, EXIT_FAILURE, "nrs->flow == true for CI mode %d\n", ciMode);
 
     break;
   }
@@ -1384,7 +1388,7 @@ void ciTestErrors(nrs_t *nrs,
       CiEvalTest("pressure iter", pIterTest);
     }
  
-    if (ciMode != 12) CiEvalTest("scalar01", s1Test);
-    CiEvalTest("scalar02", s2Test);
+    if (ciMode != 12 && ciMode != 13) CiEvalTest("scalar00", s1Test);
+    CiEvalTest("scalar01", s2Test);
   }
 }

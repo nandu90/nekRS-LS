@@ -13,13 +13,13 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("CONSTANT FLOW DIRECTION", "X");
   options.setArgs("RESTART FILE NAME", std::string("r.fld+time=0"));
   options.setArgs("SOLUTION OUTPUT INTERVAL", "-1");
-  options.setArgs("VISCOSITY", std::to_string(1.0 / 43500.0));
-  options.setArgs("DENSITY", std::string("1.0"));
+  options.setArgs("FLUID VISCOSITY", std::to_string(1.0 / 43500.0));
+  options.setArgs("FLUID DENSITY", std::string("1.0"));
   options.setArgs("NUMBER TIMESTEPS", std::string("-1"));
   options.setArgs("END TIME", std::string("10"));
-  options.setArgs("TIME INTEGRATOR", "TOMBO2");
   options.setArgs("ADVECTION TYPE", "CONVECTIVE+CUBATURE");
-  options.setArgs("DT", std::string("5e-2"));
+  options.setArgs("DT", std::string("4e-2"));
+
   options.setArgs("SUBCYCLING STEPS", std::string("0"));
 
   options.setArgs("PRESSURE KRYLOV SOLVER", "PGMRES+FLEXIBLE");
@@ -51,7 +51,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
     return;
   }
 
-  mesh_t *mesh = nrs->mesh;
+  auto mesh = nrs->meshV;
 
   std::vector<int> bidWall = {1};
   occa::memory o_bidWall = platform->device.malloc<int>(bidWall.size(), bidWall.data());

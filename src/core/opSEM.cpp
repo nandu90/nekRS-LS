@@ -9,11 +9,13 @@ namespace opSEM
 
 void grad(mesh_t *mesh, dlong offset, const occa::memory &o_in, occa::memory &o_out)
 {
-  static occa::kernel kernel;
-  if (!kernel.isInitialized()) {
-    kernel = platform->kernelRequests.load(section + "wGradientVolume" + suffix);
-  }
-  kernel(mesh->Nelements, mesh->o_vgeo, mesh->o_D, offset, o_in, o_out);
+  launchKernel(section + "gradientVolume" + suffix,
+               mesh->Nelements,
+               mesh->o_vgeo,
+               mesh->o_D,
+               offset,
+               o_in,
+               o_out);
 }
 
 occa::memory grad(mesh_t *mesh, dlong offset, const occa::memory &o_in)
@@ -25,11 +27,13 @@ occa::memory grad(mesh_t *mesh, dlong offset, const occa::memory &o_in)
 
 void strongGrad(mesh_t *mesh, dlong offset, const occa::memory &o_in, occa::memory &o_out)
 {
-  static occa::kernel kernel;
-  if (!kernel.isInitialized()) {
-    kernel = platform->kernelRequests.load(section + "gradientVolume" + suffix);
-  }
-  kernel(mesh->Nelements, mesh->o_vgeo, mesh->o_D, offset, o_in, o_out);
+  launchKernel(section + "gradientVolume" + suffix,
+               mesh->Nelements,
+               mesh->o_vgeo,
+               mesh->o_D,
+               offset,
+               o_in,
+               o_out);
 }
 
 occa::memory strongGrad(mesh_t *mesh, dlong offset, const occa::memory &o_in)
@@ -57,11 +61,13 @@ occa::memory strongGradVec(mesh_t *mesh, dlong offset, const occa::memory &o_in)
 
 void divergence(mesh_t *mesh, dlong offset, const occa::memory &o_in, occa::memory &o_out)
 {
-  static occa::kernel kernel;
-  if (!kernel.isInitialized()) {
-    kernel = platform->kernelRequests.load(section + "wDivergenceVolume" + suffix);
-  }
-  kernel(mesh->Nelements, mesh->o_vgeo, mesh->o_D, offset, o_in, o_out);
+  launchKernel(section + "wDivergenceVolume" + suffix,
+               mesh->Nelements,
+               mesh->o_vgeo,
+               mesh->o_D,
+               offset,
+               o_in,
+               o_out);
 }
 
 occa::memory divergence(mesh_t *mesh, dlong offset, const occa::memory &o_in)
@@ -73,17 +79,19 @@ occa::memory divergence(mesh_t *mesh, dlong offset, const occa::memory &o_in)
 
 void strongDivergence(mesh_t *mesh, dlong offset, const occa::memory &o_in, occa::memory &o_out)
 {
-  static occa::kernel kernel;
-  if (!kernel.isInitialized()) {
-    kernel = platform->kernelRequests.load(section + "divergenceVolume" + suffix);
-  }
-  kernel(mesh->Nelements, mesh->o_vgeo, mesh->o_D, offset, o_in, o_out);
+  launchKernel(section + "divergenceVolume" + suffix,
+               mesh->Nelements,
+               mesh->o_vgeo,
+               mesh->o_D,
+               offset,
+               o_in,
+               o_out);
 }
 
 occa::memory strongDivergence(mesh_t *mesh, dlong offset, const occa::memory &o_in)
 {
   auto o_out = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-  strongDivergence(mesh, offset, o_in);
+  strongDivergence(mesh, offset, o_in, o_out);
   return o_out;
 }
 
@@ -94,12 +102,18 @@ void laplacian(mesh_t *mesh,
                occa::memory &o_out)
 {
   static occa::memory o_fieldOffsetScan;
-  static occa::kernel kernel;
-  if (!kernel.isInitialized()) {
-    kernel = platform->kernelRequests.load(section + "weakLaplacian" + suffix);
+  if (o_fieldOffsetScan.isInitialized()) {
     o_fieldOffsetScan = platform->device.malloc<dlong>(1);
   }
-  kernel(mesh->Nelements, 1, o_fieldOffsetScan, mesh->o_ggeo, mesh->o_D, o_lambda, o_in, o_out);
+  launchKernel(section + "weakLaplacian" + suffix,
+               mesh->Nelements,
+               1,
+               o_fieldOffsetScan,
+               mesh->o_ggeo,
+               mesh->o_D,
+               o_lambda,
+               o_in,
+               o_out);
 }
 
 occa::memory laplacian(mesh_t *mesh, dlong offset, const occa::memory &o_lambda, const occa::memory &o_in)
@@ -135,12 +149,15 @@ strongLaplacian(mesh_t *mesh, dlong offset, const occa::memory &o_lambda, const 
 
 void strongCurl(mesh_t *mesh, dlong offset, const occa::memory &o_in, occa::memory &o_out)
 {
-  static occa::kernel kernel;
-  if (!kernel.isInitialized()) {
-    kernel = platform->kernelRequests.load(section + "curl" + suffix);
-  }
   const dlong scaleJW = 1;
-  kernel(mesh->Nelements, scaleJW, mesh->o_vgeo, mesh->o_D, offset, o_in, o_out);
+  launchKernel(section + "curl" + suffix,
+               mesh->Nelements,
+               scaleJW,
+               mesh->o_vgeo,
+               mesh->o_D,
+               offset,
+               o_in,
+               o_out);
 }
 
 occa::memory strongCurl(mesh_t *mesh, dlong offset, const occa::memory &o_in)

@@ -6,16 +6,63 @@ void UDF_Setup0(MPI_Comm comm, setupAide &options)
 {
 }
 
+dfloat bottomph(dfloat xin, dfloat xmin, dfloat xmax) {
+  dfloat xx = xin;
+  if (xin > xmax / 2) {
+      xx = xin - xmax; // For reflection-like behavior
+  }
+  dfloat x = std::abs(xx);
+
+  if (x >= xmin && x <= 9.0) {
+      return std::min(28.0, 28.0 + 0.0 * x + 6.775070969851e-03 * x * x - 2.124527775800e-03 * x * x * x);
+  } else if (x > 9.0 && x <= 14.0) {
+      return 25.07355893131 + 0.9754803562315 * x - 0.1016116352781 * x * x + 1.889794677828e-03 * x * x * x;
+  } else if (x > 14.0 && x <= 20.0) {
+      return 25.79601052357 + 0.8206693007457 * x - 0.09055370274339 * x * x + 1.626510569859e-03 * x * x * x;
+  } else if (x > 20.0 && x <= 30.0) {
+      return 40.46435022819 - 1.379581654948 * x + 1.945884504128e-02 * x * x - 2.070318932190e-04 * x * x * x;
+  } else if (x > 30.0 && x <= 40.0) {
+      return 17.92461334664 + 0.8743920332081 * x - 0.05567361123058 * x * x + 6.277731764683e-04 * x * x * x;
+  } else if (x > 40.0 && x <= 54.0) {
+      return std::max(0.0, 56.39011190988 - 2.010520359035 * x + 1.644919857549e-02 * x * x + 2.674976141766e-05 * x * x * x);
+  } else {
+      return 0.0;
+  }
+}
+
 void UDF_Setup()
 {
-  auto mesh = nrs->mesh;
+  auto mesh = nrs->meshV;
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
-    std::vector<dfloat> U(mesh->dim * nrs->fieldOffset, 0.0);
+    std::vector<dfloat> U(nrs->fluid->fieldOffsetSum, 0.0);
     for(int n = 0; n < mesh->Nlocal; n++) {
       U[n + 0 * nrs->fieldOffset] = 1;
     }
-    nrs->o_U.copyFrom(U.data(), U.size());
+    nrs->fluid->o_U.copyFrom(U.data(), U.size());
+
+#if 1
+    const auto xmin = 0.0;
+    const auto xmax = 9.0;
+    platform->linAlg->rescale(xmin, xmax, mesh->o_x, platform->comm.mpiComm);
+    const auto ymin = 0.0;
+    const auto ymax = 3.035;
+    platform->linAlg->rescale(ymin, ymax, mesh->o_y, platform->comm.mpiComm);
+    const auto zmin = 0.0;
+    const auto zmax = 4.5;
+    platform->linAlg->rescale(zmin, zmax, mesh->o_z, platform->comm.mpiComm);
+
+#if 1
+    const auto hmax = 28.0;
+    auto [x, y, z] = mesh->xyzHost();
+
+    for(int n = 0; n < mesh->Nlocal; n++) {
+      auto yw = bottomph(hmax * x[n], hmax * xmin, hmax * xmax) / hmax;
+      y[n] = (1. - yw / ymax) * y[n] + yw;
+    }
+    mesh->o_y.copyFrom(y.data());
+#endif
+#endif
   }
 }
 

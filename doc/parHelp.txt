@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------------------------------------------------
 Key                         Value(s)                                   Description / Comment
 ----------------------------------------------------------------------------------------------------------------------
-userSections                <string>                                   user defined par sections
+userSections                <string>, <string>, ...                    user defined par sections
 
 [OCCA]
 
@@ -28,10 +28,10 @@ redirectOutputTo            <string>
 startFrom                   "<string>"
                               + time=<float>                           reset to specified time 
                               + x                                      read mesh coordinates 
-                              + u                                      read velocity 
-                              + t                                      read temperature
-                              + s00 s01 s02 ...                        read scalars 
-                              + int                                    use point interpolation
+                              + u                                      read velocity
+                              + s                                      read all scalars 
+                                + s00 s01 s02 ...                      read specified scalars only (t is an alias for s00) 
+                              + int                                    use grid interpolatation
 
 timeStepper                 tombo1, tombo2 [D], tombo3
 
@@ -48,7 +48,7 @@ dt                          <float> [D]
                               +max=<float>
                               +initial=<float>
 
-subCyclingSteps             <int>, auto                                number of OIFS sub-steps for advection
+advectionSubCyclingSteps    <int>, auto                                number of OIFS sub-steps for advection
                             0 [D]                             
 
 
@@ -76,9 +76,7 @@ oudf                        "<string>"                                 name of .
 
 usr                         "<string>"                                 name of .usr file
 
-nScalars                    <int>                                      number of non-temperature scalars
-                                                                       by default, the scalars will have the settings
-                                                                       as outlined by the default [SCALAR] section
+scalars                     "<string>, <string>, ..."                  scalar names
 ----------------------------------------------------------------------------------------------------------------------
 [NEKNEK]
 boundaryEXTOrder            <int>                                      boundary extrapolation order
@@ -128,7 +126,7 @@ preconditioner              Jacobi [D]
                               +nonSmoothed                            
 
 coarseGridDiscretization    FEM [D]                                    linear finite elment discretization
-                              +Galerkin                                coarse grid matrix by Galerkin projection 
+                              +Galerkin                                coarse grid matrix by Galerkin projection
                             SEMFEM                                     linear FEM approx on high-order nodes
 
 coarseSolver/semfemSolver   smoother                                     
@@ -204,6 +202,10 @@ connectivityTol             <float>
 
 file                        "<string>"                                 name of .re2 file
 ----------------------------------------------------------------------------------------------------------------------
+[GEOM]
+
+...
+----------------------------------------------------------------------------------------------------------------------
 [VELOCITY]
 
 density                     <float>                                    density
@@ -212,25 +214,18 @@ rho
 viscosity                   <float>                                    dynamic viscosity
 mu
 ----------------------------------------------------------------------------------------------------------------------
-[TEMPERATURE]
+[SCALAR]                                                               default scalar section
 
-heatCapacity                <float>                                    rho*Cp 
-rhoCp
+names                       <string>                                   list of scalar names
 
-conductivity                <float>                                    thermal conductivity
-k 
+transportCoeff              <float>
+transportCoeffSolid         <float>
+
+diffusionCoeff              <float>
+diffusionCoeffSolid         <float>
+
 ----------------------------------------------------------------------------------------------------------------------
-[SCALAR]                                                               default scalar section, see general::nScalars
-                                                                       all non-temperature scalars will have settings
-                                                                       as set from this section, unless explicitly overriden
-
-density                     <float>                                    density
-rho
-
-diffusivity                 <float>                                    diffusivity
-D
-----------------------------------------------------------------------------------------------------------------------
-[SCALAR01]
+[SCALAR FOO]
 
 ...
 ----------------------------------------------------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-set(MESH_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/mesh)
+set(MESH_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/core/mesh)
 
 set(MESH_SOURCES
     ${MESH_SOURCE_DIR}/planarAvg.cpp
@@ -12,11 +12,13 @@ set(MESH_SOURCES
     ${MESH_SOURCE_DIR}/meshBasis1D.cpp
     ${MESH_SOURCE_DIR}/meshBasisHex3D.cpp
     ${MESH_SOURCE_DIR}/meshApplyElementMatrix.cpp
+    ${MESH_SOURCE_DIR}/registerMeshKernels.cpp
+    ${MESH_SOURCE_DIR}/re2Reader.cpp
     ${MESH_SOURCE_DIR}/meshMetrics.cpp
     ${MESH_SOURCE_DIR}/meshConnect.cpp
     ${MESH_SOURCE_DIR}/meshConnectFaceNodes3D.cpp
     ${MESH_SOURCE_DIR}/meshFree.cpp
-    ${MESH_SOURCE_DIR}/meshMove.cpp
+    ${MESH_SOURCE_DIR}/meshUpdate.cpp
     ${MESH_SOURCE_DIR}/meshGeometricFactorsHex3D.cpp
     ${MESH_SOURCE_DIR}/meshLoadReferenceNodesHex3D.cpp
     ${MESH_SOURCE_DIR}/meshOccaSetup3D.cpp

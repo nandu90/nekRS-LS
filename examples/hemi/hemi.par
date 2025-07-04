@@ -1,22 +1,24 @@
+userSections = CASEDATA
+
 [GENERAL] 
-polynomialOrder = 7
+polynomialOrder = 9
 #startFrom = "restart.fld"
 stopAt = endTime
 endTime = 50 
 
 dt = 7e-3
 timeStepper = tombo2
-subCyclingSteps = 1
+advectionSubCyclingSteps = 1
 
 checkpointControl = simulationTime 
 checkpointInterval = 1.0
 
 regularization = hpfrt + nModes = 1 + scalingCoeff = 8
 
-[PRESSURE]
+[FLUID PRESSURE]
 residualTol = 1e-04
 
-[VELOCITY]
+[FLUID VELOCITY]
 boundaryTypeMap = udfDirichlet, zeroNeumann, zeroDirichlet, zeroDirichletY/zeroNeumann, zeroDirichletZ/zeroNeumann 
 residualTol = 1e-06
 rho = 1.0

@@ -2,8 +2,9 @@
 #define nekrs_bcmap_hpp_
 
 #include "nekrsSys.hpp"
-#include "mesh.h"
+#include "mesh3D.h"
 #include "bcType.h"
+#include "deviceMemory.hpp" 
 #include <set>
 
 class bdryBase
@@ -34,6 +35,8 @@ public:
 
   virtual void setup() = 0;
 
+  std::string typeText(int bid, const std::string& field) const;
+
   bool useNek() const
   {
     return importFromNek;
@@ -46,8 +49,7 @@ public:
     }
 
     try {
-      lowerCase(field);
-      return bToBc.at({field, bid - 1});
+      return bToBc.at({lowerCase(field), bid - 1});
     } catch (const std::out_of_range &oor) {
       nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "lookup of bid %d field %s failed!\n", bid, field.c_str());
     }
@@ -55,17 +57,11 @@ public:
     return -1;
   };
 
-  virtual int typeElliptic(int bid, std::string field) const = 0;
-  virtual std::string typeText(int bid, std::string field) const = 0;
-
-  int size(const std::string &_field) const
+  int size(const std::string &field) const
   {
-    std::string field = _field;
-    lowerCase(field);
-
     int cnt = 0;
     for (auto &entry : bToBc) {
-      if (entry.first.first == field) {
+      if (entry.first.first == lowerCase(field)) {
         cnt++;
       }
     }
@@ -77,15 +73,16 @@ public:
     return bToBc;
   };
 
-  void setBcMap(std::string field, int *map, int nIDs)
+  void setBcMap(std::string field, bool isVector, const std::vector<int>& map)
   {
-    fields.insert(field);
-    for (int i = 0; i < nIDs; i++) {
+    fields.insert({field, isVector});
+    for (int i = 0; i < map.size(); i++) {
       bToBc[make_pair(field, i)] = map[i];
     }
   };
 
-  virtual void checkAlignment(mesh_t *mesh) const = 0;
+    
+  void checkAlignment(mesh_t *mesh) const;
 
   virtual void addKernelConstants(occa::properties &kernelInfo)
   {
@@ -97,21 +94,21 @@ public:
   bool hasRobin(std::string field) const
   {
     const auto nid = size(field);
- 
+
     for (int bid = 1; bid <= nid; bid++) {
       const auto bcType = typeId(bid, field);
       if (bcType == bdryBase::bcType_udfRobin) {
         return true;
       }
     }
- 
+
     return false;
   };
 
   bool hasUnalignedMixed(std::string field) const
   {
     const auto nid = size(field);
- 
+
     for (int bid = 1; bid <= nid; bid++) {
       const auto bcType = typeId(bid, field);
       if (bcType == bdryBase::bcType_zeroDirichletN_zeroNeumann) {
@@ -124,14 +121,102 @@ public:
         return true;
       }
     }
- 
+
     return false;
   };
 
+  int typeElliptic(int bid, const std::string& field, std::string fieldComponent = "") const;
+
+  void setupField(const std::vector<std::string>& slist, const std::string& field, bool isVector = false)
+  {              
+    if (slist.size() == 0) {
+      return;
+    }         
+    
+    if (slist.size()) {
+      importFromNek = false;
+    
+      if (slist.size() == 1 && slist[0] == "none") {
+        return;
+      }
+    }         
+              
+    fields.insert({lowerCase(field), isVector});
+    
+    if (isVector) {
+      vectorFieldSetup(lowerCase(field), slist);
+    } else {
+      scalarFieldSetup(lowerCase(field), slist);
+    } 
+  }
+
+  const std::map<std::string, int> vBcTextToID = {
+      //    {"periodic", 0},
+      {"zerodirichlet", bdryBase::bcType_zeroDirichlet},
+      {"interpolation", bdryBase::bcType_interpolation},
+      {"udfdirichlet", bdryBase::bcType_udfDirichlet},
+      {"zeroxvalue/zeroneumann", bdryBase::bcType_zeroDirichletX_zeroNeumann},
+      {"zerodirichlety/zeroneumann", bdryBase::bcType_zeroDirichletY_zeroNeumann},
+      {"zerodirichletz/zeroneumann", bdryBase::bcType_zeroDirichletZ_zeroNeumann},
+      {"zerodirichletn/zeroneumann", bdryBase::bcType_zeroDirichletN_zeroNeumann},
+      {"zerodirichletx/udfneumann", bdryBase::bcType_zeroDirichletX_udfNeumann},
+      {"zerodirichlety/udfneumann", bdryBase::bcType_zeroDirichletY_udfNeumann},
+      {"zerodirichletz/udfneumann", bdryBase::bcType_zeroDirichletZ_udfNeumann},
+      {"zerodirichletn/udfneumann", bdryBase::bcType_zeroDirichletN_udfNeumann},
+      {"zerodirichletyz/zeroneumann", bdryBase::bcType_zeroDirichletYZ_zeroNeumann},
+      {"zerodirichletxz/zeroneumann", bdryBase::bcType_zeroDirichletXZ_zeroNeumann},
+      {"zerodirichletxy/zeroneumann", bdryBase::bcType_zeroDirichletXY_zeroNeumann},
+      // {"zerodirichlett/zeroneumann", bdryBase::bcType_zeroDirichletT_zeroNeumann},
+      {"zeroneumann", bdryBase::bcType_zeroNeumann},
+      {"none", bdryBase::bcType_none}};
+
+  const std::map<int, std::string> vBcIDToText = {
+      //    {0, "periodic"},
+      {bdryBase::bcType_zeroDirichlet, "zeroDirichlet"},
+      {bdryBase::bcType_interpolation, "interpolation"},
+      {bdryBase::bcType_udfDirichlet, "udfDirichlet"},
+      {bdryBase::bcType_zeroDirichletX_zeroNeumann, "zeroDirichletX/zeroNeumann"},
+      {bdryBase::bcType_zeroDirichletY_zeroNeumann, "zeroDirichletY/zeroNeumann"},
+      {bdryBase::bcType_zeroDirichletZ_zeroNeumann, "zeroDirichletZ/zeroNeumann"},
+      {bdryBase::bcType_zeroDirichletN_zeroNeumann, "zeroDirichletN/zeroNeumann"},
+      {bdryBase::bcType_zeroDirichletX_udfNeumann, "zeroDirichletX/udfNeumann"},
+      {bdryBase::bcType_zeroDirichletY_udfNeumann, "zeroDirichletY/udfNeumann"},
+      {bdryBase::bcType_zeroDirichletZ_udfNeumann, "zeroDirichletZ/udfNeumann"},
+      {bdryBase::bcType_zeroDirichletN_udfNeumann, "zeroDirichletN/udfNeumann"},
+      {bdryBase::bcType_zeroDirichletYZ_zeroNeumann, "zeroDirichletYZ/zeroNeumann"},
+      {bdryBase::bcType_zeroDirichletXZ_zeroNeumann, "zeroDirichletXZ/zeroNeumann"},
+      // {bdryBase::bcType_zeroDirichletT_zeroNeumann, "zeroDirichletT/zeroNeumann"},
+      {bdryBase::bcType_zeroNeumann, "zeroNeumann"},
+      {bdryBase::bcType_none, "none"}};
+
+  const std::map<std::string, int> sBcTextToID = { //    {"periodic", 0},
+      {"interpolation", bdryBase::bcType_interpolation},
+      {"udfdirichlet", bdryBase::bcType_udfDirichlet},
+      {"udfrobin", bdryBase::bcType_udfRobin},
+      {"zeroneumann", bdryBase::bcType_zeroNeumann},
+      {"udfneumann", bdryBase::bcType_udfNeumann},
+      {"none", bdryBase::bcType_none}};
+
+  const std::map<int, std::string> sBcIDToText = { //    {0, "periodic"},
+      {bdryBase::bcType_interpolation, "interpolation"},
+      {bdryBase::bcType_udfDirichlet, "udfDirichlet"},
+      {bdryBase::bcType_udfRobin, "udfRobin"},
+      {bdryBase::bcType_zeroNeumann, "zeroNeumann"},
+      {bdryBase::bcType_udfNeumann, "udfNeumann"},
+      {bdryBase::bcType_none, "none"}};
+
+  bool hasOutflow(const std::string &field) const;
+  bool isOutflow(int bcType) const;
+  void printBcTypeMapping(const std::string &field) const;
+
 protected:
-  static std::set<std::string> fields;
+  static std::map<std::string, bool>  fields;
   static std::map<std::pair<std::string, int>, int> bToBc;
   static bool importFromNek;
+
+private:
+  void vectorFieldSetup(std::string field, std::vector<std::string> slist);
+  void scalarFieldSetup(std::string field, std::vector<std::string> slist);
 };
 
 #endif
