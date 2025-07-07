@@ -221,7 +221,7 @@ void updateFieldData()
 
   platform->timer.toc("nekAscent::run::update");
 
-  if (platform->comm.mpiRank == 0 && platform->verbose) {
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
     std::cout << "---------------- Ascent mesh_data ----------------" << std::endl;
     conduit::Node mesh_copy;
     mesh_copy.set(mesh_data);
@@ -396,7 +396,7 @@ void setup(mesh_t *mesh_,
   platform->timer.set("nekAscent::setup", tSetup);
   if (platform->comm.mpiRank == 0) {
     printf("\ndone (%gs)\n\n", tSetup);
-    if (platform->verbose) {
+    if (platform->verbose()) {
       conduit::Node mesh_copy;
       mesh_copy.set(mesh_data);
       mesh_copy.print();

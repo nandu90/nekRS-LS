@@ -22,7 +22,7 @@ int _pgmres(elliptic_t *elliptic,
   const int Nblock = (mesh->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
   const auto nRestartVectors = elliptic->gmresData->nRestartVectors;
-  const auto verbose = platform->verbose;
+  const auto verbose = platform->verbose();
   const auto serial = platform->serial;
   const auto flexible = elliptic->gmresData->flexible;
 

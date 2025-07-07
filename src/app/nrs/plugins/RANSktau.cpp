@@ -115,7 +115,7 @@ void RANSktau::buildKernel(occa::properties _kernelInfo)
     kernelInfo["defines/p_pope"] = coeff[14];
   }
 
-  if (platform->comm.mpiRank == 0 && platform->verbose) {
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
     std::cout << "\nRANSktau settings\n";
     std::cout << kernelInfo << std::endl;
   }
@@ -233,12 +233,13 @@ void RANSktau::setup(int ifld)
     auto &scalar = nrs->scalar;
 
     platform->options.getArgs("FLUID DENSITY", rho);
-    auto o_rho = scalar->o_rho.slice(scalar->fieldOffsetScan[kFieldIndex + i], scalar->mesh(kFieldIndex + i)->Nlocal);
+    auto o_rho =
+        scalar->o_rho.slice(scalar->fieldOffsetScan[kFieldIndex + i], scalar->mesh(kFieldIndex + i)->Nlocal);
     platform->linAlg->fill(o_rho.size(), rho, o_rho);
 
     const std::string sid = scalarDigitStr(kFieldIndex + i);
     nekrsCheck(!platform->options.getArgs("SCALAR" + sid + " DIFFUSIVITY").empty() ||
-               !platform->options.getArgs("SCALAR" + sid + " DENSITY").empty(),
+                   !platform->options.getArgs("SCALAR" + sid + " DENSITY").empty(),
                platform->comm.mpiComm,
                EXIT_FAILURE,
                "%s\n",

@@ -29,9 +29,9 @@ static void verifyOudf()
     const auto typeId = value;
 
     if (typeId == bdryBase::bcType_zeroDirichletYZ_zeroNeumann ||
-          typeId == bdryBase::bcType_zeroDirichletXZ_zeroNeumann ||
-          typeId == bdryBase::bcType_zeroDirichletXY_zeroNeumann ||
-          typeId == bdryBase::bcType_zeroDirichletT_zeroNeumann || typeId == bdryBase::bcType_zeroNeumann) {
+        typeId == bdryBase::bcType_zeroDirichletXZ_zeroNeumann ||
+        typeId == bdryBase::bcType_zeroDirichletXY_zeroNeumann ||
+        typeId == bdryBase::bcType_zeroDirichletT_zeroNeumann || typeId == bdryBase::bcType_zeroNeumann) {
       oudfFindDirichlet(field);
     }
 
@@ -39,11 +39,10 @@ static void verifyOudf()
       oudfFindDirichlet(field);
     }
 
-    if (typeId == bdryBase::bcType_udfNeumann ||
-          typeId == bdryBase::bcType_zeroDirichletX_udfNeumann ||
-          typeId == bdryBase::bcType_zeroDirichletY_udfNeumann ||
-          typeId == bdryBase::bcType_zeroDirichletZ_udfNeumann ||
-          typeId == bdryBase::bcType_zeroDirichletN_udfNeumann) {
+    if (typeId == bdryBase::bcType_udfNeumann || typeId == bdryBase::bcType_zeroDirichletX_udfNeumann ||
+        typeId == bdryBase::bcType_zeroDirichletY_udfNeumann ||
+        typeId == bdryBase::bcType_zeroDirichletZ_udfNeumann ||
+        typeId == bdryBase::bcType_zeroDirichletN_udfNeumann) {
       oudfFindNeumann(field);
     }
 
@@ -128,7 +127,7 @@ void udfBuild(setupAide &options)
     nekrsCheck(!fs::exists(udfFile), MPI_COMM_SELF, EXIT_FAILURE, "Cannot find %s!\n", udfFile.c_str());
   }
 
-  const int verbose = options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
+  const int verbose = platform->verbose() ? 1 : 0;
   const std::string installDir(getenv("NEKRS_HOME"));
   const std::string cache_dir(getenv("NEKRS_CACHE_DIR"));
   const std::string udfLib = cache_dir + "/udf/libudf.so";
@@ -212,7 +211,7 @@ void udfBuild(setupAide &options)
 
   if (platform->cacheBcast || platform->cacheLocal) {
     if (oudfFileExists) {
-      fileBcast(oudfFile, platform->tmpDir, comm, platform->verbose);
+      fileBcast(oudfFile, platform->tmpDir, comm, platform->verbose());
       oudfFile = platform->tmpDir / fs::path(oudfFile).filename();
       options.setArgs("UDF OKL FILE", std::string(oudfFile));
     }
@@ -222,14 +221,14 @@ void udfBuild(setupAide &options)
     const auto err = (buildRank == 0 && buildRequired)
                          ? udfMake(options, platform->solver->id(), platform->comm.mpiRank)
                          : 0;
-    auto log = cmakeBuildDir + "/cmake.log";   
+    auto log = cmakeBuildDir + "/cmake.log";
     nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "see %s for more details\n", log.c_str());
   }
 
   if (platform->cacheBcast || platform->cacheLocal) {
     const auto dst = fs::path(platform->tmpDir) / "udf";
-    fileBcast(fs::path(udfLib), dst, comm, platform->verbose);
-    fileBcast(fs::path(oudfFileCache), dst, comm, platform->verbose);
+    fileBcast(fs::path(udfLib), dst, comm, platform->verbose());
+    fileBcast(fs::path(oudfFileCache), dst, comm, platform->verbose());
   }
 
   if (buildRank == 0) {
@@ -264,7 +263,7 @@ void *udfLoadFunction(const char *fname, int errchk)
 
     const auto udfLib = std::string(fs::path(cache_dir) / "udf/libudf.so");
 
-    if (platform->comm.mpiRank == 0 && platform->verbose) {
+    if (platform->comm.mpiRank == 0 && platform->verbose()) {
       std::cout << "loading " << udfLib << std::endl;
     }
 
@@ -305,13 +304,15 @@ void udfEcho()
 
   std::ifstream fudf(tmpFile);
   std::string text;
-  while (std::getline(fudf, text))
+  while (std::getline(fudf, text)) {
     std::cout << "<<< " << text << "\n";
+  }
   std::cout << std::endl;
   fs::remove(tmpFile);
 
   std::ifstream foudf(oudfFileCache);
-  while (std::getline(foudf, text))
+  while (std::getline(foudf, text)) {
     std::cout << "<<< " << text << "\n";
+  }
   std::cout << std::endl;
 }

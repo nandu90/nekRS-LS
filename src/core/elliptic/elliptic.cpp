@@ -148,7 +148,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
                       const occa::memory &o_rhs,
                       occa::memory o_x)
 {
-  auto& elliptic = this->solver;
+  auto &elliptic = this->solver;
 
   elliptic->o_lambda0 = o_lambda0;
   elliptic->o_lambda1 = o_lambda1;
@@ -160,7 +160,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   int maxIter = 999;
   options.getArgs("MAXIMUM ITERATIONS", maxIter);
 
-  const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+  const int verbose = platform->verbose();
   const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
 
   auto printNorm = [&](const occa::memory &o_u, const std::string &txt) {
@@ -241,7 +241,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   }
 
   o_x0.copyFrom(o_x);
-  if (platform->verbose) {
+  if (platform->verbose()) {
     printNorm(o_x0, "o_x0");
     printNorm(o_rhs, "o_rhs");
   }
@@ -264,7 +264,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     return o_r;
   }();
 
-  if (platform->verbose) {
+  if (platform->verbose()) {
     printNorm(o_r, "o_r");
   }
 
@@ -355,7 +355,6 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   elliptic->o_lambda1 = nullptr;
   ellipticFreeWorkspace(elliptic);
 }
-
 
 void checkConfig(elliptic_t *elliptic)
 {
@@ -457,7 +456,7 @@ void checkConfig(elliptic_t *elliptic)
 
 void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambda1)
 {
-  auto& elliptic = solver;
+  auto &elliptic = solver;
 
   MPI_Barrier(platform->comm.mpiComm);
   const double tStart = MPI_Wtime();
@@ -502,7 +501,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     elliptic->options.setArgs("COARSE SOLVER LOCATION", "CPU");
   }
 
-  if (platform->comm.mpiRank == 0 && platform->verbose) {
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
     std::cout << elliptic->options << std::endl;
   }
 
@@ -516,7 +515,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   elliptic->blockSolver = elliptic->Nfields > 1;
 
   setupAide &options = elliptic->options;
-  const int verbose = platform->options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
+  const int verbose = platform->verbose() ? 1 : 0;
 
   mesh_t *mesh = elliptic->mesh;
   const dlong Nlocal = mesh->Np * mesh->Nelements;

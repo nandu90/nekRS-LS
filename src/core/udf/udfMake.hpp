@@ -5,7 +5,7 @@
 #include <regex>
 #include <set>
 #include <chrono>
-#include <fcntl.h> 
+#include <fcntl.h>
 
 #include "unifdef.h"
 #include "sha1.hpp"
@@ -13,8 +13,8 @@
 #include "setupAide.hpp"
 
 static void udfAutoKernels(const std::string &udfFileCache,
-                    const std::string &postOklSource,
-                    const std::string &oudfFileCache)
+                           const std::string &postOklSource,
+                           const std::string &oudfFileCache)
 {
   const std::string includeFile = fs::path(udfFileCache).parent_path() / fs::path("udfAutoLoadKernel.hpp");
   std::ofstream f(includeFile);
@@ -63,7 +63,7 @@ int udfMake(setupAide &options, const std::string &solverName, int rank)
   options.getArgs("UDF FILE", udfFile);
   udfFile = fs::absolute(udfFile);
 
-  const int verbose = options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
+  const int verbose = platform->verbose() ? 1 : 0;
   const std::string installDir(getenv("NEKRS_HOME"));
   const std::string udf_dir = installDir + "/udf";
   const std::string cache_dir(getenv("NEKRS_CACHE_DIR"));
@@ -82,7 +82,7 @@ int udfMake(setupAide &options, const std::string &solverName, int rank)
   int oudfFileExists = 0;
   options.getArgs("UDF OKL FILE", oudfFile);
   if (!oudfFile.empty()) {
-    oudfFileExists = 1; 
+    oudfFileExists = 1;
     oudfFile = fs::absolute(oudfFile);
   }
 
@@ -93,8 +93,7 @@ int udfMake(setupAide &options, const std::string &solverName, int rank)
 
   fs::create_directories(std::string(cache_dir + "/udf"));
 
-  const std::string pipeToNull =
-      (rank == 0) ? std::string("") : std::string("> /dev/null 2>&1");
+  const std::string pipeToNull = (rank == 0) ? std::string("") : std::string("> /dev/null 2>&1");
 
   if (rank == 0) {
     printf("building udf ... \n");
@@ -178,7 +177,7 @@ int udfMake(setupAide &options, const std::string &solverName, int rank)
   bool oklSectionFound = fs::file_size(cache_dir + "/udf/okl.cpp");
 
   if (!oklSectionFound && oudfFileExists) {
-    fs::copy(oudfFile, std::string(cache_dir + "/udf/okl.cpp"),  fs::copy_options::overwrite_existing);
+    fs::copy(oudfFile, std::string(cache_dir + "/udf/okl.cpp"), fs::copy_options::overwrite_existing);
     if (rank == 0) {
       printf("Cannot find okl section in udf (oudf will be deprecated in next version!)\n");
     }
@@ -250,4 +249,3 @@ int udfMake(setupAide &options, const std::string &solverName, int rank)
 
   return 0;
 }
-

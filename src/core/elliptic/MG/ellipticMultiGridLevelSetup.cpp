@@ -358,7 +358,7 @@ dfloat pMGLevel::maxEigSmoothAx()
   for (int j = 0; j < k; j++) {
     // v[j+1] = invD*(A*v[j])
 
-    if (platform->verbose) {
+    if (platform->verbose()) {
       const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                                    1,
                                                                    elliptic->fieldOffset,
@@ -373,7 +373,7 @@ dfloat pMGLevel::maxEigSmoothAx()
 
     platform->copyPfloatToDfloatKernel(M, o_VxPfloat, o_V[j + 1]);
 
-    if (platform->verbose) {
+    if (platform->verbose()) {
       const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                                    1,
                                                                    elliptic->fieldOffset,

@@ -35,10 +35,10 @@ std::optional<int> parseScalarIntegerFromString(const std::string &scalarString)
 
   if (scalarString.length() > std::string("scalar").length()) {
     try {
-        std::istringstream iss(scalarString);
-        std::string firstWord, secondWord;
-        iss >> firstWord >> secondWord;
-        return scalarMap.at(secondWord);
+      std::istringstream iss(scalarString);
+      std::string firstWord, secondWord;
+      iss >> firstWord >> secondWord;
+      return scalarMap.at(secondWord);
     } catch (std::invalid_argument &e) {
       std::cout << "Hit an invalid_argument error for scalarString=\"" << scalarString << "\". It said\n"
                 << e.what() << "\n";
@@ -58,9 +58,11 @@ std::string parPrefixFromParSection(const std::string &parSection)
     return std::string("");
   }
   if (parSection.find("scalar") != std::string::npos) {
-    if (parSection == std::string("scalar")) return "scalar default ";
+    if (parSection == std::string("scalar")) {
+      return "scalar default ";
+    }
     const auto is = parseScalarIntegerFromString(parSection);
-    return "scalar" +  scalarDigitStr(is.value()) + " ";
+    return "scalar" + scalarDigitStr(is.value()) + " ";
   }
   return parSection + std::string(" ");
 }
@@ -402,14 +404,14 @@ void validate(inipp::Ini *ini, const std::vector<std::string> &userSections)
     if (isScalar) {
       if (firstWord != "scalar") {
         std::ostringstream error;
-        error << "invalid scalar section " << sec.first << "\n"; 
+        error << "invalid scalar section " << sec.first << "\n";
         append_error(error.str());
         err++;
       }
 
       if (sec.first != "scalar" && scalarMap.find(secondWord) == scalarMap.end()) {
         std::ostringstream error;
-        error << "scalar section defined for unknown scalar " << secondWord << "\n"; 
+        error << "scalar section defined for unknown scalar " << secondWord << "\n";
         append_error(error.str());
         err++;
       }
@@ -443,8 +445,8 @@ void validate(inipp::Ini *ini, const std::vector<std::string> &userSections)
 
   if (scalarMap.size() >= NSCALAR_MAX) {
     std::ostringstream error;
-    error << "specified " << scalarMap.size() << " scalars, while the maximum allowed is "
-          << NSCALAR_MAX << "\n";
+    error << "specified " << scalarMap.size() << " scalars, while the maximum allowed is " << NSCALAR_MAX
+          << "\n";
     append_error(error.str());
     err++;
   }
@@ -689,7 +691,7 @@ void parseCvodeSolver(const int rank, setupAide &options, inipp::Ini *ini)
     options.setArgs("CVODE DQ SIGMA", to_string_f(sigScale));
   }
 
-  bool dealiasing ;
+  bool dealiasing;
   ini->extract(parScope, "dealiasing", dealiasing);
   if (dealiasing && !options.compareArgs("OVERINTEGRATION", "TRUE")) {
     append_error("dealiasing for CVODE only is not supported!" + parScope);
@@ -1434,11 +1436,11 @@ void parseCheckpointing(const int rank, setupAide &options, inipp::Ini *ini, std
 {
   std::string val = "true";
   if (ini->extract(parSection, "checkpointing", val)) {
-     if (val == "true") {
-       val = "true"; 
-     } else {
-       val = "false";
-     }
+    if (val == "true") {
+      val = "true";
+    } else {
+      val = "false";
+    }
   }
 
   std::string parPrefix = upperCase(parPrefixFromParSection(parSection));
@@ -1450,7 +1452,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
 {
   int N;
   options.getArgs("POLYNOMIAL DEGREE", N);
-  const bool isScalar = (parSection.find("scalar") != std::string::npos); 
+  const bool isScalar = (parSection.find("scalar") != std::string::npos);
   const bool isVelocity = parSection.find("fluid velocity") != std::string::npos;
   std::string sbuf;
 
@@ -1508,13 +1510,16 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
       if (usesHPFRT) {
         options.setArgs(parPrefix + "HPFRT MODES", "1");
         options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPFRT");
-        if (usesGJP) options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP+HPFRT");
-
+        if (usesGJP) {
+          options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP+HPFRT");
+        }
       }
 
       if (usesAVM) {
         options.setArgs(parPrefix + "REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY");
-        if (usesGJP) options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP+AVM_AVERAGED_MODAL_DECAY");
+        if (usesGJP) {
+          options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP+AVM_AVERAGED_MODAL_DECAY");
+        }
         options.setArgs(parPrefix + "REGULARIZATION AVM ACTIVATION WIDTH", to_string_f(1.0));
         options.setArgs(parPrefix + "REGULARIZATION AVM DECAY THRESHOLD", to_string_f(2.0));
         options.setArgs(parPrefix + "REGULARIZATION AVM C0", "FALSE");
@@ -1557,7 +1562,6 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         if (options.getArgs(parPrefix + "REGULARIZATION AVM ABSOLUTE TOL").empty()) {
           append_error("absoluteTol qualifier required for avm!\n");
         }
-
       }
 
       if (usesHPFRT) {
@@ -1611,7 +1615,8 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         }
 
         if (defaultSettings.find("gjp") != std::string::npos) {
-          options.setArgs(parPrefix + "REGULARIZATION GJP PENALTY FACTOR", options.getArgs("REGULARIZATION GJP PENALTY FACTOR"));
+          options.setArgs(parPrefix + "REGULARIZATION GJP PENALTY FACTOR",
+                          options.getArgs("REGULARIZATION GJP PENALTY FACTOR"));
         }
 
         if (defaultSettings.find("avm") != std::string::npos) {
@@ -2302,12 +2307,14 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
     std::istringstream stream(sec.first);
     std::string firstWord, secondWord;
     stream >> firstWord >> secondWord;
-    if (firstWord != "scalar") return;
+    if (firstWord != "scalar") {
+      return;
+    }
 
     std::string sid;
     if (secondWord.empty()) {
       sid = " DEFAULT";
-    } else { 
+    } else {
       auto it = scalarMap.find(secondWord);
       if (it != scalarMap.end()) {
         sid = scalarDigitStr(scalarMap.at(secondWord));
@@ -2344,12 +2351,12 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
     options.setArgs("SCALAR" + sid + " MESH", "FLUID");
     if (ini->extract(parScope, "mesh", sbuf)) {
       auto keys = serializeString(sbuf, '+');
-      if (keys.at(0) != "fluid") { 
+      if (keys.at(0) != "fluid") {
         append_error("Valid mesh values are fluid or fluid+solid");
       }
 
       if (keys.size() > 1) {
-        if (keys.at(1) == "solid") { 
+        if (keys.at(1) == "solid") {
           options.setArgs("SCALAR" + sid + " MESH", "FLUID+SOLID");
         } else {
           append_error("Valid mesh values are fluid or fluid+solid");
@@ -2369,7 +2376,8 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
       options.setArgs("SCALAR" + sid + " DIFFUSIONCOEFF", to_string_f(diffusivity));
     }
 
-    if (ini->extract(parScope, "diffusionCoeffSolid", sbuf) || ini->extract(parScope, "conductivitySolid", sbuf)) {
+    if (ini->extract(parScope, "diffusionCoeffSolid", sbuf) ||
+        ini->extract(parScope, "conductivitySolid", sbuf)) {
       int err = 0;
       double diffusivity = parseFormula(sbuf.c_str(), &err);
       if (err) {
@@ -2410,7 +2418,7 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
     parseScalarSection(std::make_pair(std::string("scalar"), sections.at("scalar")));
   }
 
-  // initialize with default settings if available 
+  // initialize with default settings if available
   const std::string defaultSettingStr = "SCALAR DEFAULT ";
   for (int is = 0; is < nscal; ++is) {
     std::string sid = scalarDigitStr(is);
@@ -2455,7 +2463,6 @@ void parseScalarSections(const int rank, setupAide &options, inipp::Ini *ini)
       }
     }
   }
-
 }
 
 void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *ini)
@@ -2560,8 +2567,8 @@ void Par::parse(setupAide &options)
     std::string names;
     ini->extract("general", "scalars", names);
     auto list = serializeString(names, ',');
-    for(int i = 0; i < list.size(); i++) {
-      scalarMap[list[i]] =  i;
+    for (int i = 0; i < list.size(); i++) {
+      scalarMap[list[i]] = i;
     }
   }
 

@@ -8,7 +8,7 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
 
   auto mesh = elliptic->mesh;
 
-  const int verbose = (platform->options.compareArgs("VERBOSE", "TRUE")) ? 1 : 0;
+  const int verbose = (platform->verbose()) ? 1 : 0;
   const int useFP32 = elliptic->options.compareArgs("COARSE SOLVER PRECISION", "FP32");
   const bool useDevice = elliptic->options.compareArgs("COARSE SOLVER LOCATION", "DEVICE");
 

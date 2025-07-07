@@ -155,7 +155,7 @@ int standardPCG(elliptic_t *elliptic,
   setupAide &options = elliptic->options;
 
   const int flexible = options.compareArgs("SOLVER", "FLEXIBLE");
-  const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+  const int verbose = platform->verbose();
 
   dfloat rdotz1;
   dfloat alpha;
@@ -277,9 +277,8 @@ int combinedPCG(elliptic_t *elliptic,
   setupAide &options = elliptic->options;
   auto &precon = elliptic->precon;
 
-  const int verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+  const int verbose = platform->verbose();
   const int preco = !options.compareArgs("PRECONDITIONER", "NONE");
-
 
   dfloat betakm1 = 0;
   dfloat betakm2 = 0;
@@ -325,8 +324,7 @@ int combinedPCG(elliptic_t *elliptic,
                                          o_r);
 
     platform->flopCounter->add(elliptic->name + " ellipticCombinedPCGPreMatVecKernel",
-                               elliptic->Nfields * static_cast<double>(mesh->Nlocal) * 0.5*(11 + 5));
-
+                               elliptic->Nfields * static_cast<double>(mesh->Nlocal) * 0.5 * (11 + 5));
 
     ellipticOperator(elliptic, o_p, o_v, dfloatString);
 
@@ -437,17 +435,17 @@ int pcg(elliptic_t *elliptic,
     o_v = platform->deviceMemoryPool.reserve<dfloat>(Nlocal);
   }
 
-  const auto Nblock = [&]()
-  {
+  const auto Nblock = [&]() {
     auto mesh = elliptic->mesh;
     const dlong Nlocal = mesh->Np * mesh->Nelements;
     return (Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
   }();
 
-
   auto Nreductions = [&]() {
     int n = 1;
-    if (options.compareArgs("SOLVER", "PCG+COMBINED")) n = CombinedPCGId::nReduction; 
+    if (options.compareArgs("SOLVER", "PCG+COMBINED")) {
+      n = CombinedPCGId::nReduction;
+    }
     return n;
   }();
 

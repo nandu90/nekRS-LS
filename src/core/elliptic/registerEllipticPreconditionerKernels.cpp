@@ -1,10 +1,10 @@
 #include <registerKernels.hpp>
 #include "benchmarkFDM.hpp"
 #include "benchmarkAx.hpp"
-#include "ellipticPrecon.h" 
+#include "ellipticPrecon.h"
 
-
-namespace {
+namespace
+{
 
 void registerAxKernels(const std::string &section, int N, int poissonEquation)
 {
@@ -12,8 +12,7 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
     const std::string precision = std::string(floatString);
     if (precision.find(pfloatString) != std::string::npos) {
       return std::string("_") + std::to_string(N) + std::string("pfloat");
-    }
-    else {
+    } else {
       return std::string("_") + std::to_string(N);
     }
   };
@@ -38,13 +37,13 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
   occa::properties AxKernelInfo = kernelInfo;
   const auto Nq = N + 1;
   for (auto &&coeffField : {true, false}) {
-    if (platform->options.compareArgs(optionsPrefix + "ELLIPTIC PRECO COEFF FIELD","TRUE") != coeffField) {
+    if (platform->options.compareArgs(optionsPrefix + "ELLIPTIC PRECO COEFF FIELD", "TRUE") != coeffField) {
       continue;
     }
     const auto floatString = std::string(pfloatString);
     const auto wordSize = sizeof(pfloat);
 
-    bool verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+    bool verbose = platform->verbose();
     const int verbosity = verbose ? 2 : 1;
     const std::string kernelSuffix = gen_suffix(floatString.c_str());
     auto axKernel = benchmarkAx(NelemBenchmark,
@@ -63,10 +62,11 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
 
     const std::string suffix = "CoeffHex3D";
 
-    if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR"))
+    if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
       kernelName = "ellipticPartialAxTrilinear" + suffix;
-    else
+    } else {
       kernelName = "ellipticPartialAx" + suffix;
+    }
 
     fileName = oklpath + kernelName + fileNameExtension;
 
@@ -115,7 +115,7 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
   int p;
   platform->options.getArgs("POLYNOMIAL DEGREE", p);
 
-  if (N != p){
+  if (N != p) {
     std::string fileName;
     const std::string oklpath = getenv("NEKRS_KERNEL_DIR");
 
@@ -124,7 +124,10 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
     kernelName = "geometricFactorsHex3D";
     fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
     const std::string meshPrefix = "pMGmesh-";
-    platform->kernelRequests.add(meshPrefix + kernelName + orderSuffix, fileName, meshKernelInfo, orderSuffix);
+    platform->kernelRequests.add(meshPrefix + kernelName + orderSuffix,
+                                 fileName,
+                                 meshKernelInfo,
+                                 orderSuffix);
   }
 
   {
@@ -144,8 +147,9 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
     fileName = oklpath + kernelName + ".okl";
     occa::properties buildDiagInfo = kernelInfo;
     const std::string poissonPrefix = poissonEquation ? "poisson-" : "";
-    if (poissonEquation)
+    if (poissonEquation) {
       buildDiagInfo["defines/p_poisson"] = 1;
+    }
 
     occa::properties props = buildDiagInfo;
     props["defines/dfloat"] = pfloatString;
@@ -165,7 +169,7 @@ void registerSchwarzKernels(const std::string &section, int N)
 
   const bool serial = platform->serial;
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/elliptic/");
- 
+
   std::string fileName, kernelName;
   const std::string extension = serial ? ".c" : ".okl";
 
@@ -188,7 +192,7 @@ void registerSchwarzKernels(const std::string &section, int N)
     re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm);
     const int NelemBenchmark = nelgv / platform->comm.mpiCommSize;
 
-    bool verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+    bool verbose = platform->verbose();
     const int verbosity = verbose ? 2 : 1;
     auto fdmKernel = benchmarkFDM(NelemBenchmark,
                                   Nq_e,
@@ -204,14 +208,14 @@ void registerSchwarzKernels(const std::string &section, int N)
     platform->kernelRequests.add("postFDM" + suffix, fileName, properties, suffix);
   }
 }
+
 void registerFineLevelKernels(const std::string &section, int N, int poissonEquation)
 {
   auto gen_suffix = [N](const char *floatString) {
     const std::string precision = std::string(floatString);
     if (precision.find(pfloatString) != std::string::npos) {
       return std::string("_") + std::to_string(N) + std::string("pfloat");
-    }
-    else {
+    } else {
       return std::string("_") + std::to_string(N);
     }
   };
@@ -222,6 +226,7 @@ void registerFineLevelKernels(const std::string &section, int N, int poissonEqua
   registerAxKernels(section, N, poissonEquation);
   registerSchwarzKernels(section, N);
 }
+
 void registerSEMFEMKernels(const std::string &section, int N, int poissonEquation);
 
 void registerMultigridLevelKernels(const std::string &section, int Nf, int N, int poissonEquation)
@@ -261,15 +266,21 @@ void registerMultigridLevelKernels(const std::string &section, int Nf, int N, in
     const std::string knlpath = getenv("NEKRS_KERNEL_DIR");
     fileName = knlpath + "/core/mesh/coarsen" + suffix + fileNameExtension;
     kernelName = "coarsen" + suffix;
-    platform->kernelRequests.add("elliptic::" + kernelName + orderSuffix, fileName, coarsenProlongateKernelInfo, orderSuffix);
+    platform->kernelRequests.add("elliptic::" + kernelName + orderSuffix,
+                                 fileName,
+                                 coarsenProlongateKernelInfo,
+                                 orderSuffix);
     fileName = knlpath + "/core/mesh/prolongate" + suffix + fileNameExtension;
     kernelName = "prolongate" + suffix;
-    platform->kernelRequests.add("elliptic::" + kernelName + orderSuffix, fileName, coarsenProlongateKernelInfo, orderSuffix);
+    platform->kernelRequests.add("elliptic::" + kernelName + orderSuffix,
+                                 fileName,
+                                 coarsenProlongateKernelInfo,
+                                 orderSuffix);
   }
 
   if (N == 1) {
-    if (  platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE", "TRUE") &&
-         !platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE") ) { 
+    if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE", "TRUE") &&
+        !platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE")) {
       return;
     }
   }
@@ -277,6 +288,7 @@ void registerMultigridLevelKernels(const std::string &section, int Nf, int N, in
   registerAxKernels(section, N, poissonEquation);
   registerSchwarzKernels(section, N);
 }
+
 void registerMultiGridKernels(const std::string &section, int poissonEquation)
 {
   int N;
@@ -287,8 +299,9 @@ void registerMultiGridKernels(const std::string &section, int poissonEquation)
 
   std::vector<int> levels = determineMGLevels(section);
 
-  if (levels.empty())
+  if (levels.empty()) {
     return;
+  }
 
   for (unsigned levelIndex = 1U; levelIndex < levels.size(); ++levelIndex) {
     const int levelFine = levels[levelIndex - 1];
@@ -299,8 +312,7 @@ void registerMultiGridKernels(const std::string &section, int poissonEquation)
   if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE", "TRUE")) {
     if (platform->options.compareArgs(optionsPrefix + "MULTIGRID SEMFEM", "TRUE")) {
       registerSEMFEMKernels(section, coarseLevel, poissonEquation);
-    }
-    else {
+    } else {
       {
         const std::string oklpath = getenv("NEKRS_KERNEL_DIR");
 
@@ -311,6 +323,7 @@ void registerMultiGridKernels(const std::string &section, int poissonEquation)
     }
   }
 }
+
 void registerSEMFEMKernels(const std::string &section, int N, int poissonEquation)
 {
   const int Nq = N + 1;
@@ -320,8 +333,7 @@ void registerSEMFEMKernels(const std::string &section, int N, int poissonEquatio
   occa::properties SEMFEMKernelProps = platform->kernelInfo;
   if (useFP32) {
     SEMFEMKernelProps["defines/pfloat"] = "float";
-  }
-  else {
+  } else {
     SEMFEMKernelProps["defines/pfloat"] = "double";
   }
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/elliptic/");

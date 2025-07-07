@@ -44,7 +44,7 @@ hlong hsum(mesh_t *mesh, const dlong N, occa::memory &o_a, MPI_Comm _comm)
 occa::memory
 cheapDist(mesh_t *mesh, int nbID, const occa::memory &o_bID, dlong offsetFld, bool minDist, int maxIter)
 {
-  bool verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+  bool verbose = platform->verbose();
   const auto [minCoord, maxCoord] = [&]() {
     const auto xMin = platform->linAlg->min(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm);
     const auto yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);

@@ -279,7 +279,7 @@ int cvode_t::jtv(double t,
       const auto y_wrms = sqrt(
           platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_y, platform->comm.mpiComm) / this->nEqTotal);
       const auto sig = sqrt((1 + y_wrms) * std::numeric_limits<dfloat>::epsilon()) / v_wrms;
-      if (platform->verbose && platform->comm.mpiRank == 0) {
+      if (platform->verbose() && platform->comm.mpiRank == 0) {
         std::cout << "sigma= " << sig << std::endl;
       }
       return sig;

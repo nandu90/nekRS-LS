@@ -25,7 +25,7 @@ void iofldAdios::openEngine()
 
   streamName = "default";
   adiosIO = adios->DeclareIO(streamName);
-  if (platform->verbose) {
+  if (platform->verbose()) {
     adiosIO.SetParameters({{"verbose", "4"}});
   }
 
@@ -468,8 +468,8 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
 
   auto convertToDfloat = [&]() {
     std::vector<occa::memory> o_work;
-    // type of o_userBuf might not be available (in case it's zero), 
-    // instead use the type matching o_userBuf   
+    // type of o_userBuf might not be available (in case it's zero),
+    // instead use the type matching o_userBuf
     if (o_userBuf.at(0).dtype() == occa::dtype::get<dfloat>()) {
       o_work = o_convDistributedData;
     } else {
@@ -651,7 +651,7 @@ template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::str
     var.data = platform->memoryPool.reserve<T>(Nlocal);
   }
 
-  if (platform->verbose && var.blocks.size()) {
+  if (platform->verbose() && var.blocks.size()) {
     std::cout << " " << name << " on rank " << platform->comm.mpiRank << " is of type " << var.type;
 
     if (var.dim) {
@@ -681,16 +681,16 @@ size_t iofldAdios::read()
     return variables;
   }();
 
-   auto isAvailable = [&] (const std::string& name, bool abort = false)
-   {
-      auto exists = std::find(_availableVariables.begin(), _availableVariables.end(), name) != _availableVariables.end();
-      nekrsCheck(!exists && abort,
-                 platform->comm.mpiComm,
-                 EXIT_FAILURE,
-                 "requested variable %s not found in file!\n",
-                 name.c_str());
-      return exists;
-   };
+  auto isAvailable = [&](const std::string &name, bool abort = false) {
+    auto exists =
+        std::find(_availableVariables.begin(), _availableVariables.end(), name) != _availableVariables.end();
+    nekrsCheck(!exists && abort,
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "requested variable %s not found in file!\n",
+               name.c_str());
+    return exists;
+  };
 
   // first allocate then get variable to ensure deferred pointer to memPool remains valid
   for (int pass = 0; pass < 2; pass++) {
@@ -779,7 +779,9 @@ size_t iofldAdios::read()
       const auto &name = o_entry.first;
       auto &o_userBuf = o_entry.second;
 
-      if (!isAvailable(name)) continue; 
+      if (!isAvailable(name)) {
+        continue;
+      }
 
       if ((meshRequested && name != "mesh") || (!meshRequested && name == "mesh")) {
         continue;

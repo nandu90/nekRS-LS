@@ -100,7 +100,7 @@ void uservp(double time)
   scalarScaledAdd(mesh->Nlocal, conductivity, 1 / Pr_t, RANSktau::o_mue_t(), scalar->o_diffusionCoeff("temperature"));
 
 #if 0
-  if (platform->verbose) {
+  if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                                  1,
                                                                  nrs->fluid->fieldOffset,

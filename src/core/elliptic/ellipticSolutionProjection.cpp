@@ -105,7 +105,7 @@ void SolutionProjection::updateProjectionSpace()
   // printf("norm_new:%g norm_orig:%g sumAlpha:%g\n", norm_new, norm_orig, sumAlpha);
   norm_new = sqrt(norm_new);
 
-  const dfloat tol = (sizeof(dfloat) == sizeof(double)) ? 1e-6: 1e-4;
+  const dfloat tol = (sizeof(dfloat) == sizeof(double)) ? 1e-6 : 1e-4;
   const dfloat test = norm_new / norm_orig;
   if (test > tol) {
     const dfloat scale = 1.0 / norm_new;
@@ -229,8 +229,8 @@ SolutionProjection::SolutionProjection(elliptic_t &elliptic,
     : maxNumVecsProjection(_maxNumVecsProjection), numTimeSteps(_numTimeSteps), type(_type),
       alpha((dfloat *)calloc(maxNumVecsProjection, sizeof(dfloat))), numVecsProjection(0),
       prevNumVecsProjection(0), Nlocal(elliptic.mesh->Np * elliptic.mesh->Nelements),
-      fieldOffset(elliptic.fieldOffset), Nfields(elliptic.Nfields), timestep(0),
-      verbose(platform->options.compareArgs("VERBOSE", "TRUE")), o_invDegree(elliptic.mesh->ogs->o_invDegree)
+      fieldOffset(elliptic.fieldOffset), Nfields(elliptic.Nfields), timestep(0), verbose(platform->verbose()),
+      o_invDegree(elliptic.mesh->ogs->o_invDegree)
 {
   solverName = elliptic.name;
 

@@ -120,7 +120,12 @@ size_t iofldNek::write()
     return data;
   }();
 
-  nek::writeFld(fileName, data, (precision == 64) ? true : false, elementMask, (N > 0) ? N : mesh->N, uniform);
+  nek::writeFld(fileName,
+                data,
+                (precision == 64) ? true : false,
+                elementMask,
+                (N > 0) ? N : mesh->N,
+                uniform);
 
   // metadata file
   if (platform->comm.mpiRank == 0) {
@@ -139,7 +144,11 @@ size_t iofldNek::write()
 
 size_t iofldNek::read()
 {
-  nekrsCheck(pointInterpolation, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "read attribute interpolate not supported!");
+  nekrsCheck(pointInterpolation,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "read attribute interpolate not supported!");
 
   nek::readFld(fldData);
 
@@ -151,7 +160,7 @@ size_t iofldNek::read()
   }
 
   auto populateVariable = [&](const std::string &name, const std::vector<occa::memory> &o_src) {
-    if (platform->comm.mpiRank == 0 && platform->verbose) {
+    if (platform->comm.mpiRank == 0 && platform->verbose()) {
       std::cout << " reading " << name << std::endl;
     }
     auto &o_buf = inquireVariable<std::vector<occa::memory>>(name)->get();

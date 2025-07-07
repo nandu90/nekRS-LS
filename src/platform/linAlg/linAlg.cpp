@@ -126,7 +126,7 @@ linAlg_t::linAlg_t()
   timer = 0;
 
   const auto tStart = MPI_Wtime();
-  if (platform->comm.mpiRank == 0 && platform->verbose) {
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
     std::cout << "initializing linAlg ...\n";
   }
 
@@ -923,17 +923,17 @@ void linAlg_t::weightedInnerProdMulti(const dlong N,
 
   if (N > 1 || NVec > 1 || Nfields > 1) {
     launchKernel(prefix + "weightedInnerProdMulti",
-                                 Nblock,
-                                 N,
-                                 Nfields,
-                                 fieldOffset,
-                                 NVec,
-                                 yOffset,
-                                 weight,
-                                 o_w,
-                                 o_x,
-                                 o_y,
-                                 o_scratch);
+                 Nblock,
+                 N,
+                 Nfields,
+                 fieldOffset,
+                 NVec,
+                 yOffset,
+                 weight,
+                 o_w,
+                 o_x,
+                 o_y,
+                 o_scratch);
 
     o_scratch.copyTo(scratch, Nbytes);
 
@@ -987,17 +987,17 @@ void linAlg_t::weightedInnerProdMulti(const dlong N,
 
   if (N > 1 || NVec > 1 || Nfields > 1) {
     launchKernel(prefix + "weightedInnerProdMultiDevice",
-                                       Nblock,
-                                       N,
-                                       Nfields,
-                                       fieldOffset,
-                                       NVec,
-                                       yOffset,
-                                       weight,
-                                       o_w,
-                                       o_x,
-                                       o_y,
-                                       o_result);
+                 Nblock,
+                 N,
+                 Nfields,
+                 fieldOffset,
+                 NVec,
+                 yOffset,
+                 weight,
+                 o_w,
+                 o_x,
+                 o_y,
+                 o_result);
   }
 
   if (_comm != MPI_COMM_SELF) {

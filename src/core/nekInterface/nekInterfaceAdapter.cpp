@@ -537,7 +537,7 @@ void set_usr_handles(const char *session_in, int verbose)
 
   const std::string lib = cache_dir + "/nek5000/lib" + session_in + ".so";
 
-  if (platform->comm.mpiRank == 0 && platform->verbose) {
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
     std::cout << "\nloading " << lib << std::endl;
   }
   void *handle = dlopen(lib.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -690,7 +690,7 @@ void mkSIZE(int lx1,
   const std::string installDir(getenv("NEKRS_HOME"));
   const std::string nek5000_dir = installDir + "/nek5000";
 
-  const int verbose = options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
+  const int verbose = platform->verbose() ? 1 : 0;
 
   // Read and generate the new size file.
   snprintf(line, lineSize, "%s/core/SIZE.template", nek5000_dir.c_str());
@@ -823,7 +823,7 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
     MPI_Comm_rank(platform->comm.mpiCommLocal, &buildRank);
   }
 
-  const int verbose = platform->verbose;
+  const int verbose = platform->verbose();
 
   const std::string installDir(getenv("NEKRS_HOME"));
   const std::string nek5000_dir = installDir + "/nek5000";
@@ -950,7 +950,7 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
       fileBcast(libFile,
                 fs::path(platform->tmpDir) / fs::path("nek5000"),
                 platform->comm.mpiComm,
-                platform->verbose);
+                platform->verbose());
     }
 
     return 0;
@@ -1011,7 +1011,7 @@ void bootstrap()
 
     MPI_Fint nek_comm = MPI_Comm_c2f(platform->comm.mpiComm);
 
-    set_usr_handles(usrname.c_str(), platform->verbose);
+    set_usr_handles(usrname.c_str(), platform->verbose());
 
     (*nek_bootstrap_ptr)(&nek_comm,
                          (char *)cwd.c_str(),
@@ -1084,10 +1084,11 @@ int setup(int numberActiveFields)
   int nelgt, nelgv;
   re2::nelg(options->getArgs("MESH FILE"), nelgt, nelgv, platform->comm.mpiComm);
 
-  const auto cht = [&]()
-  {
+  const auto cht = [&]() {
     for (int is = 0; is < nscal; is++) {
-      if (options->compareArgs("SCALAR" + scalarDigitStr(is) + " MESH", "SOLID")) return true;
+      if (options->compareArgs("SCALAR" + scalarDigitStr(is) + " MESH", "SOLID")) {
+        return true;
+      }
     }
     return false;
   }();

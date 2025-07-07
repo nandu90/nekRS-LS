@@ -214,7 +214,7 @@ occa::kernel device_t::compileKernel(const std::string &fileName,
   const std::string binaryFileName = ...;
   if (collective && platform->cacheBcast) {
     auto dstPath = fs::path(platform->tmpDir) / fs::path("occa/");
-    fileBcast(fs::path(binaryFileName).parent_path(), dstPath, comm, platform->verbose);
+    fileBcast(fs::path(binaryFileName).parent_path(), dstPath, comm, platform->verbose());
   }
 #endif
 

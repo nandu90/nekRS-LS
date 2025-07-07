@@ -520,7 +520,7 @@ void nrs_t::restartFromFile(const std::string &restartStr)
       }
     }
 
-    const int idxStart = (std::find(flds.begin(), flds.end(), "t") != flds.end()) ? 1 : 0; 
+    const int idxStart = (std::find(flds.begin(), flds.end(), "t") != flds.end()) ? 1 : 0;
     for (const auto &entry : flds) {
       if (entry == "s") {
         for (int i = idxStart; i < Nscalar; i++) {
@@ -534,7 +534,7 @@ void nrs_t::restartFromFile(const std::string &restartStr)
         auto last = std::unique(flds.begin(), flds.end());
         flds.erase(last, flds.end());
       }
-    } 
+    }
 
     return flds;
   }();
@@ -550,7 +550,7 @@ void nrs_t::restartFromFile(const std::string &restartStr)
   iofld->open(meshT, iofld::mode::read, fileName, requestedStep);
 
   const auto avaiableFields = iofld->availableVariables();
-  if (platform->comm.mpiRank == 0 && platform->verbose) {
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
     for (const auto &entry : avaiableFields) {
       std::cout << " found variable " << entry << std::endl;
     }
@@ -1525,7 +1525,7 @@ dfloat nrs_t::adjustDt(int tstep)
   }
   firstTime = false;
 
-  if (platform->verbose && platform->comm.mpiRank == 0) {
+  if (platform->verbose() && platform->comm.mpiRank == 0) {
     printf("adjustDt: dt=%g CFL= %g CFLpred= %g CFLmax= %g CFLmin= %g\n", dt_, CFL, CFLpred, CFLmax, CFLmin);
   }
 
@@ -1745,7 +1745,7 @@ bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter, bo
 
   platform->timer.tic("udfExecuteStep");
   if (udf.executeStep) {
-    if (platform->verbose && platform->comm.mpiRank == 0) {
+    if (platform->verbose() && platform->comm.mpiRank == 0) {
       std::cout << "calling UDF_ExecuteStep ...\n";
     }
 
@@ -2137,7 +2137,7 @@ void nrs_t::computeUrst()
   }
   platform->flopCounter->add("Urst", flopCount);
 
-  if (platform->verbose) {
+  if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                                  mesh->dim,
                                                                  fieldOffset,

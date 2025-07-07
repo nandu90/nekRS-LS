@@ -20,7 +20,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
 
   std::string kernelName;
   std::string fileName;
- 
+
   // platform copy kernels
   if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
     {
@@ -40,7 +40,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
       prop["defines/dummy"] = 2; // just to make it different from copyDfloatToDouble to avoid collison
       platform->kernelRequests.add(section + "copyDfloatToFloat", fileName, prop);
     }
- 
+
     {
       kernelName = "copyDfloatToPfloat";
       fileName = oklpath + kernelName + extension;
@@ -69,7 +69,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
     kernelName = "copyPfloatToDfloat";
     fileName = oklpath + kernelName + extension;
     platform->kernelRequests.add(section + kernelName, fileName, prop);
-  } else { 
+  } else {
     std::string kernelName;
     kernelName = section + "copyDfloatToPfloat";
     platform->copyDfloatToPfloatKernel = platform->kernelRequests.load(kernelName);
@@ -90,8 +90,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
     platform->copyFloatToDfloatKernel = platform->kernelRequests.load(kernelName);
   }
 
-  const auto meshProps = [&]()
-  { 
+  const auto meshProps = [&]() {
     auto props = platform->kernelInfo;
     int N;
     platform->options.getArgs("POLYNOMIAL DEGREE", N);
@@ -109,12 +108,14 @@ void registerCoreKernels(occa::properties kernelInfoBC)
 
     int Nsubsteps = 0;
     platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
-        
+
     int nBDF = 0;
-    int nEXT = 0; 
+    int nEXT = 0;
     platform->options.getArgs("BDF ORDER", nBDF);
-    platform->options.getArgs("EXT ORDER", nEXT); 
-    if (Nsubsteps) nEXT = nBDF;
+    platform->options.getArgs("EXT ORDER", nEXT);
+    if (Nsubsteps) {
+      nEXT = nBDF;
+    }
 
     int cubN;
     platform->options.getArgs("CUBATURE POLYNOMIAL DEGREE", cubN);
@@ -125,8 +126,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
 
     std::string diffDataFile = oklpath + "mesh/constantDifferentiationMatrices.h";
     std::string interpDataFile = oklpath + "mesh/constantInterpolationMatrices.h";
-    std::string diffInterpDataFile =
-                oklpath + "mesh/constantDifferentiationInterpolationMatrices.h";
+    std::string diffInterpDataFile = oklpath + "mesh/constantDifferentiationInterpolationMatrices.h";
 
     prop["includes"] += diffDataFile.c_str();
     prop["includes"] += interpDataFile.c_str();
@@ -136,11 +136,11 @@ void registerCoreKernels(occa::properties kernelInfoBC)
       if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
         prop["defines/p_cubNq"] = cubNq;
         prop["defines/p_cubNp"] = cubNp;
- 
+
         kernelName = "strongAdvectionCubatureVolume" + suffix;
         fileName = oklpath + kernelName + ".okl";
         platform->kernelRequests.add(section + kernelName, fileName, prop);
- 
+
         kernelName = "strongAdvectionCubatureVolumeScalar" + suffix;
         fileName = oklpath + kernelName + ".okl";
         platform->kernelRequests.add(section + kernelName, fileName, prop);
@@ -148,7 +148,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
         kernelName = "strongAdvectionVolume" + suffix;
         fileName = oklpath + kernelName + ".okl";
         platform->kernelRequests.add(section + kernelName, fileName, prop);
-  
+
         kernelName = "strongAdvectionVolumeScalar" + suffix;
         fileName = oklpath + kernelName + ".okl";
         platform->kernelRequests.add(section + kernelName, fileName, prop);
@@ -162,41 +162,41 @@ void registerCoreKernels(occa::properties kernelInfoBC)
         kernelName = "subCycleRK";
         fileName = oklpath + kernelName + ".okl";
         platform->kernelRequests.add(section + kernelName, fileName, platform->kernelInfo);
- 
-        { 
+
+        {
           auto p = platform->kernelInfo;
           p["defines/p_MovingMesh"] = movingMesh;
-    
+
           kernelName = "subCycleInitU0";
           fileName = oklpath + kernelName + ".okl";
           platform->kernelRequests.add(section + kernelName, fileName, p);
         }
- 
+
         prop["defines/p_MovingMesh"] = movingMesh;
         prop["defines/p_nEXT"] = nEXT;
         prop["defines/p_cubNq"] = cubNq;
         prop["defines/p_cubNp"] = cubNp;
-        prop["defines/p_NVfields"] = nVFields; 
-    
+        prop["defines/p_NVfields"] = nVFields;
+
         kernelName = "subCycleStrongVolume" + suffix;
         fileName = oklpath + kernelName + ".okl";
         platform->kernelRequests.add(section + kernelName, fileName, prop);
-  
+
         kernelName = "subCycleStrongVolumeScalar" + suffix;
         fileName = oklpath + kernelName + ".okl";
         platform->kernelRequests.add(section + kernelName, fileName, prop);
-      }  
-    
-      {         
+      }
+
+      {
         int nelgt, nelgv;
         const std::string meshFile = platform->options.getArgs("MESH FILE");
         re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm);
-    
-        bool verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+
+        bool verbose = platform->verbose();
         const int verbosity = verbose ? 2 : 1;
-     
+
         const auto dealiasing = true;
-                      
+
         auto subCycleKernel =
             benchmarkAdvsub(nVFields,
                             nelgv / platform->comm.mpiCommSize,
@@ -208,7 +208,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
                             verbosity,
                             targetTimeBenchmark,
                             platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
-                          
+
         kernelName = "subCycleStrongCubatureVolume" + suffix;
         platform->kernelRequests.add(section + kernelName, subCycleKernel);
 
@@ -218,12 +218,12 @@ void registerCoreKernels(occa::properties kernelInfoBC)
                             Nq,
                             cubNq,
                             nEXT,
-                            dealiasing, 
+                            dealiasing,
                             true,
                             verbosity,
                             targetTimeBenchmark,
                             platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
-                          
+
         kernelName = "subCycleStrongCubatureVolumeScalar" + suffix;
         platform->kernelRequests.add(section + kernelName, subCycleScalarKernel);
       }
@@ -234,47 +234,47 @@ void registerCoreKernels(occa::properties kernelInfoBC)
     kernelName = "maskCopy";
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, platform->kernelInfo);
-    
+
     kernelName = "maskCopy2";
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, platform->kernelInfo);
- 
+
     kernelName = "nStagesSum3";
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, platform->kernelInfo);
- 
+
     kernelName = "nStagesSum3Vector";
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, platform->kernelInfo);
- 
+
     kernelName = "nStagesSumMany";
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, platform->kernelInfo);
- 
+
     kernelName = "extrapolate";
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, meshProps);
- 
+
     kernelName = "gradientVolume" + suffix;
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, meshProps);
- 
+
     kernelName = "wGradientVolume" + suffix;
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, meshProps);
- 
+
     kernelName = "wDivergenceVolume" + suffix;
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, meshProps);
- 
+
     kernelName = "divergenceVolume" + suffix;
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, meshProps);
- 
+
     kernelName = "curl" + suffix;
     fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(section + kernelName, fileName, meshProps);
- 
+
     {
       auto p = meshProps;
       p["includes"].asArray();
@@ -285,50 +285,50 @@ void registerCoreKernels(occa::properties kernelInfoBC)
       fileName = oklpath + kernelName + ".okl";
       platform->kernelRequests.add(section + kernelName, fileName, p);
     }
- 
+
     // register stabilization kernels
     {
       kernelName = "filterRT" + suffix;
       fileName = oklpath + kernelName + ".okl";
       platform->kernelRequests.add(section + kernelName, fileName, meshProps);
-  
+
       kernelName = "vectorFilterRT" + suffix;
       fileName = oklpath + kernelName + ".okl";
       platform->kernelRequests.add(section + kernelName, fileName, meshProps);
-  
+
       kernelName = "tensorProduct1D" + suffix;
       fileName = oklpath + kernelName + ".okl";
       platform->kernelRequests.add(section + kernelName, fileName, meshProps);
-  
+
       kernelName = "relativeMassAveragedMode";
       fileName = oklpath + kernelName + ".okl";
       platform->kernelRequests.add(section + "avm::" + kernelName, fileName, meshProps);
- 
+
       kernelName = "computeAvmMaxVisc";
       fileName = oklpath + kernelName + ".okl";
       platform->kernelRequests.add(section + "avm::" + kernelName, fileName, meshProps);
-  
+
       kernelName = "interpolateP1";
       fileName = oklpath + kernelName + ".okl";
       platform->kernelRequests.add(section + "avm::" + kernelName, fileName, meshProps);
     }
- 
-    // register gjp kernels 
+
+    // register gjp kernels
     {
       kernelName = "gjp" + suffix;
-      fileName = oklpath + kernelName + ".okl"; 
+      fileName = oklpath + kernelName + ".okl";
       platform->kernelRequests.add(kernelName, fileName, meshProps);
- 
+
       int N;
       platform->options.getArgs("POLYNOMIAL DEGREE", N);
       const int Nq = N + 1;
- 
+
       auto props = meshProps;
       props["defines/p_invNqNq"] = 1. / (Nq * Nq);
       kernelName = "gjpHelper" + suffix;
       fileName = oklpath + kernelName + ".okl";
       platform->kernelRequests.add(kernelName, fileName, props);
- 
+
       nekrsCheck(BLOCKSIZE < Nq * Nq,
                  platform->comm.mpiComm,
                  EXIT_FAILURE,

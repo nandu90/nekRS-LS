@@ -165,7 +165,7 @@ void kernelRequestManager_t::compile()
     Nthreads = std::stoi(getenv("NEKRS_JITC_NTHREADS"));
   }
 
-  if (platformRef.comm.mpiRank == 0 && (platform->verbose || platform->buildOnly)) {
+  if (platformRef.comm.mpiRank == 0 && (platform->verbose() || platform->buildOnly)) {
     std::cout << "requests.size(): " << requests.size() << std::endl;
     std::cout << "Nthreads: " << Nthreads << std::endl;
   }
@@ -197,7 +197,7 @@ void kernelRequestManager_t::compile()
           return;
         }
         try {
-          if (platform->verbose || platform->buildOnly) {
+          if (platform->verbose() || platform->buildOnly) {
             std::cout << "Compiling request <" << req.requestName << ">";
           }
 
@@ -207,7 +207,7 @@ void kernelRequestManager_t::compile()
 
           std::strncpy(hashes + reqId * hashLength, hash.c_str(), hashLength);
 
-          if (platform->verbose || platform->buildOnly) {
+          if (platform->verbose() || platform->buildOnly) {
             std::cout << " (" << hash << ") on rank " << rank << std::flush << std::endl;
           }
 
@@ -257,7 +257,7 @@ void kernelRequestManager_t::compile()
   if (platform->cacheBcast && !platform->buildOnly) {
     const auto srcPath = fs::path(getenv("OCCA_CACHE_DIR"));
     const std::string cacheDir = platform->tmpDir / fs::path("occa/");
-    fileBcast(srcPath, fs::path(cacheDir) / "..", platform->comm.mpiComm, platform->verbose);
+    fileBcast(srcPath, fs::path(cacheDir) / "..", platform->comm.mpiComm, platform->verbose());
 
     // redirect
     occa::env::OCCA_CACHE_DIR = cacheDir;

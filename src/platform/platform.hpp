@@ -64,7 +64,6 @@ public:
   std::unique_ptr<flopCounter_t> flopCounter;
   int exitValue;
   std::string tmpDir;
-  int verbose;
   bool cacheLocal;
   bool cacheBcast;
   bool buildOnly;
@@ -77,6 +76,11 @@ public:
   occa::kernel copyDfloatToFloatKernel;
   occa::kernel copyDoubleToDfloatKernel;
   occa::kernel copyFloatToDfloatKernel;
+
+  bool verbose() const
+  {
+    return options.compareArgs("VERBOSE", "TRUE");
+  } 
 };
 #endif
 

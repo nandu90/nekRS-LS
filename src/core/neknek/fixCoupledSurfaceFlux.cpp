@@ -2,7 +2,7 @@
 #include "nrs.hpp"
 #include <array>
 
-void neknek_t::fixCoupledSurfaceFlux(const occa::memory& o_EToB, dlong fieldOffsetU, occa::memory& o_U)
+void neknek_t::fixCoupledSurfaceFlux(const occa::memory &o_EToB, dlong fieldOffsetU, occa::memory &o_U)
 {
   constexpr int nReduction = 2; // flux + area
   auto o_reduction = platform->deviceMemoryPool.reserve<dfloat>(nReduction * mesh->Nelements);
@@ -36,7 +36,7 @@ void neknek_t::fixCoupledSurfaceFlux(const occa::memory& o_EToB, dlong fieldOffs
     gamma = -1.0 * flux / area;
   }
 
-  if (platform->verbose && platform->comm.mpiRank == 0) {
+  if (platform->verbose() && platform->comm.mpiRank == 0) {
     printf("neknek::fixCoupledSurfaceFlux flux = %11.4e, area = %11.4e, gamma = %11.4e\n", flux, area, gamma);
   }
 

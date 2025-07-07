@@ -100,8 +100,6 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
     oogs::sync_recv(std::stoi(getenv("OOGS_SYNC_RECV")));
   }
 
-  verbose = options.compareArgs("VERBOSE", "TRUE") ? 1 : 0;
-
   timer.enableSync();
   if (options.compareArgs("ENABLE TIMER SYNC", "FALSE")) {
     timer.disableSync();
@@ -235,7 +233,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 // input files required for JIT kernel compilation or load
 void platform_t::bcastJITKernelSourceFiles()
 {
-  if (platform->verbose && comm.mpiRank == 0) {
+  if (verbose() && comm.mpiRank == 0) {
     std::cout << "broadcast kernel sources to " << platform->tmpDir << std::endl;
   }
 
@@ -243,7 +241,7 @@ void platform_t::bcastJITKernelSourceFiles()
   const auto srcPath = fs::path(getenv("NEKRS_HOME"));
   for (auto &entry : {fs::path("include"), fs::path("kernels")}) {
 
-    fileBcast(srcPath / entry, NEKRS_HOME_NEW, comm.mpiComm, verbose);
+    fileBcast(srcPath / entry, NEKRS_HOME_NEW, comm.mpiComm, verbose());
   }
 
   setenv("NEKRS_HOME", std::string(NEKRS_HOME_NEW).c_str(), 1);

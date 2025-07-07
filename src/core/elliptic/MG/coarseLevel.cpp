@@ -65,7 +65,7 @@ void MGSolver_t::coarseLevel_t::setupSolver(
 
   N = (dlong)(globalRowStarts[rank + 1] - globalRowStarts[rank]);
 
-  const int verbose = (platform->options.compareArgs("VERBOSE", "TRUE")) ? 1 : 0;
+  const int verbose = (platform->verbose()) ? 1 : 0;
   const bool useDevice = options.compareArgs("COARSE SOLVER LOCATION", "DEVICE");
   const int useFP32 = options.compareArgs("COARSE SOLVER PRECISION", "FP32");
 

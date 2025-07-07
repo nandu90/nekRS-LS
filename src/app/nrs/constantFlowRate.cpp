@@ -100,8 +100,7 @@ void nrs_t::computeHomogenousStokesSolution(double time)
   o_Prhs.free();
   o_lambda0.free();
 
-  auto o_RhsVel = [&]()
-  {
+  auto o_RhsVel = [&]() {
     platform->timer.tic("velocity rhs");
 
     occa::memory o_rhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->dim * fieldOffset);
@@ -157,8 +156,11 @@ void nrs_t::computeHomogenousStokesSolution(double time)
 
 void nrs_t::computeBaseFlowRate(double time, int tstep)
 {
-  if (platform->verbose && platform->comm.mpiRank == 0) {
-    printf("computing base flow rate (dir: %g, %g, %g)\n", flowDirection[0], flowDirection[1], flowDirection[2]);
+  if (platform->verbose() && platform->comm.mpiRank == 0) {
+    printf("computing base flow rate (dir: %g, %g, %g)\n",
+           flowDirection[0],
+           flowDirection[1],
+           flowDirection[2]);
   }
 
   auto getSolverData = [](elliptic *solver) {
@@ -407,13 +409,15 @@ void nrs_t::adjustFlowRate(int tstep, double time)
     }
   }
 
-  auto compute = [&]() 
-  {
+  auto compute = [&]() {
     bool compute = false;
-    const auto delta = platform->linAlg->maxRelativeError(mesh->Nlocal, 
-                                        fluid->o_prop.size() / fluid->fieldOffset, 
-                                        fluid->fieldOffset, 0, 
-                                        o_prevProp, fluid->o_prop, platform->comm.mpiComm);
+    const auto delta = platform->linAlg->maxRelativeError(mesh->Nlocal,
+                                                          fluid->o_prop.size() / fluid->fieldOffset,
+                                                          fluid->fieldOffset,
+                                                          0,
+                                                          o_prevProp,
+                                                          fluid->o_prop,
+                                                          platform->comm.mpiComm);
 
     if (delta > 10 * std::numeric_limits<dfloat>::epsilon()) {
       o_prevProp.copyFrom(fluid->o_prop);
@@ -462,8 +466,9 @@ void nrs_t::adjustFlowRate(int tstep, double time)
     return (targetRate - currentFlowRate) / baseFlowRate;
   }();
 
-  // superimpose 
-  platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fluid->fieldOffset, rescaleFactor, o_Uc, 1.0, this->fluid->o_U);
+  // superimpose
+  platform->linAlg
+      ->axpbyMany(mesh->Nlocal, mesh->dim, fluid->fieldOffset, rescaleFactor, o_Uc, 1.0, this->fluid->o_U);
   platform->linAlg->axpby(mesh->Nlocal, rescaleFactor, o_Pc, 1.0, this->fluid->o_P);
 
   // diagnostics

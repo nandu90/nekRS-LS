@@ -105,12 +105,12 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
                  velocityName.c_str(),
                  platform->solver->bc->size(velocityName),
                  mesh->Nbid);
-    
+
       platform->solver->bc->checkAlignment(mesh);
     };
-  
+
     verifyBC();
-  }  
+  }
 }
 
 void fluidSolver_t::solvePressure(double time, int stage)
@@ -239,7 +239,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
 
   ellipticSolverP->solve(o_lambda0, o_NULL, o_pRhs, o_P);
 
-  if (platform->verbose) {
+  if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                                  1,
                                                                  fieldOffset,
@@ -373,7 +373,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     ellipticSolver.at(2)->solve(o_lambda0, o_lambda1, o_rhsZ, o_U.slice(2 * fieldOffset, mesh->Nlocal));
   }
 
-  if (platform->verbose) {
+  if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                                  mesh->dim,
                                                                  fieldOffset,
@@ -445,8 +445,10 @@ void fluidSolver_t::setupEllipticSolver()
       ellipticSolver.at(0)->applyZeroNormalMask(f);
     }
   } else {
-    nekrsCheck(unalignedBoundary, platform->comm.mpiComm, EXIT_FAILURE,
-               "unaligned mixed boundary conditions require using block solver for %s\n", 
+    nekrsCheck(unalignedBoundary,
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "unaligned mixed boundary conditions require using block solver for %s\n",
                velocityName.c_str());
 
     ellipticSolver.push_back(new elliptic(velocityName, mesh, fieldOffset, EToBx, o_lambda0, o_lambda1));
@@ -575,7 +577,7 @@ void fluidSolver_t::applyDirichlet(double time)
       auto o_dirichletValues = o_tmp.slice(fieldOffset, fieldOffsetSum);
       launchKernel("core-maskCopy2",
                    solver->Nmasked(),
-                   offset, 
+                   offset,
                    offset,
                    solver->o_maskIds(),
                    o_dirichletValues,
@@ -607,11 +609,10 @@ void fluidSolver_t::makeForcing()
                o_EXT,
                o_JwF);
 
-  dfloat flops =
-      Nsubsteps ? (6 + 6 * o_coeffEXT.size()) : (6 * o_coeffEXT.size() + 12 * o_coeffBDF.size());
+  dfloat flops = Nsubsteps ? (6 + 6 * o_coeffEXT.size()) : (6 * o_coeffEXT.size() + 12 * o_coeffBDF.size());
   platform->flopCounter->add(velocityName + " sumMakef", flops * static_cast<double>(mesh->Nlocal));
 
-  if (platform->verbose) {
+  if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                                  mesh->dim,
                                                                  fieldOffset,
@@ -688,13 +689,7 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     dfloat strength = 1.0;
     platform->options.getArgs(upperCase(velocityName) + " HPFRT STRENGTH", strength);
 
-    launchKernel("core-vectorFilterRTHex3D",
-                 mesh->Nelements,
-                 o_filterRT,
-                 strength,
-                 fieldOffset,
-                 o_U,
-                 o_EXT);
+    launchKernel("core-vectorFilterRTHex3D", mesh->Nelements, o_filterRT, strength, fieldOffset, o_U, o_EXT);
 
     double flops = 24 * mesh->Np * mesh->Nq + 3 * mesh->Np;
     flops *= static_cast<double>(mesh->Nelements);

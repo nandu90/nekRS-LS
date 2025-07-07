@@ -170,7 +170,7 @@ static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory 
       platform->timer.toc(timerName + "solve::cvode::linearSolve::cgsi");
 
 #if 0
-      if(platform->comm.mpiRank == 0 && platform->verbose) {
+      if(platform->comm.mpiRank == 0 && platform->verbose()) {
         std::cout << "CGSI: vk_norm0/vk_norm= " << vk_norm0/(*new_vk_norm) << ", iter=" << iter << std::endl;
       }
 #endif

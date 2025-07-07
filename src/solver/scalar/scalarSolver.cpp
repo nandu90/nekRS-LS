@@ -67,7 +67,7 @@ void scalar_t::advectionSubcycling(int nEXT, double time, int is)
                         o_Si,
                         o_JwFi);
 
-  if (platform->verbose) {
+  if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                                  1,
                                                                  0,
@@ -84,7 +84,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 {
 
   if (platform->comm.mpiRank == 0) {
-    std::cout << "================ " <<  "SETUP SCALAR" <<  " ===============\n";
+    std::cout << "================ " << "SETUP SCALAR" << " ===============\n";
   }
 
   auto &options = platform->options;
@@ -148,7 +148,6 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   o_diff = o_prop.slice(0 * fieldOffsetSum, fieldOffsetSum);
   o_rho = o_prop.slice(1 * fieldOffsetSum, fieldOffsetSum);
 
-
   for (int is = 0; is < NSfields; is++) {
     const std::string sid = scalarDigitStr(is);
 
@@ -156,8 +155,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
     name.push_back(_name);
     nameToIndex[_name] = is;
 
-    auto o_tmp = [&]()
-    {
+    auto o_tmp = [&]() {
       const auto prefixedName = "scalar " + _name;
       auto tmp = platform->device.malloc<char>(prefixedName.size() + 1);
       tmp.copyFrom(prefixedName.data());
@@ -195,8 +193,8 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
     options.getArgs("SCALAR" + sid + " DIFFUSIONCOEF SOLID", diffSolid);
     options.getArgs("SCALAR" + sid + " TRANSPORTCOEF SOLID", rhoSolid);
     for (int i = meshV->Nlocal; i < this->_mesh[is]->Nlocal; i++) {
-      diffTmp[i] = diffSolid; 
-      rhoTmp[i] = rhoSolid; 
+      diffTmp[i] = diffSolid;
+      rhoTmp[i] = rhoSolid;
     }
 
     o_diff_i.copyFrom(diffTmp.data(), diffTmp.size());
@@ -206,9 +204,8 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   anyCvodeSolver = false;
   anyEllipticSolver = false;
 
-  EToBOffset = [&]()
-  {
-    dlong NelementsMax = 0; 
+  EToBOffset = [&]() {
+    dlong NelementsMax = 0;
     for (int is = 0; is < NSfields; is++) {
       NelementsMax = std::max(this->_mesh[is]->Nelements, NelementsMax);
     }
@@ -277,7 +274,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
   if (filteringEnabled) {
     std::vector<dlong> applyFilterRT(NSfields, 0);
-    const dlong Nmodes = meshV->N + 1; // assumed to be the same for all fields 
+    const dlong Nmodes = meshV->N + 1; // assumed to be the same for all fields
     o_filterRT = platform->device.malloc<dfloat>(NSfields * Nmodes * Nmodes);
     o_filterS = platform->device.malloc<dfloat>(NSfields);
     o_applyFilterRT = platform->device.malloc<dlong>(NSfields);
@@ -308,7 +305,6 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
     o_filterS.copyFrom(filterS.data(), NSfields);
     o_applyFilterRT.copyFrom(applyFilterRT.data(), NSfields);
-
   }
 
   if (avmEnabled) {
@@ -335,7 +331,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
                  _mesh[is]->Nbid);
     }
   };
-  
+
   verifyBC();
 }
 
@@ -462,7 +458,7 @@ void scalar_t::restoreSolutionState()
 
 void scalar_t::applyAVM()
 {
-  auto verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+  auto verbose = platform->verbose();
   auto mesh = this->meshV; // assumes mesh is the same for all scalars
   static std::vector<occa::memory> o_diff0(NSfields);
 
@@ -586,8 +582,7 @@ void scalar_t::applyDirichlet(double time)
       return o_NULL;
     }();
 
-    auto intValIdx = [&](int is)
-    {
+    auto intValIdx = [&](int is) {
       int idx = -1;
       if (neknek) {
         if (neknek->hasField("scalar")) {
@@ -715,7 +710,7 @@ void scalar_t::makeForcing()
     scalarSumMakef += (Nsubsteps) ? 1 : 3 * o_coeffBDF.size();
     platform->flopCounter->add("scalarSumMakef", scalarSumMakef * static_cast<double>(_mesh[is]->Nlocal));
 
-    if (platform->verbose) {
+    if (platform->verbose()) {
       const dfloat debugNorm = platform->linAlg->weightedNorm2Many(_mesh[is]->Nlocal,
                                                                    1,
                                                                    0,
@@ -825,7 +820,7 @@ void scalar_t::solve(double time, int stage)
 
 void scalar_t::lagSolution()
 {
-  if(!anyEllipticSolver) {
+  if (!anyEllipticSolver) {
     return;
   }
 
@@ -905,7 +900,6 @@ void scalar_t::computeUrst()
   }
   platform->flopCounter->add("Urst", flopCount);
 }
-
 
 void registerScalarKernels(occa::properties kernelInfoBC)
 {

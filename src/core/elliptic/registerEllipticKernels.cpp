@@ -2,7 +2,8 @@
 #include "elliptic.h"
 #include "benchmarkAx.hpp"
 
-namespace {
+namespace
+{
 
 void registerGMRESKernels(int Nfields)
 {
@@ -82,7 +83,7 @@ void registerEllipticKernels(std::string section, bool stressForm)
   const int poisson = platform->options.compareArgs(optionsPrefix + "HELMHOLTZ TYPE", "POISSON");
 
   const bool blockSolver = [&]() {
-    if (platform->options.compareArgs(optionsPrefix + "BLOCK SOLVER", "TRUE")) { 
+    if (platform->options.compareArgs(optionsPrefix + "BLOCK SOLVER", "TRUE")) {
       return true;
     }
     if (stressForm) {
@@ -138,7 +139,7 @@ void registerEllipticKernels(std::string section, bool stressForm)
   const std::string meshFile = platform->options.getArgs("MESH FILE");
   re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm);
   const int NelemBenchmark = nelgv / platform->comm.mpiCommSize;
-  bool verbose = platform->options.compareArgs("VERBOSE", "TRUE");
+  bool verbose = platform->verbose();
   const int verbosity = verbose ? 2 : 1;
 
   for (auto &&coeffField : {true, false}) {
@@ -160,16 +161,18 @@ void registerEllipticKernels(std::string section, bool stressForm)
                                 platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
 
     if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
-      std::string kernelNamePrefix = (poisson) ? "poisson-" : ""; 
+      std::string kernelNamePrefix = (poisson) ? "poisson-" : "";
       kernelNamePrefix += "elliptic";
-      if (blockSolver)
+      if (blockSolver) {
         kernelNamePrefix += (stressForm) ? "Stress" : "Block";
- 
+      }
+
       std::string kernelName = "AxCoeff";
-      if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR"))
+      if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
         kernelName += "Trilinear";
+      }
       kernelName += suffix;
- 
+
       platform->kernelRequests.add(kernelNamePrefix + "Partial" + kernelName, axKernel);
     }
   }
