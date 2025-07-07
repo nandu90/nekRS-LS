@@ -52,39 +52,39 @@ public:
   // By default, only the particle coordinates are automatically registered.
   // Pre:
   //   initialized() = false
-  void registerDOF(const std::string &dofName, bool output = true);
+  void addVariable(const std::string &dofName, bool output = true);
 
   // Multi-component field version
   // On output, this field will be output to the VTU file as a vector quantity.
-  void registerDOF(dlong Nfields, const std::string &dofName, bool output = true);
+  void addVariable(dlong Nfields, const std::string &dofName, bool output = true);
 
   // Properties associated with the particle
-  // NOTE: these are _not_ degrees of freedom. Use registerDOF(...) for that.
-  // As registerDOF(...), there's an optional bool output argument to
+  // NOTE: these are _not_ degrees of freedom. Use addVariable(...) for that.
+  // As addVariable(...), there's an optional bool output argument to
   // flag whether a field should be output during a lpm_t::writeFld(...) call.
   // Pre:
   //   initialized() = false
-  void registerProp(const std::string &propName, bool output = true);
+  void addProp(const std::string &propName, bool output = true);
 
   // Multi-component field version
   // On output, this field will be output to the VTU file as a vector quantity.
-  void registerProp(dlong Nfields, const std::string &propName, bool output = true);
+  void addProp(dlong Nfields, const std::string &propName, bool output = true);
 
   // Fields associated with the fluid mesh to be interpolated
   // to the particle locations.
   // On input, o_fld is a field on the fluid mesh to be interpolated.
-  // NOTE: these are _not_ degrees of freedom. Use registerDOF(...) for that.
-  // As registerDOF(...), there's an optional bool output argument to
+  // NOTE: these are _not_ degrees of freedom. Use addVariable(...) for that.
+  // As addVariable(...), there's an optional bool output argument to
   // flag whether a field should be output during a lpm_t::writeFld(...) call.
   // Pre:
   //   initialized() = false
-  void registerInterpField(const std::string &interpFieldName, const occa::memory &o_fld, bool output = true);
+  void addInterpField(const std::string &interpFieldName, const occa::memory &o_fld, bool output = true);
 
   // Multi-component field version
   // Prefer using this version for multi-component fields, as the performance
   // will be better during interpolation.
   // On output, this field will be output to the VTU file as a vector quantity.
-  void registerInterpField(const std::string &interpFieldName,
+  void addInterpField(const std::string &interpFieldName,
                            int Nfields,
                            dlong fieldOffset,
                            const occa::memory &o_fld,

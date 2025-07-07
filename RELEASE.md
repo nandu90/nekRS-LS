@@ -25,28 +25,29 @@
 
 ## Good to know
 
-* GPU aware MPI is disabled by default (`NEKRS_GPU_MPI=0`)
+* GPU aware MPI is disabled by default (enable using env-var `NEKRS_GPU_MPI=1`)
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
 * nrsman <par, env>  can be used to display the par file or environment settings
-* HYPRE replaces AmgX
+* HYPRE replaced AmgX
 * Field file extension starts with 0-index
 
 ## Breaking Changes
 
-This list provides an overview of the most significant changes in this release, although it may not encompass all modifications. We acknowledge that this release introduces several breaking changes. These adjustments were essential to enhance the stability of the user interface in future iterations. We apologize for any inconvenience this may cause.
+This list provides an overview of the most significant changes in this release, although it may not encompass all modifications. We recognize that several of these updates directly affect the user experience. These adjustments were essential to enhance the stability of the user interface in future iterations. We apologize for any inconvenience this may cause.
 
 * run `build.sh` instead of `nrsconfig` to build the code
-* change par scalar section nameing from `SCALAR00` to `SCALAR FOO`
-* host mirrored variables including `nrs->U, cds->S, mesh->x, nrs->usrwrk` have been removed 
+* par `SCALAR` section name changed to e.g. `SCALAR FOO` and scalars have to be defined in `GENERAL` using `scalars = FOO`
+* host mirrored variables including `nrs->U, cds->S, mesh->x` have been removed 
 * send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd`
-* use `auto foo = platform->deviceMemoryPool.reserve<T>(nWords)` instead of pre-allocated dfloat slices like `platform->o_mempool.slice0`
+* use `auto foo = platform->deviceMemoryPool.reserve<T>(nWords)` instead of `platform->o_mempool.slice[0-15]`
 * change count argument of `occa::memory::slice, occa::memory::copyFrom, occa::memory::copyTo` to number of words instead of bytes 
 * use `nekrs_registerPtr` instead of common blocks NRSSCPTR / SCNRS in usr file and access them using `nek::ptr` in udf (see examples)
 * use par section [GEOM] for geometry solver instead of [MESH]
-* for conjugate heat transfer add `conjugateHeatTransfer = true` to `[PROBLEMTYPE]` in par
+* use `mesh = fluid+solid` for T-mesh (conjugate heat transfer) for a scalar e.g. temperature 
 
 ### Name Changes
 * boundary type names: `codedFixed` -> `udf`, `value` -> `Dirichlet`, `Gradient` -> `Neumann` 
+* some member names of `bcData` changed (see include/app/nrs/bdry/bcData.h)
 * `velocityDirichletConditions` -> `udfDirichlet` (same for all fields)
 * `velocityNeumannConditions` -> `udfNeumann` (same for all fields)
 * `nrs->o_usrwrk`-> `platform->solver->o_usrwrk`
@@ -59,7 +60,7 @@ This list provides an overview of the most significant changes in this release, 
 * `cds->o_rho` -> `scalar->o_transportCoeff(std::string)`
 * `cds->o_diff` -> `scalar->o_diffusionCoeff(std::string)`
 * `cds->o_diff` -> `scalar->o_diffusionCoeff(std::string)`
-* `cds->mesh[...]` -> ``scalar->mesh(...)`
+* `cds->mesh[...]` -> `scalar->mesh(...)`
 * `occaKernel` -> `deviceKernel`
 * `occaProperties` > `deviceKernelProperties`
 * `occa::memory` -> `deviceMemory` 
@@ -69,6 +70,8 @@ This list provides an overview of the most significant changes in this release, 
 * par section `PRESSURE` -> `FLUID PRESSURE`
 * par section `TEMPERATURE` -> `SCALAR TEMPERATURE`
 * par section `SCALAR01` -> `SCALAR FOO`
+* par key `diffusivity` -> `diffusionCoeff`
+* par key `density` -> `transportCoeff`
 
 ### Interface Changes 
 * define `time` as double (instead of defloat) in all UDF functions
@@ -94,7 +97,7 @@ This list provides an overview of the most significant changes in this release, 
 
 ## Thanks to our Contributors
 
-@kris-rowe, @tcew, @yslan, @MalachiTimothyPhillips, @thilinarmtb
+@yslan, @kris-rowe, @tcew, @MalachiTimothyPhillips, @thilinarmtb
 
 We are grateful to all who added new features, filed issues or helped resolve them, 
 asked and answered questions, and were part of inspiring discussions.

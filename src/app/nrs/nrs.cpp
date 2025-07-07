@@ -519,6 +519,23 @@ void nrs_t::restartFromFile(const std::string &restartStr)
         flds.push_back(s);
       }
     }
+
+    const int idxStart = (std::find(flds.begin(), flds.end(), "t") != flds.end()) ? 1 : 0; 
+    for (const auto &entry : flds) {
+      if (entry == "s") {
+        for (int i = idxStart; i < Nscalar; i++) {
+          std::ostringstream oss;
+          oss << "s" << std::setw(2) << std::setfill('0') << i;
+          flds.push_back(oss.str());
+        }
+
+        flds.erase(std::remove(flds.begin(), flds.end(), "s"), flds.end());
+        std::sort(flds.begin(), flds.end());
+        auto last = std::unique(flds.begin(), flds.end());
+        flds.erase(last, flds.end());
+      }
+    } 
+
     return flds;
   }();
 

@@ -125,6 +125,7 @@ linAlg_t::linAlg_t()
   comm = platform->comm.mpiComm;
   timer = 0;
 
+  const auto tStart = MPI_Wtime();
   if (platform->comm.mpiRank == 0 && platform->verbose) {
     std::cout << "initializing linAlg ...\n";
   }
@@ -134,6 +135,11 @@ linAlg_t::linAlg_t()
 
   if (platform->options.compareArgs("ENABLE LINALG TIMER", "TRUE")) {
     timer = 1;
+  }
+
+  MPI_Barrier(platform->comm.mpiComm);
+  if (platform->comm.mpiRank == 0) {
+    printf("done (%g)\n", MPI_Wtime() - tStart);
   }
 }
 

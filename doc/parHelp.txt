@@ -29,8 +29,7 @@ startFrom                   "<string>"
                               + time=<float>                           reset to specified time 
                               + x                                      read mesh coordinates 
                               + u                                      read velocity
-                              + s                                      read all scalars 
-                                + s00 s01 s02 ...                      read specified scalars only (t is an alias for s00) 
+                              + s or s00 s01 s02 ...                   read all or list of scalars 
                               + int                                    use grid interpolatation
 
 timeStepper                 tombo1, tombo2 [D], tombo3

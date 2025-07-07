@@ -355,10 +355,10 @@ void UDF_Setup()
     particles->setUserRHS(particleRHS);
 
     // register fluid velocity as an interpolated quantity
-    particles->registerInterpField("fluid_velocity", nrs->fluid->mesh->dim, nrs->fluid->fieldOffset, nrs->fluid->o_solution());
+    particles->addInterpField("fluid_velocity", nrs->fluid->mesh->dim, nrs->fluid->fieldOffset, nrs->fluid->o_solution());
 
     // register unique particle id as a field
-    particles->registerProp("gid", 1);
+    particles->addProp("gid", 1);
 
     // uniformly distribute particles in a cube [-Lx/2, Lx/2] x [-Ly/2, Ly/2] x [-Lz/2, Lz/2]
     // in a round-robin fashion

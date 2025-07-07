@@ -167,13 +167,13 @@ void UDF_Setup()
   particles->setSolver("AB");
 
   // register fluid velocity as an interpolated quantity
-  particles->registerInterpField("fluid_velocity", mesh->dim, nrs->fluid->fieldOffset, nrs->fluid->o_U);
+  particles->addInterpField("fluid_velocity", mesh->dim, nrs->fluid->fieldOffset, nrs->fluid->o_U);
 
   // register particle velocity as DOF
-  particles->registerDOF(mesh->dim, "velocity");
+  particles->addVariable(mesh->dim, "velocity");
 
   // register Stokes number as a property
-  particles->registerProp("stokes_number");
+  particles->addProp("stokes_number");
 
   auto [xPart, yPart, zPart] = generateInflowPoints(nrs);
   const dlong nParticles = xPart.size();

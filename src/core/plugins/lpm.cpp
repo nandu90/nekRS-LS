@@ -39,9 +39,9 @@ lpm_t::lpm_t(mesh_t* mesh_, dfloat* dt_, dfloat bb_tol_, dfloat newton_tol_)
   o_coeffAB = platform->device.malloc<dfloat>(solverOrder);
 
   // coordinates are registered by default
-  registerDOF("x");
-  registerDOF("y");
-  registerDOF("z");
+  addVariable("x");
+  addVariable("y");
+  addVariable("z");
 
   nStagesSumManyKernel = platform->kernelRequests.load("core-nStagesSumMany");
   remapParticlesKernel = platform->kernelRequests.load("lpm", "remapParticles");
@@ -138,12 +138,12 @@ void lpm_t::setSolver(const std::string &_solver)
              solver.c_str());
 }
 
-void lpm_t::registerDOF(const std::string &dofName, bool output)
+void lpm_t::addVariable(const std::string &dofName, bool output)
 {
-  registerDOF(1, dofName, output);
+  addVariable(1, dofName, output);
 }
 
-void lpm_t::registerDOF(dlong Nfields, const std::string &_dofName, bool output)
+void lpm_t::addVariable(dlong Nfields, const std::string &_dofName, bool output)
 {
   auto dofName = lowerCase(_dofName);
   nekrsCheck(this->initialized(),
@@ -185,12 +185,12 @@ int lpm_t::numDOFs(const std::string &_dofName) const
   return dofCounts.at(dofName);
 }
 
-void lpm_t::registerProp(const std::string &propName, bool output)
+void lpm_t::addProp(const std::string &propName, bool output)
 {
-  registerProp(1, propName, output);
+  addProp(1, propName, output);
 }
 
-void lpm_t::registerProp(dlong Nfields, const std::string &_propName, bool output)
+void lpm_t::addProp(dlong Nfields, const std::string &_propName, bool output)
 {
   auto propName = lowerCase(_propName);
   nekrsCheck(this->initialized(),
@@ -231,7 +231,7 @@ int lpm_t::numProps(const std::string &_propName) const
   return propCounts.at(propName);
 }
 
-void lpm_t::registerInterpField(const std::string &_interpFieldName,
+void lpm_t::addInterpField(const std::string &_interpFieldName,
                                 int Nfields,
                                 dlong fieldOffset,
                                 const occa::memory &o_fld,
@@ -255,9 +255,9 @@ void lpm_t::registerInterpField(const std::string &_interpFieldName,
   }
 }
 
-void lpm_t::registerInterpField(const std::string &interpFieldName, const occa::memory &o_fld, bool output)
+void lpm_t::addInterpField(const std::string &interpFieldName, const occa::memory &o_fld, bool output)
 {
-  registerInterpField(interpFieldName, 1, mesh->Nlocal, o_fld, output);
+  addInterpField(interpFieldName, 1, mesh->Nlocal, o_fld, output);
 }
 
 int lpm_t::interpFieldId(const std::string &_interpFieldName) const

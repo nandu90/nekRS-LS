@@ -315,7 +315,20 @@ void setup(MPI_Comm commg_in,
   }
 
   // now just load compiled kernels
-  loadComponents(false);
+  {
+    const auto tStart = MPI_Wtime();
+    if (platform->comm.mpiRank == 0) {
+      std::cout << "loading kernels ...\n";
+    }
+ 
+    loadComponents(false);
+
+    MPI_Barrier(platform->comm.mpiComm);
+    const double loadTime = MPI_Wtime() - tStart;
+    if (platform->comm.mpiRank == 0) {
+      printf("done (%gs)\n", MPI_Wtime() - tStart);
+    }
+  }
 
   platform->linAlg = linAlg_t::getInstance();
 
