@@ -76,7 +76,7 @@ void ellipticAx(elliptic_t *elliptic,
   occa::memory &o_D = mesh->o_D;
   occa::memory &o_DT = mesh->o_DT;
   occa::memory &o_lambda0 = elliptic->o_lambda0;
-  occa::memory &o_lambda1 = elliptic->o_lambda1;
+  occa::memory o_lambda1 = (elliptic->poisson) ? o_NULL : elliptic->o_lambda1;
 
   occa::kernel &AxKernel = elliptic->AxKernel;
 
@@ -91,7 +91,6 @@ void ellipticAx(elliptic_t *elliptic,
            o_lambda1,
            o_q,
            o_Aq);
-
 
   double flopCount = mesh->Np * 12 * mesh->Nq + 15 * mesh->Np;
   if (coeffField) {

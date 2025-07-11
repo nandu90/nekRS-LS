@@ -40,7 +40,7 @@ public:
   {
     if (key.empty()) return o_U;
 
-    if (lowerCase(key) == "pressure") return o_P;
+    if (lowerCase(key) == "p" || lowerCase(key) == "pressure") return o_P;
 
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;

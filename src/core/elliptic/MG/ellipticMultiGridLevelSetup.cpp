@@ -97,63 +97,67 @@ pMGLevel::pMGLevel(elliptic_t *ellipticBase, // finest level
   /* build coarsening and prologation operators to connect levels */
   this->buildCoarsenerQuadHex(meshLevels, Nf, Nc);
 
-  if (!isCoarse) {
+  if (!isCoarse ||
+      options.compareArgs("MULTIGRID COARSE SOLVE", "FALSE") ||
+      options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE"))
+  {
     this->setupSmoother(ellipticBase);
-  } else {
-    if (options.compareArgs("MULTIGRID COARSE SOLVE", "FALSE") ||
-        options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE")) {
-      this->setupSmoother(ellipticBase);
-    }
   }
 }
 
-void pMGLevel::setupSmoother(elliptic_t *ellipticBase)
+void pMGLevel::updateSetupSmootherChebyshev()
 {
+  // estimate the max eigenvalue of S*A
+  this->maxEig = this->maxEigSmoothAx();
+
   dfloat minMultiplier = 0.1;
   options.getArgs("MULTIGRID CHEBYSHEV MIN EIGENVALUE BOUND FACTOR", minMultiplier);
 
   dfloat maxMultiplier = 1.1;
   options.getArgs("MULTIGRID CHEBYSHEV MAX EIGENVALUE BOUND FACTOR", maxMultiplier);
 
+  lambda0 = minMultiplier * this->maxEig;
+  lambda1 = maxMultiplier * this->maxEig;
+
+  // default degree
+  if (isCoarse) {
+    if (options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE")) {
+      UpLegChebyshevDegree = 3;
+      DownLegChebyshevDegree = 3;
+    } else {
+      UpLegChebyshevDegree = 3;
+      DownLegChebyshevDegree = 3;
+    }
+  } else {
+    UpLegChebyshevDegree = 3;
+    DownLegChebyshevDegree = 3;
+  }
+  options.getArgs("MULTIGRID CHEBYSHEV DEGREE", UpLegChebyshevDegree);
+  options.getArgs("MULTIGRID CHEBYSHEV DEGREE", DownLegChebyshevDegree);
+}
+
+void pMGLevel::setupSmoother(elliptic_t *ellipticBase)
+{
+
   const bool useASM = options.compareArgs("MULTIGRID SMOOTHER", "ASM");
   const bool useRAS = options.compareArgs("MULTIGRID SMOOTHER", "RAS");
   const bool useJacobi = options.compareArgs("MULTIGRID SMOOTHER", "DAMPEDJACOBI");
+
   if (useASM || useRAS) {
     smootherType = useASM ? SmootherType::ASM : SmootherType::RAS;
-    build(ellipticBase);
-  } else {
-    nekrsCheck(!useJacobi, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Invalid pMGLevel smoother!");
+    setupSmootherSchwarz(ellipticBase);
+  } else if (useJacobi) {
     smootherType = SmootherType::JACOBI;
     o_invDiagA = platform->device.malloc<pfloat>(mesh->Nlocal);
     ellipticUpdateJacobi(elliptic, o_invDiagA); // required to compute eigenvalues
+  } else {
+    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "No supported pMGLevel smoother found!");
   }
 
   if (options.compareArgs("MULTIGRID SMOOTHER", "CHEBYSHEV")) {
     chebySmootherType = convertSmootherType(smootherType);
     smootherType = SmootherType::CHEBYSHEV;
-
-    // estimate the max eigenvalue of S*A
-    dfloat rho = this->maxEigSmoothAx();
-
-    lambda1 = maxMultiplier * rho;
-    lambda0 = minMultiplier * rho;
-    this->maxEig = rho;
-
-    // default degree
-    if (isCoarse) {
-      if (options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE")) {
-        UpLegChebyshevDegree = 3;
-        DownLegChebyshevDegree = 3;
-      } else {
-        UpLegChebyshevDegree = 3;
-        DownLegChebyshevDegree = 3;
-      }
-    } else {
-      UpLegChebyshevDegree = 3;
-      DownLegChebyshevDegree = 3;
-    }
-    options.getArgs("MULTIGRID CHEBYSHEV DEGREE", UpLegChebyshevDegree);
-    options.getArgs("MULTIGRID CHEBYSHEV DEGREE", DownLegChebyshevDegree);
+    updateSetupSmootherChebyshev();
   }
 
   std::string schedule = options.getArgs("MULTIGRID SCHEDULE");
@@ -275,11 +279,9 @@ static void eigenValue(const int Nrows, double *A, double *WR, double *WI)
   auto VL = new double[Nrows * Nrows];
   auto VR = new double[Nrows * Nrows];
 
-  auto invalid = 0;
+  bool invalid = false;
   for (int i = 0; i < Nrows * Nrows; i++) {
-    if (std::isnan(A[i]) || std::isinf(A[i])) {
-      invalid++;
-    }
+    invalid |= std::isnan(A[i]) || std::isinf(A[i]);
   }
   nekrsCheck(invalid, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "invalid matrix entries!");
 
@@ -313,6 +315,7 @@ dfloat pMGLevel::maxEigSmoothAx()
   const auto k = (unsigned int)std::min(pMGLevel::Narnoldi, Nglobal);
 
   std::vector<double> H(k * k, 0.0);
+
   auto Vx = randomVector<dfloat>(M, 0.0, 1.0, true); // deterministic random numbers
 
   std::vector<occa::memory> o_V(k + 1);
@@ -357,29 +360,11 @@ dfloat pMGLevel::maxEigSmoothAx()
   // Arnoldi
   for (int j = 0; j < k; j++) {
     // v[j+1] = invD*(A*v[j])
-
-    if (platform->verbose()) {
-      const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
-                                                                   1,
-                                                                   elliptic->fieldOffset,
-                                                                   mesh->ogs->o_invDegree,
-                                                                   o_V[j],
-                                                                   platform->comm.mpiComm);
-    }
-
-    platform->copyDfloatToPfloatKernel(M, o_V[j], o_VxPfloat);
-    ellipticOperator(elliptic, o_VxPfloat, o_AVxPfloat, pfloatString);
-    this->smoother(o_AVxPfloat, o_VxPfloat, true);
-
-    platform->copyPfloatToDfloatKernel(M, o_VxPfloat, o_V[j + 1]);
-
-    if (platform->verbose()) {
-      const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
-                                                                   1,
-                                                                   elliptic->fieldOffset,
-                                                                   mesh->ogs->o_invDegree,
-                                                                   o_V[j + 1],
-                                                                   platform->comm.mpiComm);
+    {
+      platform->copyDfloatToPfloatKernel(M, o_V[j], o_VxPfloat);
+      ellipticOperator(elliptic, o_VxPfloat, o_AVxPfloat, pfloatString);
+      this->smoother(o_AVxPfloat, o_VxPfloat, true);
+      platform->copyPfloatToDfloatKernel(M, o_VxPfloat, o_V[j + 1]);
     }
 
     // modified Gram-Schmidth
@@ -402,14 +387,17 @@ dfloat pMGLevel::maxEigSmoothAx()
 
     if (j + 1 < k) {
       // v[j+1] = v[j+1]/||v[j+1]||
-      dfloat norm_vj = platform->linAlg->weightedInnerProdMany(Nlocal,
+      auto norm_vj = platform->linAlg->weightedInnerProdMany(Nlocal,
                                                                elliptic->Nfields,
                                                                elliptic->fieldOffset,
                                                                o_invDegree,
                                                                o_V[j + 1],
                                                                o_V[j + 1],
                                                                platform->comm.mpiComm);
+
+      nekrsCheck(norm_vj <= 0, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "invalid norm!");
       norm_vj = sqrt(norm_vj);
+
       platform->linAlg->scaleMany(Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1 / norm_vj, o_V[j + 1]);
       H[j + 1 + j * k] = (double)norm_vj;
     }
@@ -432,7 +420,7 @@ dfloat pMGLevel::maxEigSmoothAx()
 
   MPI_Barrier(platform->comm.mpiComm);
   if (platform->comm.mpiRank == 0) {
-    printf("%g done (%gs)\n", rho, MPI_Wtime() - tStart);
+    printf("value=%g done (%gs)\n", rho, MPI_Wtime() - tStart);
   }
   fflush(stdout);
 

@@ -23,6 +23,77 @@ static int HYPREinit = 0;
 
 namespace hypreWrapper {
 
+void __attribute__((visibility("default")))
+boomerAMG_t::setup()
+{
+  // Perform AMG setup
+  HYPRE_ParVector par_b;
+  HYPRE_ParVector par_x;
+  HYPRE_IJVectorGetObject(*b, (void **)&par_b);
+  HYPRE_IJVectorGetObject(*x, (void **)&par_x);
+
+  HYPRE_ParCSRMatrix par_A;
+  HYPRE_IJMatrixGetObject(*A, (void **)&par_A);
+
+#ifdef _OPENMP
+  const int NthreadsSave = omp_get_max_threads();
+  omp_set_num_threads(Nthreads);
+  omp_set_num_threads(Nthreads);
+#endif
+
+  const int err = HYPRE_BoomerAMGSetup(*solver, par_A, par_b, par_x);
+  if (err > 0) {
+    std::string txt = "HYPRE_BoomerAMGSetup failed with " + std::to_string(err);
+    throw std::runtime_error(txt);
+  }
+
+#ifdef _OPENMP
+  omp_set_num_threads(NthreadsSave);
+#endif
+}
+
+void __attribute__((visibility("default")))
+boomerAMG_t::setMatrix(int nz,
+                       const long long int *Ai,
+                       const long long int *Aj,
+                       const double *Av)
+{
+  std::map<HYPRE_BigInt, std::vector<std::pair<HYPRE_BigInt, HYPRE_Real>>> rowToColAndVal;
+  for (int i = 0; i < nz; i++) {
+    HYPRE_BigInt mati = (HYPRE_BigInt)(Ai[i]);
+    HYPRE_BigInt matj = (HYPRE_BigInt)(Aj[i]);
+    HYPRE_Real matv = (HYPRE_Real)Av[i];
+    rowToColAndVal[mati].emplace_back(std::make_pair(matj, matv));
+  }
+
+  const HYPRE_Int rowsToSet = rowToColAndVal.size();
+  std::vector<HYPRE_Int> ncols(rowsToSet);
+  std::vector<HYPRE_BigInt> rows(rowsToSet);
+  std::vector<HYPRE_BigInt> cols(nz);
+  std::vector<HYPRE_Real> vals(nz);
+
+  unsigned rowCtr = 0;
+  unsigned colCtr = 0;
+  for (auto &&rowAndColValPair : rowToColAndVal) {
+    const auto &row = rowAndColValPair.first;
+    const auto &colAndValues = rowAndColValPair.second;
+
+    rows[rowCtr] = row;
+    ncols[rowCtr] = colAndValues.size();
+
+    for (auto &&colAndValue : colAndValues) {
+      const auto &col = colAndValue.first;
+      const auto &val = colAndValue.second;
+      cols[colCtr] = col;
+      vals[colCtr] = val;
+      ++colCtr;
+    }
+    ++rowCtr;
+  }
+
+  HYPRE_IJMatrixSetValues(*A, rowsToSet, ncols.data(), rows.data(), cols.data(), vals.data());
+}
+
 __attribute__((visibility("default")))
 boomerAMG_t::boomerAMG_t(int _nRows,
                    int nz,
@@ -84,40 +155,7 @@ boomerAMG_t::boomerAMG_t(int _nRows,
   HYPRE_IJMatrixSetObjectType(*A, HYPRE_PARCSR);
   HYPRE_IJMatrixInitialize(*A);
 
-  std::map<HYPRE_BigInt, std::vector<std::pair<HYPRE_BigInt, HYPRE_Real>>> rowToColAndVal;
-  for (int i = 0; i < nz; i++) {
-    HYPRE_BigInt mati = (HYPRE_BigInt)(Ai[i]);
-    HYPRE_BigInt matj = (HYPRE_BigInt)(Aj[i]);
-    HYPRE_Real matv = (HYPRE_Real)Av[i];
-    rowToColAndVal[mati].emplace_back(std::make_pair(matj, matv));
-  }
-
-  const HYPRE_Int rowsToSet = rowToColAndVal.size();
-  std::vector<HYPRE_Int> ncols(rowsToSet);
-  std::vector<HYPRE_BigInt> rows(rowsToSet);
-  std::vector<HYPRE_BigInt> cols(nz);
-  std::vector<HYPRE_Real> vals(nz);
-
-  unsigned rowCtr = 0;
-  unsigned colCtr = 0;
-  for (auto &&rowAndColValPair : rowToColAndVal) {
-    const auto &row = rowAndColValPair.first;
-    const auto &colAndValues = rowAndColValPair.second;
-
-    rows[rowCtr] = row;
-    ncols[rowCtr] = colAndValues.size();
-
-    for (auto &&colAndValue : colAndValues) {
-      const auto &col = colAndValue.first;
-      const auto &val = colAndValue.second;
-      cols[colCtr] = col;
-      vals[colCtr] = val;
-      ++colCtr;
-    }
-    ++rowCtr;
-  }
-
-  HYPRE_IJMatrixSetValues(*A, rowsToSet, ncols.data(), rows.data(), cols.data(), vals.data());
+  setMatrix(nz, Ai, Aj, Av);
 
   HYPRE_IJMatrixAssemble(*A);
 
@@ -182,29 +220,8 @@ boomerAMG_t::boomerAMG_t(int _nRows,
   HYPRE_IJVectorInitialize(*x);
   HYPRE_IJVectorAssemble(*x);
 
-  // Perform AMG setup
-  HYPRE_ParVector par_b;
-  HYPRE_ParVector par_x;
-  HYPRE_IJVectorGetObject(*b, (void **)&par_b);
-  HYPRE_IJVectorGetObject(*x, (void **)&par_x);
-  HYPRE_ParCSRMatrix par_A;
-  HYPRE_IJMatrixGetObject(*A, (void **)&par_A);
+  setup();
 
-#ifdef _OPENMP
-  const int NthreadsSave = omp_get_max_threads();
-  omp_set_num_threads(Nthreads);
-  omp_set_num_threads(Nthreads);
-#endif
-
-  const int err = HYPRE_BoomerAMGSetup(*solver, par_A, par_b, par_x);
-  if (err > 0) {
-    std::string txt = "HYPRE_BoomerAMGSetup failed with " + std::to_string(err);
-    throw std::runtime_error(txt);
-  }
-
-#ifdef _OPENMP
-  omp_set_num_threads(NthreadsSave);
-#endif
   HYPREinit = 1;
 }
 

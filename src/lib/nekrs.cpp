@@ -74,8 +74,8 @@ setupAide *setDefaultSettings(std::string casename)
 
   options->setArgs("ENABLE GS COMM OVERLAP", "TRUE");
 
-#if 1
-  options->setArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "L2_RESIDUAL");
+#if 0
+  options->setArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "l2_RESIDUAL");
 #else
   options->setArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "LEGACY");
 #endif

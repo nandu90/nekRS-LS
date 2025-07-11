@@ -162,6 +162,8 @@ struct elliptic_t {
 void ellipticMultiGridUpdateLambda(elliptic_t *elliptic);
 void ellipticMultiGridSetup(elliptic_t *elliptic);
 
+void ellipticCoarseGridSetup(elliptic_t *elliptic, bool update = 0);
+
 elliptic_t *ellipticBuildMultigridLevelFine(elliptic_t *elliptic);
 elliptic_t *ellipticBuildMultigridLevel(elliptic_t *baseElliptic, int Nc, int Nf);
 

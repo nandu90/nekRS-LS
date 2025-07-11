@@ -59,8 +59,8 @@ void udfDirichlet(bcData *bc)
 void udfNeumann(bcData *bc)
 {
   if (isField("fluid velocity")) {
-    const dfloat invMagUWall = 1 / bc->uxfluidsrwrk[1];
-    const dfloat uTau = bc->uxfluidsrwrk[3];
+    const dfloat invMagUWall = 1 / bc->usrwrk[1];
+    const dfloat uTau = bc->usrwrk[3];
  
     const dfloat ut1x = bc->uxFluid * bc->t1x + bc->uyFluid * bc->t1y + bc->uzFluid * bc->t1z;
     const dfloat ut2x = bc->uxFluid * bc->t2x + bc->uyFluid * bc->t2y + bc->uzFluid * bc->t2z;
@@ -70,10 +70,10 @@ void udfNeumann(bcData *bc)
   } else if (isField("scalar temperature")) {
     bc->fluxScalar = p_cond * p_TsGrad;
     if (bc->id == 2) {
-      const dfloat thts = bc->uxfluidsrwrk[0];
-      const dfloat dtempWall = fabs(bc->uxfluidsrwrk[2] - (thts - 1));
-      const dfloat uTau = bc->uxfluidsrwrk[3];
-      const dfloat thetaTau = bc->uxfluidsrwrk[4];
+      const dfloat thts = bc->urwrk[0];
+      const dfloat dtempWall = fabs(bc->urwrk[2] - (thts - 1));
+      const dfloat uTau = bc->usrwrk[3];
+      const dfloat thetaTau = bc->usrwrk[4];
       const dfloat dtemp = bc->sScalar - (thts - 1);
  
       bc->fluxScalar = 0;

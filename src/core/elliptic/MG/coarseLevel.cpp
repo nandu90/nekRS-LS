@@ -44,6 +44,34 @@ MGSolver_t::coarseLevel_t::coarseLevel_t(setupAide options, MPI_Comm comm)
   this->solvePtr = &MGSolver_t::coarseLevel_t::solve;
 }
 
+void MGSolver_t::coarseLevel_t::updateMatrix(
+  dlong nnz,     //--
+  hlong *Ai,     //-- Local A matrix data (globally indexed, COO storage, row sorted)
+  hlong *Aj,     //--
+  dfloat *Avals) //--
+{
+  std::string crsSolver;
+  options.getArgs("COARSE SOLVER", crsSolver);
+
+  if (crsSolver == "BOOMERAMG") {
+    auto boomerAMG = (hypreWrapper::boomerAMG_t *)this->boomerAMG;
+
+    // convert dfloat to double 
+    std::vector<double> Av(nnz);
+    for (int i = 0; i < Av.size(); i++) {
+      Av[i] = Avals[i];
+    }
+
+    boomerAMG->setMatrix(nnz, Ai, Aj, Av.data());
+    boomerAMG->setup();
+  } else {
+    nekrsAbort(platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "COARSE SOLVER <%s> is not supported!\n",
+               crsSolver.c_str());
+  }
+}
+
 void MGSolver_t::coarseLevel_t::setupSolver(
     hlong *globalRowStarts,
     dlong nnz,     //--
@@ -78,6 +106,7 @@ void MGSolver_t::coarseLevel_t::setupSolver(
   h_xBuffer = platform->device.mallocHost<pfloat>(N);
   xBuffer = (pfloat *)h_xBuffer.ptr();
 
+  // convert dfloat to double 
   std::vector<double> Av(nnz);
   for (int i = 0; i < Av.size(); i++) {
     Av[i] = Avals[i];

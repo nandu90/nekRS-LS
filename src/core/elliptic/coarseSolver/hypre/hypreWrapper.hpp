@@ -44,6 +44,13 @@ public:
              const double *param,
              int verbose);
 
+  void setMatrix(int nz,
+                 const long long int *Ai,
+                 const long long int *Aj,
+                 const double *Av);
+
+  void setup();
+
   void solve(void *b, void *x);
 
 private:

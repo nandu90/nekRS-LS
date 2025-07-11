@@ -291,8 +291,6 @@ void ellipticBuildFEMHex3D(elliptic_t* elliptic,
   if (*nnz) cnt++;
   *nnz = cnt;
 
-  if(platform->comm.mpiRank == 0) printf("done.\n");
-
   MPI_Barrier(platform->comm.mpiComm);
   MPI_Type_free(&MPI_NONZERO_T);
 
@@ -572,6 +570,8 @@ void ellipticBuildFEMGalerkinHex3D(elliptic_t* elliptic,
 
   MPI_Barrier(platform->comm.mpiComm);
   MPI_Type_free(&MPI_NONZERO_T);
+
+  free(mask);
 
   free(sendNonZeros);
   free(globalNumbering);

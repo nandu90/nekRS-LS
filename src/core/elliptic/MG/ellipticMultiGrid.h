@@ -102,9 +102,10 @@ public:
   void* ogsExt;
   void* ogsExtOverlap;
 
-  void build(
-    elliptic_t* pSolver);
-  void generate_weights();
+  void setupSmootherSchwarz(elliptic_t* pSolver);
+  void updateSmootherSchwarz(elliptic_t *pSolver);
+
+  void generateSchwarzWeights();
 
   setupAide options;
 
@@ -150,6 +151,7 @@ public:
 
   void smoothChebyshev (occa::memory &o_r, occa::memory &o_x, bool xIsZero);
   void smoothFourthKindChebyshev (occa::memory &o_r, occa::memory &o_x, bool xIsZero);
+
   void smoothSchwarz (occa::memory &o_r, occa::memory &o_x, bool xIsZero);
   void smoothJacobi (occa::memory &o_r, occa::memory &o_x, bool xIsZero);
 
@@ -158,6 +160,8 @@ public:
   void Report() final;
 
   void setupSmoother(elliptic_t* base);
+  void updateSetupSmootherChebyshev();
+
   dfloat maxEigSmoothAx();
 
   void buildCoarsenerQuadHex(mesh_t **meshLevels, int Nf, int Nc);

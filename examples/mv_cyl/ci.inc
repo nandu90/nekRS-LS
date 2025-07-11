@@ -96,9 +96,9 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
   expectedErr[4] = 0.2465620E-05;
   expectedErr[5] = 0.4929804E-06;
 
-  int expectedSIter = 9;
-  int expectedPIter = 9;
-  int expectedVIter = 8;
+  int expectedSIter = 4;
+  int expectedPIter = 5;
+  int expectedVIter = 2;
 
   if (ciMode == 1) {
   }

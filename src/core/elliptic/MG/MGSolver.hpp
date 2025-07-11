@@ -97,6 +97,8 @@ public:
     ~coarseLevel_t();
 
     void setupSolver(hlong *globalRowStarts, dlong nnz, hlong *Ai, hlong *Aj, dfloat *Avals, bool nullSpace);
+    void updateMatrix(dlong nnz, hlong *Ai, hlong *Aj, dfloat *Avals);
+
     void solve(occa::memory &o_rhs, occa::memory &o_x);
     std::function<void(coarseLevel_t *, occa::memory &, occa::memory &)> solvePtr = nullptr;
 

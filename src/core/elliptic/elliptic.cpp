@@ -30,6 +30,49 @@ elliptic::~elliptic()
   solver->o_EToB.free();
 }
 
+void elliptic::updatePreconditioner()
+{
+  MPI_Barrier(platform->comm.mpiComm);
+  auto tStart = MPI_Wtime();
+  if (platform->comm.mpiRank == 0) {
+    printf("updating preconditioner for %s ... \n", solver->name.c_str());
+  }
+  auto precon = solver->precon;
+
+  if (solver->options.compareArgs("PRECONDITIONER", "JACOBI")) {
+    ellipticUpdateJacobi(solver);
+  } else if (solver->options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
+    MGSolver_t::multigridLevel** levels = precon->MGSolver->levels;
+    auto elliptic = dynamic_cast<pMGLevel*>(levels[0])->elliptic;                            
+
+    if (solver->options.compareArgs("MULTIGRID SMOOTHER", "DAMPEDJACOBI")) {
+      ellipticMultiGridUpdateLambda(solver);
+    } else if (solver->options.compareArgs("MULTIGRID SMOOTHER", "ASM") || solver->options.compareArgs("MULTIGRID SMOOTHER", "RAS")) {
+      for (int n = 0; n < elliptic->nLevels - 1; n++) {
+        auto level = dynamic_cast<pMGLevel*>(levels[n]);
+        level->updateSmootherSchwarz(solver);
+      }
+    }
+
+    if (solver->options.compareArgs("MULTIGRID SMOOTHER", "CHEBYSHEV")) {
+      for (int n = 0; n < elliptic->nLevels - 1; n++) {
+        auto level = dynamic_cast<pMGLevel*>(levels[n]);
+        level->updateSetupSmootherChebyshev();
+      }
+    }
+
+    if (solver->options.compareArgs("MULTIGRID COARSE SOLVE", "TRUE")) {
+      ellipticCoarseGridSetup(elliptic, 1);
+    }
+  }
+
+  MPI_Barrier(platform->comm.mpiComm);
+  if (platform->comm.mpiRank == 0) {
+    printf("done (%gs)\n", MPI_Wtime() - tStart);
+  }
+  fflush(stdout);
+}
+
 void elliptic::solve(const occa::memory &o_lambda0,
                      const occa::memory &o_lambda1,
                      const occa::memory &RHS,
@@ -192,7 +235,9 @@ void elliptic::_solve(const occa::memory &o_lambda0,
         elliptic->o_residualWeight = platform->device.malloc<dfloat>(mesh->Nlocal);
       }
       elliptic->o_residualWeight.copyFrom(elliptic->o_invDegree);
-      platform->linAlg->scale(mesh->Nlocal, 1 / mesh->volume, elliptic->o_residualWeight);
+//      platform->linAlg->scale(mesh->Nlocal, 1 / mesh->volume, elliptic->o_residualWeight);
+      platform->linAlg->scale(mesh->Nlocal, 1.0, elliptic->o_residualWeight);
+
     } else if (platform->options.compareArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "l2_RESIDUAL")) {
       if (!elliptic->o_residualWeight.isInitialized()) {
         elliptic->o_residualWeight = platform->device.malloc<dfloat>(mesh->Nlocal);
@@ -204,6 +249,14 @@ void elliptic::_solve(const occa::memory &o_lambda0,
                               mesh->o_invAJw,
                               elliptic->o_residualWeight);
       platform->linAlg->axmy(mesh->Nlocal, 1.0, elliptic->o_invDegree, elliptic->o_residualWeight);
+
+#if 0
+      nekrsCheck(elliptic->nullspace,
+                 MPI_COMM_SELF,
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "STOPPING CRITERION l2_RESIDUAL is currently unsupported if there is a non-trival nullspace");
+#endif
     } else if (platform->options.compareArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "L2_RESIDUAL")) {
       elliptic->o_residualWeight = mesh->o_invAJwTimesInvDegree;
     } else {

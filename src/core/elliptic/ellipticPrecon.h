@@ -39,7 +39,6 @@ struct precon_t {
   MGSolver_t *MGSolver = nullptr;
   occa::kernel coarsenKernel;
   occa::kernel prolongateKernel;
-  bool additive = 0;
 
   SEMFEMSolver_t *SEMFEMSolver = nullptr;
 
