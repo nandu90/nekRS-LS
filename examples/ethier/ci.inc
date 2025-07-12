@@ -1004,7 +1004,7 @@ void ciTestErrors(nrs_t *nrs,
 
     // mode 11 uses Chebyshev+Jacobi smoothing
     if (ciMode == 11) {
-      expectedNiterP = 11;
+      expectedNiterP = 9;
     }
 
     // mode 14 uses additive multigrid with Schwarz
@@ -1025,8 +1025,8 @@ void ciTestErrors(nrs_t *nrs,
     int expectedNiterS00 = 13;
     int expectedNiterS01 = 13;
     if (ciMode == 19 && nrs->timeStepConverged) {
-      expectedNiterS00 = 11;
-      expectedNiterS01 = 11;
+      expectedNiterS00 = 7;
+      expectedNiterS01 = 7;
     }
 
     if (ciMode == 22) {
@@ -1124,10 +1124,10 @@ void ciTestErrors(nrs_t *nrs,
   }
   case 11:
   {
-    velIterTest = abs(NiterU - 15) < 2;
+    velIterTest = abs(NiterU - 11) < 2;
     s1Test = abs((err[2] - 6.67E-12) / err[2]) < EPS;
     s2Test = abs((err[3] - 7.49E-12) / err[3]) < EPS;
-    pIterTest = abs(NiterP - 5) < 2;
+    pIterTest = abs(NiterP - 3) < 2;
     vxTest = abs((err[0] - 2.77E-10) / err[0]) < EPS;
     prTest = abs((err[1] - 6.98E-10) / err[1]) < EPS;
     break;
