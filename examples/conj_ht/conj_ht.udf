@@ -4,8 +4,6 @@ static int updateProperties = 1;
 
 #ifdef __okl__
 
-#include <cstdio>
-
 void udfDirichlet(bcData *bc)
 {
   if (isField("fluid velocity")) {

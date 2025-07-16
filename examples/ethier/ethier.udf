@@ -20,7 +20,6 @@ constexpr int nPartGlobal = 1000;
 deviceMemory<dfloat> o_x0, o_y0, o_z0;
 
 #ifdef __okl__
-#include <cstdio>
 
 @kernel void dpdx(const dlong Ntotal,
                   const double time,

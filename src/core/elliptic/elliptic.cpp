@@ -445,16 +445,6 @@ void checkConfig(elliptic_t *elliptic)
     err++;
   }
 
-  if (options.compareArgs("PRECONDITIONER", "MULTIGRID") &&
-      options.compareArgs("MULTIGRID COARSE SOLVE", "TRUE")) {
-    if (elliptic->poisson == 0) {
-      if (platform->comm.mpiRank == 0) {
-        printf("Multigrid + coarse solve only supported for Poisson type equations\n");
-      }
-      err++;
-    }
-  }
-
   if (options.compareArgs("SOLVER", "PCG+COMBINED") && !options.compareArgs("PRECONDITIONER", "JACO")) {
     if (platform->comm.mpiRank == 0) {
       printf("combinedPCG requires Jacobi preconditioner!\n");
@@ -529,6 +519,14 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
                                                      platform->comm.mpiComm) /
                          elliptic->mesh->volume;
 
+  if (elliptic->o_lambda1.isInitialized()) {
+    elliptic->lambda1Avg = platform->linAlg->innerProd(elliptic->mesh->Nlocal,
+                                                       elliptic->mesh->o_LMM,
+                                                       elliptic->o_lambda1,
+                                                       platform->comm.mpiComm) /
+                           elliptic->mesh->volume;
+  }
+
   nekrsCheck(!std::isnormal(elliptic->lambda0Avg) || elliptic->lambda0Avg == 0,
              MPI_COMM_SELF,
              EXIT_FAILURE,
@@ -550,7 +548,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     }
   }
 
-  if (platform->device.mode() == "Serial") {
+  if (platform->device.mode() == "Serial" && solver->options.compareArgs("MULTIGRID COARSE SOLVE", "TRUE")) {
     elliptic->options.setArgs("COARSE SOLVER LOCATION", "CPU");
   }
 
@@ -579,10 +577,6 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
       platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * elliptic->Nfields, elliptic->EToB);
 
   checkConfig(elliptic);
-
-  if (options.compareArgs("ELLIPTIC COARSE COEFF FIELD", "TRUE")) {
-    options.setArgs("GALERKIN COARSE OPERATOR", "TRUE");
-  }
 
   if (options.compareArgs("SOLVER", "PGMRES")) {
     initializeGmresData(elliptic);

@@ -855,6 +855,7 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
 
   int err = [&]() {
     if (buildRank == 0) {
+
       mkdir(cache_dir.c_str(), S_IRWXU);
 
       int nelgt, nelgv;
@@ -879,12 +880,11 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
       }
 
       if (buildRequired) {
-        const double tStart = MPI_Wtime();
-
         if (rank == 0) {
-          printf("building nekInterface for lx1=%d, lelt=%d and lelg=%d ... ", N + 1, lelt, nelgt);
+          std::cout << "building nekInterface for lx1=" << N + 1 << ", lelt=" << lelt << ", lelg=" << nelgt << " ..." << std::endl << std::flush;
         }
-        fflush(stdout);
+
+        const double tStart = MPI_Wtime();
 
         const std::string makeOutput = (rank == 0) ? cache_dir + "/make.out" : "/dev/null";
         const std::string case_dir(fs::current_path());

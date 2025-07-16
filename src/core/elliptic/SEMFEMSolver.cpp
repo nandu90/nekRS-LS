@@ -19,6 +19,11 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
   }
   fflush(stdout);
 
+  nekrsCheck(!elliptic->poisson, 
+             platform->comm.mpiComm, 
+             EXIT_FAILURE, "%s\n", 
+             "SEMFEM only supported for type Poisson!");
+
   const auto mask = [&]() {
     std::vector<int> mask(mesh->Nlocal, 1);
     if (elliptic->Nmasked > 0) {

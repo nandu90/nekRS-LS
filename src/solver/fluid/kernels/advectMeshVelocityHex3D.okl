@@ -138,17 +138,17 @@
           const dfloat dtdy = vgeo[gid + p_TYID * p_Np];
           const dfloat dtdz = vgeo[gid + p_TZID * p_Np];
 
-          dfloat d_uwx_dr = 0.f, d_uwx_ds = 0.f, d_uwx_dt = 0.f;
-          dfloat d_uwy_dr = 0.f, d_uwy_ds = 0.f, d_uwy_dt = 0.f;
-          dfloat d_uwz_dr = 0.f, d_uwz_ds = 0.f, d_uwz_dt = 0.f;
+          dfloat d_uwx_dr = 0, d_uwx_ds = 0, d_uwx_dt = 0;
+          dfloat d_uwy_dr = 0, d_uwy_ds = 0, d_uwy_dt = 0;
+          dfloat d_uwz_dr = 0, d_uwz_ds = 0, d_uwz_dt = 0;
 
-          dfloat d_vwx_dr = 0.f, d_vwx_ds = 0.f, d_vwx_dt = 0.f;
-          dfloat d_vwy_dr = 0.f, d_vwy_ds = 0.f, d_vwy_dt = 0.f;
-          dfloat d_vwz_dr = 0.f, d_vwz_ds = 0.f, d_vwz_dt = 0.f;
+          dfloat d_vwx_dr = 0, d_vwx_ds = 0, d_vwx_dt = 0;
+          dfloat d_vwy_dr = 0, d_vwy_ds = 0, d_vwy_dt = 0;
+          dfloat d_vwz_dr = 0, d_vwz_ds = 0, d_vwz_dt = 0;
 
-          dfloat d_wwx_dr = 0.f, d_wwx_ds = 0.f, d_wwx_dt = 0.f;
-          dfloat d_wwy_dr = 0.f, d_wwy_ds = 0.f, d_wwy_dt = 0.f;
-          dfloat d_wwz_dr = 0.f, d_wwz_ds = 0.f, d_wwz_dt = 0.f;
+          dfloat d_wwx_dr = 0, d_wwx_ds = 0, d_wwx_dt = 0;
+          dfloat d_wwy_dr = 0, d_wwy_ds = 0, d_wwy_dt = 0;
+          dfloat d_wwz_dr = 0, d_wwz_ds = 0, d_wwz_dt = 0;
 
 #pragma unroll p_Nq
           for (int n = 0; n < p_Nq; ++n) {

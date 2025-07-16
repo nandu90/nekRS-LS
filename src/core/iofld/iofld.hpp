@@ -118,7 +118,7 @@ public:
 
     if (platform->comm.mpiRank == 0) {
       if (engineMode == iofld::mode::write) {
-        std::cout << "writing checkpoint ..." << std::endl << std::flush;
+        std::cout << "writing to field file ..." << std::endl << std::flush;
       }
     }
 

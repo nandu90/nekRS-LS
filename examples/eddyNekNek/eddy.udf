@@ -12,8 +12,6 @@ static dfloat P_SCALE;
 
 #ifdef __okl__
 
-#include <cstdio>
-
 void exact(dfloat *uu, dfloat *vv, dfloat *ww, dfloat xx, dfloat yy, dfloat zz, double time, dfloat visc)
 {
   const dfloat a[10] = {-.2, -.2, .25, 0.0, 0, 0, 0, 0, 0, 0};
@@ -89,8 +87,6 @@ void udfDirichlet(bcData *bc)
     bc->uxFluid = bc->uxFluidInt;
     bc->uyFluid = bc->uyFluidInt;
     bc->uzFluid = bc->uzFluidInt;
-    //printf("%g %g %g\n", bc->uxFluid, bc->uyFluid, bc->uzFluid);
-  } else if (isField("scalar ps1")) { 
     bc->sScalar = bc->sScalarInt;
   } else if (isField("scalar ps2")) { 
     dfloat u, v, w;

@@ -686,7 +686,7 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
   }
 
   if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "HPFRT")) {
-    dfloat strength = 1.0;
+    dfloat strength = NAN;
     platform->options.getArgs(upperCase(velocityName) + " HPFRT STRENGTH", strength);
 
     launchKernel("core-vectorFilterRTHex3D", mesh->Nelements, o_filterRT, strength, fieldOffset, o_U, o_EXT);

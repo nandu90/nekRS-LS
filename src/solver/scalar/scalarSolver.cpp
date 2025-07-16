@@ -292,9 +292,9 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
       if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPFRT")) {
         int filterNc = -1;
         options.getArgs("SCALAR" + sid + " HPFRT MODES", filterNc);
-        dfloat strength;
+        dfloat strength = NAN;
         options.getArgs("SCALAR" + sid + " HPFRT STRENGTH", strength);
-        filterS[is] = -1.0 * fabs(strength);
+        filterS[is] = strength;
         this->o_filterRT.copyFrom(lowPassFilterSetup(this->_mesh[is], filterNc),
                                   Nmodes * Nmodes,
                                   is * Nmodes * Nmodes);

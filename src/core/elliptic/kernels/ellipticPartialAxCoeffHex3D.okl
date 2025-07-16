@@ -255,8 +255,8 @@
           const dfloat r_GwJ = ggeo[gbase + p_GWJID * p_Np];
 #endif
 
-          dfloat ur = 0.f;
-          dfloat us = 0.f;
+          dfloat ur = 0;
+          dfloat us = 0;
           dfloat ut = 0;
 
 #pragma unroll p_Nq
@@ -519,8 +519,8 @@
 #endif
             }
 
-            dfloat ur = 0.f;
-            dfloat us = 0.f;
+            dfloat ur = 0;
+            dfloat us = 0;
             dfloat ut = 0;
 
 #pragma unroll p_Nq
@@ -972,8 +972,8 @@
 #endif
             }
 
-            dfloat ur = 0.f;
-            dfloat us = 0.f;
+            dfloat ur = 0;
+            dfloat us = 0;
             dfloat ut = 0;
 
 #pragma unroll p_Nq
@@ -1163,8 +1163,8 @@
 #endif
             }
 
-            dfloat ur = 0.f;
-            dfloat us = 0.f;
+            dfloat ur = 0;
+            dfloat us = 0;
             dfloat ut = 0;
 
 #pragma unroll p_Nq
@@ -1378,8 +1378,8 @@
           const dfloat r_GwJ = ggeo[gbase + p_GWJID * p_Np];
 #endif
 
-          dfloat ur = 0.f;
-          dfloat us = 0.f;
+          dfloat ur = 0;
+          dfloat us = 0;
           dfloat ut = 0;
 
 #pragma unroll p_Nq

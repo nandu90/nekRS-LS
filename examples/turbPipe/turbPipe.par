@@ -8,9 +8,8 @@ userSections = CASEDATA
 #verbose = true
 polynomialOrder = 7
 #startFrom = "restart.fld"
-numSteps = 3
-#stopAt = endTime
-#endTime = 200
+stopAt = endTime
+endTime = 200
 
 timeStepper = tombo2
 

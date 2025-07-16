@@ -2,6 +2,7 @@ set(MESH_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/core/mesh)
 
 set(MESH_SOURCES
     ${MESH_SOURCE_DIR}/planarAvg.cpp
+    ${MESH_SOURCE_DIR}/planarCopy.cpp
     ${MESH_SOURCE_DIR}/meshSetup.cpp
     ${MESH_SOURCE_DIR}/meshIntp.cpp
     ${MESH_SOURCE_DIR}/meshSurface.cpp

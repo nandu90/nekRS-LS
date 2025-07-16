@@ -140,8 +140,9 @@ struct elliptic_t {
   occa::kernel combinedPCGUpdateConvergedSolutionKernel;
 
   occa::memory o_lambda0;
-  dfloat lambda0Avg;
+  dfloat lambda0Avg = NAN;
   occa::memory o_lambda1;
+  dfloat lambda1Avg = NAN;
 
   int nLevels = 0;
   int *levels = nullptr;

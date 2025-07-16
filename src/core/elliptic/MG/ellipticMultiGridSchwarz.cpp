@@ -986,6 +986,11 @@ void pMGLevel::setupSmootherSchwarz(elliptic_t *baseElliptic)
              "%s\n",
              "Unsupported element type!");
 
+  nekrsCheck(!elliptic->poisson, 
+             platform->comm.mpiComm, 
+             EXIT_FAILURE, "%s\n", 
+             "Schwarz smoother only supported for type Poisson!");
+
   const dlong Nelements = elliptic->mesh->Nelements;
   const int Nq = elliptic->mesh->Nq;
   const int Np = elliptic->mesh->Np;

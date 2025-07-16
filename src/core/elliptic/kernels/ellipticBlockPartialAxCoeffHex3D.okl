@@ -49,9 +49,9 @@
           r_V[k] = q[base + k * p_Nq * p_Nq + 1 * offset];
           r_W[k] = q[base + k * p_Nq * p_Nq + 2 * offset];
 
-          r_AU[k] = 0.f;
-          r_AV[k] = 0.f;
-          r_AW[k] = 0.f;
+          r_AU[k] = 0;
+          r_AV[k] = 0;
+          r_AW[k] = 0;
         }
       }
     }
@@ -84,9 +84,9 @@
 
       for (int j = 0; j < p_Nq; ++j; @inner(1)) {
         for (int i = 0; i < p_Nq; ++i; @inner(0)) {
-          dfloat Ur = 0.f, Us = 0.f;
-          dfloat Vr = 0.f, Vs = 0.f;
-          dfloat Wr = 0.f, Ws = 0.f;
+          dfloat Ur = 0, Us = 0;
+          dfloat Vr = 0, Vs = 0;
+          dfloat Wr = 0, Ws = 0;
 
 #pragma unroll p_Nq
           for (int m = 0; m < p_Nq; m++) {
@@ -237,9 +237,9 @@
             s_tmp[1][s + k * n_plane][j][i] = q[base + (s + k * n_plane) * p_Nq * p_Nq + 1 * offset];
             s_tmp[2][s + k * n_plane][j][i] = q[base + (s + k * n_plane) * p_Nq * p_Nq + 2 * offset];
 
-            r_AU[k] = 0.f;
-            r_AV[k] = 0.f;
-            r_AW[k] = 0.f;
+            r_AU[k] = 0;
+            r_AV[k] = 0;
+            r_AW[k] = 0;
             r_Ur[k] = 0;
             r_Us[k] = 0;
             r_Ut[k] = 0;

@@ -68,76 +68,46 @@ extCoeffs(int nEXT, double time, dfloat tstage, dfloat sdt, dfloat *dt, dfloat *
 static void
 applyOperator(int nFields, dfloat *extC, const occa::memory &o_Urst, const occa::memory &o_u1, occa::memory &o_rhs)
 {
-  if (meshV->NglobalGatherElements) {
-    if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
-      opKernel(meshV->NglobalGatherElements,
-               meshV->o_globalGatherElementList,
-               meshV->o_cubDiffInterpT,
-               meshV->o_cubInterpT,
-               fieldOffset,
-               cubatureOffset,
-               meshOffset,
-               mesh->o_invLMM,
-               o_divUMesh,
-               extC[0],
-               extC[1],
-               extC[2],
-               o_Urst,
-               o_u1,
-               o_rhs);
-    } else {
-      opKernel(meshV->NglobalGatherElements,
-               meshV->o_globalGatherElementList,
-               meshV->o_D,
-               fieldOffset,
-               meshOffset,
-               mesh->o_invLMM,
-               o_divUMesh,
-               extC[0],
-               extC[1],
-               extC[2],
-               o_Urst,
-               o_u1,
-               o_rhs);
+  auto run = [&](dlong Nelements, const occa::memory& gatherElementList)
+  {
+    if (Nelements) {
+      if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+        opKernel(Nelements,
+                 gatherElementList,
+                 meshV->o_cubDiffInterpT,
+                 meshV->o_cubInterpT,
+                 fieldOffset,
+                 cubatureOffset,
+                 meshOffset,
+                 mesh->o_invLMM,
+                 o_divUMesh,
+                 extC[0],
+                 extC[1],
+                 extC[2],
+                 o_Urst,
+                 o_u1,
+                 o_rhs);
+      } else {
+        opKernel(Nelements,
+                 gatherElementList,
+                 meshV->o_D,
+                 fieldOffset,
+                 meshOffset,
+                 mesh->o_invLMM,
+                 o_divUMesh,
+                 extC[0],
+                 extC[1],
+                 extC[2],
+                 o_Urst,
+                 o_u1,
+                 o_rhs);
+      }
     }
-  }
+  };
 
+  run(meshV->NglobalGatherElements, meshV->o_globalGatherElementList);
   oogs::start(o_rhs, nFields, fieldOffset, ogsDfloat, ogsAdd, gsh);
-
-  if (meshV->NlocalGatherElements) {
-    if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
-      opKernel(meshV->NlocalGatherElements,
-               meshV->o_localGatherElementList,
-               meshV->o_cubDiffInterpT,
-               meshV->o_cubInterpT,
-               fieldOffset,
-               cubatureOffset,
-               meshOffset,
-               mesh->o_invLMM,
-               o_divUMesh,
-               extC[0],
-               extC[1],
-               extC[2],
-               o_Urst,
-               o_u1,
-               o_rhs);
-    } else {
-      opKernel(meshV->NlocalGatherElements,
-               meshV->o_localGatherElementList,
-               meshV->o_D,
-               fieldOffset,
-               meshOffset,
-               mesh->o_invLMM,
-               o_divUMesh,
-               extC[0],
-               extC[1],
-               extC[2],
-               o_Urst,
-               o_u1,
-               o_rhs);
-    }
-  }
-
+  run(meshV->NlocalGatherElements, meshV->o_localGatherElementList);
   oogs::finish(o_rhs, nFields, fieldOffset, ogsDfloat, ogsAdd, gsh);
 
   flops(meshV, nFields);

@@ -87,7 +87,12 @@ void ellipticBuildFEMHex3D(elliptic_t* elliptic,
     return lambda0;
   }();
 
-  const pfloat lambda1 = 0.0;  // assume Poisson
+  auto lambda1 = [&]() 
+  {
+    const auto val = (elliptic->poisson) ? 0 : elliptic->lambda1Avg;
+    std::vector<pfloat> lambda1(elliptic->o_lambda0.size(), val);
+    return lambda1;
+  }();
 
   int rank = platform->comm.mpiRank;
 
@@ -219,12 +224,12 @@ void ellipticBuildFEMHex3D(elliptic_t* elliptic,
                 if ((nx == mx) && (ny == my) && (nz == mz)) {
                   id = nx + ny * mesh->Nq + nz * mesh->Nq * mesh->Nq;
                   dfloat JW = ggeo[e * mesh->Np * mesh->Nggeo + id + GWJID * mesh->Np];
-                  valDiag = JW * lambda1;
+                  valDiag = JW * lambda1[e * mesh->Np + idn];
                 }
 
                 // pack non-zero
                 if (fabs(val) > dropTol) {
-                  sendNonZeros[cnt].val = lambda0[e * mesh->Np + idn]*val + lambda1*valDiag;
+                  sendNonZeros[cnt].val = lambda0[e * mesh->Np + idn]*val + valDiag;
                   sendNonZeros[cnt].row = globalNumbering[e * mesh->Np + idn];
                   sendNonZeros[cnt].col = globalNumbering[e * mesh->Np + idm];
                   sendNonZeros[cnt].ownerRank = globalOwners[e * mesh->Np + idn];

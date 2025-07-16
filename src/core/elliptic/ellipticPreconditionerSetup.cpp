@@ -38,6 +38,12 @@ void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs)
   const double tStart = MPI_Wtime();
 
   if (options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
+
+    if (options.compareArgs("MULTIGRID COARSE SOLVE", "TRUE") &&
+          options.compareArgs("ELLIPTIC COARSE COEFF FIELD", "TRUE")) {
+      options.setArgs("GALERKIN COARSE OPERATOR", "TRUE");
+    }
+
     const std::vector<int> levels = determineMGLevels(elliptic->name);
     elliptic->nLevels = levels.size();
     elliptic->levels = (int *)calloc(elliptic->nLevels, sizeof(int));

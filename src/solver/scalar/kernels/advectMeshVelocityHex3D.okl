@@ -105,9 +105,9 @@
           const dfloat dtdz = vgeo[gid + p_TZID * p_Np];
           const dfloat rhoM = rho[id + isOffset];
 
-          dfloat d_swx_dr = 0.f, d_swx_ds = 0.f, d_swx_dt = 0.f;
-          dfloat d_swy_dr = 0.f, d_swy_ds = 0.f, d_swy_dt = 0.f;
-          dfloat d_swz_dr = 0.f, d_swz_ds = 0.f, d_swz_dt = 0.f;
+          dfloat d_swx_dr = 0, d_swx_ds = 0, d_swx_dt = 0;
+          dfloat d_swy_dr = 0, d_swy_ds = 0, d_swy_dt = 0;
+          dfloat d_swz_dr = 0, d_swz_ds = 0, d_swz_dt = 0;
 
 #pragma unroll p_Nq
           for (int n = 0; n < p_Nq; ++n) {

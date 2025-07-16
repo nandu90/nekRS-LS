@@ -47,7 +47,7 @@ SOFTWARE.
         s_g[m] = q[gid];               // random access
       }
       else {
-        s_g[m] = 0.f;
+        s_g[m] = 0;
       }
     }
 

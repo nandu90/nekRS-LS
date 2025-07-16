@@ -25,7 +25,7 @@
 
 ## Good to know
 
-* GPU aware MPI is disabled by default (enable using env-var `NEKRS_GPU_MPI=1`)
+* GPU aware MPI is disabled by default (to enable set env-var `NEKRS_GPU_MPI=1`)
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
 * nrsman <par, env>  can be used to display the par file or environment settings
 * HYPRE replaced AmgX
@@ -36,14 +36,29 @@
 This list provides an overview of the most significant changes in this release, although it may not encompass all modifications. We recognize that several of these updates directly affect the user experience. These adjustments were essential to enhance the stability of the user interface in future iterations. We apologize for any inconvenience this may cause.
 
 * run `build.sh` instead of `nrsconfig` to build the code
-* par `SCALAR` section name changed to e.g. `SCALAR FOO` and scalars have to be defined in `GENERAL` using `scalars = FOO`
-* host mirrored variables including `nrs->U, cds->S, mesh->x` have been removed 
+* host mirrored variables like `nrs->U, cds->S, mesh->x` have been removed 
 * send signal (defined in env-var `NEKRS_SIGNUM_UPD`) to process trigger file `nekrs.upd`
 * use `auto foo = platform->deviceMemoryPool.reserve<T>(nWords)` instead of `platform->o_mempool.slice[0-15]`
 * change count argument of `occa::memory::slice, occa::memory::copyFrom, occa::memory::copyTo` to number of words instead of bytes 
 * use `nekrs_registerPtr` instead of common blocks NRSSCPTR / SCNRS in usr file and access them using `nek::ptr` in udf (see examples)
 * use par section [GEOM] for geometry solver instead of [MESH]
+* usr `scalars = FOO1, FOO2, ...` in `[GENERAL]` to define additional scalar transport equations
 * use `mesh = fluid+solid` for T-mesh (conjugate heat transfer) for a scalar e.g. temperature 
+* use `iofld` class instead of `writeFld`
+* `::postProcessing` functions are now members of `nrs_t` (except planarAvg)
+
+### Interface Changes 
+* define `time` as double (instead of defloat) in all UDF functions
+* remove `nrs_t` argument from all UDF functions (nrs object is now globally accessible within udf if the Navier Stokes solver is enabled)
+
+* `udf::properties = std::function<void(nrs_t *, dfloat, occa::memory, occa::memory, occa::memory, occa::memory)>` -> `nrs_t::userProperties = std::function<void(double)>`
+* `udf::uEqnSource = std::function<void(nrs_t *, dfloat, occa::memory, occa::memory)>` -> `nrs_t::userSource = std::function<void(double)>` (same hook for all fields)
+* `udf::udfconv = std::function<int(nrs_t *, int)>` -> `nrs_t::userConvergenceCheck = std::function<bool(int)>`
+* `udf::udfdif = std::function<void(nrs_t *, dfloat, occa::memory)>` -> `nrs_t::userDivergence = std::function<void(double)>`
+* `tavg::setup(nrs_t*)` -> `tavg::setup(dlong fieldOffset, const fields& fields)`
+* `postProcessing::planarAvg(nrs_t*, const std::string&, int, int, int, int, occa::memory)` -> `planarAvg(mesh_t*, const std::string&, int, int, int, int, dlong, occa::memory o_avg)`
+* remove `nrs_t` argument from `<plugin>::setup`
+* `pointInterpolation_t::setPoints(const std::vector<dfloat>&, const std::vector<dfloat>&, const std::vector<dfloat>&)` -> `pointInterpolation_t::setPoints(int, dfloat*, dfloat*, dfloat*)`
 
 ### Name Changes
 * boundary type names: `codedFixed` -> `udf`, `value` -> `Dirichlet`, `Gradient` -> `Neumann` 
@@ -70,23 +85,8 @@ This list provides an overview of the most significant changes in this release, 
 * par section `PRESSURE` -> `FLUID PRESSURE`
 * par section `TEMPERATURE` -> `SCALAR TEMPERATURE`
 * par section `SCALAR01` -> `SCALAR FOO`
-* par key `diffusivity` -> `diffusionCoeff`
-* par key `density` -> `transportCoeff`
-
-### Interface Changes 
-* define `time` as double (instead of defloat) in all UDF functions
-* remove `nrs_t` argument from all UDF functions (nrs object is now globally accessible within udf if the Navier Stokes solver is enabled)
-
-* `udf::properties = std::function<void(nrs_t *, dfloat, occa::memory, occa::memory, occa::memory, occa::memory)>` -> `nrs_t::userProperties = std::function<void(double)>`
-* `udf::uEqnSource = std::function<void(nrs_t *, dfloat, occa::memory, occa::memory)>` -> `nrs_t::userSource = std::function<void(double)>` (same hook for all fields)
-* `udf::udfconv = std::function<int(nrs_t *, int)>` -> `nrs_t::userConvergenceCheck = std::function<bool(int)>`
-* `udf::udfdif = std::function<void(nrs_t *, dfloat, occa::memory)>` -> `nrs_t::userDivergence = std::function<void(double)>`
-* `tavg::setup(nrs_t*)` -> `tavg::setup(dlong fieldOffset, const fields& fields)`
-* `postProcessing::planarAvg(nrs_t*, const std::string&, int, int, int, int, occa::memory)` -> `planarAvg(mesh_t*, const std::string&, int, int, int, int, dlong, occa::memory o_avg)`
-* `::postProcessing` functions are now members of `nrs_t` (except planarAvg)
-* remove `nrs_t` argument from `<plugin>::setup`
-* `pointInterpolation_t::setPoints(const std::vector<dfloat>&, const std::vector<dfloat>&, const std::vector<dfloat>&)` -> `pointInterpolation_t::setPoints(int, dfloat*, dfloat*, dfloat*)`
-* use `iofld` class instead of `writeFld`
+* par `SCALAR` key `diffusivity` -> `diffusionCoeff`
+* par `SCALAR`key `density` -> `transportCoeff`
 
 ## Known Bugs / Restrictions
 

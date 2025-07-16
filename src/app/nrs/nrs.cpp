@@ -1074,7 +1074,7 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solve
           printSolverInfo(fluid->ellipticSolver.at(2), "FLUID uz");
         }
 
-        printf("step=%-8d %-20s: %.2e  %.2e\n", tstep, "divUErr", divUErrVolAvg, divUErrL2);
+        printf("step=%-8d %-20s: %.2e  %.2e\n", tstep, "FLUID divUErr", divUErrVolAvg, divUErrL2);
       }
 
       if (geom) {
