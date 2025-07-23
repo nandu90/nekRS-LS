@@ -11,7 +11,7 @@ static int processAscentYamlFrequency;
 deviceMemory<dfloat> o_qcriterion;
 deviceMemory<dfloat> o_nuAVM;
 
-std::unique_ptr<iofld> iofld;
+std::unique_ptr<iofld> io;
 
 nrs_t::tavgLegacy_t* avg = nullptr;
 
@@ -113,10 +113,10 @@ void UDF_Setup()
   o_qcriterion.resize(mesh->Nlocal);
 
 #if 0
-  iofld = iofldFactory::create();
-  iofld->open(mesh, iofld::mode::write, "qcrit");
-  iofld->writeAttribute("uniformSpacing", "true");
-  iofld->writeAttribute("polynomialOrder", std::to_string(mesh->N + 2));
+  io = iofldFactory::create();
+  io->open(mesh, iofld::mode::write, "qcrit");
+  io->writeAttribute("uniformSpacing", "true");
+  io->writeAttribute("polynomialOrder", std::to_string(mesh->N + 2));
 
 #if 0
   auto elementFilter = [&]() 
@@ -129,10 +129,10 @@ void UDF_Setup()
     }
     return elementFilter;
   }();
-  iofld->writeElementFilter(elementFilter);
+  io->writeElementFilter(elementFilter);
 #endif
 
-  iofld->addVariable("scalar00", std::vector<deviceMemory<dfloat>>{o_qcriterion});
+  io->addVariable("scalar00", std::vector<deviceMemory<dfloat>>{o_qcriterion});
 #endif
 
   // set IC
@@ -204,28 +204,28 @@ void UDF_Setup()
   }
 
   {
-#if 0
-    std::vector< std::vector<deviceMemory<dfloat>> > tavgFields;
+#if 1
+    std::vector< tavg::field  > tavgFields;
 
-    deviceMemory<dfloat> o_u(nrs->fluid->o_solution(x));
-    deviceMemory<dfloat> o_v(nrs->fluid->o_solution(y));
-    deviceMemory<dfloat> o_w(nrs->fluid->o_solution(z));
+    deviceMemory<dfloat> o_ux(nrs->fluid->o_solution(x));
+    deviceMemory<dfloat> o_uy(nrs->fluid->o_solution(y));
+    deviceMemory<dfloat> o_uz(nrs->fluid->o_solution(z));
 
     deviceMemory<dfloat> o_s00(nrs->scalar->o_solution("s00"));
 
-    tavgFields.push_back({o_u});
-    tavgFields.push_back({o_v});
-    tavgFields.push_back({o_w});
-    tavgFields.push_back({o_s00});
+    tavgFields.push_back({"ux", std::vector{o_ux}});
+    tavgFields.push_back({"uy", std::vector{o_uy}});
+    tavgFields.push_back({"uz", std::vector{o_uz}});
+    tavgFields.push_back({"s0", std::vector{o_s00}});
 
-    tavgFields.push_back({o_u, o_u});
-    tavgFields.push_back({o_v, o_v});
-    tavgFields.push_back({o_w, o_w});
-    tavgFields.push_back({o_s00, o_s00});
+    tavgFields.push_back({"uxux", std::vector{o_ux, o_ux}});
+    tavgFields.push_back({"uyuy", std::vector{o_uy, o_uy}});
+    tavgFields.push_back({"uzuz", std::vector{o_uz, o_uz}});
+    tavgFields.push_back({"s0s0", std::vector{o_s00, o_s00}});
 
-    tavgFields.push_back({o_u, o_v});
-    tavgFields.push_back({o_v, o_w});
-    tavgFields.push_back({o_w, o_v});
+    tavgFields.push_back({"uxuy", std::vector{o_ux, o_uy}});
+    tavgFields.push_back({"uyuz", std::vector{o_uy, o_uz}});
+    tavgFields.push_back({"uzux", std::vector{o_oz, o_ux}});
 
     avg = std::make_unique<tavg>(nrs->fluid->fieldOffset, tavgFields);
 #else
@@ -302,13 +302,13 @@ void UDF_ExecuteStep(double time, int tstep)
       printf(" uBulk: %g\n", ubar);
     }
 
-    avg->outfld(mesh);
+    avg->writeToFile(mesh);
   }
 
 #if 0
-  iofld->addVariable("time", time);
-  iofld->process();
-  if (nrs->lastStep) iofld->close();
+  io->addVariable("time", time);
+  io->process();
+  if (nrs->lastStep) io->close();
 #endif
 
 #ifdef NEKRS_ASCENT_ENABLED 

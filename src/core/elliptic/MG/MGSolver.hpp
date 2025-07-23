@@ -85,6 +85,8 @@ public:
     occa::memory h_Sx, h_Gx;
     occa::memory o_Sx, o_Gx;
 
+    std::string name;
+
     pfloat *weight = NULL;
     occa::memory o_weight;
 
@@ -93,7 +95,7 @@ public:
 
     setupAide options;
 
-    coarseLevel_t(setupAide options, MPI_Comm comm);
+    coarseLevel_t(const std::string& name, setupAide options, MPI_Comm comm);
     ~coarseLevel_t();
 
     void setupSolver(hlong *globalRowStarts, dlong nnz, hlong *Ai, hlong *Aj, dfloat *Avals, bool nullSpace);
@@ -108,6 +110,8 @@ public:
 
   MPI_Comm comm;
   int rank, size;
+
+  std::string name;
 
   occa::device device;
   setupAide options;
@@ -124,7 +128,7 @@ public:
   bool additive;
   bool overlapCrsGridSolve;
 
-  MGSolver_t(occa::device otherdevice, MPI_Comm othercomm, setupAide otheroptions);
+  MGSolver_t(const std::string& name, occa::device otherdevice, MPI_Comm othercomm, setupAide otheroptions);
 
   ~MGSolver_t();
 

@@ -44,7 +44,8 @@ This list provides an overview of the most significant changes in this release, 
 * use par section [GEOM] for geometry solver instead of [MESH]
 * usr `scalars = FOO1, FOO2, ...` in `[GENERAL]` to define additional scalar transport equations
 * use `mesh = fluid+solid` for T-mesh (conjugate heat transfer) for a scalar e.g. temperature 
-* use `iofld` class instead of `writeFld`
+* use `iofld` class () instead of `writeFld`
+* use `planarCopy` class instead of `velRecycling`
 * `::postProcessing` functions are now members of `nrs_t` (except planarAvg)
 
 ### Interface Changes 
@@ -58,7 +59,7 @@ This list provides an overview of the most significant changes in this release, 
 * `tavg::setup(nrs_t*)` -> `tavg::setup(dlong fieldOffset, const fields& fields)`
 * `postProcessing::planarAvg(nrs_t*, const std::string&, int, int, int, int, occa::memory)` -> `planarAvg(mesh_t*, const std::string&, int, int, int, int, dlong, occa::memory o_avg)`
 * remove `nrs_t` argument from `<plugin>::setup`
-* `pointInterpolation_t::setPoints(const std::vector<dfloat>&, const std::vector<dfloat>&, const std::vector<dfloat>&)` -> `pointInterpolation_t::setPoints(int, dfloat*, dfloat*, dfloat*)`
+* `pointInterpolation_t::setPoints(int, dfloat*, dfloat*, dfloat*)` -> `pointInterpolation_t::setPoints(const std::vector<dfloat>&, const std::vector<dfloat>&, const std::vector<dfloat>&)`
 
 ### Name Changes
 * boundary type names: `codedFixed` -> `udf`, `value` -> `Dirichlet`, `Gradient` -> `Neumann` 

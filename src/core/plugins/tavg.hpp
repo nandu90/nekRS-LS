@@ -16,12 +16,14 @@ class tavg
 {
 public:
 
+using field = std::tuple< std::string, std::vector<deviceMemory<dfloat>> >;
+
 static void registerKernels(occa::properties &kernelInfo);
-tavg(dlong fieldOffset, const std::vector< std::vector<deviceMemory<dfloat>> >& fields, std::string ioEngine = "");
+tavg(dlong fieldOffset, const std::vector<tavg::field>& fields, std::string ioEngine = "");
 ~tavg();
 
 void run(double time);
-void outfld(mesh_t *mesh);
+void writeToFile(mesh_t *mesh, bool resetAvergingTime = true);
 void reset();
 void free();
 const double& time() const { return atime; }
@@ -32,7 +34,7 @@ deviceMemory<double> o_data();
 private:
 dlong fieldOffset_;
 
-std::vector< std::vector<deviceMemory<dfloat>> > userFieldList;
+std::vector<field> userFieldList;
 occa::memory o_AVG;
 
 static occa::kernel E1Kernel;

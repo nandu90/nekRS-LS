@@ -11,7 +11,7 @@
 class iofld
 {
 protected:
-  // Static global map to keep track of the step count
+  // shared global map to keep track of the step count
   static std::map<std::string, int> stepCounter;
 
 public:
@@ -147,6 +147,7 @@ public:
 
     if (engineMode == iofld::mode::write) {
       if (platform->comm.mpiRank == 0) {
+        std::cout << " io step: " << getStepCounter() << std::endl;
         std::cout << " settings: N=" << N << "  precision=" << precision << "  uniform=" << uniform
                   << std::endl
                   << std::flush;

@@ -230,10 +230,14 @@ public:
   sumMany(const dlong N, const dlong Nfields, const dlong fieldOffset, const occa::memory &o_a, MPI_Comm _comm);
 
   // \min o_a
+  std::vector<dfloat> min(dlong Nlocal, const std::vector<occa::memory>& o_fldList, MPI_Comm comm);
   dfloat min(const dlong N, const occa::memory &o_a, MPI_Comm _comm);
 
   // \max o_a
+  std::vector<dfloat> max(const dlong Nlocal, const std::vector<occa::memory>& o_fldList, MPI_Comm comm);
   dfloat max(const dlong N, const occa::memory &o_a, MPI_Comm _comm);
+
+  std::vector<std::pair<dfloat, dfloat>> minMax(const dlong Nlocal, const std::vector<occa::memory>& o_fldList, MPI_Comm comm);
 
   // ||o_a||_\infty
   dfloat amax(const dlong N, const occa::memory &o_a, MPI_Comm _comm);

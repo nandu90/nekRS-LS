@@ -39,14 +39,11 @@ void nrs_t::printSolutionMinMax()
     auto o_y = mesh->o_y;
     auto o_z = mesh->o_z;
 
-    const auto xMin = platform->linAlg->min(mesh->Nlocal, o_x, platform->comm.mpiComm);
-    const auto yMin = platform->linAlg->min(mesh->Nlocal, o_y, platform->comm.mpiComm);
-    const auto zMin = platform->linAlg->min(mesh->Nlocal, o_z, platform->comm.mpiComm);
-    const auto xMax = platform->linAlg->max(mesh->Nlocal, o_x, platform->comm.mpiComm);
-    const auto yMax = platform->linAlg->max(mesh->Nlocal, o_y, platform->comm.mpiComm);
-    const auto zMax = platform->linAlg->max(mesh->Nlocal, o_z, platform->comm.mpiComm);
+    const auto minMax = platform->linAlg->minMax(mesh->Nlocal, {mesh->o_x, mesh->o_y, mesh->o_z}, platform->comm.mpiComm);
+
     if (platform->comm.mpiRank == 0) {
-      printf("%-15s min/max: %g %g  %g %g  %g %g\n", "MESH X", xMin, xMax, yMin, yMax, zMin, zMax);
+      printf("%-15s min/max: %g %g  %g %g  %g %g\n", "MESH X", 
+             minMax[0].first, minMax[0].second, minMax[1].first, minMax[1].second, minMax[2].first, minMax[2].second);
     }
   }
 
@@ -55,14 +52,12 @@ void nrs_t::printSolutionMinMax()
     auto o_ux = geom->o_U + 0 * geom->fieldOffset;
     auto o_uy = geom->o_U + 1 * geom->fieldOffset;
     auto o_uz = geom->o_U + 2 * geom->fieldOffset;
-    const auto uxMin = platform->linAlg->min(mesh->Nlocal, o_ux, platform->comm.mpiComm);
-    const auto uyMin = platform->linAlg->min(mesh->Nlocal, o_uy, platform->comm.mpiComm);
-    const auto uzMin = platform->linAlg->min(mesh->Nlocal, o_uz, platform->comm.mpiComm);
-    const auto uxMax = platform->linAlg->max(mesh->Nlocal, o_ux, platform->comm.mpiComm);
-    const auto uyMax = platform->linAlg->max(mesh->Nlocal, o_uy, platform->comm.mpiComm);
-    const auto uzMax = platform->linAlg->max(mesh->Nlocal, o_uz, platform->comm.mpiComm);
+
+    const auto minMax = platform->linAlg->minMax(mesh->Nlocal, {o_ux, o_uy, o_uz}, platform->comm.mpiComm);
+
     if (platform->comm.mpiRank == 0) {
-      printf("%-15s min/max: %g %g  %g %g  %g %g\n", "GEOM U", uxMin, uxMax, uyMin, uyMax, uzMin, uzMax);
+      printf("%-15s min/max: %g %g  %g %g  %g %g\n", "GEOM U", 
+             minMax[0].first, minMax[0].second, minMax[1].first, minMax[1].second, minMax[2].first, minMax[2].second);
     }
   }
 
@@ -71,20 +66,16 @@ void nrs_t::printSolutionMinMax()
     auto o_ux = fluid->o_U + 0 * fluid->fieldOffset;
     auto o_uy = fluid->o_U + 1 * fluid->fieldOffset;
     auto o_uz = fluid->o_U + 2 * fluid->fieldOffset;
-    const auto uxMin = platform->linAlg->min(mesh->Nlocal, o_ux, platform->comm.mpiComm);
-    const auto uyMin = platform->linAlg->min(mesh->Nlocal, o_uy, platform->comm.mpiComm);
-    const auto uzMin = platform->linAlg->min(mesh->Nlocal, o_uz, platform->comm.mpiComm);
-    const auto uxMax = platform->linAlg->max(mesh->Nlocal, o_ux, platform->comm.mpiComm);
-    const auto uyMax = platform->linAlg->max(mesh->Nlocal, o_uy, platform->comm.mpiComm);
-    const auto uzMax = platform->linAlg->max(mesh->Nlocal, o_uz, platform->comm.mpiComm);
+
+    const auto minMax = platform->linAlg->minMax(mesh->Nlocal, {o_ux, o_uy, o_uz, fluid->o_P}, platform->comm.mpiComm);
+
     if (platform->comm.mpiRank == 0) {
-      printf("%-15s min/max: %g %g  %g %g  %g %g\n", "FLUID U", uxMin, uxMax, uyMin, uyMax, uzMin, uzMax);
+      printf("%-15s min/max: %g %g  %g %g  %g %g\n", "FLUID U", 
+             minMax[0].first, minMax[0].second, minMax[1].first, minMax[1].second, minMax[2].first, minMax[2].second);
     }
 
-    const auto prMin = platform->linAlg->min(mesh->Nlocal, fluid->o_P, platform->comm.mpiComm);
-    const auto prMax = platform->linAlg->max(mesh->Nlocal, fluid->o_P, platform->comm.mpiComm);
     if (platform->comm.mpiRank == 0) {
-      printf("%-15s min/max: %g %g\n", "FLUID p", prMin, prMax);
+      printf("%-15s min/max: %g %g\n", "FLUID p", minMax[3].first, minMax[3].second);
     }
   }
 
@@ -98,17 +89,16 @@ void nrs_t::printSolutionMinMax()
       cnt++;
 
       auto mesh = scalar->mesh(is);
-
       auto o_si = scalar->o_S + scalar->fieldOffsetScan[is];
-      const auto siMin = platform->linAlg->min(mesh->Nlocal, o_si, platform->comm.mpiComm);
-      const auto siMax = platform->linAlg->max(mesh->Nlocal, o_si, platform->comm.mpiComm);
+      const auto minMax = platform->linAlg->minMax(mesh->Nlocal, {o_si}, platform->comm.mpiComm);
+
       if (platform->comm.mpiRank == 0) {
         if (cnt > 1) {
           printf("  ");
         } else {
           printf(" ");
         }
-        printf("%g %g", siMin, siMax);
+        printf("%g %g", minMax[is].first, minMax[is].second);
       }
     }
     if (platform->comm.mpiRank == 0) {
@@ -1106,11 +1096,55 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solve
   }
 
   const auto cflTooLarge = (cfl > 100) && numberActiveFields();
-  nekrsCheck(cflTooLarge || std::isnan(cfl) || std::isinf(cfl),
-             MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "Unreasonable CFL (value: %g)!\n",
-             cfl);
+  if (!platform->options.compareArgs("CHECK FLUID CFL", "FALSE")) {
+    nekrsCheck(cflTooLarge || std::isnan(cfl) || std::isinf(cfl),
+               MPI_COMM_SELF,
+               EXIT_FAILURE,
+               "Unreasonable FLUID CFL (value: %g)!\n",
+               cfl);
+  }
+}
+
+
+void nrs_t::writeFieldFile(const std::string &fileName_, double time, mesh_t *mesh_, const std::vector<std::tuple<std::string, std::vector<deviceMemory<dfloat>>>>& list, 
+                           bool enforceOutXYZ, bool enforceFP64, int N_, bool uniform)
+{
+  auto fileNameEndsWithBp = [&]() {
+    const std::string suffix = ".bp";
+    if (fileName_.size() >= suffix.size()) {
+      return fileName_.compare(fileName_.size() - suffix.size(), suffix.size(), suffix) == 0;
+    }
+    return false;
+  }();
+
+  auto iofld = iofldFactory::create((fileNameEndsWithBp) ? "adios" : "");
+  iofld->open(mesh_, iofld::mode::write, fileName_);
+
+  iofld->addVariable("time", time);
+  for (const auto& [name, o_u] : list) {
+    iofld->addVariable(name, o_u);
+  }
+
+  const auto outXYZ =
+      (enforceOutXYZ) ? true : platform->options.compareArgs("CHECKPOINT OUTPUT MESH", "TRUE");
+
+  const auto Nfld = [&]() {
+    int N;
+    platform->options.getArgs("POLYNOMIAL DEGREE", N);
+    return (N_) ? N_ : N;
+  }();
+  iofld->writeAttribute("polynomialOrder", std::to_string(Nfld));
+
+  auto FP64 = platform->options.compareArgs("CHECKPOINT PRECISION", "FP64");
+  if (enforceFP64) {
+    FP64 = true;
+  }
+  iofld->writeAttribute("precision", (FP64) ? "64" : "32");
+  iofld->writeAttribute("uniform", (uniform) ? "true" : "false");
+  iofld->writeAttribute("outputMesh", (outXYZ) ? "true" : "false");
+
+  iofld->process();
+  iofld->close();
 }
 
 void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforceFP64, int N_, bool uniform)
@@ -2155,30 +2189,30 @@ nrs_t::tavgLegacy_t::tavgLegacy_t()
   auto nrs = dynamic_cast<nrs_t *>(platform->solver);
   auto &fluid = nrs->fluid;
 
-  std::vector<std::vector<deviceMemory<dfloat>>> avgFields;
+  std::vector<tavg::field> avgFields;
   deviceMemory<dfloat> o_u(fluid->o_U.slice(0 * fluid->fieldOffset, fluid->fieldOffset));
   deviceMemory<dfloat> o_v(fluid->o_U.slice(1 * fluid->fieldOffset, fluid->fieldOffset));
   deviceMemory<dfloat> o_w(fluid->o_U.slice(2 * fluid->fieldOffset, fluid->fieldOffset));
-  avgFields.push_back({o_u});
-  avgFields.push_back({o_v});
-  avgFields.push_back({o_w});
+  avgFields.push_back({"", std::vector{o_u}});
+  avgFields.push_back({"", std::vector{o_v}});
+  avgFields.push_back({"", std::vector{o_w}});
 
-  std::vector<std::vector<deviceMemory<dfloat>>> rmsFields;
-  rmsFields.push_back({o_u, o_u});
-  rmsFields.push_back({o_v, o_v});
-  rmsFields.push_back({o_w, o_w});
+  std::vector<tavg::field> rmsFields;
+  rmsFields.push_back({"", std::vector{o_u, o_u}});
+  rmsFields.push_back({"", std::vector{o_v, o_v}});
+  rmsFields.push_back({"", std::vector{o_w, o_w}});
 
   for (int i = 0; i < nrs->Nscalar; i++) {
     deviceMemory<dfloat> o_temp(
         nrs->scalar->o_S.slice(nrs->scalar->fieldOffsetScan[i], nrs->scalar->fieldOffset()));
-    avgFields.push_back({o_temp});
-    rmsFields.push_back({o_temp, o_temp});
+    avgFields.push_back({"", std::vector{o_temp}});
+    rmsFields.push_back({"", std::vector{o_temp, o_temp}});
   }
 
-  std::vector<std::vector<deviceMemory<dfloat>>> rm2Fields;
-  rm2Fields.push_back({o_u, o_v});
-  rm2Fields.push_back({o_v, o_w});
-  rm2Fields.push_back({o_w, o_u});
+  std::vector<tavg::field> rm2Fields;
+  rm2Fields.push_back({"", std::vector{o_u, o_v}});
+  rm2Fields.push_back({"", std::vector{o_v, o_w}});
+  rm2Fields.push_back({"", std::vector{o_w, o_u}});
 
   _avg = std::make_unique<tavg>(fluid->fieldOffset, avgFields);
   _rms = std::make_unique<tavg>(fluid->fieldOffset, rmsFields);
@@ -2203,7 +2237,11 @@ void nrs_t::tavgLegacy_t::outfld(mesh_t *mesh)
     avgWriter = iofldFactory::create("nek");
     avgWriter->open(mesh, iofld::mode::write, "avg");
 
-    avgWriter->writeAttribute("precision", "64");
+    if (platform->options.compareArgs("TAVG OUTPUT PRECISION", "FP32")) {
+      avgWriter->writeAttribute("precision", "32");
+    } else {   
+      avgWriter->writeAttribute("precision", "64");
+    } 
     avgWriter->writeAttribute("outputmesh", (outXYZ) ? "true" : "false");
 
     avgWriter->addVariable("time", const_cast<double &>(_avg->time()));

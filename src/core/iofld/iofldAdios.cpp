@@ -32,9 +32,20 @@ void iofldAdios::openEngine()
   const std::string ext = ".bp";
 
   if (engineMode == iofld::mode::write) {
-    fileNameBase += ext;
+    const std::string extension = ".bp";
+
+    auto endsWithBp = [&](const std::string& filename) {
+      if (filename.length() < extension.length()) return false;
+      return filename.compare(filename.length() - extension.length(), extension.length(), extension) == 0;
+    };
+
+    if (!endsWithBp(fileNameBase)) fileNameBase += extension;
     adiosIO.DefineAttribute<uint32_t>("dimension", static_cast<uint32_t>(mesh_vis->dim));
-    adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::Write);
+    if (getStepCounter() < 1) {
+      adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::Write);
+    } else {
+      adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::Append);
+    }
   } else {
     if (platform->comm.mpiRank == 0) {
       std::cout << "reading checkpoint ..." << std::endl;

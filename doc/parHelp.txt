@@ -128,8 +128,9 @@ coarseGridDiscretization    FEM [D]                                    linear fi
                               +Galerkin                                coarse grid matrix by Galerkin projection
                             SEMFEM                                     linear FEM approx on high-order nodes
 
-coarseSolver/semfemSolver   smoother                                     
+coarseSolver/semfemSolver   smoother                                   run smoother only                                  
                             boomerAMG [D]                              HYPRE's AMG solver
+                              +smoother
                               +cpu [D for multigrid]
                               +device [D for SEMFEM] 
                                 +overlap                               overlap coarse grid solve in additive MG cycle

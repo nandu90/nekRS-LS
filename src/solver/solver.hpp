@@ -32,10 +32,10 @@ public:
   virtual void setupEllipticSolver() = 0;
   virtual void finalize() = 0;
 
-  virtual occa::memory o_solution(std::string key = "") = 0;
-  virtual occa::memory o_explicitTerms(std::string key = "") = 0;
-  virtual occa::memory o_diffusionCoeff(std::string key = "") = 0;
-  virtual occa::memory o_transportCoeff(std::string key = "") = 0;
+  virtual deviceMemory<dfloat> o_solution(std::string key = "") = 0;
+  virtual deviceMemory<dfloat> o_explicitTerms(std::string key = "") = 0;
+  virtual deviceMemory<dfloat> o_diffusionCoeff(std::string key = "") = 0;
+  virtual deviceMemory<dfloat> o_transportCoeff(std::string key = "") = 0;
 
   std::string name;
 

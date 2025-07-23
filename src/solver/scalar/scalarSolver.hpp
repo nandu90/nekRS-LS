@@ -68,36 +68,36 @@ public:
     return _mesh.at(idx);
   };
 
-  occa::memory o_solution(std::string key = "") override
+  deviceMemory<dfloat> o_solution(std::string key = "") override
   {
-    if (key.empty()) return o_S;
+    if (key.empty()) return deviceMemory<dfloat>(o_S);
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? o_S.slice(fieldOffsetScan[idx], _fieldOffset) : o_NULL;
+    return (idx >= 0) ? deviceMemory<dfloat>(o_S.slice(fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   };
 
-  occa::memory o_explicitTerms(std::string key = "") override
+  deviceMemory<dfloat> o_explicitTerms(std::string key = "") override
   {
-    if (key.empty()) return o_EXT;
+    if (key.empty()) return deviceMemory<dfloat>(o_EXT);
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? o_EXT.slice(fieldOffsetScan[idx], _fieldOffset) : o_NULL;
+    return (idx >= 0) ? deviceMemory<dfloat>(o_EXT.slice(fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   };
 
-  occa::memory o_diffusionCoeff(std::string key = "") override
+  deviceMemory<dfloat> o_diffusionCoeff(std::string key = "") override
   {
-    if (key.empty()) return o_prop.slice(0, fieldOffsetSum);
+    if (key.empty()) return deviceMemory<dfloat>(o_prop.slice(0, fieldOffsetSum));
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? o_prop.slice(fieldOffsetScan[idx], _fieldOffset) : o_NULL;
+    return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   };
 
-  occa::memory o_transportCoeff(std::string key = "") override
+  deviceMemory<dfloat> o_transportCoeff(std::string key = "") override
   {
-    if (key.empty()) return o_prop.slice(fieldOffsetSum, fieldOffsetSum);
+    if (key.empty()) return deviceMemory<dfloat>(o_prop.slice(fieldOffsetSum, fieldOffsetSum));
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? o_prop.slice(fieldOffsetSum + fieldOffsetScan[idx], _fieldOffset) : o_NULL;
+    return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(fieldOffsetSum + fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   }
 
   mesh_t *meshV;

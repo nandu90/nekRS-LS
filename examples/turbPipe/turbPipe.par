@@ -39,7 +39,7 @@ transportCoeff = 1.0
 diffusionCoeff = 1/19000
 boundaryTypeMap = udfDirichlet, zeroNeumann, udfDirichlet 
 residualTol = 1e-06
-#regularization = avm+noiseThreshold=1e-3
+regularization = avm+noiseThreshold=1e-3
 
 [CASEDATA]
 # adjust to actual mesh 

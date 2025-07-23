@@ -37,7 +37,7 @@ set(PLATFORM_SOURCES
     src/platform/device.cpp
     src/platform/fileUtils.cpp
     src/platform/fileBcast.cpp
-    src/platform/par.cpp
+    src/platform/par/par.cpp
     src/platform/QQt.cpp
     src/platform/configReader.cpp
     src/platform/kernelRequestManager.cpp

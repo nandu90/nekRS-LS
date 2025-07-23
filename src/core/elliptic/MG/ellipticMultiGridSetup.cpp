@@ -100,7 +100,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
     meshLevels[n] = new mesh_t();
     meshLevels[n]->Nverts = mesh->Nverts;
     meshLevels[n]->Nfaces = mesh->Nfaces;
-    meshLevels[n]->Nfields = mesh->Nfields; // TW: ahem
+    meshLevels[n]->Nfields = mesh->Nfields;
 
     switch (elliptic->elementType) {
     case HEXAHEDRA:
@@ -119,7 +119,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
   int Nmax = levelDegree[0];
   int Nmin = levelDegree[numMGLevels - 1];
 
-  precon->MGSolver = new MGSolver_t(platform->device.occaDevice(), platform->comm.mpiComm, options);
+  precon->MGSolver = new MGSolver_t(elliptic->name, platform->device.occaDevice(), platform->comm.mpiComm, options);
   MGSolver_t::multigridLevel **levels = precon->MGSolver->levels;
 
   oogs_mode oogsMode = OOGS_AUTO;

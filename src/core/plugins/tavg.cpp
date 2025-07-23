@@ -2,6 +2,7 @@
 #include "tavg.hpp"
 #include "nekInterfaceAdapter.hpp"
 #include "iofldFactory.hpp"
+#include "iofldNek.hpp"
 
 bool tavg::buildKernelCalled = false;
 occa::kernel tavg::E1Kernel;
@@ -96,7 +97,7 @@ void tavg::run(double time)
 
   if (userFieldList.size()) {
     int cnt = 0;
-    for (auto &entry : userFieldList) {
+    for (auto [name, entry] : userFieldList) {
       auto o_avg = o_AVG.slice(cnt * fieldOffset_, fieldOffset_);
       const auto N = fieldOffset_;
 
@@ -116,13 +117,13 @@ void tavg::run(double time)
   timel = time;
 }
 
-tavg::tavg(dlong fieldOffsetIn, const std::vector< std::vector<deviceMemory<dfloat>> >& flds, std::string ioEngine)
+tavg::tavg(dlong fieldOffsetIn, const std::vector<tavg::field>& flds, std::string ioEngine)
 {
   nekrsCheck(!buildKernelCalled, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "called prior tavg::registerKernels()!");
 
   userFieldList = flds;
 
-  for (auto &entry : userFieldList) {
+  for (auto [name, entry] : userFieldList) {
     nekrsCheck(entry.size() < 1 || entry.size() > 4,
                platform->comm.mpiComm,
                EXIT_FAILURE,
@@ -144,7 +145,7 @@ tavg::tavg(dlong fieldOffsetIn, const std::vector< std::vector<deviceMemory<dflo
   fldWriter = iofldFactory::create(ioEngine);
 }
 
-void tavg::outfld(mesh_t *mesh)
+void tavg::writeToFile(mesh_t *mesh, bool reset)
 {
   if (userFieldList.size() == 0) return;
 
@@ -153,19 +154,26 @@ void tavg::outfld(mesh_t *mesh)
   if (!fldWriter->isInitialized()) {
     fldWriter->open(mesh, iofld::mode::write, "tavg");
 
-    fldWriter->writeAttribute("precision", "64");
+    if (platform->options.compareArgs("TAVG OUTPUT PRECISION", "FP32")) {
+      fldWriter->writeAttribute("precision", "32");
+    } else {
+      fldWriter->writeAttribute("precision", "64");
+    }
 
     fldWriter->addVariable("time", atime);
 
+    const auto engineTypeIsNek = (dynamic_cast<iofldNek*>(fldWriter.get())) ? true : false; 
+
     for(int i = 0; i < userFieldList.size(); i++) {
-      fldWriter->addVariable("scalar" + scalarDigitStr(i), std::vector<occa::memory>{o_AVG.slice(i * fieldOffset_, mesh->Nlocal)});
+      const auto name = engineTypeIsNek ? "scalar" + scalarDigitStr(i) : std::get<0>(userFieldList.at(i));
+      fldWriter->addVariable(name, std::vector<occa::memory>{o_AVG.slice(i * fieldOffset_, mesh->Nlocal)});
     }  
   }
 
   fldWriter->writeAttribute("outputmesh", (outXYZ) ? "true" : "false");
   fldWriter->process(); 
 
-  atime = 0; // reset
+  if (reset) atime = 0;
   outfldCounter++;
 }
 

@@ -42,6 +42,15 @@ public:
 
   int setLastStep(double timeNew, int tstep, double elapsedTime) override;
 
+  void writeFieldFile(const std::string &fileName_, 
+                      double time, 
+                      mesh_t *mesh_, 
+                      const std::vector<std::tuple<std::string, std::vector<deviceMemory<dfloat>>>>& list,
+                      bool enforceOutXYZ = true,
+                      bool enforceFP64 = false,
+                      int Nout = 0,
+                      bool uniform = false);
+
   void writeCheckpoint(double t,
                        int step,
                        bool enforceOutXYZ = false,

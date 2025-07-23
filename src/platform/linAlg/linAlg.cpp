@@ -521,7 +521,27 @@ dfloat linAlg_t::sumMany(const dlong N,
   return sum;
 }
 
+std::vector<std::pair<dfloat, dfloat>> linAlg_t::minMax(dlong Nlocal, const std::vector<occa::memory>& o_fldList, MPI_Comm comm)
+{
+  std::vector<std::pair<dfloat, dfloat>> out;
+  for(const auto &o_entry : o_fldList) {
+     const auto min = platform->linAlg->min(Nlocal, o_entry, comm);
+     const auto max = platform->linAlg->max(Nlocal, o_entry, comm);
+     out.push_back({min, max});
+  }
+  return out;
+}
+
 // \min o_a
+std::vector<dfloat> linAlg_t::min(dlong Nlocal, const std::vector<occa::memory>& o_fldList, MPI_Comm comm)
+{
+  std::vector<dfloat> out;
+  for(const auto &o_entry : o_fldList) {
+     out.push_back(min(Nlocal, o_entry, comm));
+  }
+  return out;
+}
+
 dfloat linAlg_t::min(const dlong N, const occa::memory &o_a, MPI_Comm _comm)
 {
   int Nblock = (N + blocksize - 1) / blocksize;
@@ -549,6 +569,15 @@ dfloat linAlg_t::min(const dlong N, const occa::memory &o_a, MPI_Comm _comm)
 }
 
 // \max o_a
+std::vector<dfloat> linAlg_t::max(const dlong Nlocal, const std::vector<occa::memory>& o_fldList, MPI_Comm comm)
+{
+  std::vector<dfloat> out;
+  for(const auto &o_entry : o_fldList) {
+     out.push_back(max(Nlocal, o_entry, comm));
+  }
+  return out;
+}
+
 dfloat linAlg_t::max(const dlong N, const occa::memory &o_a, MPI_Comm _comm)
 {
   int Nblock = (N + blocksize - 1) / blocksize;

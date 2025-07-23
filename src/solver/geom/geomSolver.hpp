@@ -34,28 +34,28 @@ public:
     }
   };
 
-  occa::memory o_solution(std::string key = "") override
+  deviceMemory<dfloat> o_solution(std::string key = "") override
   {
-    if (key.empty()) return o_U;
+    if (key.empty()) return deviceMemory<dfloat>(o_U);
 
     auto it = nameToIndex.find(key);
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? o_U.slice(idx * fieldOffset, fieldOffset) : o_NULL;
+    return (idx >= 0) ? deviceMemory<dfloat>(o_U.slice(idx * fieldOffset, fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   };
 
-  occa::memory o_explicitTerms(std::string key = "") override
+  deviceMemory<dfloat> o_explicitTerms(std::string key = "") override
   {
-    return o_NULL;
+    return deviceMemory<dfloat>(o_NULL);
   };
 
-  occa::memory o_diffusionCoeff(std::string key = "") override
+  deviceMemory<dfloat> o_diffusionCoeff(std::string key = "") override
   {
-    return o_prop;
+    return deviceMemory<dfloat>(o_prop);
   };
 
-  occa::memory o_transportCoeff(std::string key = "") override
+  deviceMemory<dfloat> o_transportCoeff(std::string key = "") override
   {
-    return o_NULL;
+    return deviceMemory<dfloat>(o_NULL);
   }
 
   void integrate(bool lag = true);

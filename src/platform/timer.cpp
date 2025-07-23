@@ -190,7 +190,10 @@ void timer_t::deviceToc(const std::string tag)
   std::map<std::string, tagData>::iterator it = m_.find(tag);
   nekrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE, "Invalid tag name %s\n", tag.c_str());
 
-  it->second.deviceElapsed += device_.timeBetween(it->second.startTag, stopTag);
+  auto timeBetween = device_.timeBetween(it->second.startTag, stopTag);
+  if (platform->device.mode() == "dpcpp") timeBetween = -1; // until upstream bug is fixed
+
+  it->second.deviceElapsed += timeBetween;
   it->second.count++;
 }
 
@@ -242,8 +245,11 @@ void timer_t::toc(const std::string tag)
   auto it = m_.find(tag);
   nekrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE, "Invalid tag name %s\n", tag.c_str());
 
+  auto timeBetween = device_.timeBetween(it->second.startTag, stopTag);
+  if (platform->device.mode() == "dpcpp") timeBetween = -1; // until upstream bug is fixed
+
   it->second.hostElapsed += (stopTime - it->second.startTime);
-  it->second.deviceElapsed += device_.timeBetween(it->second.startTag, stopTag);
+  it->second.deviceElapsed += timeBetween;
   it->second.count++;
 }
 

@@ -5,11 +5,11 @@ verbose = false
 polynomialOrder = 9
 #startFrom = "restart.fld"
 stopAt = numSteps
-numSteps = 1000
+numSteps = 100
 dt = 2e-03
 timeStepper = tombo3
-checkpointControl = simulationTime 
-checkpointInterval = 0.1
+#checkpointControl = simulationTime 
+checkpointInterval = 10 
 scalars = VELX_DIR, VELX_NEU
 
 [FLUID PRESSURE]

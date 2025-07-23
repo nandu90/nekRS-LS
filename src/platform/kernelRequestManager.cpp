@@ -187,39 +187,46 @@ void kernelRequestManager_t::compile()
   constexpr int hashLength = 16 + 1; // null-terminated
   auto hashes = (char *)std::calloc(requests.size() * hashLength, sizeof(char));
 
-  ThreadPool pool(Nthreads);
+  auto compile = [&](const kernelRequest_t& req)
+  {
+    const auto reqId = std::distance(requests.begin(), requests.find(req));
+    if (reqId % ranksCompiling != rank) {
+      return;
+    }
+    try {
+      if (platform->verbose() || platform->buildOnly) {
+        std::cout << "Compiling request <" << req.requestName << ">";
+      }
+
+      auto knl = device.compileKernel(req.fileName, req.props, req.suffix, MPI_COMM_SELF);
+      const auto hash = knl.hash().getString();
+      nekrsCheck(hash.size() != hashLength - 1, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "Invalid hash!");
+
+      std::strncpy(hashes + reqId * hashLength, hash.c_str(), hashLength);
+
+      if (platform->verbose() || platform->buildOnly) {
+        std::cout << " (" << hash << ") on rank " << rank << std::flush << std::endl;
+      }
+
+    } catch (const std::exception &e) {
+      std::cerr << "Caught exception: " << e.what() << std::endl;
+    }
+  };
+
+  ThreadPool* pool = (Nthreads > 1) ? new ThreadPool(Nthreads) : nullptr;
 
   if (rank < ranksCompiling) {
     for (auto &&req : requests) {
-      auto retVal = pool.enqueue([&]() {
-        const auto reqId = std::distance(requests.begin(), requests.find(req));
-        if (reqId % ranksCompiling != rank) {
-          return;
-        }
-        try {
-          if (platform->verbose() || platform->buildOnly) {
-            std::cout << "Compiling request <" << req.requestName << ">";
-          }
-
-          auto knl = device.compileKernel(req.fileName, req.props, req.suffix, MPI_COMM_SELF);
-          const auto hash = knl.hash().getString();
-          nekrsCheck(hash.size() != hashLength - 1, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "Invalid hash!");
-
-          std::strncpy(hashes + reqId * hashLength, hash.c_str(), hashLength);
-
-          if (platform->verbose() || platform->buildOnly) {
-            std::cout << " (" << hash << ") on rank " << rank << std::flush << std::endl;
-          }
-
-        } catch (const std::exception &e) {
-          std::cerr << "Caught exception: " << e.what() << std::endl;
-        }
-      });
+      if (pool) {
+        pool->enqueue([&]() { compile(req); });
+      } else {
+        compile(req);
+      }
     }
   }
 
   // finish compilation
-  pool.finish();
+  if (pool) pool->finish();
   MPI_Barrier(platform->comm.mpiComm);
 
   // a-posteriori check for duplicated hash causing a potential race condition

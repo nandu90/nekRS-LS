@@ -37,11 +37,12 @@ SOFTWARE.
 
 static occa::kernel vectorDotStarKernel;
 
-MGSolver_t::coarseLevel_t::coarseLevel_t(setupAide options, MPI_Comm comm)
+MGSolver_t::coarseLevel_t::coarseLevel_t(const std::string& name_, setupAide options_, MPI_Comm comm_)
 {
-  this->options = options;
-  this->comm = comm;
-  this->solvePtr = &MGSolver_t::coarseLevel_t::solve;
+  name = name_;
+  options = options_;
+  comm = comm_;
+  solvePtr = &MGSolver_t::coarseLevel_t::solve;
 }
 
 void MGSolver_t::coarseLevel_t::updateMatrix(

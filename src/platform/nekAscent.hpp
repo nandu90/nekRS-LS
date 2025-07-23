@@ -50,12 +50,11 @@ void initializeAscent()
 {
   const double tStart = MPI_Wtime();
 
-  MPI_Comm comm;
-  MPI_Comm_dup(platform->comm.mpiComm, &comm);
-
   conduit::utils::set_warning_handler(errHandler);
   conduit::utils::set_error_handler(errHandler);
 
+  MPI_Comm comm;
+  MPI_Comm_dup(platform->comm.mpiCommParent, &comm);
   ascent_opts["mpi_comm"] = MPI_Comm_c2f(comm);
   // ascent_opts["runtime/vtkm/backend"] = "serial";
   //  ascent_opts["exceptions"] = "forward";
@@ -256,7 +255,7 @@ void setup(mesh_t *mesh_,
            const std::string &actionFile,
            int Nin_ = 0,
            bool uniform_ = false,
-           bool stageThroughHost_ = false bool async_ = false)
+           bool stageThroughHost_ = false, bool async_ = false)
 {
   mesh_in = mesh_;
   const int Nin = (Nin_) ? Nin_ : mesh_in->N;

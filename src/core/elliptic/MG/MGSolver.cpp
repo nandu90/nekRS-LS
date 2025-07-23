@@ -82,8 +82,9 @@ void schwarzSolve(MGSolver_t *M)
 
 } // namespace
 
-MGSolver_t::MGSolver_t(occa::device device_, MPI_Comm comm_, setupAide options_)
+MGSolver_t::MGSolver_t(const std::string& name_, occa::device device_, MPI_Comm comm_, setupAide options_)
 {
+  name = name_;
   device = device_;
   comm = comm_;
   options = options_;
@@ -93,7 +94,7 @@ MGSolver_t::MGSolver_t(occa::device device_, MPI_Comm comm_, setupAide options_)
 
   levels = (MGSolver_t::multigridLevel **)calloc(MAX_LEVELS, sizeof(MGSolver_t::multigridLevel *));
 
-  coarseLevel = new coarseLevel_t(options, comm);
+  coarseLevel = new coarseLevel_t(name, options, comm);
 
   numLevels = 0;
 
