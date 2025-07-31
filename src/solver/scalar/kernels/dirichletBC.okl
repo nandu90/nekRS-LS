@@ -88,12 +88,12 @@
           bc.t2y = sgeo[sk * p_Nsgeo + p_T2YID];
           bc.t2z = sgeo[sk * p_Nsgeo + p_T2ZID];
 
-          bc.sScalar = NAN;
+          bc.sScalar = 0.0;
 
-          bc.sScalarInt = NAN;
-          bc.uxFluidInt = NAN;
-          bc.uyFluidInt = NAN;
-          bc.uzFluidInt = NAN;
+          bc.sScalarInt = 0.0;
+          bc.uxFluidInt = 0.0;
+          bc.uyFluidInt = 0.0;
+          bc.uzFluidInt = 0.0;
 
           if (bcType == p_bcType_interpolation) {
             const int neknekId = neknekPoints[idM];

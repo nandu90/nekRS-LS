@@ -113,13 +113,13 @@
           bc.t2y = sgeo[sid * p_Nsgeo + p_T2YID];
           bc.t2z = sgeo[sid * p_Nsgeo + p_T2ZID];
 
-          bc.uxFluid = NAN;
-          bc.uyFluid = NAN;
-          bc.uzFluid = NAN;
+          bc.uxFluid = 0.0;
+          bc.uyFluid = 0.0;
+          bc.uzFluid = 0.0;
 
-          bc.uxFluidInt = NAN;
-          bc.uyFluidInt = NAN;
-          bc.uzFluidInt = NAN;
+          bc.uxFluidInt = 0.0;
+          bc.uyFluidInt = 0.0;
+          bc.uzFluidInt = 0.0;
 
           bc.transCoeff = rho[idM];
           bc.diffCoeff = mue[idM];

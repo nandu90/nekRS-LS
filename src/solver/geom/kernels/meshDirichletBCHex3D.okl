@@ -109,9 +109,9 @@
             bc.usrwrk = work;
             bc.fieldOffset = offset;
 
-            bc.uxGeom = NAN;
-            bc.uyGeom = NAN;
-            bc.uzGeom = NAN;
+            bc.uxGeom = 0.0;
+            bc.uyGeom = 0.0;
+            bc.uzGeom = 0.0;
 
             udfDirichlet(&bc);
 

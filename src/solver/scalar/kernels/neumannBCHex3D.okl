@@ -57,10 +57,10 @@
       bc.usrwrk = W;                                                                                         \
       const dfloat WsJ = sgeo[sk * p_Nsgeo + p_WSJID];                                                       \
       bc.idScalar = scalarId;                                                                                \
-      bc.fluxScalar = NAN;                                                                                   \
+      bc.fluxScalar = 0.0;                                                                                   \
       if (bcType == p_bcType_udfRobin) {                                                                     \
-        bc.sInfScalar = NAN;                                                                                 \
-        bc.h = NAN;                                                                                          \
+        bc.sInfScalar = 0.0;                                                                                 \
+        bc.h = 0.0;                                                                                          \
         udfRobin(&bc);                                                                                       \
         bc.fluxScalar = bc.h * bc.sInfScalar;                                                                \
         s_lhsU[j][i] = bc.h * WsJ * sgeo[sk * p_Nsgeo + p_IJWID];                                            \
