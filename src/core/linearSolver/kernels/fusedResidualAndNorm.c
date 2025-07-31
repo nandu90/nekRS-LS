@@ -24,27 +24,24 @@
 
  */
 
-extern "C" void FUNC(ellipticBlockUpdatePCG)(const dlong & N,
-                       const dlong & offset,
-                       const dfloat* __restrict__ cpu_invDegree,
-                       const dfloat* __restrict__ cpu_Ap,
-                       const dfloat & alpha,
-                       dfloat* __restrict__ cpu_r,
-                       dfloat* __restrict__ cpu_rdotr)
+// r = b - Ax
+// (r,r)
+extern "C" void FUNC(fusedResidualAndNorm)(const dlong &Nblocks,
+                                           const dlong &N,
+                                           const dlong &offset,
+                                           const dfloat *__restrict__ weights,
+                                           const dfloat *__restrict__ b_vec,
+                                           const dfloat *__restrict__ Ax,
+                                           dfloat *__restrict__ r,
+                                           dfloat *__restrict__ reduction)
 {
-  dfloat rdotr = 0;
-
-#ifdef __NEKRS__OMP__
-  #pragma omp parallel for collapse(2)
-#endif
-  for(int fld = 0; fld < p_Nfields; fld++)
-    for(int i = 0; i < N; ++i) {
-      const dlong n = i + fld * offset;
-
-      const dfloat rn = cpu_r[n] - alpha * cpu_Ap[n];
-      rdotr += rn * rn * cpu_invDegree[i];
-      cpu_r[n] = rn;
+  dfloat rdotr = 0.0;
+  for (int fld = 0; fld < p_Nfields; ++fld) {
+    for (int id = 0; id < N; ++id) {
+      const dfloat rnew = b_vec[id + fld * offset] - Ax[id + fld * offset];
+      r[id + fld * offset] = rnew;
+      rdotr += rnew * rnew * weights[id];
     }
-
-  cpu_rdotr[0] = rdotr;
+  }
+  reduction[0] = rdotr;
 }

@@ -40,7 +40,7 @@ residualTol = 1e-06
 rhoCp = 1.0
 conductivity = 1/50e6
 
-[BOOMERAMG]
+[FLUID PRESSURE BOOMERAMG]
 iterations = 1
 
 [CASEDATA]

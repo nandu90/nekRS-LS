@@ -97,10 +97,7 @@ pMGLevel::pMGLevel(elliptic_t *ellipticBase, // finest level
   /* build coarsening and prologation operators to connect levels */
   this->buildCoarsenerQuadHex(meshLevels, Nf, Nc);
 
-  if (!isCoarse ||
-      options.compareArgs("MULTIGRID COARSE SOLVE", "FALSE") ||
-      options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE"))
-  {
+  if (!isCoarse || options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER")) {
     this->setupSmoother(ellipticBase);
   }
 }
@@ -121,7 +118,7 @@ void pMGLevel::updateSetupSmootherChebyshev()
 
   // default degree
   if (isCoarse) {
-    if (options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE")) {
+    if (options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER")) {
       UpLegChebyshevDegree = 3;
       DownLegChebyshevDegree = 3;
     } else {
@@ -214,28 +211,21 @@ void pMGLevel::Report()
   }
 
   if (platform->comm.mpiRank == 0) {
-    if (isCoarse && options.compareArgs("MULTIGRID COARSE SOLVE", "TRUE")) {
-      const auto useSEMFEM = options.compareArgs("MULTIGRID SEMFEM", "TRUE");
-      if (options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE") ||
-          options.compareArgs("MULTIGRID SEMFEM", "TRUE")) {
-
+    if (isCoarse) {
+      std::string spaces = "";
+      if (options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER") || 
+          options.compareArgs("PRECONDITIONER", "SEMFEM")) {
         printf("|    pMG     |   Matrix-free   | %s\n", smootherString.c_str());
         printf("     |            |     p = %2d      |\n", degree);
-        if (useSEMFEM) {
-          printf("     |    AMG     |   SEMFEM Matrix | \n");
-        } else {
-          printf("     |    AMG     |   FEM Matrix    | \n");
-        }
-
-      } else {
-
-        if (useSEMFEM) {
-          printf("|    AMG     |   SEMFEM Matrix | \n");
-        } else {
-          printf("|    AMG     |   FEM Matrix    | \n");
-        }
+        spaces = "     "; 
       }
-
+ 
+      if (options.compareArgs("PRECONDITIONER", "SEMFEM") ||
+          options.compareArgs("MULTIGRID COARSE GRID DISCRETIZATION", "SMEFEM")) {
+        printf("%s|    AMG     |   SEMFEM Matrix | \n", spaces.c_str());
+      } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
+        printf("%s|    AMG     |   FEM Matrix    | \n", spaces.c_str());
+      }
     } else {
       printf("|    pMG     |   Matrix-free   | %s\n", smootherString.c_str());
       printf("     |            |     p = %2d      |\n", degree);

@@ -1,14 +1,14 @@
 // "post" region from Algorithm 5, https://arxiv.org/pdf/2205.08909.pdf
 @kernel void combinedPCGPostMatVec(const dlong N,
-                                  const dlong fieldOffset,
-                                  const dlong preco,
-                                  @ restrict const dfloat *resWeight,
-                                  @ restrict const dfloat *weights,
-                                  @ restrict const dfloat *Minv,
-                                  @ restrict const dfloat *v,
-                                  @ restrict const dfloat *p,
-                                  @ restrict const dfloat *r,
-                                  @ restrict dfloat *reduction)
+                                   const dlong fieldOffset,
+                                   const dlong preco,
+                                   @ restrict const dfloat *resWeight,
+                                   @ restrict const dfloat *weights,
+                                   @ restrict const dfloat *Minv,
+                                   @ restrict const dfloat *v,
+                                   @ restrict const dfloat *p,
+                                   @ restrict const dfloat *r,
+                                   @ restrict dfloat *reduction)
 {
   for (dlong b = 0; b < (N + p_blockSize - 1) / p_blockSize; ++b; @outer(0)) {
 
@@ -49,13 +49,13 @@
           const dfloat Mvk = M * vk;
           const dfloat Mrk = M * rk;
 
-          gamma += rk*rk;
-          a += pk*vk;
-          b += rk*vk;
-          c += vk*vk;
-          d += rk*Mrk;
-          e += rk*Mvk;
-          f += vk*Mvk;
+          gamma += rk * rk;
+          a += pk * vk;
+          b += rk * vk;
+          c += vk * vk;
+          d += rk * Mrk;
+          e += rk * Mvk;
+          f += vk * Mvk;
         }
 
         s_gamma[t] = resWeight[id] * gamma;
@@ -66,14 +66,13 @@
         s_d[t] = wt * d;
         s_e[t] = wt * e;
         s_f[t] = wt * f;
-
       }
     }
 
     @barrier();
 #if p_blockSize > 512
-    for (int t = 0; t < p_blockSize; ++t; @inner(0))
-      if (t < 512){
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+      if (t < 512) {
         s_gamma[t] += s_gamma[t + 512];
         s_a[t] += s_a[t + 512];
         s_b[t] += s_b[t + 512];
@@ -82,11 +81,12 @@
         s_e[t] += s_e[t + 512];
         s_f[t] += s_f[t + 512];
       }
+    }
     @barrier();
 #endif
 #if p_blockSize > 256
-    for (int t = 0; t < p_blockSize; ++t; @inner(0))
-      if (t < 256){
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+      if (t < 256) {
         s_gamma[t] += s_gamma[t + 256];
         s_a[t] += s_a[t + 256];
         s_b[t] += s_b[t + 256];
@@ -95,11 +95,12 @@
         s_e[t] += s_e[t + 256];
         s_f[t] += s_f[t + 256];
       }
+    }
     @barrier();
 #endif
 
-    for (int t = 0; t < p_blockSize; ++t; @inner(0))
-      if (t < 128){
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+      if (t < 128) {
         s_gamma[t] += s_gamma[t + 128];
         s_a[t] += s_a[t + 128];
         s_b[t] += s_b[t + 128];
@@ -108,10 +109,11 @@
         s_e[t] += s_e[t + 128];
         s_f[t] += s_f[t + 128];
       }
+    }
     @barrier();
 
-    for (int t = 0; t < p_blockSize; ++t; @inner(0))
-      if (t < 64){
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+      if (t < 64) {
         s_gamma[t] += s_gamma[t + 64];
         s_a[t] += s_a[t + 64];
         s_b[t] += s_b[t + 64];
@@ -120,10 +122,11 @@
         s_e[t] += s_e[t + 64];
         s_f[t] += s_f[t + 64];
       }
+    }
     @barrier();
 
-    for (int t = 0; t < p_blockSize; ++t; @inner(0))
-      if (t < 32){
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+      if (t < 32) {
         s_gamma[t] += s_gamma[t + 32];
         s_a[t] += s_a[t + 32];
         s_b[t] += s_b[t + 32];
@@ -132,9 +135,10 @@
         s_e[t] += s_e[t + 32];
         s_f[t] += s_f[t + 32];
       }
+    }
     @barrier();
-    for (int t = 0; t < p_blockSize; ++t; @inner(0))
-      if (t < 16){
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+      if (t < 16) {
         s_gamma[t] += s_gamma[t + 16];
         s_a[t] += s_a[t + 16];
         s_b[t] += s_b[t + 16];
@@ -143,9 +147,10 @@
         s_e[t] += s_e[t + 16];
         s_f[t] += s_f[t + 16];
       }
+    }
     @barrier();
-    for (int t = 0; t < p_blockSize; ++t; @inner(0))
-      if (t < 8){
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+      if (t < 8) {
         s_gamma[t] += s_gamma[t + 8];
         s_a[t] += s_a[t + 8];
         s_b[t] += s_b[t + 8];
@@ -154,9 +159,10 @@
         s_e[t] += s_e[t + 8];
         s_f[t] += s_f[t + 8];
       }
+    }
     @barrier();
-    for (int t = 0; t < p_blockSize; ++t; @inner(0))
-      if (t < 4){
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+      if (t < 4) {
         s_gamma[t] += s_gamma[t + 4];
         s_a[t] += s_a[t + 4];
         s_b[t] += s_b[t + 4];
@@ -165,9 +171,10 @@
         s_e[t] += s_e[t + 4];
         s_f[t] += s_f[t + 4];
       }
+    }
     @barrier();
-    for (int t = 0; t < p_blockSize; ++t; @inner(0))
-      if (t < 2){
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+      if (t < 2) {
         s_gamma[t] += s_gamma[t + 2];
         s_a[t] += s_a[t + 2];
         s_b[t] += s_b[t + 2];
@@ -176,10 +183,11 @@
         s_e[t] += s_e[t + 2];
         s_f[t] += s_f[t + 2];
       }
+    }
     @barrier();
 
-    for (int t = 0; t < p_blockSize; ++t; @inner(0))
-      if (t < 1){
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+      if (t < 1) {
         const dlong Nblocks = (N + p_blockSize - 1) / p_blockSize;
         reduction[b + Nblocks * p_gamma] = s_gamma[0] + s_gamma[1];
         reduction[b + Nblocks * p_a] = s_a[0] + s_a[1];
@@ -189,5 +197,6 @@
         reduction[b + Nblocks * p_e] = s_e[0] + s_e[1];
         reduction[b + Nblocks * p_f] = s_f[0] + s_f[1];
       }
+    }
   }
 }

@@ -748,7 +748,7 @@ void ciCheckpointing(nrs_t *nrs)
       platform->options.setArgs("CHECKPOINT ENGINE", engine);
       nrs->checkpointWriter = iofldFactory::create();
   
-      nrs->writeCheckpoint(time, 0);
+      nrs->writeCheckpoint(time);
     }
 
     nrs->restartFromFile(restartFile); 

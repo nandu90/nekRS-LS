@@ -144,18 +144,16 @@ public:
   void prolongate(occa::memory o_x, occa::memory o_Px) final;
 
   //smoother ops
+  void smoother(occa::memory o_x, occa::memory o_Sx, bool xIsZero);
+
   void smooth(dfloat* /*rhs*/, dfloat* /*x*/, bool /*x_is_zero*/) {}
   void smooth(occa::memory o_rhs, occa::memory o_x, bool x_is_zero) final;
-
-  void smoother(occa::memory o_x, occa::memory o_Sx, bool xIsZero);
 
   void smoothChebyshev (occa::memory &o_r, occa::memory &o_x, bool xIsZero);
   void smoothFourthKindChebyshev (occa::memory &o_r, occa::memory &o_x, bool xIsZero);
 
   void smoothSchwarz (occa::memory &o_r, occa::memory &o_x, bool xIsZero);
   void smoothJacobi (occa::memory &o_r, occa::memory &o_x, bool xIsZero);
-
-  void smootherJacobi    (occa::memory &o_r, occa::memory &o_Sr);
 
   void Report() final;
 

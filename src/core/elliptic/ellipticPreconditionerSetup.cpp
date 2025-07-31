@@ -39,7 +39,7 @@ void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs)
 
   if (options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
 
-    if (options.compareArgs("MULTIGRID COARSE SOLVE", "TRUE") &&
+    if (options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG") &&
           options.compareArgs("ELLIPTIC COARSE COEFF FIELD", "TRUE")) {
       options.setArgs("GALERKIN COARSE OPERATOR", "TRUE");
     }
@@ -52,7 +52,7 @@ void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs)
     }
 
     ellipticMultiGridSetup(elliptic);
-  } else if (options.compareArgs("PRECONDITIONER", "SEMFEM")) {
+  } else if (options.getArgs("PRECONDITIONER") == "SEMFEM") {
     if (platform->comm.mpiRank == 0) {
       printf("building SEMFEM preconditioner ...\n");
     }

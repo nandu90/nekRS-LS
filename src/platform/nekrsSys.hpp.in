@@ -157,8 +157,7 @@ nekrsCheck(true, __VA_ARGS__);                                                  
 
 #define launchKernel(name, ...)                                                                              \
 do {                                                                                                         \
-  static occa::kernel kernel;                                                                                \
-  if (!kernel.isInitialized()) kernel = platform->kernelRequests.load(name);                                 \
+  auto kernel = platform->kernelRequests.load(name);                                                         \
   kernel(__VA_ARGS__);                                                                                       \
 } while (0)
 

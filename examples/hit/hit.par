@@ -35,7 +35,7 @@ residualTol = 1e-06
 [CASEDATA]
 uPrime = 1.0
 
-[BOOMERAMG]
+[FLUID PRESSURE BOOMERAMG]
 #smootherType = 18
 iterations = 1
 chebyshevRelaxOrder = 1

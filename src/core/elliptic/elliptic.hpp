@@ -44,6 +44,8 @@ public:
 
   void applyZeroNormalMask(const std::function<void(dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x)>& f);
   void userPreconditioner(const std::function<void(const occa::memory &o_r, occa::memory &o_z)>& f);
+  void userAx(const std::function<void(const occa::memory &o_x, occa::memory &o_Ax)>& f);
+
   std::tuple<int, int> projectionCounters() const; 
 
 private:

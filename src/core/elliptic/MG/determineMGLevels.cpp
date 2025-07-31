@@ -28,20 +28,13 @@ std::vector<int> determineMGLevels(std::string section)
     }
 
     std::sort(levels.rbegin(), levels.rend());
-
-    if (levels.back() > 1) {
-      if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE", "TRUE")) {
-        // if the coarse level has p > 1 and requires solving the coarsest level,
-        // rather than just smoothing, SEMFEM must be used for the discretization
-        const auto usesSEMFEM = platform->options.compareArgs(optionsPrefix + "MULTIGRID SEMFEM", "TRUE");
-
-        nekrsCheck(!usesSEMFEM,
-                   platform->comm.mpiComm,
-                   EXIT_FAILURE,
-                   "%s\n",
-                   "FEM coarse discretization only supports p=1 for the coarsest level!");
-      }
-    }
+   
+    const auto coarseLevelN = levels.back();
+    nekrsCheck(coarseLevelN > 1 && platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "BOOMERAMG"),
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "%s\n",
+               "coarseSolver does not support pCoarse > 1!");
 
     return levels;
   }
@@ -66,12 +59,11 @@ std::vector<int> determineMGLevels(std::string section)
         {15, {15, 9, 1}},
     };
 
-    if (platform->options.compareArgs(optionsPrefix + "SMOOTHED SEMFEM", "TRUE")) {
+    if (platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "MULTIGRID+SEMFEM")) {
       return std::vector<int> {N}; 
     } else { 
       return mg_level_lookup.at(N);
     }
-
   }
 
   std::map<int, std::vector<int>> mg_level_lookup = {
@@ -92,7 +84,7 @@ std::vector<int> determineMGLevels(std::string section)
       {15, {15, 13, 5, 1}},
   };
 
-  if (platform->options.compareArgs(optionsPrefix + "SMOOTHED SEMFEM", "TRUE")) {
+  if (platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "MULTIGRID+SEMFEM")) {
     return std::vector<int> {N}; 
   } else { 
     return mg_level_lookup.at(N);

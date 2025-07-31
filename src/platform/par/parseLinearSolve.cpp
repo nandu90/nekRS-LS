@@ -54,34 +54,28 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
 {
   std::string parSectionName = upperCase(parPrefixFromParSection(parScope));
 
-  int maxIter = 500;
-  ini->extract(parScope, "maxiterations", maxIter);
-
-  options.setArgs(parSectionName + "MAXIMUM ITERATIONS", std::to_string(maxIter));
-
   std::string noop;
   bool applyDefault = (options.getArgs(parSectionName + "SOLVER", noop) == 0);
 
   if (applyDefault) {
-    options.setArgs(parSectionName + "SOLVER", "PCG");
+    options.setArgs(parSectionName + "SOLVER", "CG");
     if (options.compareArgs(parSectionName + "PRECONDITIONER", "JACOBI")) {
 #if 0
-      options.setArgs(parSectionName + "SOLVER", "PCG+COMBINED");
+      options.setArgs(parSectionName + "SOLVER", "CG+COMBINED");
 #else
-      options.setArgs(parSectionName + "SOLVER", "PCG");
+      options.setArgs(parSectionName + "SOLVER", "CG");
 #endif
     }
 
     if (parScope == "fluid pressure") {
-      options.setArgs(parSectionName + "SOLVER", "PGMRES+FLEXIBLE");
-      options.setArgs(parSectionName + "PGMRES RESTART", "15");
+      options.setArgs(parSectionName + "SOLVER", "GMRES+FLEXIBLE+NVECTOR=15");
     }
     if (parScope == "fluid mesh") {
       options.setArgs(parSectionName + "SOLVER", "NONE");
     }
 
     if (parScope == "fluid velocity" || parScope == "geom") {
-      options.setArgs(parSectionName + "BLOCK SOLVER", "TRUE");
+      options.setArgs(parSectionName + "SOLVER", "CG+BLOCK");
     }
   }
 
@@ -95,59 +89,33 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
       {"cvode"},
       {"none"},
       {"nvector"},
-      {"pfgmres"},
-      {"pfcg"},
       {"flexible"},
+      {"gmres"},
       {"pgmres"},
+      {"cg"},
       {"pcg"},
       {"combined"},
       {"block"},
+      {"maxiterations"},
   };
   std::vector<std::string> list = serializeString(p_solver, '+');
   for (const std::string s : list) {
     checkValidity(rank, validValues, s);
   }
-
   if (p_solver.find("gmres") != std::string::npos) {
-    std::vector<std::string> list;
-    list = serializeString(p_solver, '+');
-    std::string n = "15";
-    for (std::string s : list) {
-      const auto nvectorStr = parseValueForKey(s, "nvector");
-      if (!nvectorStr.empty()) {
-        n = nvectorStr;
-      }
-    }
-    options.setArgs(parSectionName + "PGMRES RESTART", n);
-    if (p_solver.find("fgmres") != std::string::npos || p_solver.find("flexible") != std::string::npos) {
-      p_solver = "PGMRES+FLEXIBLE";
-    } else {
-      p_solver = "PGMRES";
-    }
+    //
   } else if (p_solver.find("cg") != std::string::npos) {
-    if (p_solver.find("block") != std::string::npos) {
-      options.setArgs(parSectionName + "BLOCK SOLVER", "TRUE");
-    } else {
-      options.setArgs(parSectionName + "BLOCK SOLVER", "FALSE");
-    }
-
-    if (p_solver.find("fcg") != std::string::npos || p_solver.find("flexible") != std::string::npos) {
-      p_solver = "PCG+FLEXIBLE";
+    if (p_solver.find("flexible") != std::string::npos) {
       if (p_solver.find("combined") != std::string::npos) {
         std::ostringstream ss;
-        ss << "combined PCG solver not supported with flexible preconditioner!\n";
+        ss << "combined CG solver not support flexible!\n";
         append_value_error(ss.str());
       }
-    } else {
-      if (p_solver.find("combined") != std::string::npos) {
-        if (!options.compareArgs(parSectionName + "PRECONDITIONER", "JACOBI")) {
-          std::ostringstream ss;
-          ss << "combined PCG solver only supported with Jacobi preconditioner!\n";
-          append_value_error(ss.str());
-        }
-        p_solver = "PCG+COMBINED";
-      } else {
-        p_solver = "PCG";
+    } else  if (p_solver.find("combined") != std::string::npos) {
+      if (!options.compareArgs(parSectionName + "PRECONDITIONER", "JACOBI")) {
+        std::ostringstream ss;
+        ss << "combined CG solver only supports Jacobi preconditioner!\n";
+        append_value_error(ss.str());
       }
     }
   } else if (p_solver.find("user") != std::string::npos) {
@@ -159,7 +127,7 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
   } else {
     append_error("Invalid solver for " + parScope);
   }
-  options.setArgs(parSectionName + "SOLVER", p_solver);
+  options.setArgs(parSectionName + "SOLVER", upperCase(p_solver));
 }
 
 void parseInitialGuess(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope)

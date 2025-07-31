@@ -2,70 +2,6 @@
 #include "elliptic.h"
 #include "benchmarkAx.hpp"
 
-namespace
-{
-
-void registerGMRESKernels(int Nfields)
-{
-  const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/elliptic/linearSolver/");
-  std::string fileName;
-  const bool serial = platform->serial;
-
-  const std::string fileNameExtension = (serial) ? ".c" : ".okl";
-  const std::string sectionIdentifier = std::to_string(Nfields) + "-";
-
-  occa::properties gmresKernelInfo = platform->kernelInfo;
-  gmresKernelInfo["defines/p_Nfields"] = Nfields;
-
-  std::string kernelName = "gramSchmidtOrthogonalization";
-  fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
-
-  kernelName = "updatePGMRESSolution";
-  fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
-
-  kernelName = "fusedResidualAndNorm";
-  fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
-}
-
-void registerCombinedPCGKernels(int Nfields)
-{
-  const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/elliptic/linearSolver/");
-  std::string fileName;
-  const bool serial = platform->serial;
-
-  const std::string fileNameExtension = (serial) ? ".c" : ".okl";
-  const std::string sectionIdentifier = std::to_string(Nfields) + "-";
-
-  occa::properties combinedPCGInfo = platform->kernelInfo;
-  combinedPCGInfo["defines/p_Nfields"] = Nfields;
-
-  std::string kernelName = "combinedPCGPreMatVec";
-  fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, combinedPCGInfo);
-
-  kernelName = "combinedPCGUpdateConvergedSolution";
-  fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, combinedPCGInfo);
-
-  combinedPCGInfo["defines/p_nReduction"] = CombinedPCGId::nReduction;
-  combinedPCGInfo["defines/p_gamma"] = CombinedPCGId::gamma;
-  combinedPCGInfo["defines/p_a"] = CombinedPCGId::a;
-  combinedPCGInfo["defines/p_b"] = CombinedPCGId::b;
-  combinedPCGInfo["defines/p_c"] = CombinedPCGId::c;
-  combinedPCGInfo["defines/p_d"] = CombinedPCGId::d;
-  combinedPCGInfo["defines/p_e"] = CombinedPCGId::e;
-  combinedPCGInfo["defines/p_f"] = CombinedPCGId::f;
-
-  kernelName = "combinedPCGPostMatVec";
-  fileName = oklpath + kernelName + fileNameExtension;
-  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, combinedPCGInfo);
-}
-
-} // namespace
-
 void registerEllipticKernels(std::string section, bool stressForm)
 {
   int N;
@@ -99,14 +35,6 @@ void registerEllipticKernels(std::string section, bool stressForm)
   const std::string sectionIdentifier = std::to_string(Nfields) + "-";
   const std::string suffix = "Hex3D";
 
-  if (platform->options.compareArgs(optionsPrefix + "SOLVER", "PGMRES")) {
-    registerGMRESKernels(Nfields);
-  }
-
-  if (platform->options.compareArgs(optionsPrefix + "SOLVER", "PCG+COMBINED")) {
-    registerCombinedPCGKernels(Nfields);
-  }
-
   {
     const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/elliptic/");
     std::string fileName, kernelName;
@@ -120,10 +48,6 @@ void registerEllipticKernels(std::string section, bool stressForm)
       platform->kernelRequests.add(kernelName, fileName, properties);
 
       properties["defines/p_Nfields"] = Nfields;
-
-      kernelName = "ellipticBlockUpdatePCG";
-      fileName = oklpath + "/linearSolver/" + "ellipticBlockUpdatePCG" + fileNameExtension;
-      platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, properties);
 
       kernelName = "multiScaledAddwOffset";
       fileName = oklpath + kernelName + extension;

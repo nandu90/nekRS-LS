@@ -1,4 +1,4 @@
-#include <registerKernels.hpp>
+#include "registerKernels.hpp"
 #include "LVector.hpp"
 #include "benchmarkAdvsub.hpp"
 
@@ -6,6 +6,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
 {
   oogs::registerKernels();
   registerLinAlgKernels();
+  registerLinearSolverKernels();
   registerMeshKernels(kernelInfoBC);
   registerPointInterpolationKernels();
   registerNekNekKernels();

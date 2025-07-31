@@ -25,6 +25,9 @@ set(CORE_SOURCES
     src/core/pointInterpolation/findpts/findpts.cpp
     src/core/pointInterpolation/pointInterpolation.cpp
     src/core/pointInterpolation/registerPointInterpolationKernels.cpp
+    src/core/linearSolver/registerLinearSolverKernels.cpp
+    src/core/linearSolver/linearSolverFactory.cpp
+    src/core/linearSolver/amgx/AMGX.cpp
     src/core/neknek/neknek.cpp
     src/core/neknek/fixCoupledSurfaceFlux.cpp
     src/core/neknek/multirateNekNek.cpp
@@ -44,6 +47,9 @@ set(CORE_INCLUDE
     src/core/plugins
     src/core/pointInterpolation/findpts
     src/core/pointInterpolation
+    src/core/linearSolver
+    src/core/linearSolver/hypre
+    src/core/linearSolver/amgx
     src/core/udf
     src/core/advsub
     ${MESH_SOURCE_DIR}

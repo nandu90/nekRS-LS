@@ -388,11 +388,11 @@ void validate(inipp::Ini *ini, const std::vector<std::string> &userSections)
   for (auto const &sec : sections) {
     const auto isScalar = sec.first.find("scalar") != std::string::npos;
 
-    std::istringstream iss(sec.first);
-    std::string firstWord, secondWord;
-    iss >> firstWord >> secondWord;
-
     if (isScalar) {
+      std::istringstream iss(sec.first);
+      std::string firstWord, secondWord;
+      iss >> firstWord >> secondWord;
+
       if (firstWord != "scalar") {
         std::ostringstream error;
         error << "invalid scalar section " << sec.first << "\n";
@@ -408,24 +408,31 @@ void validate(inipp::Ini *ini, const std::vector<std::string> &userSections)
       }
     }
 
+    const auto isBoomer = sec.first.find("boomeramg") != std::string::npos;
+
     // check that section exists
     if (std::find(validSections.begin(), validSections.end(), sec.first) == validSections.end() &&
-        !isScalar) {
+        (!isScalar && !isBoomer)) {
       std::ostringstream error;
       error << "Invalid section name: " << sec.first << std::endl;
       append_error(error.str());
       err++;
     } else {
-      const auto &validKeys = getValidKeys(sec.first);
+      auto validKeys = getValidKeys(sec.first);
+      if (isBoomer) validKeys = getValidKeys("boomeramg");
+
       for (auto const &val : sec.second) {
+        const auto& key = val.first;
+
+        // skip user sections
         if (std::find(userSections.begin(), userSections.end(), sec.first) != userSections.end()) {
           continue;
         }
 
-        if (std::find(validKeys.begin(), validKeys.end(), val.first) == validKeys.end()) {
-          if (std::find(commonKeys.begin(), commonKeys.end(), val.first) == commonKeys.end()) {
+        if (std::find(validKeys.begin(), validKeys.end(), key) == validKeys.end()) {
+          if (std::find(commonKeys.begin(), commonKeys.end(), key) == commonKeys.end()) {
             std::ostringstream error;
-            error << "unknown key: " << sec.first << "::" << val.first << "\n";
+            error << "unknown key: " << sec.first << "::" << key << "\n";
             append_error(error.str());
             err++;
           }
@@ -563,7 +570,7 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *ini)
                                               "ELLIPTIC COEFF FIELD",
                                               "REGULARIZATION",
                                               "BOUNDARY TYPE MAP",
-                                              "MAXIMUM ITERATIONS",
+                                              "LINEAR SOLVER MAXIMUM ITERATIONS",
                                               "BLOCK SOLVER",
                                               "PRECONDITIONER",
                                               "ELLIPTIC",

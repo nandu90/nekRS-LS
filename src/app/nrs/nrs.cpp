@@ -39,11 +39,18 @@ void nrs_t::printSolutionMinMax()
     auto o_y = mesh->o_y;
     auto o_z = mesh->o_z;
 
-    const auto minMax = platform->linAlg->minMax(mesh->Nlocal, {mesh->o_x, mesh->o_y, mesh->o_z}, platform->comm.mpiComm);
+    const auto minMax =
+        platform->linAlg->minMax(mesh->Nlocal, {mesh->o_x, mesh->o_y, mesh->o_z}, platform->comm.mpiComm);
 
     if (platform->comm.mpiRank == 0) {
-      printf("%-15s min/max: %g %g  %g %g  %g %g\n", "MESH X", 
-             minMax[0].first, minMax[0].second, minMax[1].first, minMax[1].second, minMax[2].first, minMax[2].second);
+      printf("%-15s min/max: %g %g  %g %g  %g %g\n",
+             "MESH X",
+             minMax[0].first,
+             minMax[0].second,
+             minMax[1].first,
+             minMax[1].second,
+             minMax[2].first,
+             minMax[2].second);
     }
   }
 
@@ -56,8 +63,14 @@ void nrs_t::printSolutionMinMax()
     const auto minMax = platform->linAlg->minMax(mesh->Nlocal, {o_ux, o_uy, o_uz}, platform->comm.mpiComm);
 
     if (platform->comm.mpiRank == 0) {
-      printf("%-15s min/max: %g %g  %g %g  %g %g\n", "GEOM U", 
-             minMax[0].first, minMax[0].second, minMax[1].first, minMax[1].second, minMax[2].first, minMax[2].second);
+      printf("%-15s min/max: %g %g  %g %g  %g %g\n",
+             "GEOM U",
+             minMax[0].first,
+             minMax[0].second,
+             minMax[1].first,
+             minMax[1].second,
+             minMax[2].first,
+             minMax[2].second);
     }
   }
 
@@ -67,11 +80,18 @@ void nrs_t::printSolutionMinMax()
     auto o_uy = fluid->o_U + 1 * fluid->fieldOffset;
     auto o_uz = fluid->o_U + 2 * fluid->fieldOffset;
 
-    const auto minMax = platform->linAlg->minMax(mesh->Nlocal, {o_ux, o_uy, o_uz, fluid->o_P}, platform->comm.mpiComm);
+    const auto minMax =
+        platform->linAlg->minMax(mesh->Nlocal, {o_ux, o_uy, o_uz, fluid->o_P}, platform->comm.mpiComm);
 
     if (platform->comm.mpiRank == 0) {
-      printf("%-15s min/max: %g %g  %g %g  %g %g\n", "FLUID U", 
-             minMax[0].first, minMax[0].second, minMax[1].first, minMax[1].second, minMax[2].first, minMax[2].second);
+      printf("%-15s min/max: %g %g  %g %g  %g %g\n",
+             "FLUID U",
+             minMax[0].first,
+             minMax[0].second,
+             minMax[1].first,
+             minMax[1].second,
+             minMax[2].first,
+             minMax[2].second);
     }
 
     if (platform->comm.mpiRank == 0) {
@@ -120,6 +140,11 @@ void nrs_t::setDefaultSettings(setupAide &options)
     }
   } else {
     options.removeArgs("ADVECTION TYPE");
+  }
+
+  options.setArgs("FLUID VELOCITY BLOCK SOLVER", "FALSE");
+  if (options.compareArgs("FLUID VELOCITY SOLVER", "BLOCK")) {
+    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
   }
 
   if (options.compareArgs("FLUID STRESSFORMULATION", "TRUE")) {
@@ -848,26 +873,27 @@ void nrs_t::printRunStat(int step)
     platform->timer.printStatEntry("        find kernel     ", tFindKernel, nFindKernel, tFindpts);
   }
 
-  const double tVelocity = platform->timer.query("velocitySolve", "DEVICE:MAX");
+  const double tVelocity = platform->timer.query("fluid velocitySolve", "DEVICE:MAX");
+
   platform->timer.printStatEntry("    velocitySolve       ",
-                                 "velocitySolve",
+                                 "fluid velocitySolve",
                                  "DEVICE:MAX",
                                  tElapsedTimeSolve);
-  platform->timer.printStatEntry("      rhs               ", "velocity rhs", "DEVICE:MAX", tVelocity);
+  platform->timer.printStatEntry("      rhs               ", "fluid velocity rhs", "DEVICE:MAX", tVelocity);
   platform->timer.printStatEntry("      preconditioner    ",
-                                 "velocity preconditioner",
+                                 "fluid velocity preconditioner",
                                  "DEVICE:MAX",
                                  tVelocity);
-  platform->timer.printStatEntry("      initial guess     ", "velocity proj", "DEVICE:MAX", tVelocity);
+  platform->timer.printStatEntry("      initial guess     ", "fluid velocity proj", "DEVICE:MAX", tVelocity);
 
-  const double tPressure = platform->timer.query("pressureSolve", "DEVICE:MAX");
+  const double tPressure = platform->timer.query("fluid pressureSolve", "DEVICE:MAX");
   platform->timer.printStatEntry("    pressureSolve       ",
-                                 "pressureSolve",
+                                 "fluid pressureSolve",
                                  "DEVICE:MAX",
                                  tElapsedTimeSolve);
   platform->timer.printStatEntry("      rhs               ", "pressure rhs", "DEVICE:MAX", tPressure);
 
-  const double tPressurePreco = platform->timer.query("pressure preconditioner", "DEVICE:MAX");
+  const double tPressurePreco = platform->timer.query("fluid pressure preconditioner", "DEVICE:MAX");
   platform->timer.printStatEntry("      preconditioner    ",
                                  "pressure preconditioner",
                                  "DEVICE:MAX",
@@ -875,15 +901,18 @@ void nrs_t::printRunStat(int step)
 
   auto tags = platform->timer.tags();
   for (int i = 15; i > 0; i--) {
-    const std::string tag = "pressure preconditioner smoother N=" + std::to_string(i);
+    const std::string tag = "fluid pressure preconditioner smoother N=" + std::to_string(i);
     if (std::find(tags.begin(), tags.end(), tag) == tags.end()) {
       continue;
     }
     platform->timer.printStatEntry("        pMG smoother    ", tag, "DEVICE:MAX", tPressurePreco);
   }
 
-  platform->timer.printStatEntry("        coarse grid     ", "coarseSolve", "DEVICE:MAX", tPressurePreco);
-  platform->timer.printStatEntry("      initial guess     ", "pressure proj", "DEVICE:MAX", tPressure);
+  platform->timer.printStatEntry("        coarse grid     ",
+                                 "fluid pressure coarseSolve",
+                                 "DEVICE:MAX",
+                                 tPressurePreco);
+  platform->timer.printStatEntry("      initial guess     ", "fluid pressure proj", "DEVICE:MAX", tPressure);
 
   int nScalar = 0;
   platform->options.getArgs("NUMBER OF SCALARS", nScalar);
@@ -1105,9 +1134,14 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solve
   }
 }
 
-
-void nrs_t::writeFieldFile(const std::string &fileName_, double time, mesh_t *mesh_, const std::vector<std::tuple<std::string, std::vector<deviceMemory<dfloat>>>>& list, 
-                           bool enforceOutXYZ, bool enforceFP64, int N_, bool uniform)
+void nrs_t::writeToFile(const std::string &fileName_,
+                        double time,
+                        mesh_t *mesh_,
+                        const std::vector<std::tuple<std::string, std::vector<deviceMemory<dfloat>>>> &list,
+                        bool enforceOutXYZ,
+                        bool enforceFP64,
+                        int N_,
+                        bool uniform)
 {
   auto fileNameEndsWithBp = [&]() {
     const std::string suffix = ".bp";
@@ -1121,7 +1155,7 @@ void nrs_t::writeFieldFile(const std::string &fileName_, double time, mesh_t *me
   iofld->open(mesh_, iofld::mode::write, fileName_);
 
   iofld->addVariable("time", time);
-  for (const auto& [name, o_u] : list) {
+  for (const auto &[name, o_u] : list) {
     iofld->addVariable(name, o_u);
   }
 
@@ -1147,7 +1181,7 @@ void nrs_t::writeFieldFile(const std::string &fileName_, double time, mesh_t *me
   iofld->close();
 }
 
-void nrs_t::writeCheckpoint(double t, int step, bool enforceOutXYZ, bool enforceFP64, int N_, bool uniform)
+void nrs_t::writeCheckpoint(double t, bool enforceOutXYZ, bool enforceFP64, int N_, bool uniform)
 {
   if (!checkpointWriter) {
     checkpointWriter = iofldFactory::create();
@@ -2239,9 +2273,9 @@ void nrs_t::tavgLegacy_t::outfld(mesh_t *mesh)
 
     if (platform->options.compareArgs("TAVG OUTPUT PRECISION", "FP32")) {
       avgWriter->writeAttribute("precision", "32");
-    } else {   
+    } else {
       avgWriter->writeAttribute("precision", "64");
-    } 
+    }
     avgWriter->writeAttribute("outputmesh", (outXYZ) ? "true" : "false");
 
     avgWriter->addVariable("time", const_cast<double &>(_avg->time()));

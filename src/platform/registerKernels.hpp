@@ -11,6 +11,7 @@ void loadUDFKernels();
 
 void registerCoreKernels(occa::properties kernelInfoBC);
 void registerLinAlgKernels();
+void registerLinearSolverKernels();
 void registerPostProcessingKernels();
 void registerPointInterpolationKernels();
 void registerNekNekKernels();
@@ -23,4 +24,5 @@ void registerFluidSolverKernels(occa::properties kernelInfoBC);
 void registerGeomSolverKernels(occa::properties kernelInfoBC);
 
 std::string createOptionsPrefix(std::string section);
+
 #endif

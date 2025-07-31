@@ -28,6 +28,7 @@ set(INCLUDE_DIRS
   ${NEKRS_INSTALL_DIR}/include/core/bdry
   ${NEKRS_INSTALL_DIR}/include/core/udf
   ${NEKRS_INSTALL_DIR}/include/core/plugins
+  ${NEKRS_INSTALL_DIR}/include/core/linearSolver
   ${NEKRS_INSTALL_DIR}/include/core/nekInterface
   ${NEKRS_INSTALL_DIR}/include/core/neknek
   ${NEKRS_INSTALL_DIR}/include/core/elliptic

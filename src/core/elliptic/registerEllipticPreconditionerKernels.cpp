@@ -184,7 +184,7 @@ void registerSchwarzKernels(const std::string &section, int N)
       properties["defines/p_restrict"] = 1;
     }
 
-    fileName = oklpath + "preFDM" + extension;
+    fileName = oklpath + "MG/fdm/preFDM" + extension;
     platform->kernelRequests.add("preFDM" + suffix, fileName, properties, suffix);
 
     int nelgt, nelgv;
@@ -204,7 +204,7 @@ void registerSchwarzKernels(const std::string &section, int N)
                                   suffix);
     platform->kernelRequests.add("fusedFDM" + suffix, fdmKernel);
 
-    fileName = oklpath + "postFDM" + extension;
+    fileName = oklpath + "MG/fdm/postFDM" + extension;
     platform->kernelRequests.add("postFDM" + suffix, fileName, properties, suffix);
   }
 }
@@ -229,7 +229,7 @@ void registerFineLevelKernels(const std::string &section, int N, int poissonEqua
 
 void registerSEMFEMKernels(const std::string &section, int N, int poissonEquation);
 
-void registerMultigridLevelKernels(const std::string &section, int Nf, int N, int poissonEquation)
+void registerMultigridLevelKernels(const std::string &section, int Nf, int N, int poissonEquation, bool coarseLevel)
 {
   const std::string optionsPrefix = createOptionsPrefix(section);
 
@@ -278,15 +278,21 @@ void registerMultigridLevelKernels(const std::string &section, int Nf, int N, in
                                  orderSuffix);
   }
 
-  if (N == 1) {
-    if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE", "TRUE") &&
-        !platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE")) {
-      return;
+  auto smoothedSEMFEM = platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "MULTIGRID+SEMFEM");
+ 
+  if (coarseLevel && !smoothedSEMFEM) {
+    if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "SMOOTHER") ||
+                  platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "CG") ||   
+                  platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "GMRES")) {
+      registerAxKernels(section, N, poissonEquation);
     }
+    if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "SMOOTHER")) {
+      registerSchwarzKernels(section, N);
+    }
+  } else {
+    registerAxKernels(section, N, poissonEquation);
+    registerSchwarzKernels(section, N);
   }
-
-  registerAxKernels(section, N, poissonEquation);
-  registerSchwarzKernels(section, N);
 }
 
 void registerMultiGridKernels(const std::string &section, int poissonEquation)
@@ -303,24 +309,24 @@ void registerMultiGridKernels(const std::string &section, int poissonEquation)
     return;
   }
 
-  for (unsigned levelIndex = 1U; levelIndex < levels.size(); ++levelIndex) {
+  for (auto levelIndex = 1; levelIndex < levels.size(); ++levelIndex) {
     const int levelFine = levels[levelIndex - 1];
     const int levelCoarse = levels[levelIndex];
-    registerMultigridLevelKernels(section, levelFine, levelCoarse, poissonEquation);
+    auto coarseLevel = (levelIndex == levels.size() - 1);
+    registerMultigridLevelKernels(section, levelFine, levelCoarse, poissonEquation, coarseLevel);
   }
-  const int coarseLevel = levels.back();
-  if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVE", "TRUE")) {
-    if (platform->options.compareArgs(optionsPrefix + "MULTIGRID SEMFEM", "TRUE")) {
-      registerSEMFEMKernels(section, coarseLevel, poissonEquation);
-    } else {
-      {
-        const std::string oklpath = getenv("NEKRS_KERNEL_DIR");
 
-        std::string fileName = oklpath + "/core/elliptic/vectorDotStar.okl";
-        std::string kernelName = "vectorDotStar";
-        platform->kernelRequests.add(kernelName, fileName, platform->kernelInfo);
-      }
-    }
+  if (platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "SEMFEM")) {
+    const int coarseLevelN = levels.back();
+    registerSEMFEMKernels(section, coarseLevelN, poissonEquation);
+  } 
+
+  if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
+    const std::string oklpath = getenv("NEKRS_KERNEL_DIR");
+
+    std::string fileName = oklpath + "/core/elliptic/vectorDotStar.okl";
+    std::string kernelName = "vectorDotStar";
+    platform->kernelRequests.add(kernelName, fileName, platform->kernelInfo);
   }
 }
 
@@ -329,7 +335,7 @@ void registerSEMFEMKernels(const std::string &section, int N, int poissonEquatio
   const int Nq = N + 1;
   const int Np = Nq * Nq * Nq;
   const std::string optionsPrefix = createOptionsPrefix(section);
-  const int useFP32 = platform->options.compareArgs(optionsPrefix + "COARSE SOLVER PRECISION", "FP32");
+  const int useFP32 = platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER PRECISION", "FP32");
   occa::properties SEMFEMKernelProps = platform->kernelInfo;
   if (useFP32) {
     SEMFEMKernelProps["defines/pfloat"] = "float";
@@ -368,7 +374,7 @@ void registerEllipticPreconditionerKernels(std::string section)
   if (platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "MULTIGRID")) {
     registerMultiGridKernels(section, poisson);
   }
-  if (platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "SEMFEM")) {
+  if (platform->options.getArgs(optionsPrefix + "PRECONDITIONER") == "SEMFEM") {
     registerSEMFEMKernels(section, N, poisson);
   }
   if (platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "JACOBI")) {

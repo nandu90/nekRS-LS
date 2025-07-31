@@ -1686,7 +1686,7 @@ std::string lpm_vtu_data(const std::string &fieldName, long long int nComponent,
 }
 } // namespace
 
-void lpm_t::writeFld()
+void lpm_t::writeToFile()
 {
   if (timerLevel != TimerLevel::None) {
     platform->timer.tic(timerName + "write", 1);

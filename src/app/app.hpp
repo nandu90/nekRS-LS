@@ -24,7 +24,6 @@ class app_t {
     int checkpointStep= 0;
 
     virtual void writeCheckpoint(double t,
-                                 int step,
                                  bool enforceOutXYZ = false,
                                  bool enforceFP64 = false,
                                  int Nout = 0,

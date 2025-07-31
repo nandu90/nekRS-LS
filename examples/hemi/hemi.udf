@@ -307,6 +307,6 @@ void UDF_ExecuteStep(double time, int tstep)
     nek::userchk(); // compute lambda2
     nrs->copyFromNek(time);
 
-    particles->writeFld();
+    particles->writeToFile();
   }
 }

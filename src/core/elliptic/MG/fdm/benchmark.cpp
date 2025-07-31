@@ -78,7 +78,7 @@ occa::kernel benchmarkFDM(int Nelements,
 
   const std::string oklpath(getenv("NEKRS_KERNEL_DIR"));
   const std::string kernelName = "fusedFDM";
-  const std::string fileName = oklpath + "/core/elliptic/" + kernelName;
+  const std::string fileName = oklpath + "/core/elliptic/MG/fdm/" + kernelName;
   const std::string ext = platform->serial ? ".c" : ".okl";
 
   auto benchmarkFDMWithPrecision = [&](auto sampleWord) {

@@ -1,0 +1,21 @@
+#if !defined(nrs_linearSolverFactory_hpp_)
+#define nrs_linearSolverFactory_hpp_
+
+#include "platform.hpp"
+#include "linearSolver.hpp"
+
+template <typename T> class linearSolverFactory
+{
+public:
+  static std::unique_ptr<linearSolver>
+  create(const std::string &_solver,
+         const std::string &varName,
+         dlong Nlocal,
+         int Nfields,
+         dlong fieldOffset,
+         const occa::memory &o_weight,
+         std::function<void(const occa::memory &o_q, occa::memory &o_Aq)> Ax,
+         std::function<void(const occa::memory &o_r, occa::memory &o_z)> Pc = nullptr);
+};
+
+#endif

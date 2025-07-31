@@ -169,7 +169,7 @@ public:
   void integrate(double tf);
 
   // Write particle data to file
-  void writeFld();
+  void writeToFile();
 
   // Read particle data from file
   // Can be called in lieu of construct

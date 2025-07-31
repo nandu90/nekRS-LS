@@ -3,9 +3,6 @@ set(ELLIPTIC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/core/elliptic)
 set(ELLIPTIC_SOURCES
         ${ELLIPTIC_SOURCE_DIR}/elliptic.cpp
         ${ELLIPTIC_SOURCE_DIR}/ellipticWorkspace.cpp
-        ${ELLIPTIC_SOURCE_DIR}/linearSolver/PCG.cpp
-        ${ELLIPTIC_SOURCE_DIR}/linearSolver/PGMRES.cpp
-        ${ELLIPTIC_SOURCE_DIR}/coarseSolver/amgx/AMGX.cpp
         ${ELLIPTIC_SOURCE_DIR}/ellipticApplyMask.cpp
         ${ELLIPTIC_SOURCE_DIR}/ellipticUpdateJacobi.cpp
         ${ELLIPTIC_SOURCE_DIR}/ellipticBuildMultigridLevelKernels.cpp
@@ -41,7 +38,5 @@ set(ELLIPTIC_INCLUDE
     PRIVATE
     ${ELLIPTIC_SOURCE_DIR}/axHelm
     ${ELLIPTIC_SOURCE_DIR}/MG/fdm
-    ${ELLIPTIC_SOURCE_DIR}/coarseSolver/hypre
-    ${ELLIPTIC_SOURCE_DIR}/coarseSolver/amgx
     ${ELLIPTIC_SOURCE_DIR}/MG
 )

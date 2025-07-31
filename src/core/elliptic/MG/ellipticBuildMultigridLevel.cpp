@@ -114,25 +114,28 @@ elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf
 
   const std::string poissonPrefix = elliptic->poisson ? "poisson-" : "";
 
-  if (Nc > 1 || (elliptic->options.compareArgs("MULTIGRID COARSE SOLVE", "FALSE") ||
-                 elliptic->options.compareArgs("MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE"))) {
-    const std::string AxSuffix = "CoeffHex3D";
-    // check for trilinear
-    if (elliptic->elementType != HEXAHEDRA) {
-      kernelName = "ellipticPartialAx" + AxSuffix;
-    } else {
-      if (elliptic->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
-        kernelName = "ellipticPartialAxTrilinear" + AxSuffix;
-      } else {
+  elliptic->AxKernel = [&]()
+  {
+    if (Nc > 1 || (elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER") ||
+                   elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "CG") ||
+                   elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "GMRES"))) {
+      const std::string AxSuffix = "CoeffHex3D";
+      // check for trilinear
+      if (elliptic->elementType != HEXAHEDRA) {
         kernelName = "ellipticPartialAx" + AxSuffix;
+      } else {
+        if (elliptic->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
+          kernelName = "ellipticPartialAxTrilinear" + AxSuffix;
+        } else {
+          kernelName = "ellipticPartialAx" + AxSuffix;
+        }
       }
-    }
-
-    {
+ 
       const std::string kernelSuffix = gen_suffix(elliptic, pfloatString);
-      elliptic->AxKernel = platform->kernelRequests.load(poissonPrefix + kernelName + kernelSuffix);
+      return platform->kernelRequests.load(poissonPrefix + kernelName + kernelSuffix);
     }
-  }
+    return occa::kernel();
+  }();
 
   elliptic->precon = new precon_t();
   precon_t *precon = elliptic->precon;

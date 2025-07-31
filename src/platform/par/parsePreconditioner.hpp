@@ -23,10 +23,8 @@ void parseCoarseGridDiscretization(const int rank, setupAide &options, inipp::In
     return;
   }
 
-  options.setArgs(parSectionName + "MULTIGRID SEMFEM", "FALSE");
-
   if (p_coarseGridDiscretization.find("semfem") != std::string::npos) {
-    options.setArgs(parSectionName + "MULTIGRID SEMFEM", "TRUE");
+    options.setArgs(parSectionName + "MULTIGRID COARSE GRID DISCRETIZATION", "SEMFEM");
   } else if (p_coarseGridDiscretization.find("fem") != std::string::npos) {
     options.setArgs(parSectionName + "GALERKIN COARSE OPERATOR", "FALSE");
     if (p_coarseGridDiscretization.find("galerkin") != std::string::npos) {
@@ -40,6 +38,7 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
   std::string parSectionName = upperCase(parPrefixFromParSection(parScope));
 
   std::string p_coarseSolver;
+
   const bool keyExist = ini->extract(parScope, "coarsesolver", p_coarseSolver) ||
                         ini->extract(parScope, "semfemsolver", p_coarseSolver);
   if (!keyExist) {
@@ -52,11 +51,15 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
 
   const std::vector<std::string> validValues = {
       {"smoother"},
+      {"jpcg"},
       {"boomeramg"},
-      {"amgx"},
+//      {"amgx"},
+      {"combined"},
+      {"maxiterations"},
       {"cpu"},
       {"device"},
       {"overlap"},
+      {"residualtol"},
   };
 
   std::vector<std::string> entries = serializeString(p_coarseSolver, '+');
@@ -65,6 +68,8 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
   }
 
   const int smoother = p_coarseSolver.find("smoother") != std::string::npos;
+  const int cg = p_coarseSolver.find("jpcg") != std::string::npos;
+
   const int amgx = p_coarseSolver.find("amgx") != std::string::npos;
   const int boomer = p_coarseSolver.find("boomeramg") != std::string::npos;
   if (amgx + boomer > 1) {
@@ -72,43 +77,41 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
   }
 
   if (boomer) {
-    const auto MGsemfem = options.compareArgs(parSectionName + "MULTIGRID SEMFEM", "TRUE");
-
     std::string smoother;
     options.getArgs(parSectionName + "MULTIGRID SMOOTHER", smoother);
 
-    if ((smoother.find("DAMPEDJACOBI") != std::string::npos) && !MGsemfem) {
+    if ((smoother.find("DAMPEDJACOBI") != std::string::npos) && 
+        options.compareArgs(parSectionName + "PRECONDITIONER", "MULTIGRID+SEMFEM")) {
       options.setArgs("BOOMERAMG ITERATIONS", "2");
     }
   }
 
   if (boomer || amgx) {
-    options.setArgs(parSectionName + "MULTIGRID COARSE SOLVE", "TRUE");
-    options.setArgs(parSectionName + "COARSE SOLVER", "BOOMERAMG");
+    options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", "BOOMERAMG");
     if (amgx) {
-      options.setArgs(parSectionName + "COARSE SOLVER", "AMGX");
+      options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", "AMGX");
       if (!AMGXenabled()) {
         append_error("AMGX was requested but is not enabled!\n");
       }
     }
 
-    options.setArgs(parSectionName + "COARSE SOLVER PRECISION", "FP32");
-    if (options.compareArgs(parSectionName + "PRECONDITIONER", "SEMFEM")) {
-      options.setArgs(parSectionName + "COARSE SOLVER LOCATION", "DEVICE");
-    } else {
-      options.setArgs(parSectionName + "COARSE SOLVER LOCATION", "CPU");
-      if (options.compareArgs(parSectionName + "MULTIGRID SEMFEM", "TRUE")) {
-        options.setArgs(parSectionName + "COARSE SOLVER LOCATION", "DEVICE");
-      }
+    options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER PRECISION", "FP32");
+
+    options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION", "CPU");
+    if (options.getArgs(parSectionName + "PRECONDITIONER") == "SEMFEM") {
+      options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
     }
 
     for (std::string entry : entries) {
-      if (entry.find("smoother") != std::string::npos) {
-        options.setArgs(parSectionName + "MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE");
+      if (entry.find("boomeramg") != std::string::npos) {
+        //
+      } else if (entry.find("smoother") != std::string::npos) {
+        auto val = options.getArgs(parSectionName + "MULTIGRID COARSE SOLVER"); 
+        options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", val + "+SMOOTHER");
       } else if (entry.find("cpu") != std::string::npos) {
-        options.setArgs(parSectionName + "COARSE SOLVER LOCATION", "CPU");
+        options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION", "CPU");
       } else if (entry.find("device") != std::string::npos) {
-        options.setArgs(parSectionName + "COARSE SOLVER LOCATION", "DEVICE");
+        options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
       } else if (entry.find("overlap") != std::string::npos) {
         std::string currentSettings = options.getArgs(parSectionName + "MGSOLVER CYCLE");
         options.setArgs(parSectionName + "MGSOLVER CYCLE", currentSettings + "+OVERLAPCRS");
@@ -116,13 +119,41 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
         if (!options.compareArgs(parSectionName + "MGSOLVER CYCLE", "ADDITIVE")) {
           append_error("Overlapping coarse solve requires additive multigrid!\n");
         }
+      } else {
+        append_error("Invalid coarseGrid qualifier " + entry + "!\n");
       }
     }
+  } else if (cg) {
+    options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", "PJCG");
+
+    const std::vector<std::string> validValues = {
+#if 0 // not supported for now
+        "smoother",
+#endif
+        {"jpcg"},
+        {"gmres"},
+        {"maxiter"},
+        {"residualtol"},
+    };
+
+    for (std::string entry : entries) {
+      checkValidity(rank, validValues, entry);
+      if (entry == "jpcg") continue;
+      auto val = options.getArgs(parSectionName + "MULTIGRID COARSE SOLVER"); 
+      options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", val + upperCase("+" + entry));
+    }
+
+    {
+      auto val = options.getArgs(parSectionName + "MULTIGRID COARSE SOLVER"); 
+      options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", val + upperCase("+COMBINED"));
+    }
+
+    options.removeArgs(parSectionName + "MULTIGRID COARSE SOLVER PRECISION");
+    options.removeArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION");
   } else {
-    options.setArgs(parSectionName + "COARSE SOLVER", "SMOOTHER");
-    options.removeArgs(parSectionName + "COARSE SOLVER PRECISION");
-    options.removeArgs(parSectionName + "COARSE SOLVER LOCATION");
-    options.setArgs(parSectionName + "MULTIGRID COARSE SOLVE", "FALSE");
+    options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", "SMOOTHER");
+    options.removeArgs(parSectionName + "MULTIGRID COARSE SOLVER PRECISION");
+    options.removeArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION");
     if (options.compareArgs(parSectionName + "MGSOLVER CYCLE", "OVERLAPCRS")) {
       append_error("Overlap qualifier invalid if coarse solver is smoother!\n");
     }
@@ -136,17 +167,17 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
     }
   }
 
-  if (amgx && options.compareArgs(parSectionName + "COARSE SOLVER LOCATION", "CPU")) {
+  if (amgx && options.compareArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION", "CPU")) {
     append_error("AMGX on CPU is not supported!\n");
   }
 
-  if (boomer && options.compareArgs(parSectionName + "COARSE SOLVER LOCATION", "GPU")) {
+  if (boomer && options.compareArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION", "GPU")) {
     if (hypreWrapperDevice::enabled()) {
       append_error("HYPRE is not configured to run on the GPU!\n");
     }
   }
 
-  const bool runSolverOnDevice = options.compareArgs(parSectionName + "COARSE SOLVER LOCATION", "DEVICE");
+  const bool runSolverOnDevice = options.compareArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
   const bool overlapCrsSolve = options.compareArgs(parSectionName + "MGSOLVER CYCLE", "OVERLAPCRS");
   if (overlapCrsSolve && runSolverOnDevice) {
     append_error("Cannot overlap coarse grid solve when running coarse solver on the GPU!\n");
@@ -175,7 +206,7 @@ void parseSmoother(const int rank, setupAide &options, inipp::Ini *ini, std::str
     options.setArgs(parSection + "MULTIGRID CHEBYSHEV DEGREE", "1");
     options.setArgs(parSection + "MULTIGRID CHEBYSHEV MAX EIGENVALUE BOUND FACTOR", "1.1");
     if (parScope == "fluid pressure") {
-      if (options.compareArgs(parSection + "SMOOTHED SEMFEM", "TRUE")) {
+      if (options.compareArgs(parSection + "PRECONDITIONER", "MULTIGRID+SEMFEM")) {
         options.setArgs(parSection + "MULTIGRID CHEBYSHEV DEGREE", "2");
       } else {
         options.setArgs(parSection + "MULTIGRID SMOOTHER", "FOURTHOPTCHEBYSHEV+ASM");
@@ -313,7 +344,6 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *ini, st
       {"none"},
       {"jac"},
       {"semfem"},
-      {"nonsmoothed"},
       {"femsem"},
       {"pmg"},
       {"multigrid"},
@@ -336,9 +366,12 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *ini, st
     checkValidity(rank, validValues, s);
   }
 
-  const bool mg = p_preconditioner.find("pmg") != std::string::npos ||
+  const auto mg = p_preconditioner.find("pmg") != std::string::npos ||
                   p_preconditioner.find("multigrid") != std::string::npos;
 
+  const auto semfem = p_preconditioner.find("semfem") != std::string::npos ||
+                      p_preconditioner.find("femsem") != std::string::npos;
+ 
   if (p_preconditioner.find("none") != std::string::npos) {
     options.setArgs(parSection + "PRECONDITIONER", "NONE");
     return;
@@ -355,27 +388,23 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *ini, st
       key = "VCYCLE+MULTIPLICATIVE";
     }
     options.setArgs(parSection + "MGSOLVER CYCLE", key);
+
+    if (semfem) {
+      options.setArgs(parSection + "PRECONDITIONER", "MULTIGRID+SEMFEM");
+      options.setArgs(parSection + "MGSOLVER CYCLE", "VCYCLE+MULTIPLICATIVE");
+      options.setArgs(parSection + "ELLIPTIC PRECO COEFF FIELD", "FALSE");
+    }
   } else if (p_preconditioner.find("semfem") != std::string::npos ||
              p_preconditioner.find("femsem") != std::string::npos) {
-    auto smoothed = (p_preconditioner.find("nonsmoothed") != std::string::npos) ? false : true;
-
+    options.setArgs(parSection + "PRECONDITIONER", "SEMFEM");
+#if 0
     std::string p_coarseGridDiscretization;
     if (ini->extract(parScope, "coarsegriddiscretization", p_coarseGridDiscretization)) {
       if (p_coarseGridDiscretization.find("semfem") != std::string::npos) {
         smoothed = false;
       }
     }
-
-    options.setArgs(parSection + "PRECONDITIONER", "SEMFEM");
-    options.setArgs(parSection + "SMOOTHED SEMFEM", "FALSE");
-    if (smoothed) {
-      options.setArgs(parSection + "SMOOTHED SEMFEM", "TRUE");
-      options.setArgs(parSection + "PRECONDITIONER", "MULTIGRID");
-      options.setArgs(parSection + "MGSOLVER CYCLE", "VCYCLE+MULTIPLICATIVE");
-      options.setArgs(parSection + "MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE");
-      options.setArgs(parSection + "MULTIGRID SEMFEM", "TRUE");
-      options.setArgs(parSection + "ELLIPTIC PRECO COEFF FIELD", "FALSE");
-    }
+#endif
   }
 
   parseSmoother(rank, options, ini, parScope);
@@ -390,7 +419,7 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *ini, st
   if (options.compareArgs(parSection + "PRECONDITIONER", "MULTIGRID")) {
     std::string p_mgschedule;
     if (ini->extract(parScope, "pmgschedule", p_mgschedule)) {
-      const auto semfem = options.compareArgs(parSection + "SMOOTHED SEMFEM", "TRUE");
+      const auto semfem = options.getArgs(parSection + "PRECONDITIONER") == "SEMFEM";
       if (semfem) {
         append_error("pMGSchedule not supported for preconditioner = semfem.\n");
       }
@@ -445,9 +474,7 @@ void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *ini, st
       // bail if coarse degree is set, but we're not smoothing on the coarsest level
       if (scheduleMap[{minDegree, true}] > 0) {
 
-        const bool smoothCrs = options.compareArgs(parSection + "COARSE SOLVER", "SMOOTHER") ||
-                               options.compareArgs(parSection + "MULTIGRID COARSE SOLVE AND SMOOTH", "TRUE");
-        if (!smoothCrs && !semfem) {
+        if (!options.compareArgs(parSection + "MULTIGRID COARSE SOLVER", "SMOOTHER")) {
           append_error("specified coarse Chebyshev degree, but coarseSolver=smoother is not set.\n");
         }
       }

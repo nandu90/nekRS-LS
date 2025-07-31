@@ -47,7 +47,7 @@ W0 = 0
 #V0 = 2.0
 #W0 = 2.0
 
-[BOOMERAMG]
+[FLUID PRESSURE BOOMERAMG]
 #smootherType = 18
 iterations = 1
 chebyshevRelaxOrder = 1

@@ -1,9 +1,9 @@
 ----------------------------------------------------------------------------------------------------------------------
 Key                         Value(s)                                   Description / Comment
 ----------------------------------------------------------------------------------------------------------------------
-userSections                <string>, <string>, ...                    user defined par sections
+userSections                <string>, <string>, ...                    user defined sections
 
-[OCCA]
+[OCCA]                                                                 optional section
 
 backend                     SERIAL (CPU), CUDA, HIP, DPCPP             default defined in $NEKRS_HOME/nekrs.conf
 
@@ -12,7 +12,7 @@ deviceNumber                <int>, LOCAL-RANK [D]
 platformNumber              <int>                                      only used by DPCPP
                             0 [D]
 
-[GENERAL]
+[GENERAL]                                                              mandatory section
 
 verbose                     true, false [D]
 
@@ -30,7 +30,7 @@ startFrom                   "<string>"
                               + x                                      read mesh coordinates 
                               + u                                      read velocity
                               + s or s00 s01 s02 ...                   read all or list of scalars 
-                              + int                                    use grid interpolatation
+                              + int                                    interpolatate
 
 timeStepper                 tombo1, tombo2 [D], tombo3
 
@@ -69,13 +69,13 @@ constFlowRate               meanVelocity=<float>                       set const
 
 regularization                                                         see COMMON field settings
 
-udf                         "<string>"                                 name of .udf file
+udf                         "<string>"                                 optional name of .udf file
 
-oudf                        "<string>"                                 name of .oudf file
+oudf                        "<string>"                                 optional name of .oudf file
 
-usr                         "<string>"                                 name of .usr file
+usr                         "<string>"                                 optional name of .usr file
 
-scalars                     "<string>, <string>, ..."                  scalar names
+scalars                     <string>, <string>, ...                    scalar names
 ----------------------------------------------------------------------------------------------------------------------
 [NEKNEK]
 boundaryEXTOrder            <int>                                      boundary extrapolation order
@@ -99,11 +99,14 @@ COMMON field settings:
 solver                      none                                       linear solver
                             user
                             cvode
-                            PCG [D]
+                            CG [D]
                               +combined [D]
                               +block [D for VELOCITY]
                               +flexible
-                            PFGMRES [D for PRESSURE] 
+                              +maxiter=<int>
+                            GMRES [D for PRESSURE] 
+                              +flexible [D for PRESSURE]
+                              +maxiter=<int>
                               +nVector=<int>                           dimension of Krylov space
 
 residualTol                 <float>                                    absolute linear solver residual tolerance 
@@ -120,15 +123,19 @@ initialGuess                previous
 
 preconditioner              Jacobi [D]
                             multigrid [D for PRESSURE]                 polynomial multigrid + coarse grid correction
-                              +additive
+                              +multiplicative [D] or +additive
+                              +SEMFEM                                  smoothed SEMFEM
                             SEMFEM
-                              +nonSmoothed                            
 
 coarseGridDiscretization    FEM [D]                                    linear finite elment discretization
                               +Galerkin                                coarse grid matrix by Galerkin projection
                             SEMFEM                                     linear FEM approx on high-order nodes
 
-coarseSolver/semfemSolver   smoother                                   run smoother only                                  
+coarseSolver/semfemSolver   smoother
+                            jpcg                                       Jacobi preconditioned CG
+                              + combined
+                              + residualTol=<float> 
+                              + maxIter=<int> 
                             boomerAMG [D]                              HYPRE's AMG solver
                               +smoother
                               +cpu [D for multigrid]
@@ -140,9 +147,9 @@ pMGSchedule                 p=<int>, degree=<int>, ...                 custom po
 smootherType                Jacobi
                             ASM [D], RAS                               overlapping additive/restrictive Schwarz 
                               +Chebyshev                               1st Kind Chebyshev acceleration
+                                 +minEigenvalueBoundFactor=<float>     
                               +FourthChebyshev                         4th Kind Chebyshev acceleration
                               +FourthOptChebyshev [D]                  4th Opt Chebyshev acceleration
-                              +minEigenvalueBoundFactor=<float>        only for 1st Kind Chebyshev required
                               +maxEigenvalueBoundFactor=<float> 
 
 boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary type for each boundary ID 
@@ -150,9 +157,9 @@ boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary 
 
                             none                                       noop (internal or periodic) 
                             interpolation                              neknek boundary (int)
-                                                                       assign int values in codedFixedValue
+                                                                       assign int values in udfDirichlet 
 
-                            zeroDirichlet                              velocity only (w, wall)
+                            zeroDirichlet                              (w, wall)
                             udfDirichlet                               user specified Dirichlet (v, t, inlet)
 
                             zeroNeumann                                (I, o, O, insulated, outlet, outflow) 
@@ -216,20 +223,17 @@ mu
 ----------------------------------------------------------------------------------------------------------------------
 [SCALAR]                                                               default scalar section
 
-names                       <string>                                   list of scalar names
-
 transportCoeff              <float>
 transportCoeffSolid         <float>
 
 diffusionCoeff              <float>
 diffusionCoeffSolid         <float>
-
 ----------------------------------------------------------------------------------------------------------------------
 [SCALAR FOO]
 
 ...
 ----------------------------------------------------------------------------------------------------------------------
-[BOOMERAMG]
+[FOO BOOMERAMG]                                                        solver settings for field FOO
 
 coarsenType                 <int>                                      
 interpolationType           <int>                                      

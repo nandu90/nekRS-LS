@@ -530,7 +530,7 @@ void UDF_ExecuteStep(double time, int tstep)
     nek::userchk();
 
     if (ciMode == 1) {
-      particles->writeFld();
+      particles->writeToFile();
     }
   }
 

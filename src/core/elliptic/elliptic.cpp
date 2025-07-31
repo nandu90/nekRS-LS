@@ -40,29 +40,30 @@ void elliptic::updatePreconditioner()
   auto precon = solver->precon;
 
   if (solver->options.compareArgs("PRECONDITIONER", "JACOBI")) {
-    ellipticUpdateJacobi(solver);
+    ellipticUpdateAllJacobi(solver);
   } else if (solver->options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
-    MGSolver_t::multigridLevel** levels = precon->MGSolver->levels;
-    auto elliptic = dynamic_cast<pMGLevel*>(levels[0])->elliptic;                            
+    MGSolver_t::multigridLevel **levels = precon->MGSolver->levels;
+    auto elliptic = dynamic_cast<pMGLevel *>(levels[0])->elliptic;
 
     if (solver->options.compareArgs("MULTIGRID SMOOTHER", "DAMPEDJACOBI")) {
       ellipticMultiGridUpdateLambda(solver);
-    } else if (solver->options.compareArgs("MULTIGRID SMOOTHER", "ASM") || solver->options.compareArgs("MULTIGRID SMOOTHER", "RAS")) {
+    } else if (solver->options.compareArgs("MULTIGRID SMOOTHER", "ASM") ||
+               solver->options.compareArgs("MULTIGRID SMOOTHER", "RAS")) {
       for (int n = 0; n < elliptic->nLevels - 1; n++) {
-        auto level = dynamic_cast<pMGLevel*>(levels[n]);
+        auto level = dynamic_cast<pMGLevel *>(levels[n]);
         level->updateSmootherSchwarz(solver);
       }
     }
 
     if (solver->options.compareArgs("MULTIGRID SMOOTHER", "CHEBYSHEV")) {
       for (int n = 0; n < elliptic->nLevels - 1; n++) {
-        auto level = dynamic_cast<pMGLevel*>(levels[n]);
+        auto level = dynamic_cast<pMGLevel *>(levels[n]);
         level->updateSetupSmootherChebyshev();
       }
     }
 
-    if (solver->options.compareArgs("MULTIGRID COARSE SOLVE", "TRUE")) {
-      ellipticCoarseGridSetup(elliptic, 1);
+    if (solver->options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
+      ellipticCoarseFEMGridSetup(elliptic, 1);
     }
   }
 
@@ -177,6 +178,11 @@ void elliptic::userPreconditioner(const std::function<void(const occa::memory &o
   solver->userPreconditioner = f;
 };
 
+void elliptic::userAx(const std::function<void(const occa::memory &o_x, occa::memory &o_Ax)> &f)
+{
+  solver->userAx = f;
+};
+
 std::tuple<int, int> elliptic::projectionCounters() const
 {
   if (solver->solutionProjection) {
@@ -200,8 +206,22 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   auto &precon = elliptic->precon;
   auto &mesh = elliptic->mesh;
 
-  int maxIter = 999;
-  options.getArgs("MAXIMUM ITERATIONS", maxIter);
+  const auto maxIter = [&]()
+  {
+    auto val = 500;
+
+    std::regex pattern("maxiter=([0-9]+)");
+    std::smatch match;
+    auto solver = lowerCase(options.getArgs("SOLVER"));
+
+    if (std::regex_search(solver, match, pattern)) {
+      val = std::stoi(match[1]);
+    }
+
+    options.getArgs("SOLVER MAXIMUM ITERATIONS", val);
+
+    return val;
+  }();
 
   const int verbose = platform->verbose();
   const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
@@ -229,52 +249,6 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   nekrsCheck(o_x.size() < o_x0.size(), MPI_COMM_SELF, EXIT_FAILURE, "%s!\n", "unreasonable size of o_x");
   nekrsCheck(o_rhs.size() < o_x.size(), MPI_COMM_SELF, EXIT_FAILURE, "%s!\n", "unreasonable size of o_rhs");
 
-  auto updateResidualWeight = [&]() {
-    if (platform->options.compareArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "LEGACY")) {
-      if (!elliptic->o_residualWeight.isInitialized()) {
-        elliptic->o_residualWeight = platform->device.malloc<dfloat>(mesh->Nlocal);
-      }
-      elliptic->o_residualWeight.copyFrom(elliptic->o_invDegree);
-//      platform->linAlg->scale(mesh->Nlocal, 1 / mesh->volume, elliptic->o_residualWeight);
-      platform->linAlg->scale(mesh->Nlocal, 1.0, elliptic->o_residualWeight);
-
-    } else if (platform->options.compareArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "l2_RESIDUAL")) {
-      if (!elliptic->o_residualWeight.isInitialized()) {
-        elliptic->o_residualWeight = platform->device.malloc<dfloat>(mesh->Nlocal);
-      }
-      auto Nglobal = mesh->NelementsGlobal * mesh->Np;
-      platform->linAlg->axmyz(mesh->Nlocal,
-                              1. / Nglobal,
-                              mesh->o_invAJw,
-                              mesh->o_invAJw,
-                              elliptic->o_residualWeight);
-      platform->linAlg->axmy(mesh->Nlocal, 1.0, elliptic->o_invDegree, elliptic->o_residualWeight);
-
-#if 0
-      nekrsCheck(elliptic->nullspace,
-                 MPI_COMM_SELF,
-                 EXIT_FAILURE,
-                 "%s\n",
-                 "STOPPING CRITERION l2_RESIDUAL is currently unsupported if there is a non-trival nullspace");
-#endif
-    } else if (platform->options.compareArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "L2_RESIDUAL")) {
-      elliptic->o_residualWeight = mesh->o_invAJwTimesInvDegree;
-    } else {
-      const auto txt = platform->options.getArgs("LINEAR SOLVER STOPPING CRITERION TYPE");
-      nekrsAbort(MPI_COMM_SELF,
-                 EXIT_FAILURE,
-                 "%s <%s>\n",
-                 "Invalid LINEAR SOLVER STOPPING CRITERION TYPE",
-                 txt.c_str());
-    }
-  };
-
-  if (!elliptic->o_residualWeight.isInitialized()) {
-    updateResidualWeight();
-  } else if (movingMesh) {
-    updateResidualWeight();
-  }
-
   std::string timerName = elliptic->name;
   if (timerName.find("scalar") != std::string::npos) {
     timerName = "scalar";
@@ -289,7 +263,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
 
     if (options.compareArgs("PRECONDITIONER", "JACOBI") ||
         options.compareArgs("MULTIGRID SMOOTHER", "DAMPEDJACOBI")) {
-      ellipticUpdateJacobi(elliptic);
+      ellipticUpdateAllJacobi(elliptic);
     }
   }
 
@@ -325,7 +299,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     return platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                elliptic->Nfields,
                                                elliptic->fieldOffset,
-                                               elliptic->o_residualWeight,
+                                               elliptic->o_invDegree,
                                                o_r,
                                                platform->comm.mpiComm);
   };
@@ -373,20 +347,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     elliptic->resNorm = elliptic->res0Norm;
     platform->linAlg->fill(o_x.size(), 0.0, o_x);
 
-    if (options.compareArgs("SOLVER", "PCG")) {
-      elliptic->Niter = pcg(elliptic, tol, maxIter, elliptic->resNorm, o_r, o_x);
-    } else if (options.compareArgs("SOLVER", "PGMRES")) {
-      elliptic->Niter = pgmres(elliptic, tol, maxIter, elliptic->resNorm, o_r, o_x);
-    } else {
-      nekrsAbort(platform->comm.mpiComm,
-                 EXIT_FAILURE,
-                 "Unknown linear solver %s!\n",
-                 options.getArgs("SOLVER").c_str());
-    }
-
-    if (elliptic->Niter == maxIter && platform->comm.mpiRank == 0) {
-      printf("iteration limit of %s linear solver reached!\n", elliptic->name.c_str());
-    }
+    elliptic->Niter = elliptic->KSP->solve(tol * std::sqrt(mesh->volume), maxIter, elliptic->resNorm, o_r, o_x);
   }
 
   if (options.compareArgs("INITIAL GUESS", "PROJECTION") ||
@@ -426,6 +387,13 @@ void checkConfig(elliptic_t *elliptic)
   if (elliptic->elementType != HEXAHEDRA) {
     if (platform->comm.mpiRank == 0) {
       printf("solver only supports HEX elements\n");
+    }
+    err++;
+  }
+
+  if (elliptic->userAx && !elliptic->userPreconditioner) {
+    if (platform->comm.mpiRank == 0) {
+      printf("userAx requires userPreconditioner!\n");
     }
     err++;
   }
@@ -548,8 +516,8 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     }
   }
 
-  if (platform->device.mode() == "Serial" && solver->options.compareArgs("MULTIGRID COARSE SOLVE", "TRUE")) {
-    elliptic->options.setArgs("COARSE SOLVER LOCATION", "CPU");
+  if (platform->device.mode() == "Serial" || elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
+    elliptic->options.setArgs("MULTIGRID COARSE SOLVER LOCATION", "CPU");
   }
 
   if (platform->comm.mpiRank == 0 && platform->verbose()) {
@@ -577,32 +545,6 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
       platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * elliptic->Nfields, elliptic->EToB);
 
   checkConfig(elliptic);
-
-  if (options.compareArgs("SOLVER", "PGMRES")) {
-    initializeGmresData(elliptic);
-    const std::string sectionIdentifier = std::to_string(elliptic->Nfields) + "-";
-    elliptic->gramSchmidtOrthogonalizationKernel =
-        platform->kernelRequests.load(sectionIdentifier + "gramSchmidtOrthogonalization");
-    elliptic->updatePGMRESSolutionKernel =
-        platform->kernelRequests.load(sectionIdentifier + "updatePGMRESSolution");
-    elliptic->fusedResidualAndNormKernel =
-        platform->kernelRequests.load(sectionIdentifier + "fusedResidualAndNorm");
-  }
-
-  if (options.compareArgs("SOLVER", "PCG+COMBINED")) {
-    const std::string sectionIdentifier = std::to_string(elliptic->Nfields) + "-";
-    elliptic->combinedPCGPreMatVecKernel =
-        platform->kernelRequests.load(sectionIdentifier + "combinedPCGPreMatVec");
-    elliptic->combinedPCGPostMatVecKernel =
-        platform->kernelRequests.load(sectionIdentifier + "combinedPCGPostMatVec");
-    elliptic->combinedPCGUpdateConvergedSolutionKernel =
-        platform->kernelRequests.load(sectionIdentifier + "combinedPCGUpdateConvergedSolution");
-  }
-
-  int Nreductions = 1;
-  if (options.compareArgs("SOLVER", "PCG+COMBINED")) {
-    Nreductions = CombinedPCGId::nReduction;
-  }
 
   elliptic->nullspace = 0;
   if (elliptic->poisson) {
@@ -695,8 +637,6 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     kernelName += suffix;
 
     elliptic->AxKernel = platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
-
-    elliptic->updatePCGKernel = platform->kernelRequests.load(sectionIdentifier + "ellipticBlockUpdatePCG");
   }
 
   oogs_mode oogsMode = OOGS_AUTO;
@@ -756,6 +696,46 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   }
 
   ellipticPreconditionerSetup(elliptic, elliptic->ogs);
+
+  auto Ax = [elliptic](const occa::memory &o_p, occa::memory &o_Ap) {
+    if (elliptic->userAx) {
+      elliptic->userAx(o_p, o_Ap);
+    } else {
+      ellipticOperator(elliptic, o_p, o_Ap, dfloatString);
+    }
+  };
+
+  auto Pc = [elliptic](const occa::memory &o_r, occa::memory &o_z) {
+    platform->timer.tic(elliptic->name + " preconditioner");
+
+    if (elliptic->userPreconditioner) {
+      elliptic->userPreconditioner(o_r, o_z);
+    } else {
+      ellipticPreconditioner(elliptic, o_r, o_z);
+    }
+
+    platform->timer.toc(elliptic->name + " preconditioner");
+
+    if (elliptic->nullspace) {
+      ellipticZeroMean(elliptic, o_z);
+    }
+  };
+
+  {
+   elliptic->KSP = linearSolverFactory<dfloat>::create(options.getArgs("SOLVER"),
+      elliptic->name,
+      elliptic->mesh->Nlocal,
+      elliptic->Nfields,
+      elliptic->fieldOffset,
+      elliptic->o_invDegree,
+      Ax,
+      Pc);
+ 
+    auto combined = options.compareArgs("SOLVER", "COMBINED");
+    if (combined) {
+      elliptic->KSP->o_invDiagA = (elliptic->precon) ? elliptic->precon->o_invDiagA : o_NULL;
+    }
+ }
 
   if (options.compareArgs("INITIAL GUESS", "PROJECTION") ||
       options.compareArgs("INITIAL GUESS", "PROJECTION-ACONJ")) {

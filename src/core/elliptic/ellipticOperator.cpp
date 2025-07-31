@@ -123,11 +123,10 @@ void ellipticOperator(elliptic_t *elliptic,
                       const char *precision,
                       bool masked)
 {
-  mesh_t *mesh = elliptic->mesh;
-  setupAide &options = elliptic->options;
-  oogs_t *oogs = elliptic->oogsAx;
-  const bool overlap = (oogs != elliptic->oogs);
-  const char *ogsDataTypeString = (!strstr(precision, dfloatString)) ? ogsPfloat : ogsDfloat;
+  auto mesh = elliptic->mesh;
+  auto oogs = elliptic->oogsAx;
+  const auto overlap = (oogs != elliptic->oogs);
+  const auto ogsDataTypeString = (!strstr(precision, dfloatString)) ? ogsPfloat : ogsDfloat;
 
   if (overlap) {
 

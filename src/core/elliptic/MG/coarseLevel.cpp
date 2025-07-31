@@ -52,9 +52,9 @@ void MGSolver_t::coarseLevel_t::updateMatrix(
   dfloat *Avals) //--
 {
   std::string crsSolver;
-  options.getArgs("COARSE SOLVER", crsSolver);
+  options.getArgs("MULTIGRID COARSE SOLVER", crsSolver);
 
-  if (crsSolver == "BOOMERAMG") {
+  if (crsSolver.find("BOOMERAMG") != std::string::npos) {
     auto boomerAMG = (hypreWrapper::boomerAMG_t *)this->boomerAMG;
 
     // convert dfloat to double 
@@ -68,7 +68,7 @@ void MGSolver_t::coarseLevel_t::updateMatrix(
   } else {
     nekrsAbort(platform->comm.mpiComm,
                EXIT_FAILURE,
-               "COARSE SOLVER <%s> is not supported!\n",
+               "MULTIGRID COARSE SOLVER <%s> is not supported!\n",
                crsSolver.c_str());
   }
 }
@@ -95,8 +95,8 @@ void MGSolver_t::coarseLevel_t::setupSolver(
   N = (dlong)(globalRowStarts[rank + 1] - globalRowStarts[rank]);
 
   const int verbose = (platform->verbose()) ? 1 : 0;
-  const bool useDevice = options.compareArgs("COARSE SOLVER LOCATION", "DEVICE");
-  const int useFP32 = options.compareArgs("COARSE SOLVER PRECISION", "FP32");
+  const bool useDevice = options.compareArgs("MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
+  const int useFP32 = options.compareArgs("MULTIGRID COARSE SOLVER PRECISION", "FP32");
 
   const std::string kernelName = "vectorDotStar";
   if (!vectorDotStarKernel.isInitialized()) {
@@ -113,7 +113,7 @@ void MGSolver_t::coarseLevel_t::setupSolver(
     Av[i] = Avals[i];
   }
 
-  if (options.compareArgs("COARSE SOLVER", "BOOMERAMG")) {
+  if (options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
 
     double settings[hypreWrapperDevice::NPARAM + 1];
     settings[0] = 1;  /* custom settings              */
@@ -133,17 +133,17 @@ void MGSolver_t::coarseLevel_t::setupSolver(
     settings[11] = 1;   /* chebyRelaxOrder */
     settings[12] = 0.3; /* chebyRelaxOrder */
 
-    platform->options.getArgs("BOOMERAMG COARSEN TYPE", settings[1]);
-    platform->options.getArgs("BOOMERAMG INTERPOLATION TYPE", settings[2]);
-    platform->options.getArgs("BOOMERAMG COARSE SMOOTHER TYPE", settings[4]);
-    platform->options.getArgs("BOOMERAMG SMOOTHER TYPE", settings[6]);
-    platform->options.getArgs("BOOMERAMG SMOOTHER SWEEPS", settings[7]);
-    platform->options.getArgs("BOOMERAMG ITERATIONS", settings[3]);
-    platform->options.getArgs("BOOMERAMG STRONG THRESHOLD", settings[8]);
-    platform->options.getArgs("BOOMERAMG NONGALERKIN TOLERANCE", settings[9]);
-    platform->options.getArgs("BOOMERAMG AGGRESSIVE COARSENING LEVELS", settings[10]);
-    platform->options.getArgs("BOOMERAMG CHEBYSHEV RELAX ORDER", settings[11]);
-    platform->options.getArgs("BOOMERAMG CHEBYSHEV FRACTION", settings[12]);
+    options.getArgs("BOOMERAMG COARSEN TYPE", settings[1]);
+    options.getArgs("BOOMERAMG INTERPOLATION TYPE", settings[2]);
+    options.getArgs("BOOMERAMG COARSE SMOOTHER TYPE", settings[4]);
+    options.getArgs("BOOMERAMG SMOOTHER TYPE", settings[6]);
+    options.getArgs("BOOMERAMG SMOOTHER SWEEPS", settings[7]);
+    options.getArgs("BOOMERAMG ITERATIONS", settings[3]);
+    options.getArgs("BOOMERAMG STRONG THRESHOLD", settings[8]);
+    options.getArgs("BOOMERAMG NONGALERKIN TOLERANCE", settings[9]);
+    options.getArgs("BOOMERAMG AGGRESSIVE COARSENING LEVELS", settings[10]);
+    options.getArgs("BOOMERAMG CHEBYSHEV RELAX ORDER", settings[11]);
+    options.getArgs("BOOMERAMG CHEBYSHEV FRACTION", settings[12]);
 
     if (useDevice) {
       boomerAMG = new hypreWrapperDevice::boomerAMG_t(N,
@@ -171,7 +171,7 @@ void MGSolver_t::coarseLevel_t::setupSolver(
                                                 settings,
                                                 verbose);
     }
-  } else if (options.compareArgs("COARSE SOLVER", "AMGX")) {
+  } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "AMGX")) {
     std::string configFile;
     platform->options.getArgs("AMGX CONFIG FILE", configFile);
     char *cfg = NULL;
@@ -191,10 +191,10 @@ void MGSolver_t::coarseLevel_t::setupSolver(
                       cfg);
   } else {
     std::string amgSolver;
-    options.getArgs("COARSE SOLVER", amgSolver);
+    options.getArgs("MULTIGRID COARSE SOLVER", amgSolver);
     nekrsAbort(platform->comm.mpiComm,
                EXIT_FAILURE,
-               "COARSE SOLVER <%s> is not supported!\n",
+               "MULTIGRID COARSE SOLVER <%s> is not supported!\n",
                amgSolver.c_str());
   }
 
@@ -206,7 +206,7 @@ void MGSolver_t::coarseLevel_t::setupSolver(
 
 MGSolver_t::coarseLevel_t::~coarseLevel_t()
 {
-  const auto useDevice = options.compareArgs("COARSE SOLVER LOCATION", "DEVICE");
+  const auto useDevice = options.compareArgs("MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
   if (boomerAMG) {
     if (useDevice) {
       delete (hypreWrapperDevice::boomerAMG_t *)this->boomerAMG;
@@ -228,10 +228,10 @@ MGSolver_t::coarseLevel_t::~coarseLevel_t()
 
 void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
 {
-  platform->timer.tic("coarseSolve", 1);
+  platform->timer.tic(name + " coarseSolve", 1);
 
   {
-    const bool useDevice = options.compareArgs("COARSE SOLVER LOCATION", "DEVICE");
+    const bool useDevice = options.compareArgs("MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
 
     const pfloat zero = 0.0;
     platform->linAlg->pfill(N, zero, o_xBuffer);
@@ -247,7 +247,7 @@ void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
       o_Gx.copyTo(Gx, N);
     }
 
-    if (options.compareArgs("COARSE SOLVER", "BOOMERAMG")) {
+    if (options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
       if (useDevice) {
         auto boomerAMG = (hypreWrapperDevice::boomerAMG_t *)this->boomerAMG;
         boomerAMG->solve(o_Gx, o_xBuffer);
@@ -255,7 +255,7 @@ void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
         auto boomerAMG = (hypreWrapper::boomerAMG_t *)this->boomerAMG;
         boomerAMG->solve(Gx, xBuffer);
       }
-    } else if (options.compareArgs("COARSE SOLVER", "AMGX")) {
+    } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "AMGX")) {
       AMGX->solve(o_Gx.ptr(), o_xBuffer.ptr());
     }
 
@@ -268,5 +268,5 @@ void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
     }
   }
 
-  platform->timer.toc("coarseSolve");
+  platform->timer.toc(name + " coarseSolve");
 }

@@ -24,35 +24,28 @@
 
  */
 
-// w = w - \sum_i^k (w^T v_i) v_i
-// w = w - \sum_i^k y_i v_i
-extern "C" void FUNC(gramSchmidtOrthogonalization)(const dlong & Nblock, const dlong & N,
-                                    const dlong & offset,
-                                    const dlong & gmresSize,
-                                    const dfloat * __restrict__ weights,
-                                    const dfloat*  __restrict__ y,
-                                    const dfloat*  __restrict__ V,
-                                    dfloat*  __restrict__ w,
-                                    dfloat*  __restrict__ reduction)
+extern "C" void FUNC(blockUpdatePCG)(const dlong &N,
+                                     const dlong &offset,
+                                     const dfloat *__restrict__ cpu_invDegree,
+                                     const dfloat *__restrict__ cpu_Ap,
+                                     const dfloat &alpha,
+                                     dfloat *__restrict__ cpu_r,
+                                     dfloat *__restrict__ cpu_rdotr)
 {
-  for(int j = 0; j < gmresSize; ++j){
-    const dfloat yj = y[j];
-    #pragma unroll
-    for(int fld = 0; fld < p_Nfields; fld++){
-      for(dlong n = 0; n < N; ++n) {
-        const dfloat Vnj = V[n + fld * offset + j * offset * p_Nfields];
-        w[n + fld * offset] -= yj * Vnj;
-      }
+  dfloat rdotr = 0;
+
+#ifdef __NEKRS__OMP__
+#pragma omp parallel for collapse(2)
+#endif
+  for (int fld = 0; fld < p_Nfields; fld++) {
+    for (int i = 0; i < N; ++i) {
+      const dlong n = i + fld * offset;
+
+      const dfloat rn = cpu_r[n] - alpha * cpu_Ap[n];
+      rdotr += rn * rn * cpu_invDegree[i];
+      cpu_r[n] = rn;
     }
   }
-  dfloat sum = 0.0;
-  #pragma unroll
-  for(int fld = 0; fld < p_Nfields; fld++){
-    for(dlong n = 0 ; n < N; ++n){
-      const dfloat weight = weights[n];
-      const dfloat w_curr = w[n + fld * offset];
-      sum += w_curr * w_curr * weight;
-    }
-  }
-  reduction[0] = sum;
+
+  cpu_rdotr[0] = rdotr;
 }

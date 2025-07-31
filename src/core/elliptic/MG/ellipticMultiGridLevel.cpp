@@ -62,7 +62,7 @@ void pMGLevel::coarsen(occa::memory o_x, occa::memory o_Rx)
     oogs::startFinish(o_Rx, elliptic->Nfields, elliptic->fieldOffset, ogsPfloat, ogsAdd, elliptic->oogs);
     ellipticApplyMask(elliptic,
                       o_Rx,
-                      pfloatString); // apply mask again because coarsenKernel does not preserve it
+                      pfloatString); // apply mask again because coarsening does not preserve it
   }
 
   const double factor =
@@ -86,6 +86,7 @@ void pMGLevel::prolongate(occa::memory o_x, occa::memory o_Px)
   platform->flopCounter->add("pMGLevel::prolongate, N=" + std::to_string(mesh->N), factor * flopCounter);
 }
 
+// compute residual and smooths it
 void pMGLevel::smooth(occa::memory o_rhs, occa::memory o_x, bool x_is_zero)
 {
   platform->timer.tic(elliptic->name + " preconditioner smoother N=" + std::to_string(mesh->N), 1);
@@ -102,9 +103,7 @@ void pMGLevel::smooth(occa::memory o_rhs, occa::memory o_x, bool x_is_zero)
   } else if (smootherType == SmootherType::OPT_FOURTH_CHEBYSHEV ||
              smootherType == SmootherType::FOURTH_CHEBYSHEV) {
     this->smoothFourthKindChebyshev(o_rhs, o_x, x_is_zero);
-  } else if (smootherType == SmootherType::ASM) {
-    this->smoothSchwarz(o_rhs, o_x, x_is_zero);
-  } else if (smootherType == SmootherType::RAS) {
+  } else if (smootherType == SmootherType::ASM || smootherType == SmootherType::RAS) {
     this->smoothSchwarz(o_rhs, o_x, x_is_zero);
   } else if (smootherType == SmootherType::JACOBI) {
     this->smoothJacobi(o_rhs, o_x, x_is_zero);
@@ -113,10 +112,15 @@ void pMGLevel::smooth(occa::memory o_rhs, occa::memory o_x, bool x_is_zero)
   platform->timer.toc(elliptic->name + " preconditioner smoother N=" + std::to_string(mesh->N));
 }
 
+// just run smoother itself
 void pMGLevel::smoother(occa::memory o_x, occa::memory o_Sx, bool x_is_zero)
 {
   if (chebySmootherType == ChebyshevSmootherType::JACOBI) {
-    this->smootherJacobi(o_x, o_Sx);
+    platform->linAlg->paxmyz(Nrows, 1.0f, o_invDiagA, o_x, o_Sx);
+ 
+    const double factor =
+        (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value) ? 0.5 : 1.0;
+    platform->flopCounter->add("pMGLevel::smootherJacobi, N=" + std::to_string(mesh->N), factor * Nrows);
   } else {
     this->smoothSchwarz(o_x, o_Sx, true);
   }
@@ -283,13 +287,4 @@ void pMGLevel::smoothFourthKindChebyshev(occa::memory &o_r, occa::memory &o_x, b
       (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value) ? 0.5 : 1.0;
   platform->flopCounter->add("pMGLevel::smoothOptChebyshev, N=" + std::to_string(mesh->N),
                              factor * flopCount);
-}
-
-void pMGLevel::smootherJacobi(occa::memory &o_r, occa::memory &o_Sr)
-{
-  platform->linAlg->paxmyz(Nrows, 1.0f, o_invDiagA, o_r, o_Sr);
-
-  const double factor =
-      (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value) ? 0.5 : 1.0;
-  platform->flopCounter->add("pMGLevel::smootherJacobi, N=" + std::to_string(mesh->N), factor * Nrows);
 }

@@ -74,12 +74,6 @@ setupAide *setDefaultSettings(std::string casename)
 
   options->setArgs("ENABLE GS COMM OVERLAP", "TRUE");
 
-#if 0
-  options->setArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "l2_RESIDUAL");
-#else
-  options->setArgs("LINEAR SOLVER STOPPING CRITERION TYPE", "LEGACY");
-#endif
-
   return options;
 }
 
@@ -473,9 +467,9 @@ void checkpointStep(int val)
   platform->solver->checkpointStep = val;
 }
 
-void writeCheckpoint(double time, int step)
+void writeCheckpoint(double time)
 {
-  platform->solver->writeCheckpoint(time, step);
+  platform->solver->writeCheckpoint(time);
 }
 
 double endTime(void)

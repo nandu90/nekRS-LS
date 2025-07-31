@@ -35,7 +35,11 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
   dfloat flopCount = 0.0;
 
   if (!o_invDiagA.isInitialized()) {
-    o_invDiagA = platform->device.malloc<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
+    if (elliptic->mgLevel) {
+      o_invDiagA = platform->device.malloc<pfloat>(elliptic->Nfields * elliptic->fieldOffset);
+    } else {
+      o_invDiagA = platform->device.malloc<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
+    }
   }
 
   auto kernel = (elliptic->mgLevel) ?
@@ -74,7 +78,7 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
   platform->flopCounter->add(elliptic->name + " ellipticUpdateJacobi", flopCount);
 }
 
-void ellipticUpdateJacobi(elliptic_t *ellipticBase)
+void ellipticUpdateAllJacobi(elliptic_t *ellipticBase)
 {
   setupAide& options = ellipticBase->options;
 
@@ -89,8 +93,9 @@ void ellipticUpdateJacobi(elliptic_t *ellipticBase)
       auto mesh = elliptic->mesh;
   
       const bool coarsestLevel = (levelIndex == ellipticBase->nLevels - 1);
-      if(coarsestLevel && elliptic->options.compareArgs("MULTIGRID COARSE SOLVE", "TRUE"))
-        continue;
+      if(coarsestLevel && !elliptic->options.compareArgs("MULTIGRID COARSER SOLVER", "SMOOTHER")) {
+        continue; // skip
+      }
 
       ellipticUpdateJacobi(elliptic, mgLevel->o_invDiagA); 
     }

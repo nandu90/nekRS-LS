@@ -9,8 +9,8 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
   auto mesh = elliptic->mesh;
 
   const int verbose = (platform->verbose()) ? 1 : 0;
-  const int useFP32 = elliptic->options.compareArgs("COARSE SOLVER PRECISION", "FP32");
-  const bool useDevice = elliptic->options.compareArgs("COARSE SOLVER LOCATION", "DEVICE");
+  const int useFP32 = elliptic->options.compareArgs("MULTIGRID COARSE SOLVER PRECISION", "FP32");
+  const bool useDevice = elliptic->options.compareArgs("MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
 
   MPI_Barrier(platform->comm.mpiComm);
   double tStart = MPI_Wtime();
@@ -50,7 +50,7 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
   o_dofMap = platform->device.malloc<dlong>(matrix.dofMap.size());
   o_dofMap.copyFrom(matrix.dofMap.data());
 
-  if (elliptic->options.compareArgs("COARSE SOLVER", "BOOMERAMG")) {
+  if (elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
     double settings[hypreWrapper::NPARAM + 1];
     settings[0] = 1;    /* custom settings              */
     settings[1] = 8;    /* coarsening                   */
@@ -66,22 +66,23 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
     settings[11] = 1;   /* chebyRelaxOrder */
     settings[12] = 0.3; /* chebyRelaxFraction */
 
-    if (elliptic->options.compareArgs("MULTIGRID SEMFEM", "TRUE") && elliptic->mesh->N == 1) {
-      settings[6] = 16;
+    // ensure smoother is compatible to smoother on pMG Levels
+    if (elliptic->options.compareArgs("MULTIGRID COARSE GRID DISCRETIZATION", "SEMFEM") && elliptic->mesh->N == 1) {
+      settings[6] = 16; // Cheby
       settings[4] = settings[6];
     }
 
-    platform->options.getArgs("BOOMERAMG COARSEN TYPE", settings[1]);
-    platform->options.getArgs("BOOMERAMG INTERPOLATION TYPE", settings[2]);
-    platform->options.getArgs("BOOMERAMG COARSE SMOOTHER TYPE", settings[4]);
-    platform->options.getArgs("BOOMERAMG SMOOTHER TYPE", settings[6]);
-    platform->options.getArgs("BOOMERAMG SMOOTHER SWEEPS", settings[7]);
-    platform->options.getArgs("BOOMERAMG ITERATIONS", settings[3]);
-    platform->options.getArgs("BOOMERAMG STRONG THRESHOLD", settings[8]);
-    platform->options.getArgs("BOOMERAMG NONGALERKIN TOLERANCE", settings[9]);
-    platform->options.getArgs("BOOMERAMG AGGRESSIVE COARSENING LEVELS", settings[10]);
-    platform->options.getArgs("BOOMERAMG CHEBYSHEV RELAX ORDER", settings[11]);
-    platform->options.getArgs("BOOMERAMG CHEBYSHEV FRACTION", settings[12]);
+    elliptic->options.getArgs("BOOMERAMG COARSEN TYPE", settings[1]);
+    elliptic->options.getArgs("BOOMERAMG INTERPOLATION TYPE", settings[2]);
+    elliptic->options.getArgs("BOOMERAMG COARSE SMOOTHER TYPE", settings[4]);
+    elliptic->options.getArgs("BOOMERAMG SMOOTHER TYPE", settings[6]);
+    elliptic->options.getArgs("BOOMERAMG SMOOTHER SWEEPS", settings[7]);
+    elliptic->options.getArgs("BOOMERAMG ITERATIONS", settings[3]);
+    elliptic->options.getArgs("BOOMERAMG STRONG THRESHOLD", settings[8]);
+    elliptic->options.getArgs("BOOMERAMG NONGALERKIN TOLERANCE", settings[9]);
+    elliptic->options.getArgs("BOOMERAMG AGGRESSIVE COARSENING LEVELS", settings[10]);
+    elliptic->options.getArgs("BOOMERAMG CHEBYSHEV RELAX ORDER", settings[11]);
+    elliptic->options.getArgs("BOOMERAMG CHEBYSHEV FRACTION", settings[12]);
 
     const auto numRows = o_dofMap.size();
 
@@ -110,7 +111,7 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
                                                 settings,
                                                 verbose);
     }
-  } else if (elliptic->options.compareArgs("COARSE SOLVER", "AMGX")) {
+  } else if (elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "AMGX")) {
     nekrsCheck(platform->device.mode() != "CUDA",
                platform->comm.mpiComm,
                EXIT_FAILURE,
@@ -136,10 +137,10 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
                       cfg);
   } else {
     std::string amgSolver;
-    elliptic->options.getArgs("COARSE SOLVER", amgSolver);
+    elliptic->options.getArgs("MULTIGRID COARSE SOLVER", amgSolver);
     nekrsAbort(platform->comm.mpiComm,
                EXIT_FAILURE,
-               "COARSE SOLVER %s is not supported!\n",
+               "MULTIGRID COARSE SOLVER %s is not supported!\n",
                amgSolver.c_str());
   }
 
@@ -151,7 +152,7 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
 
 SEMFEMSolver_t::~SEMFEMSolver_t()
 {
-  const auto useDevice = elliptic->options.compareArgs("COARSE SOLVER LOCATION", "DEVICE");
+  const auto useDevice = elliptic->options.compareArgs("MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
   if (boomerAMG) {
     if (useDevice) {
       delete (hypreWrapperDevice::boomerAMG_t *)this->boomerAMG;
@@ -168,7 +169,7 @@ SEMFEMSolver_t::~SEMFEMSolver_t()
 
 void SEMFEMSolver_t::run(const occa::memory &o_r, occa::memory &o_z)
 {
-  const auto useDevice = elliptic->options.compareArgs("COARSE SOLVER LOCATION", "DEVICE");
+  const auto useDevice = elliptic->options.compareArgs("MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
   const dlong numRows = o_dofMap.size();
 
   auto o_rT = platform->deviceMemoryPool.reserve<pfloat>(numRows);
@@ -181,7 +182,7 @@ void SEMFEMSolver_t::run(const occa::memory &o_r, occa::memory &o_z)
 
   gatherKernel(numRows, o_dofMap, o_r, o_rT); // E->T
 
-  if (elliptic->options.compareArgs("COARSE SOLVER", "BOOMERAMG")) {
+  if (elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
 
     if (!useDevice) {
       static std::vector<pfloat> rT;
@@ -202,7 +203,7 @@ void SEMFEMSolver_t::run(const occa::memory &o_r, occa::memory &o_z)
       boomerAMG->solve(o_rT, o_zT);
     }
 
-  } else if (elliptic->options.compareArgs("COARSE SOLVER", "AMGX") && useDevice) {
+  } else if (elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "AMGX") && useDevice) {
 
     AMGX->solve(o_rT.ptr(), o_zT.ptr());
 

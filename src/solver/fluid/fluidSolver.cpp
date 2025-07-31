@@ -260,7 +260,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     return;
   }
 
-  platform->timer.tic(velocityName + "solve");
+  platform->timer.tic(velocityName + "Solve");
 
   const auto g0idt = *g0 / dt[0];
 
@@ -385,7 +385,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     }
   }
 
-  platform->timer.toc(velocityName + "solve");
+  platform->timer.toc(velocityName + "Solve");
 }
 
 void fluidSolver_t::setupEllipticSolver()

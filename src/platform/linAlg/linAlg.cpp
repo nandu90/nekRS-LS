@@ -28,8 +28,22 @@ SOFTWARE.
 #include "platform.hpp"
 #include "re2Reader.hpp"
 #include <numeric>
+#include <variant>
 
 linAlg_t *linAlg_t::singleton = nullptr;
+
+std::pair<occa::memory, std::variant<float *, double *>> getScratch(const occa::dtype_t &type, size_t n)
+{
+  if (type == occa::dtype::get<pfloat>()) {
+    auto o = platform->deviceMemoryPool.reserve<pfloat>(n);
+    auto h = platform->memoryPool.reserve<pfloat>(n);
+    return std::make_pair(o, h.ptr<pfloat>());
+  } else {
+    auto o = platform->deviceMemoryPool.reserve<dfloat>(n);
+    auto h = platform->memoryPool.reserve<dfloat>(n);
+    return std::make_pair(o, h.ptr<dfloat>());
+  }
+}
 
 void linAlg_t::runTimers()
 {
@@ -184,6 +198,11 @@ linAlg_t::~linAlg_t() {}
 void linAlg_t::mask(const dlong N, const occa::memory &o_maskIds, occa::memory &o_a)
 {
   if (N) {
+    if (o_a.dtype() == occa::dtype::get<pfloat>()) {
+      pmask(N, o_maskIds, o_a);
+      return;
+    }
+
     launchKernel(prefix + "mask", N, o_maskIds, o_a);
   }
 }
@@ -200,6 +219,11 @@ void linAlg_t::pmask(const dlong N, const occa::memory &o_maskIds, occa::memory 
 // o_a[n] = alpha
 void linAlg_t::fill(const dlong N, const dfloat alpha, occa::memory &o_a)
 {
+  if (o_a.dtype() == occa::dtype::get<pfloat>()) {
+    pfill(N, alpha, o_a);
+    return;
+  }
+
   launchKernel(prefix + "fill", N, alpha, o_a);
 }
 
@@ -248,6 +272,11 @@ void linAlg_t::axpby(const dlong N,
                      const dlong xOffset,
                      const dlong yOffset)
 {
+  if (o_y.dtype() == occa::dtype::get<pfloat>()) {
+    paxpby(N, alpha, o_x, beta, o_y, xOffset, yOffset);
+    return;
+  }
+
   launchKernel(prefix + "axpby", N, xOffset, yOffset, alpha, o_x, beta, o_y);
   platform->flopCounter->add("axpby", 3 * static_cast<double>(N));
 }
@@ -275,6 +304,11 @@ void linAlg_t::axpbyMany(const dlong N,
                          const dfloat beta,
                          occa::memory &o_y)
 {
+  if (o_y.dtype() == occa::dtype::get<pfloat>()) {
+    paxpbyMany(N, Nfields, offset, alpha, o_x, beta, o_y);
+    return;
+  }
+
   launchKernel(prefix + "axpbyMany", N, Nfields, offset, alpha, o_x, beta, o_y);
   platform->flopCounter->add("axpbyMany", 3 * static_cast<double>(N) * Nfields);
 }
@@ -464,18 +498,15 @@ void linAlg_t::axdyz(const dlong N,
 // \sum o_a
 dfloat linAlg_t::sum(const dlong N, const occa::memory &o_a, MPI_Comm _comm, const dlong offset)
 {
-  int Nblock = (N + blocksize - 1) / blocksize;
+  const auto Nblock = (N + blocksize - 1) / blocksize;
+
   const size_t Nbytes = Nblock * sizeof(dfloat);
   if (o_scratch.byte_size() < Nbytes) {
     reallocScratch(Nbytes);
   }
 
-  if (N > 1) {
-    launchKernel(prefix + "sum", Nblock, N, offset, o_a, o_scratch);
-    o_scratch.copyTo(scratch, Nbytes);
-  } else {
-    o_a.copyTo(scratch, N);
-  }
+  launchKernel(prefix + "sum", Nblock, N, offset, o_a, o_scratch);
+  o_scratch.copyTo(scratch, Nbytes);
 
   dfloat sum = 0;
   for (dlong n = 0; n < Nblock; ++n) {
@@ -521,23 +552,24 @@ dfloat linAlg_t::sumMany(const dlong N,
   return sum;
 }
 
-std::vector<std::pair<dfloat, dfloat>> linAlg_t::minMax(dlong Nlocal, const std::vector<occa::memory>& o_fldList, MPI_Comm comm)
+std::vector<std::pair<dfloat, dfloat>>
+linAlg_t::minMax(dlong Nlocal, const std::vector<occa::memory> &o_fldList, MPI_Comm comm)
 {
   std::vector<std::pair<dfloat, dfloat>> out;
-  for(const auto &o_entry : o_fldList) {
-     const auto min = platform->linAlg->min(Nlocal, o_entry, comm);
-     const auto max = platform->linAlg->max(Nlocal, o_entry, comm);
-     out.push_back({min, max});
+  for (const auto &o_entry : o_fldList) {
+    const auto min = platform->linAlg->min(Nlocal, o_entry, comm);
+    const auto max = platform->linAlg->max(Nlocal, o_entry, comm);
+    out.push_back({min, max});
   }
   return out;
 }
 
 // \min o_a
-std::vector<dfloat> linAlg_t::min(dlong Nlocal, const std::vector<occa::memory>& o_fldList, MPI_Comm comm)
+std::vector<dfloat> linAlg_t::min(dlong Nlocal, const std::vector<occa::memory> &o_fldList, MPI_Comm comm)
 {
   std::vector<dfloat> out;
-  for(const auto &o_entry : o_fldList) {
-     out.push_back(min(Nlocal, o_entry, comm));
+  for (const auto &o_entry : o_fldList) {
+    out.push_back(min(Nlocal, o_entry, comm));
   }
   return out;
 }
@@ -569,11 +601,12 @@ dfloat linAlg_t::min(const dlong N, const occa::memory &o_a, MPI_Comm _comm)
 }
 
 // \max o_a
-std::vector<dfloat> linAlg_t::max(const dlong Nlocal, const std::vector<occa::memory>& o_fldList, MPI_Comm comm)
+std::vector<dfloat>
+linAlg_t::max(const dlong Nlocal, const std::vector<occa::memory> &o_fldList, MPI_Comm comm)
 {
   std::vector<dfloat> out;
-  for(const auto &o_entry : o_fldList) {
-     out.push_back(max(Nlocal, o_entry, comm));
+  for (const auto &o_entry : o_fldList) {
+    out.push_back(max(Nlocal, o_entry, comm));
   }
   return out;
 }
@@ -646,43 +679,7 @@ dfloat linAlg_t::amaxMany(const dlong N,
 // ||o_a||_2
 dfloat linAlg_t::norm2(const dlong N, const occa::memory &o_x, MPI_Comm _comm)
 {
-  if (timer) {
-    platform->timer.tic("dotp", 1);
-  }
-
-  int Nblock = (N + blocksize - 1) / blocksize;
-  const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.byte_size() < Nbytes) {
-    reallocScratch(Nbytes);
-  }
-
-  dfloat norm = 0;
-  if (N > 1) {
-    launchKernel(prefix + "norm2", Nblock, N, o_x, o_scratch);
-
-    if (serial) {
-      norm = *((dfloat *)o_scratch.ptr());
-    } else {
-      o_scratch.copyTo(scratch, Nbytes);
-      for (dlong n = 0; n < Nblock; ++n) {
-        norm += scratch[n];
-      }
-    }
-  } else {
-    dfloat x;
-    o_x.copyTo(&x, N);
-    norm = x * x;
-  }
-
-  if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, _comm);
-  }
-
-  if (timer) {
-    platform->timer.toc("dotp");
-  }
-
-  return sqrt(norm);
+  return norm2Many(N, 1, 0, o_x, _comm);
 }
 
 dfloat linAlg_t::norm2Many(const dlong N,
@@ -732,42 +729,7 @@ dfloat linAlg_t::norm2Many(const dlong N,
 // ||o_a||_1
 dfloat linAlg_t::norm1(const dlong N, const occa::memory &o_x, MPI_Comm _comm)
 {
-  if (timer) {
-    platform->timer.tic("dotp", 1);
-  }
-
-  int Nblock = (N + blocksize - 1) / blocksize;
-  const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.byte_size() < Nbytes) {
-    reallocScratch(Nbytes);
-  }
-
-  dfloat norm = 0;
-  if (N > 1) {
-    launchKernel(prefix + "norm1", Nblock, N, o_x, o_scratch);
-    if (serial) {
-      norm = *((dfloat *)o_scratch.ptr());
-    } else {
-      o_scratch.copyTo(scratch, Nbytes);
-      for (dlong n = 0; n < Nblock; ++n) {
-        norm += scratch[n];
-      }
-    }
-  } else {
-    dfloat x;
-    o_x.copyTo(&x, N);
-    norm = std::abs(x);
-  }
-
-  if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, _comm);
-  }
-
-  if (timer) {
-    platform->timer.toc("dotp");
-  }
-
-  return norm;
+  return norm1Many(N, 1, 0, o_x, _comm);
 }
 
 dfloat linAlg_t::norm1Many(const dlong N,
@@ -865,56 +827,6 @@ dfloat linAlg_t::innerProd(const dlong N,
   return dot;
 }
 
-// o_w.o_x.o_y
-dfloat linAlg_t::weightedInnerProd(const dlong N,
-                                   const occa::memory &o_w,
-                                   const occa::memory &o_x,
-                                   const occa::memory &o_y,
-                                   MPI_Comm _comm)
-{
-
-  if (timer) {
-    platform->timer.tic("dotp", 1);
-  }
-
-  int Nblock = (N + blocksize - 1) / blocksize;
-  const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.byte_size() < Nbytes) {
-    reallocScratch(Nbytes);
-  }
-
-  dfloat dot = 0;
-  if (N > 1) {
-    launchKernel(prefix + "weightedInnerProd", Nblock, N, o_w, o_x, o_y, o_scratch);
-
-    if (serial) {
-      dot = *((dfloat *)o_scratch.ptr());
-    } else {
-      o_scratch.copyTo(scratch, Nbytes);
-      for (dlong n = 0; n < Nblock; ++n) {
-        dot += scratch[n];
-      }
-    }
-  } else {
-    dfloat w, x, y;
-    o_w.copyTo(&w, N);
-    o_x.copyTo(&x, N);
-    o_y.copyTo(&y, N);
-    dot = w * x * y;
-  }
-
-  if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &dot, 1, MPI_DFLOAT, MPI_SUM, _comm);
-  }
-
-  if (timer) {
-    platform->timer.toc("dotp");
-  }
-
-  platform->flopCounter->add("weightedInnerProd", 3 * static_cast<double>(N));
-  return dot;
-}
-
 void linAlg_t::innerProdMulti(const dlong N,
                               const dlong NVec,
                               const dlong Nfields,
@@ -944,46 +856,42 @@ void linAlg_t::weightedInnerProdMulti(const dlong N,
     platform->timer.tic("dotpMulti", 1);
   }
 
-  int Nblock = (N + blocksize - 1) / blocksize;
-  const size_t Nbytes = NVec * Nblock * sizeof(dfloat);
-  if (o_scratch.byte_size() < Nbytes) {
-    reallocScratch(Nbytes);
+  auto prefix_ = prefix;
+  dfloat FPFactor = 1.0;
+  if (o_y.dtype() == occa::dtype::get<pfloat>()) {
+    prefix_ += "p";
+    FPFactor = 0.5;
   }
 
-  if (N > 1 || NVec > 1 || Nfields > 1) {
-    launchKernel(prefix + "weightedInnerProdMulti",
-                 Nblock,
-                 N,
-                 Nfields,
-                 fieldOffset,
-                 NVec,
-                 yOffset,
-                 weight,
-                 o_w,
-                 o_x,
-                 o_y,
-                 o_scratch);
+  const auto Nblock = (N + blocksize - 1) / blocksize;
+  auto [o_scratch, h_scratch] = getScratch(o_y.dtype(), NVec * Nblock);
 
-    o_scratch.copyTo(scratch, Nbytes);
+  launchKernel(prefix_ + "weightedInnerProdMulti",
+               Nblock,
+               N,
+               Nfields,
+               fieldOffset,
+               NVec,
+               yOffset,
+               weight,
+               o_w,
+               o_x,
+               o_y,
+               o_scratch);
 
-    for (int field = 0; field < NVec; ++field) {
-      dfloat dot = 0;
-      for (dlong n = 0; n < Nblock; ++n) {
-        dot += scratch[n + field * Nblock];
-      }
-      result[field] = dot;
-    }
-  } else {
-    dfloat w, x, y;
-    o_w.copyTo(&w, N);
-    o_x.copyTo(&x, N);
-    o_y.copyTo(&y, N);
-    if (weight) {
-      result[0] = w * x * y;
-    } else {
-      result[0] = x * y;
-    }
-  }
+  std::visit(
+      [&](auto&& scratch) {
+        o_scratch.copyTo(scratch);
+
+        for (int field = 0; field < NVec; ++field) {
+          dfloat dot = 0;
+          for (dlong n = 0; n < Nblock; ++n) {
+            dot += scratch[n + field * Nblock];
+          }
+          result[field] = dot;
+        }
+      },
+      h_scratch);
 
   if (_comm != MPI_COMM_SELF) {
     MPI_Allreduce(MPI_IN_PLACE, result, NVec, MPI_DFLOAT, MPI_SUM, _comm);
@@ -993,7 +901,8 @@ void linAlg_t::weightedInnerProdMulti(const dlong N,
     platform->timer.toc("dotpMulti");
   }
 
-  platform->flopCounter->add("weightedInnerProdMulti", NVec * static_cast<double>(N) * (2 * Nfields + 1));
+  platform->flopCounter->add("weightedInnerProdMulti",
+                             FPFactor * NVec * static_cast<double>(N) * (2 * Nfields + 1));
 }
 
 void linAlg_t::weightedInnerProdMulti(const dlong N,
@@ -1012,10 +921,25 @@ void linAlg_t::weightedInnerProdMulti(const dlong N,
     platform->timer.tic("dotpMulti", 1);
   }
 
-  const int Nblock = (N + blocksize - 1) / blocksize;
+  const auto Nblock = (N + blocksize - 1) / blocksize;
+
+  auto mpiType = MPI_DFLOAT;
+  auto prefix_ = prefix;
+  dfloat FPFactor = 1.0;
+  if (o_y.dtype() == occa::dtype::get<pfloat>()) {
+    mpiType = MPI_PFLOAT;
+    prefix_ += "p";
+    FPFactor = 0.5;
+  }
+
+  nekrsCheck(!platform->device.deviceAtomic,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "requires support of floating point atomics!\n");
 
   if (N > 1 || NVec > 1 || Nfields > 1) {
-    launchKernel(prefix + "weightedInnerProdMultiDevice",
+    launchKernel(prefix_ + "weightedInnerProdMultiDevice",
                  Nblock,
                  N,
                  Nfields,
@@ -1031,14 +955,24 @@ void linAlg_t::weightedInnerProdMulti(const dlong N,
 
   if (_comm != MPI_COMM_SELF) {
     platform->device.finish();
-    MPI_Allreduce(MPI_IN_PLACE, (void *)o_result.ptr(), NVec, MPI_DFLOAT, MPI_SUM, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, (void *)o_result.ptr(), NVec, mpiType, MPI_SUM, _comm);
   }
 
   if (timer) {
     platform->timer.toc("dotpMulti");
   }
 
-  platform->flopCounter->add("weightedInnerProdMulti", NVec * static_cast<double>(N) * (2 * Nfields + 1));
+  platform->flopCounter->add("weightedInnerProdMulti",
+                             FPFactor * NVec * static_cast<double>(N) * (2 * Nfields + 1));
+}
+
+dfloat linAlg_t::weightedInnerProd(const dlong N,
+                                   const occa::memory &o_w,
+                                   const occa::memory &o_x,
+                                   const occa::memory &o_y,
+                                   MPI_Comm _comm)
+{
+  return weightedInnerProdMany(N, 1, 0, o_w, o_x, o_y, _comm);
 }
 
 dfloat linAlg_t::weightedInnerProdMany(const dlong N,
@@ -1053,31 +987,33 @@ dfloat linAlg_t::weightedInnerProdMany(const dlong N,
     platform->timer.tic("dotp", 1);
   }
 
-  int Nblock = (N + blocksize - 1) / blocksize;
-  const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.byte_size() < Nbytes) {
-    reallocScratch(Nbytes);
+  auto prefix_ = prefix;
+  auto FPfactor = 1.0;
+  if (o_y.dtype() == occa::dtype::get<pfloat>()) {
+    prefix_ += "p";
+    FPfactor = 0.5;
   }
+
+  const auto Nblock = (N + blocksize - 1) / blocksize;
+  auto [o_scratch, h_scratch] = getScratch(o_y.dtype(), Nblock);
+
+  launchKernel(prefix_ + "weightedInnerProdMany", Nblock, N, Nfields, fieldOffset, o_w, o_x, o_y, o_scratch);
 
   dfloat dot = 0;
-  if (N > 1 || Nfields > 1) {
-    launchKernel(prefix + "weightedInnerProdMany", Nblock, N, Nfields, fieldOffset, o_w, o_x, o_y, o_scratch);
+  std::visit(
+      [&](auto&& scratch) {
+        using T = std::decay_t<decltype(scratch)>;
 
-    if (serial) {
-      dot = *((dfloat *)o_scratch.ptr());
-    } else {
-      o_scratch.copyTo(scratch, Nbytes);
-      for (dlong n = 0; n < Nblock; ++n) {
-        dot += scratch[n];
-      }
-    }
-  } else {
-    dfloat w, x, y;
-    o_w.copyTo(&w, N);
-    o_x.copyTo(&x, N);
-    o_y.copyTo(&y, N);
-    dot = w * x * y;
-  }
+        if (serial) {
+          dot = *((T)o_scratch.ptr());;
+        } else {
+          o_scratch.copyTo(scratch);
+          for (dlong n = 0; n < Nblock; ++n) {
+            dot += scratch[n];
+          }
+        }
+      },
+      h_scratch);
 
   if (_comm != MPI_COMM_SELF) {
     MPI_Allreduce(MPI_IN_PLACE, &dot, 1, MPI_DFLOAT, MPI_SUM, _comm);
@@ -1087,7 +1023,7 @@ dfloat linAlg_t::weightedInnerProdMany(const dlong N,
     platform->timer.toc("dotp");
   }
 
-  platform->flopCounter->add("weightedInnerProdMany", 3 * static_cast<double>(N) * Nfields);
+  platform->flopCounter->add("weightedInnerProdMany", FPfactor * 3 * static_cast<double>(N) * Nfields);
 
   return dot;
 }
@@ -1096,46 +1032,7 @@ dfloat linAlg_t::weightedInnerProdMany(const dlong N,
 dfloat
 linAlg_t::weightedNorm2(const dlong N, const occa::memory &o_w, const occa::memory &o_a, MPI_Comm _comm)
 {
-  if (timer) {
-    platform->timer.tic("dotp", 1);
-  }
-
-  int Nblock = (N + blocksize - 1) / blocksize;
-  const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.byte_size() < Nbytes) {
-    reallocScratch(Nbytes);
-  }
-
-  dfloat norm = 0;
-  if (N > 1) {
-    launchKernel(prefix + "weightedNorm2", Nblock, N, o_w, o_a, o_scratch);
-
-    if (serial) {
-      norm = *((dfloat *)o_scratch.ptr());
-    } else {
-      o_scratch.copyTo(scratch, Nbytes);
-      for (dlong n = 0; n < Nblock; ++n) {
-        norm += scratch[n];
-      }
-    }
-  } else {
-    dfloat w, a;
-    o_w.copyTo(&w, N);
-    o_a.copyTo(&a, N);
-    norm = w * a * a;
-  }
-
-  if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, _comm);
-  }
-
-  if (timer) {
-    platform->timer.toc("dotp");
-  }
-
-  platform->flopCounter->add("weightedNorm2", 3 * static_cast<double>(N));
-
-  return sqrt(norm);
+  return weightedNorm2Many(N, 1, 0, o_w, o_a, _comm);
 }
 
 dfloat linAlg_t::weightedNorm2Many(const dlong N,
@@ -1145,89 +1042,14 @@ dfloat linAlg_t::weightedNorm2Many(const dlong N,
                                    const occa::memory &o_a,
                                    MPI_Comm _comm)
 {
-  if (timer) {
-    platform->timer.tic("dotp", 1);
-  }
-
-  int Nblock = (N + blocksize - 1) / blocksize;
-  const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.byte_size() < Nbytes) {
-    reallocScratch(Nbytes);
-  }
-
-  dfloat norm = 0;
-  if (N > 1 || Nfields > 1) {
-    launchKernel(prefix + "weightedNorm2Many", Nblock, N, Nfields, fieldOffset, o_w, o_a, o_scratch);
-
-    if (serial) {
-      norm = *((dfloat *)o_scratch.ptr());
-    } else {
-      o_scratch.copyTo(scratch, Nbytes);
-      for (dlong n = 0; n < Nblock; ++n) {
-        norm += scratch[n];
-      }
-    }
-  } else {
-    dfloat w, a;
-    o_w.copyTo(&w, N);
-    o_a.copyTo(&a, N);
-    norm = w * a * a;
-  }
-
-  if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, _comm);
-  }
-
-  if (timer) {
-    platform->timer.toc("dotp");
-  }
-
-  platform->flopCounter->add("weightedNorm2Many", 3 * static_cast<double>(N) * Nfields);
-  return sqrt(norm);
+  return std::sqrt(weightedInnerProdMany(N, Nfields, fieldOffset, o_w, o_a, o_a, _comm));
 }
 
 // ||o_a||_w1
 dfloat
 linAlg_t::weightedNorm1(const dlong N, const occa::memory &o_w, const occa::memory &o_a, MPI_Comm _comm)
 {
-  if (timer) {
-    platform->timer.tic("dotp", 1);
-  }
-
-  int Nblock = (N + blocksize - 1) / blocksize;
-  const size_t Nbytes = Nblock * sizeof(dfloat);
-  if (o_scratch.byte_size() < Nbytes) {
-    reallocScratch(Nbytes);
-  }
-
-  dfloat norm = 0;
-  if (N > 1) {
-    launchKernel(prefix + "weightedNorm1", Nblock, N, o_w, o_a, o_scratch);
-
-    if (serial) {
-      norm = *((dfloat *)o_scratch.ptr());
-    } else {
-      o_scratch.copyTo(scratch, Nbytes);
-      for (dlong n = 0; n < Nblock; ++n) {
-        norm += scratch[n];
-      }
-    }
-  } else {
-    dfloat w, a;
-    o_w.copyTo(&w, N);
-    o_a.copyTo(&a, N);
-    norm = std::abs(w * a);
-  }
-
-  if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, _comm);
-  }
-
-  if (timer) {
-    platform->timer.toc("dotp");
-  }
-
-  return norm;
+  return weightedNorm1Many(N, 1, 0, o_w, o_a, _comm);
 }
 
 dfloat linAlg_t::weightedNorm1Many(const dlong N,

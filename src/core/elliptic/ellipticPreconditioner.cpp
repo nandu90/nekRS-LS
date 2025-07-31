@@ -36,7 +36,6 @@ void ellipticPreconditioner(elliptic_t *elliptic, const occa::memory &o_r, occa:
   auto precon = elliptic->precon;
   auto &options = elliptic->options;
 
-  platform->timer.tic(elliptic->name + " preconditioner", 1);
   if (options.compareArgs("PRECONDITIONER", "JACOBI")) {
     const dlong Nlocal = mesh->Np * mesh->Nelements;
 
@@ -55,17 +54,10 @@ void ellipticPreconditioner(elliptic_t *elliptic, const occa::memory &o_r, occa:
     platform->copyPfloatToDfloatKernel(elliptic->fieldOffset * elliptic->Nfields, elliptic->o_zPfloat, o_z);
   } else if (options.compareArgs("PRECONDITIONER", "NONE")) {
     o_z.copyFrom(o_r, elliptic->fieldOffset * elliptic->Nfields);
-  } else if (options.compareArgs("PRECONDITIONER", "USER")) {
-    elliptic->userPreconditioner(o_r, o_z);
   } else {
     if (platform->comm.mpiRank == 0) {
       printf("ERROR: Unknown preconditioner\n");
     }
     MPI_Abort(platform->comm.mpiComm, 1);
-  }
-  platform->timer.toc(elliptic->name + " preconditioner");
-
-  if (elliptic->nullspace) {
-    ellipticZeroMean(elliptic, o_z);
   }
 }

@@ -296,7 +296,7 @@ int main(int argc, char** argv)
           nekrs::printStepInfo(timeNew, tStep, false, true);
       }
  
-      if (checkpointStep) nekrs::writeCheckpoint(timeNew, tStep);
+      if (checkpointStep) nekrs::writeCheckpoint(timeNew);
  
       MPI_Barrier(comm);
       const double elapsedStep = MPI_Wtime() - timeStartStep;
