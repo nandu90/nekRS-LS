@@ -225,12 +225,6 @@ void udfBuild(setupAide &options)
     nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "see %s for more details\n", log.c_str());
   }
 
-  if (platform->cacheBcast || platform->cacheLocal) {
-    const auto dst = fs::path(platform->tmpDir) / "udf";
-    fileBcast(fs::path(udfLib), dst, comm, platform->verbose());
-    fileBcast(fs::path(oudfFileCache), dst, comm, platform->verbose());
-  }
-
   if (buildRank == 0) {
     if (fs::exists(cache_dir + "/udf/okl.cpp")) {
       fs::rename(cache_dir + "/udf/okl.cpp", oudfFileCache);
@@ -240,6 +234,12 @@ void udfBuild(setupAide &options)
     verifyOudf();
 
     fileSync(oudfFileCache.c_str());
+  }
+
+  if (platform->cacheBcast || platform->cacheLocal) {
+    const auto dst = fs::path(platform->tmpDir) / "udf";
+    fileBcast(fs::path(udfLib), dst, comm, platform->verbose());
+    fileBcast(fs::path(oudfFileCache), dst, comm, platform->verbose());
   }
 
   // some BC kernels will include this file
