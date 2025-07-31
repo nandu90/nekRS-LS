@@ -739,39 +739,68 @@ void ciTestSurfaceIntegral(nrs_t *nrs)
 
 void ciCheckpointing(nrs_t *nrs)
 {
-  auto run = [&](const std::string& engine, const std::string& restartFile, bool readOnly = false) 
+  auto run = [&](const std::string &tag, const std::string& engine, const std::vector<std::string>& fileList, bool readOnly = false)
   {
-    const auto tol = 10 * std::numeric_limits<float>::epsilon();
+    auto FP64 = (!readOnly) && platform->options.compareArgs("CHECKPOINT PRECISION", "FP64");
+    const auto tol = (FP64) ? 10 * std::numeric_limits<double>::epsilon() : 10 * std::numeric_limits<float>::epsilon();
     const double time = 0.123; // just for testing, actual solution is based on t==0
 
     if (!readOnly) {
       platform->options.setArgs("CHECKPOINT ENGINE", engine);
       nrs->checkpointWriter = iofldFactory::create();
-  
       nrs->writeCheckpoint(time);
     }
 
-    nrs->restartFromFile(restartFile); 
- 
+    // wipe out solutions after write
+    platform->linAlg->fill(nrs->fluid->fieldOffsetSum, 0.0, nrs->fluid->o_U);
+    if (nrs->Nscalar > 0) {
+      platform->linAlg->fill(nrs->scalar->fieldOffsetSum, 0.0, nrs->scalar->o_S);
+    }
+
+    nrs->restartFromFiles(fileList);
+
     double startTime;
     platform->options.getArgs("START TIME", startTime);
- 
-    nrs->copyToNek(0.0, 0);
+
+    nrs->copyToNek(0.0, 0, true);
     nek::userchk();
- 
+
     auto err = nek::ptr<double>("errors");
-    CiEvalTest("velocity", err[0] < tol);
-    CiEvalTest("pressure", err[1] < tol);
-    CiEvalTest("scalar00", err[2] < tol);
-    CiEvalTest("scalar01", err[3] < tol);
-    CiEvalTest("time", std::abs(startTime- time) < tol);
+    CiEvalTest(tag + " velocity", err[0] < tol);
+    CiEvalTest(tag + " pressure", err[1] < tol);
+    CiEvalTest(tag + " scalar00", err[2] < tol);
+    CiEvalTest(tag + " scalar01", err[3] < tol);
+    CiEvalTest(tag + " time", std::abs(startTime - time) < tol);
 
     nrs->checkpointWriter.reset();
   };
 
-  run("NEK", "ethier0.f00000");
-  run("ADIOS", "ethier.bp");
-  run("ADIOS", "ethier.bp+int", true);
+  auto breakMesh = [&]() {
+    auto mesh = nrs->meshT;
+    platform->linAlg->fill(mesh->Nlocal, -0.12, mesh->o_x);
+    platform->linAlg->fill(mesh->Nlocal, -0.12, mesh->o_y);
+    platform->linAlg->fill(mesh->Nlocal, -0.12, mesh->o_z);
+    auto [x, y, z] = mesh->xyzHost(); // device to host
+    for (int i = 0; i < mesh->Nlocal; i++) {
+      nekData.xm1[i] = x[i];
+      nekData.ym1[i] = y[i];
+      nekData.zm1[i] = z[i];
+    }
+  };
+
+  platform->options.setArgs("CHECKPOINT PRECISION", "FP64");
+  platform->options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
+  run("1", "NEK", {"ethier0.f00000"}); // FP64, with mesh
+  platform->options.setArgs("CHECKPOINT PRECISION", "FP32");
+
+  run("2", "NEK", {"ethier0.f00001"}); // FP32, with mesh
+  run("3", "NEK", {"ethier0.f00001+U+P+S"}, true);
+
+  breakMesh(); // force loading mesh from file
+  run("4", "NEK", {"ethier0.f00000+X", "ethier0.f00001+U+P+S"}, true);
+
+  run("5", "ADIOS", {"ethier.bp"});
+  run("6", "ADIOS", {"ethier.bp+int"}, true);
 }
 
 void ciTestDistance(nrs_t *nrs)

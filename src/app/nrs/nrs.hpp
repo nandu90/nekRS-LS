@@ -157,7 +157,7 @@ public:
   occa::memory Qcriterion(dlong offset, const occa::memory &o_U);
   occa::memory Qcriterion();
 
-  void restartFromFile(const std::string &restartStr);
+  void restartFromFiles(const std::vector<std::string>& list);
 
   int lastStepLocalSession(double timeNew, int tstep, double elapsedTime);
 

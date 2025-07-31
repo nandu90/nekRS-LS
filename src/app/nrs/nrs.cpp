@@ -467,178 +467,180 @@ void nrs_t::setupNeknek()
   neknek->setup();
 }
 
-void nrs_t::restartFromFile(const std::string &restartStr)
+void nrs_t::restartFromFiles(const std::vector<std::string>& fileList)
 {
-  auto options = serializeString(restartStr, '+');
-  const auto fileName = options[0];
-  options.erase(options.begin());
+  for (const std::string& restartStr : fileList) {
+    auto options = serializeString(restartStr, '+');
+    const auto fileName = options[0];
+    options.erase(options.begin());
 
-  if (platform->comm.mpiRank == 0) {
-    if (options.size()) {
-      std::cout << "restart options: ";
+    if (platform->comm.mpiRank == 0) {
+      if (options.size()) {
+        std::cout << "restart options: ";
+      }
+      for (const auto &element : options) {
+        std::cout << element << "  ";
+      }
+      std::cout << std::endl;
     }
-    for (const auto &element : options) {
-      std::cout << element << "  ";
-    }
-    std::cout << std::endl;
-  }
 
-  auto requestedStep = [&]() {
-    auto it = std::find_if(options.begin(), options.end(), [](const std::string &s) {
-      return s.find("step") != std::string::npos;
-    });
-
-    std::string val;
-    if (it != options.end()) {
-      val = serializeString(*it, '=').at(1);
-      options.erase(it);
-    }
-    return (val.empty()) ? -1 : std::stoi(val);
-  }();
-
-  auto requestedTime = [&]() {
-    auto it = std::find_if(options.begin(), options.end(), [](const std::string &s) {
-      return s.find("time") != std::string::npos;
-    });
-
-    std::string val;
-    if (it != options.end()) {
-      val = serializeString(*it, '=').at(1);
-      options.erase(it);
-    }
-    return val;
-  }();
-
-  auto pointInterpolation = [&]() {
-    auto it = std::find_if(options.begin(), options.end(), [](const std::string &s) {
-      return s.find("int") != std::string::npos;
-    });
-
-    auto found = false;
-    if (it != options.end()) {
-      found = true;
-      options.erase(it);
-    }
-    return found;
-  }();
-
-  const auto requestedFields = [&]() {
-    std::vector<std::string> flds;
-    for (const auto &entry : {"x", "u", "p", "t", "s"}) {
-      auto it = std::find_if(options.begin(), options.end(), [entry](const std::string &s) {
-        auto ss = lowerCase(s);
-        return ss.find(entry) != std::string::npos;
+    auto requestedStep = [&]() {
+      auto it = std::find_if(options.begin(), options.end(), [](const std::string &s) {
+        return s.find("step") != std::string::npos;
       });
+
+      std::string val;
       if (it != options.end()) {
-        auto s = lowerCase(*it);
-        flds.push_back(s);
+        val = serializeString(*it, '=').at(1);
+        options.erase(it);
       }
-    }
+      return (val.empty()) ? -1 : std::stoi(val);
+    }();
 
-    const int idxStart = (std::find(flds.begin(), flds.end(), "t") != flds.end()) ? 1 : 0;
-    for (const auto &entry : flds) {
-      if (entry == "s") {
-        for (int i = idxStart; i < Nscalar; i++) {
-          std::ostringstream oss;
-          oss << "s" << std::setw(2) << std::setfill('0') << i;
-          flds.push_back(oss.str());
+    auto requestedTime = [&]() {
+      auto it = std::find_if(options.begin(), options.end(), [](const std::string &s) {
+        return s.find("time") != std::string::npos;
+      });
+
+      std::string val;
+      if (it != options.end()) {
+        val = serializeString(*it, '=').at(1);
+        options.erase(it);
+      }
+      return val;
+    }();
+
+    auto pointInterpolation = [&]() {
+      auto it = std::find_if(options.begin(), options.end(), [](const std::string &s) {
+        return s.find("int") != std::string::npos;
+      });
+
+      auto found = false;
+      if (it != options.end()) {
+        found = true;
+        options.erase(it);
+      }
+      return found;
+    }();
+
+    const auto requestedFields = [&]() {
+      std::vector<std::string> flds;
+      for (const auto &entry : {"x", "u", "p", "t", "s"}) {
+        auto it = std::find_if(options.begin(), options.end(), [entry](const std::string &s) {
+          auto ss = lowerCase(s);
+          return ss.find(entry) != std::string::npos;
+        });
+        if (it != options.end()) {
+          auto s = lowerCase(*it);
+          flds.push_back(s);
         }
+      }
 
-        flds.erase(std::remove(flds.begin(), flds.end(), "s"), flds.end());
-        std::sort(flds.begin(), flds.end());
-        auto last = std::unique(flds.begin(), flds.end());
-        flds.erase(last, flds.end());
+      const int idxStart = (std::find(flds.begin(), flds.end(), "t") != flds.end()) ? 1 : 0;
+      for (const auto &entry : flds) {
+        if (entry == "s") {
+          for (int i = idxStart; i < Nscalar; i++) {
+            std::ostringstream oss;
+            oss << "s" << std::setw(2) << std::setfill('0') << i;
+            flds.push_back(oss.str());
+          }
+
+          flds.erase(std::remove(flds.begin(), flds.end(), "s"), flds.end());
+          std::sort(flds.begin(), flds.end());
+          auto last = std::unique(flds.begin(), flds.end());
+          flds.erase(last, flds.end());
+        }
+      }
+
+      return flds;
+    }();
+
+    auto fileNameEndsWithBp = [&]() {
+      const std::string suffix = ".bp";
+      if (fileName.size() >= suffix.size()) {
+        return fileName.compare(fileName.size() - suffix.size(), suffix.size(), suffix) == 0;
+      }
+      return false;
+    }();
+    auto iofld = iofldFactory::create((fileNameEndsWithBp) ? "adios" : "");
+    iofld->open(meshT, iofld::mode::read, fileName, requestedStep);
+
+    const auto avaiableFields = iofld->availableVariables();
+    if (platform->comm.mpiRank == 0 && platform->verbose()) {
+      for (const auto &entry : avaiableFields) {
+        std::cout << " found variable " << entry << std::endl;
       }
     }
 
-    return flds;
-  }();
-
-  auto fileNameEndsWithBp = [&]() {
-    const std::string suffix = ".bp";
-    if (fileName.size() >= suffix.size()) {
-      return fileName.compare(fileName.size() - suffix.size(), suffix.size(), suffix) == 0;
-    }
-    return false;
-  }();
-  auto iofld = iofldFactory::create((fileNameEndsWithBp) ? "adios" : "");
-  iofld->open(meshT, iofld::mode::read, fileName, requestedStep);
-
-  const auto avaiableFields = iofld->availableVariables();
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
-    for (const auto &entry : avaiableFields) {
-      std::cout << " found variable " << entry << std::endl;
-    }
-  }
-
-  double time = -1;
-  iofld->addVariable("time", time);
-  if (platform->options.compareArgs("LOWMACH", "TRUE")) {
-    iofld->addVariable("p0th", p0th[0]);
-  }
-
-  auto checkOption = [&](const std::string &name) {
-    if (requestedFields.size() == 0) {
-      return true; // nothing specfied -> assign all
-    }
-    if (std::find(requestedFields.begin(), requestedFields.end(), name) != requestedFields.end()) {
-      return true;
-    }
-    return false;
-  };
-
-  auto isAvailable = [&](const std::string &name) {
-    return std::find(avaiableFields.begin(), avaiableFields.end(), name) != avaiableFields.end();
-  };
-
-  if (checkOption("x") && isAvailable("mesh")) {
-    std::vector<occa::memory> o_iofldX;
-    auto mesh = meshT;
-    o_iofldX.push_back(mesh->o_x);
-    o_iofldX.push_back(mesh->o_y);
-    o_iofldX.push_back(mesh->o_z);
-    iofld->addVariable("mesh", o_iofldX);
-  }
-
-  if (checkOption("u") && isAvailable("velocity")) {
-    std::vector<occa::memory> o_iofldU;
-    o_iofldU.push_back(fluid->o_U.slice(0 * fluid->fieldOffset, fluid->mesh->Nlocal));
-    o_iofldU.push_back(fluid->o_U.slice(1 * fluid->fieldOffset, fluid->mesh->Nlocal));
-    o_iofldU.push_back(fluid->o_U.slice(2 * fluid->fieldOffset, fluid->mesh->Nlocal));
-    iofld->addVariable("velocity", o_iofldU);
-  }
-
-  if (checkOption("p") && isAvailable("pressure")) {
-    std::vector<occa::memory> o_iofldP = {fluid->o_P.slice(0, meshV->Nlocal)};
-    iofld->addVariable("pressure", o_iofldP);
-  }
-
-  if (Nscalar) {
-    std::vector<occa::memory> o_iofldT;
-    if (checkOption("t") && isAvailable("temperature")) {
-      o_iofldT.push_back(scalar->o_S.slice(0, scalar->mesh(0)->Nlocal));
-      iofld->addVariable("temperature", o_iofldT);
+    double time = -1;
+    iofld->addVariable("time", time);
+    if (platform->options.compareArgs("LOWMACH", "TRUE")) {
+      iofld->addVariable("p0th", p0th[0]);
     }
 
-    const auto scalarStart = (o_iofldT.size()) ? 1 : 0;
-    for (int i = scalarStart; i < Nscalar; i++) {
-      const auto sid = scalarDigitStr(i - scalarStart);
-      if (checkOption("s" + sid) && isAvailable("scalar" + sid)) {
-        auto o_Si = scalar->o_S.slice(scalar->fieldOffsetScan[i], meshV->Nlocal);
-        std::vector<occa::memory> o_iofldSi = {o_Si};
-        iofld->addVariable("scalar" + sid, o_iofldSi);
+    auto checkOption = [&](const std::string &name) {
+      if (requestedFields.size() == 0) {
+        return true; // nothing specfied -> assign all
+      }
+      if (std::find(requestedFields.begin(), requestedFields.end(), name) != requestedFields.end()) {
+        return true;
+      }
+      return false;
+    };
+
+    auto isAvailable = [&](const std::string &name) {
+      return std::find(avaiableFields.begin(), avaiableFields.end(), name) != avaiableFields.end();
+    };
+
+    if (checkOption("x") && isAvailable("mesh")) {
+      std::vector<occa::memory> o_iofldX;
+      auto mesh = meshT;
+      o_iofldX.push_back(mesh->o_x);
+      o_iofldX.push_back(mesh->o_y);
+      o_iofldX.push_back(mesh->o_z);
+      iofld->addVariable("mesh", o_iofldX);
+    }
+
+    if (checkOption("u") && isAvailable("velocity")) {
+      std::vector<occa::memory> o_iofldU;
+      o_iofldU.push_back(fluid->o_U.slice(0 * fluid->fieldOffset, fluid->mesh->Nlocal));
+      o_iofldU.push_back(fluid->o_U.slice(1 * fluid->fieldOffset, fluid->mesh->Nlocal));
+      o_iofldU.push_back(fluid->o_U.slice(2 * fluid->fieldOffset, fluid->mesh->Nlocal));
+      iofld->addVariable("velocity", o_iofldU);
+    }
+
+    if (checkOption("p") && isAvailable("pressure")) {
+      std::vector<occa::memory> o_iofldP = {fluid->o_P.slice(0, meshV->Nlocal)};
+      iofld->addVariable("pressure", o_iofldP);
+    }
+
+    if (Nscalar) {
+      std::vector<occa::memory> o_iofldT;
+      if (checkOption("t") && isAvailable("temperature")) {
+        o_iofldT.push_back(scalar->o_S.slice(0, scalar->mesh(0)->Nlocal));
+        iofld->addVariable("temperature", o_iofldT);
+      }
+
+      const auto scalarStart = (o_iofldT.size()) ? 1 : 0;
+      for (int i = scalarStart; i < Nscalar; i++) {
+        const auto sid = scalarDigitStr(i - scalarStart);
+        if (checkOption("s" + sid) && isAvailable("scalar" + sid)) {
+          auto o_Si = scalar->o_S.slice(scalar->fieldOffsetScan[i], meshV->Nlocal);
+          std::vector<occa::memory> o_iofldSi = {o_Si};
+          iofld->addVariable("scalar" + sid, o_iofldSi);
+        }
       }
     }
+
+    if (pointInterpolation) {
+      iofld->readAttribute("interpolate", "true");
+    }
+
+    iofld->process();
+    iofld->close();
+
+    platform->options.setArgs("START TIME", (requestedTime.size()) ? requestedTime : to_string_f(time));
   }
-
-  if (pointInterpolation) {
-    iofld->readAttribute("interpolate", "true");
-  }
-
-  iofld->process();
-  iofld->close();
-
-  platform->options.setArgs("START TIME", (requestedTime.size()) ? requestedTime : to_string_f(time));
 }
 
 void nrs_t::setIC()
@@ -654,7 +656,11 @@ void nrs_t::setIC()
   }
 
   if (!platform->options.getArgs("RESTART FILE NAME").empty()) {
-    restartFromFile(platform->options.getArgs("RESTART FILE NAME"));
+    std::string restartStr;
+    platform->options.getArgs("RESTART FILE NAME", restartStr);
+    std::vector<std::string> fileList = serializeString(restartStr, ',');
+
+    restartFromFiles(fileList);
   }
 
   double startTime;
