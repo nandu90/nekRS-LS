@@ -141,7 +141,12 @@ void geomSolver_t::setupEllipticSolver()
     return;
   }
 
-  if (platform->options.compareArgs(upperCase(name) + " BLOCK SOLVER", "TRUE")) {
+  if (platform->comm.mpiRank == 0) {
+    std::cout << "================ "
+              << "ELLIPTIC SETUP " + upperCase(name) << " ================" << std::endl;
+  } 
+
+  if (platform->options.compareArgs(upperCase(name) + " SOLVER", "BLOCK")) {
     platform->options.setArgs(upperCase(name) + " NFIELDS", std::to_string(mesh->dim));
   }
 
@@ -326,7 +331,7 @@ void geomSolver_t::computeDiv()
   for (int s = o_coeffEXT.size(); s > 1; s--) {
     o_div.copyFrom(o_div, fieldOffset, (s - 1) * fieldOffset, (s - 2) * fieldOffset);
   }
-  opSEM::strongDivergence(mesh, fieldOffset, o_U, o_div);
+  opSEM::strongDivergence(mesh, fieldOffset, o_U, o_div, false);
 };
 
 void registerGeomSolverKernels(occa::properties kernelInfoBC)

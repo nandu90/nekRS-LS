@@ -4,7 +4,7 @@
 #include "platform.hpp"
 #include "linearSolver.hpp"
 
-template <typename T> class linearSolverFactory
+template <typename T = dfloat> class linearSolverFactory
 {
 public:
   static std::unique_ptr<linearSolver>

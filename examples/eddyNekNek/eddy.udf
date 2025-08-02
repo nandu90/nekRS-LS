@@ -87,6 +87,7 @@ void udfDirichlet(bcData *bc)
     bc->uxFluid = bc->uxFluidInt;
     bc->uyFluid = bc->uyFluidInt;
     bc->uzFluid = bc->uzFluidInt;
+  } else if (isField("scalar ps1")) { 
     bc->sScalar = bc->sScalarInt;
   } else if (isField("scalar ps2")) { 
     dfloat u, v, w;

@@ -24,14 +24,16 @@ SOFTWARE.
 
 */
 
-
-extern "C" void FUNC(axmyz)(const dlong & N, const dfloat & alpha, const dfloat * __restrict__ a,
-               const dfloat * __restrict__ b, dfloat * __restrict__ c)
+extern "C" void FUNC(axmyz)(const dlong &N,
+                            const dfloat &alpha,
+                            const dfloat *__restrict__ a,
+                            const dfloat *__restrict__ b,
+                            dfloat *__restrict__ c)
 {
 #ifdef __NEKRS__OMP__
-  #pragma omp parallel for
+#pragma omp parallel for
 #endif
-  for(dlong i=0;i<N;++i){
+  for (dlong i = 0; i < N; ++i) {
     c[i] = alpha * a[i] * b[i];
   }
 }

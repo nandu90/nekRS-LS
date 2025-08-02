@@ -37,7 +37,7 @@ SOFTWARE.
 
 static occa::kernel vectorDotStarKernel;
 
-MGSolver_t::coarseLevel_t::coarseLevel_t(const std::string& name_, setupAide options_, MPI_Comm comm_)
+MGSolver_t::coarseLevel_t::coarseLevel_t(const std::string &name_, setupAide options_, MPI_Comm comm_)
 {
   name = name_;
   options = options_;
@@ -46,10 +46,10 @@ MGSolver_t::coarseLevel_t::coarseLevel_t(const std::string& name_, setupAide opt
 }
 
 void MGSolver_t::coarseLevel_t::updateMatrix(
-  dlong nnz,     //--
-  hlong *Ai,     //-- Local A matrix data (globally indexed, COO storage, row sorted)
-  hlong *Aj,     //--
-  dfloat *Avals) //--
+    dlong nnz,     //--
+    hlong *Ai,     //-- Local A matrix data (globally indexed, COO storage, row sorted)
+    hlong *Aj,     //--
+    dfloat *Avals) //--
 {
   std::string crsSolver;
   options.getArgs("MULTIGRID COARSE SOLVER", crsSolver);
@@ -57,7 +57,7 @@ void MGSolver_t::coarseLevel_t::updateMatrix(
   if (crsSolver.find("BOOMERAMG") != std::string::npos) {
     auto boomerAMG = (hypreWrapper::boomerAMG_t *)this->boomerAMG;
 
-    // convert dfloat to double 
+    // convert dfloat to double
     std::vector<double> Av(nnz);
     for (int i = 0; i < Av.size(); i++) {
       Av[i] = Avals[i];
@@ -107,7 +107,7 @@ void MGSolver_t::coarseLevel_t::setupSolver(
   h_xBuffer = platform->device.mallocHost<pfloat>(N);
   xBuffer = (pfloat *)h_xBuffer.ptr();
 
-  // convert dfloat to double 
+  // convert dfloat to double
   std::vector<double> Av(nnz);
   for (int i = 0; i < Av.size(); i++) {
     Av[i] = Avals[i];
@@ -234,7 +234,7 @@ void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
     const bool useDevice = options.compareArgs("MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
 
     const pfloat zero = 0.0;
-    platform->linAlg->pfill(N, zero, o_xBuffer);
+    platform->linAlg->fill<pfloat>(N, zero, o_xBuffer);
     if (!useDevice) {
       o_xBuffer.copyTo(xBuffer, N);
     }

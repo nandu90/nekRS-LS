@@ -19,28 +19,28 @@ SOFTWARE.
 */
 #include <cmath>
 
+extern "C" void FUNC(weightedNorm1Many)(const dlong &Nblocks,
+                                        const dlong &N,
+                                        const dlong &Nfields,
+                                        const dlong &offset,
+                                        const dfloat *__restrict__ cpu_w,
+                                        const dfloat *__restrict__ cpu_a,
+                                        dfloat *__restrict__ cpu_wa)
+{
 
-extern "C" void FUNC(weightedNorm1Many)(const dlong & Nblocks, const dlong & N, 
-                        const dlong & Nfields,
-                        const dlong & offset,
-                        const dfloat * __restrict__ cpu_w,
-                        const dfloat * __restrict__ cpu_a,
-                        dfloat * __restrict__ cpu_wa){
-  
   dfloat wa2 = 0;
 
 #ifdef __NEKRS__OMP__
-  #pragma omp parallel for collapse(2) reduction(+:wa2)
+#pragma omp parallel for collapse(2) reduction(+ : wa2)
 #endif
-  for(int fld=0;fld<Nfields;fld++) {
-    for(int i=0;i<N;++i){
-      const dlong id = i + fld*offset;
+  for (int fld = 0; fld < Nfields; fld++) {
+    for (int i = 0; i < N; ++i) {
+      const dlong id = i + fld * offset;
       const dfloat ai = cpu_a[id];
       const dfloat wi = cpu_w[i];
-      wa2 += fabs(ai)*wi;
+      wa2 += fabs(ai) * wi;
     }
   }
 
   cpu_wa[0] = wa2;
-
 }

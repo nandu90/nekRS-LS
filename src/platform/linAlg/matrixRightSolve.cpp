@@ -31,17 +31,12 @@
 #include "mesh.h"
 
 extern "C" {
-void dgesv_ ( int* N, int* NRHS, double* A,
-              int* LDA,
-              int* IPIV,
-              double* B,
-              int* LDB,
-              int* INFO );
+void dgesv_(int *N, int *NRHS, double *A, int *LDA, int *IPIV, double *B, int *LDB, int *INFO);
 }
 
 // C = A/B  = trans(trans(B)\trans(A))
 // assume row major
-void matrixRightSolve(int NrowsA, int NcolsA, dfloat* A, int NrowsB, int NcolsB, dfloat* B, dfloat* C)
+void matrixRightSolve(int NrowsA, int NcolsA, dfloat *A, int NrowsB, int NcolsB, dfloat *B, dfloat *C)
 {
   int info;
 
@@ -54,25 +49,29 @@ void matrixRightSolve(int NrowsA, int NcolsA, dfloat* A, int NrowsB, int NcolsB,
   int lwork = NrowsX * NcolsX;
 
   // compute inverse mass matrix
-  double* tmpX = (double*) calloc(NrowsX * NcolsX, sizeof(double));
-  double* tmpY = (double*) calloc(NrowsY * NcolsY, sizeof(double));
+  double *tmpX = (double *)calloc(NrowsX * NcolsX, sizeof(double));
+  double *tmpY = (double *)calloc(NrowsY * NcolsY, sizeof(double));
 
-  int* ipiv = (int*) calloc(NrowsX, sizeof(int));
-  double* work = (double*) calloc(lwork, sizeof(double));
+  int *ipiv = (int *)calloc(NrowsX, sizeof(int));
+  double *work = (double *)calloc(lwork, sizeof(double));
 
-  for(int n = 0; n < NrowsX * NcolsX; ++n)
+  for (int n = 0; n < NrowsX * NcolsX; ++n) {
     tmpX[n] = B[n];
+  }
 
-  for(int n = 0; n < NrowsY * NcolsY; ++n)
+  for (int n = 0; n < NrowsY * NcolsY; ++n) {
     tmpY[n] = A[n];
+  }
 
   dgesv_(&NrowsX, &NcolsY, tmpX, &NrowsX, ipiv, tmpY, &NrowsY, &info); // ?
 
-  for(int n = 0; n < NrowsY * NcolsY; ++n)
+  for (int n = 0; n < NrowsY * NcolsY; ++n) {
     C[n] = tmpY[n];
+  }
 
-  if(info)
+  if (info) {
     printf("matrixRightSolve: dgesv reports info = %d when inverting matrix\n", info);
+  }
 
   free(work);
   free(ipiv);

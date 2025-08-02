@@ -72,7 +72,7 @@ public:
       fields.push_back("geom");
     }
 
-    if (!options.compareArgs("FLUID SOLVER", "NONE") && !options.compareArgs("FLUID VELOCITY SOLVER", "NONE")) {
+    if (!options.compareArgs("FLUID", "FALSE") && !options.compareArgs("FLUID VELOCITY SOLVER", "NONE")) {
       fields.push_back("fluid velocity");
       fields.push_back("fluid pressure");
    }

@@ -1,7 +1,7 @@
 userSections = CASEDATA
 
 [GENERAL]
-verbose = true 
+#verbose = true 
 polynomialOrder = 9
 #startFrom = "restart.fld"
 stopAt = numSteps

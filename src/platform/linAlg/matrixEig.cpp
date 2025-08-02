@@ -31,12 +31,24 @@
 #include "mesh.h"
 
 extern "C" {
-void dgeev_(char* JOBVL, char* JOBVR, int* N, double* A, int* LDA, double* WR, double* WI,
-            double* VL, int* LDVL, double* VR, int* LDVR, double* WORK, int* LWORK, int* INFO );
+void dgeev_(char *JOBVL,
+            char *JOBVR,
+            int *N,
+            double *A,
+            int *LDA,
+            double *WR,
+            double *WI,
+            double *VL,
+            int *LDVL,
+            double *VR,
+            int *LDVR,
+            double *WORK,
+            int *LWORK,
+            int *INFO);
 }
 
 // compute right eigenvectors
-void matrixEig(int N, dfloat* A, dfloat* VR, dfloat* WR, dfloat* WI)
+void matrixEig(int N, dfloat *A, dfloat *VR, dfloat *WR, dfloat *WI)
 {
   char JOBVL = 'N';
   char JOBVR = 'V';
@@ -45,25 +57,28 @@ void matrixEig(int N, dfloat* A, dfloat* VR, dfloat* WR, dfloat* WI)
   int LDVR = N;
   int LWORK = 8 * N;
 
-  double* tmpA  = (double*) calloc(N * N,sizeof(double));
-  double* tmpWR = (double*) calloc(N,sizeof(double));
-  double* tmpWI = (double*) calloc(N,sizeof(double));
-  double* tmpVR = (double*) calloc(N * N,sizeof(double));
-  double* tmpVL = NULL;
-  double* WORK  = (double*) calloc(LWORK,sizeof(double));
+  double *tmpA = (double *)calloc(N * N, sizeof(double));
+  double *tmpWR = (double *)calloc(N, sizeof(double));
+  double *tmpWI = (double *)calloc(N, sizeof(double));
+  double *tmpVR = (double *)calloc(N * N, sizeof(double));
+  double *tmpVL = NULL;
+  double *WORK = (double *)calloc(LWORK, sizeof(double));
 
   int info;
 
-  for(int n = 0; n < N; ++n)
-    for(int m = 0; m < N; ++m)
+  for (int n = 0; n < N; ++n) {
+    for (int m = 0; m < N; ++m) {
       tmpA[n + m * N] = A[n * N + m];
+    }
+  }
 
-  dgeev_ (&JOBVL, &JOBVR, &N, tmpA, &LDA, tmpWR, tmpWI, tmpVL, &LDVL, tmpVR, &LDVR, WORK, &LWORK, &info);
+  dgeev_(&JOBVL, &JOBVR, &N, tmpA, &LDA, tmpWR, tmpWI, tmpVL, &LDVL, tmpVR, &LDVR, WORK, &LWORK, &info);
 
-  for(int n = 0; n < N; ++n) {
+  for (int n = 0; n < N; ++n) {
     WR[n] = tmpWR[n];
     WI[n] = tmpWI[n];
-    for(int m = 0; m < N; ++m)
+    for (int m = 0; m < N; ++m) {
       VR[n + m * N] = tmpVR[n * N + m];
+    }
   }
 }

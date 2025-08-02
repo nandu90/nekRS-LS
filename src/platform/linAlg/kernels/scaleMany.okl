@@ -27,7 +27,7 @@ SOFTWARE.
 // scale every entry of a vector by a constant scalar
 
 @kernel void scaleMany(const dlong N,
-                       const dlong Nfields,
+                       const int Nfields,
                        const dlong fieldOffset,
                        const dlong offset,
                        const dfloat alpha,

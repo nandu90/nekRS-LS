@@ -8,7 +8,7 @@
 static void addGJP(mesh_t *mesh, const occa::memory& o_EToB, const occa::memory& o_coef, dlong fieldOffset, const occa::memory& o_U, const occa::memory& o_S, occa::memory& o_out)
 {
    // (n * o_grad)
-   auto o_grad = opSEM::strongGrad(mesh, fieldOffset, o_S);
+   auto o_grad = opSEM::strongGrad(mesh, fieldOffset, o_S, false);
 
    auto o_jump = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements * mesh->Nfaces * mesh->Nfp);
    auto o_h = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements * mesh->Nfaces);

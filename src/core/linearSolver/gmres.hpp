@@ -25,9 +25,8 @@ public:
 
     this->tiny = 10 * std::numeric_limits<T>::min();
     this->FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
-    this->knlPrefix = std::string("gmres::") +
-                      ((std::is_same<T, pfloat>::value) ? std::string("pfloat") : std::string("")) +
-                      std::to_string(this->Nfields) + "-";
+    auto type = ((std::is_same<T, pfloat>::value && !std::is_same<dfloat, pfloat>::value) ? std::string("pfloat") : std::string(""));
+    this->knlPrefix = std::string("gmres::") + type + std::to_string(this->Nfields) + "-";
   };
 
   int solve(const dfloat tol, const int MAXIT, dfloat &rdotr, occa::memory &o_r, occa::memory &o_x) override

@@ -212,6 +212,19 @@ void advectionSubcyclingRK(mesh_t *_meshT,
   cubatureOffset = _cubatureOffset;
   o_divUMesh = _o_divUMesh; 
 
+        
+  if (platform->verbose()) { 
+    const dfloat debugNorm = platform->linAlg->weightedNorm2Many(meshV->Nlocal,
+                                                                 meshV->dim,
+                                                                 meshOffset,
+                                                                 meshV->ogs->o_invDegree,
+                                                                 o_divUMesh,
+                                                                 platform->comm.mpiComm);
+    if (platform->comm.mpiRank == 0) {
+      printf("geom o_div norm: %.15e\n", debugNorm);
+    }
+  }
+
   for (int torder = nEXT - 1; torder >= 0; torder--) {
     // Initialize u0 = U^(t-torder*dt)
     launchKernel("core-subCycleInitU0",

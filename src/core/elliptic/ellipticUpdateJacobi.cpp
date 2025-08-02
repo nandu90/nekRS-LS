@@ -42,9 +42,8 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
     }
   }
 
-  auto kernel = (elliptic->mgLevel) ?
-                elliptic->ellipticBlockBuildDiagonalPfloatKernel :
-                elliptic->ellipticBlockBuildDiagonalKernel;
+  auto kernel = (elliptic->mgLevel) ? elliptic->ellipticBlockBuildDiagonalPfloatKernel
+                                    : elliptic->ellipticBlockBuildDiagonalKernel;
 
   kernel(mesh->Nelements,
          elliptic->Nfields,
@@ -60,8 +59,7 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
   flopCount += 12 * mesh->Nq + 12;
   flopCount += (elliptic->poisson) ? 0.0 : 2.0;
   flopCount *= static_cast<double>(mesh->Nlocal) * elliptic->Nfields;
-  flopCount *= (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value) 
-               ? 0.5 : 1.0;
+  flopCount *= (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value) ? 0.5 : 1.0;
 
   oogs::startFinish(o_invDiagA,
                     elliptic->Nfields,
@@ -70,37 +68,38 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
                     ogsAdd,
                     elliptic->oogs);
 
-  if(elliptic->mgLevel)
-    platform->linAlg->padyMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_invDiagA);
-  else
+  if (elliptic->mgLevel) {
+    platform->linAlg->adyMany<pfloat>(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_invDiagA);
+  } else {
     platform->linAlg->adyMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_invDiagA);
+  }
 
   platform->flopCounter->add(elliptic->name + " ellipticUpdateJacobi", flopCount);
 }
 
 void ellipticUpdateAllJacobi(elliptic_t *ellipticBase)
 {
-  setupAide& options = ellipticBase->options;
+  setupAide &options = ellipticBase->options;
 
-  if(options.compareArgs("PRECONDITIONER", "MULTIGRID") &&
-     options.compareArgs("MULTIGRID SMOOTHER", "DAMPEDJACOBI")) {
+  if (options.compareArgs("PRECONDITIONER", "MULTIGRID") &&
+      options.compareArgs("MULTIGRID SMOOTHER", "DAMPEDJACOBI")) {
     precon_t *precon = ellipticBase->precon;
-    MGSolver_t::multigridLevel** levels = precon->MGSolver->levels;
+    MGSolver_t::multigridLevel **levels = precon->MGSolver->levels;
 
-    for(int levelIndex = 0; levelIndex < ellipticBase->nLevels; levelIndex++) {
-      auto mgLevel = dynamic_cast<pMGLevel*>(levels[levelIndex]);
+    for (int levelIndex = 0; levelIndex < ellipticBase->nLevels; levelIndex++) {
+      auto mgLevel = dynamic_cast<pMGLevel *>(levels[levelIndex]);
       auto elliptic = mgLevel->elliptic;
       auto mesh = elliptic->mesh;
-  
+
       const bool coarsestLevel = (levelIndex == ellipticBase->nLevels - 1);
-      if(coarsestLevel && !elliptic->options.compareArgs("MULTIGRID COARSER SOLVER", "SMOOTHER")) {
+      if (coarsestLevel && !elliptic->options.compareArgs("MULTIGRID COARSER SOLVER", "SMOOTHER")) {
         continue; // skip
       }
 
-      ellipticUpdateJacobi(elliptic, mgLevel->o_invDiagA); 
+      ellipticUpdateJacobi(elliptic, mgLevel->o_invDiagA);
     }
-  } else if(options.compareArgs("PRECONDITIONER", "JACOBI")) {
+  } else if (options.compareArgs("PRECONDITIONER", "JACOBI")) {
     precon_t *precon = ellipticBase->precon;
-    ellipticUpdateJacobi(ellipticBase, precon->o_invDiagA); 
+    ellipticUpdateJacobi(ellipticBase, precon->o_invDiagA);
   }
 }

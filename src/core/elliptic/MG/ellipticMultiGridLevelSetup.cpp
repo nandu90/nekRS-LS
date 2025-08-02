@@ -335,17 +335,19 @@ dfloat pMGLevel::maxEigSmoothAx()
   o_Vx.copyFrom(Vx.data(), M);
   platform->linAlg->fill(Nlocal, 0.0, o_V[0]);
 
-  dfloat norm_vo = platform->linAlg->weightedInnerProdMany(Nlocal,
+  dfloat norm_v0 = platform->linAlg->weightedInnerProdMany(Nlocal,
                                                            elliptic->Nfields,
                                                            elliptic->fieldOffset,
                                                            o_invDegree,
                                                            o_Vx,
                                                            o_Vx,
                                                            platform->comm.mpiComm);
-  norm_vo = sqrt(norm_vo);
+  nekrsCheck(norm_v0 <= 0, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "invalid v0 norm!");
+  norm_v0 = sqrt(norm_v0);
 
+  // normalize
   platform->linAlg
-      ->axpbyMany(Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1. / norm_vo, o_Vx, 0.0, o_V[0]);
+      ->axpbyMany(Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1. / norm_v0, o_Vx, 0.0, o_V[0]);
 
   // Arnoldi
   for (int j = 0; j < k; j++) {
@@ -360,13 +362,13 @@ dfloat pMGLevel::maxEigSmoothAx()
     // modified Gram-Schmidth
     for (int i = 0; i <= j; i++) {
       // H(i,j) = v[i]'*A*v[j]
-      dfloat hij = platform->linAlg->weightedInnerProdMany(Nlocal,
-                                                           elliptic->Nfields,
-                                                           elliptic->fieldOffset,
-                                                           o_invDegree,
-                                                           o_V[i],
-                                                           o_V[j + 1],
-                                                           platform->comm.mpiComm);
+      const auto hij = platform->linAlg->weightedInnerProdMany(Nlocal,
+                                                               elliptic->Nfields,
+                                                               elliptic->fieldOffset,
+                                                               o_invDegree,
+                                                               o_V[i],
+                                                               o_V[j + 1],
+                                                               platform->comm.mpiComm);
 
       // v[j+1] = v[j+1] - hij*v[i]
       platform->linAlg
@@ -378,14 +380,14 @@ dfloat pMGLevel::maxEigSmoothAx()
     if (j + 1 < k) {
       // v[j+1] = v[j+1]/||v[j+1]||
       auto norm_vj = platform->linAlg->weightedInnerProdMany(Nlocal,
-                                                               elliptic->Nfields,
-                                                               elliptic->fieldOffset,
-                                                               o_invDegree,
-                                                               o_V[j + 1],
-                                                               o_V[j + 1],
-                                                               platform->comm.mpiComm);
+                                                             elliptic->Nfields,
+                                                             elliptic->fieldOffset,
+                                                             o_invDegree,
+                                                             o_V[j + 1],
+                                                             o_V[j + 1],
+                                                             platform->comm.mpiComm);
 
-      nekrsCheck(norm_vj <= 0, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "invalid norm!");
+      nekrsCheck(norm_vj <= 0, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "invalid vj norm!");
       norm_vj = sqrt(norm_vj);
 
       platform->linAlg->scaleMany(Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1 / norm_vj, o_V[j + 1]);

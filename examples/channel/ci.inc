@@ -13,12 +13,12 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("END TIME", std::string("0.1"));
   options.setArgs("DT", std::string("1e-3"));
   options.setArgs("SUBCYCLING STEPS", std::string("0"));
-  options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
+  options.setArgs("FLUID VELOCITY SOLVER", "CG+BLOCK");
   options.setArgs("BDF ORDER", "3");
   options.setArgs("ADVECTION", "FALSE");
-  options.setArgs("VELOCITY SOLVER TOLERANCE", std::string("1e-12"));
-  options.setArgs("PRESSURE SOLVER TOLERANCE", std::string("1e-08"));
-  options.setArgs("VELOCITY STRESSFORMULATION", "TRUE");
+  options.setArgs("FLUID VELOCITY SOLVER TOLERANCE", std::string("1e-12"));
+  options.setArgs("FLUID PRESSURE SOLVER TOLERANCE", std::string("1e-08"));
+  options.setArgs("FLUID STRESSFORMULATION", "TRUE");
   options.setArgs("ADVECTION TYPE", "CONVECTIVE");
 
   if (ciMode == 1) {

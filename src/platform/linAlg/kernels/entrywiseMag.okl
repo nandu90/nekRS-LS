@@ -25,10 +25,10 @@ SOFTWARE.
 */
 
 @kernel void entrywiseMag(const dlong N,
-                      const dlong Nfields,
-                      const dlong offset,
-                      @ restrict const dfloat *a,
-                      @ restrict dfloat *b)
+                          const int Nfields,
+                          const dlong offset,
+                          @ restrict const dfloat *a,
+                          @ restrict dfloat *b)
 {
 
   for (dlong n = 0; n < N; ++n; @tile(p_blockSize, @outer, @inner)) {

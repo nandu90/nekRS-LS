@@ -18,26 +18,24 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-extern "C" void FUNC(innerProd)(
-            const dlong & Nblocks,
-            const dlong & N,
-            const dlong & offset,
-            const dfloat * __restrict__ cpu_a,
-            const dfloat * __restrict__ cpu_b,
-            dfloat * __restrict__ cpu_ab){
+extern "C" void FUNC(innerProd)(const dlong &Nblocks,
+                                const dlong &N,
+                                const dlong &offset,
+                                const dfloat *__restrict__ cpu_a,
+                                const dfloat *__restrict__ cpu_b,
+                                dfloat *__restrict__ cpu_ab)
+{
 
   dfloat ab = 0;
 
 #ifdef __NEKRS__OMP__
-  #pragma omp parallel for reduction(+:ab)
+#pragma omp parallel for reduction(+ : ab)
 #endif
-  for(int i=0;i<N;++i){
-    const dfloat ai = cpu_a[i+offset];
+  for (int i = 0; i < N; ++i) {
+    const dfloat ai = cpu_a[i + offset];
     const dfloat bi = cpu_b[i];
-    ab += ai*bi;
+    ab += ai * bi;
   }
 
   cpu_ab[0] = ab;
-
 }

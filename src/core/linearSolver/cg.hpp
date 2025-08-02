@@ -55,9 +55,8 @@ public:
 
     this->tiny = 10 * std::numeric_limits<T>::min();
     this->FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
-    this->knlPrefix = std::string("cg::") +
-                      ((std::is_same<T, pfloat>::value) ? std::string("pfloat") : std::string("")) +
-                      std::to_string(this->Nfields) + "-";
+    auto type = ((std::is_same<T, pfloat>::value && !std::is_same<dfloat, pfloat>::value) ? std::string("pfloat") : std::string(""));
+    this->knlPrefix = std::string("cg::") + type + std::to_string(this->Nfields) + "-";
   };
 
   int solve(const dfloat tol, const int MAXIT, dfloat &rdotr, occa::memory &o_r, occa::memory &o_x) override
@@ -165,7 +164,7 @@ private:
     }
 
     // x <= x + alpha*p
-    platform->linAlg->axpbyMany(this->Nlocal, this->Nfields, this->fieldOffset, alpha, o_p, 1.0, o_x);
+    platform->linAlg->axpbyMany(this->Nlocal, this->Nfields, this->fieldOffset, alpha, o_p, static_cast<T>(1.0), o_x);
 
     MPI_Allreduce(MPI_IN_PLACE, &rdotr1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
 #ifdef ELLIPTIC_ENABLE_TIMER
@@ -282,7 +281,7 @@ private:
       printf("beta: %.15e\n", beta);
 #endif
 
-      platform->linAlg->axpbyMany(this->Nlocal, this->Nfields, this->fieldOffset, 1.0, o_z, beta, o_p);
+      platform->linAlg->axpbyMany(this->Nlocal, this->Nfields, this->fieldOffset, static_cast<dfloat>(1.0), o_z, beta, o_p);
 
       Ax(o_p, o_Ap);
 

@@ -1079,7 +1079,7 @@ int setup(int numberActiveFields)
   int stressForm = 1; // avoid recompilation + bypass unligned SYM/SHL check
 
   // for now velocityExists is always true
-  int velocityExists = (options->getArgs("FLUID SOLVER").empty()) ? 0 : 1;
+  int velocityExists = (options->getArgs("FLUID").empty()) ? 0 : 1;
 
   int nelgt, nelgv;
   re2::nelg(options->getArgs("MESH FILE"), nelgt, nelgv, platform->comm.mpiComm);
@@ -1187,7 +1187,7 @@ int setup(int numberActiveFields)
     gen_bcmap();
 
     auto flow = true;
-    if (platform->options.compareArgs("FLUID SOLVER", "NONE")) {
+    if (platform->options.compareArgs("FLUID", "FALSE")) {
       flow = false;
     }
 

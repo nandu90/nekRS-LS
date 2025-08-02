@@ -11,7 +11,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("END TIME", std::string("0.05"));
   options.setArgs("DT", std::string("1e-3"));
   options.setArgs("SUBCYCLING STEPS", std::string("0"));
-  options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
+  options.setArgs("FLUID VELOCITY SOLVER", "CG+BLOCK");
   options.setArgs("BDF ORDER", "3");
   options.setArgs("EXT ORDER", "3");
   options.setArgs("ADVECTION", "FALSE");

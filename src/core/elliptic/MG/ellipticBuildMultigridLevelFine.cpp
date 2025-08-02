@@ -58,7 +58,7 @@ elliptic_t *ellipticBuildMultigridLevelFine(elliptic_t *baseElliptic)
   if (elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
     platform->copyDfloatToPfloatKernel(mesh->Nlocal, baseElliptic->o_lambda0, elliptic->o_lambda0);
   } else {
-    platform->linAlg->pfill(mesh->Nlocal, elliptic->lambda0Avg, elliptic->o_lambda0);
+    platform->linAlg->fill<pfloat>(mesh->Nlocal, elliptic->lambda0Avg, elliptic->o_lambda0);
   }
 
   if (baseElliptic->poisson) {

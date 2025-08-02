@@ -19,21 +19,23 @@ SOFTWARE.
 */
 
 #include <stdio.h>
-extern "C" void FUNC(weightedSqrSum)(const dlong & Nblocks, const dlong & N, 
-                   const dfloat * __restrict__ cpu_w,
-                   const dfloat * __restrict__ cpu_a,
-                   dfloat * __restrict__ cpu_wa)
+
+extern "C" void FUNC(weightedSqrSum)(const dlong &Nblocks,
+                                     const dlong &N,
+                                     const dfloat *__restrict__ cpu_w,
+                                     const dfloat *__restrict__ cpu_a,
+                                     dfloat *__restrict__ cpu_wa)
 {
   dfloat wa2 = 0;
 
 #ifdef __NEKRS__OMP__
-  #pragma omp parallel for reduction(+:wa2)
+#pragma omp parallel for reduction(+ : wa2)
 #endif
-  for(int i=0;i<N;++i){
+  for (int i = 0; i < N; ++i) {
     const dfloat ai = cpu_a[i];
     const dfloat wi = cpu_w[i];
 
-    wa2 += (ai*wi) * (ai*wi);
+    wa2 += (ai * wi) * (ai * wi);
   }
 
   cpu_wa[0] = wa2;

@@ -18,27 +18,25 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-extern "C" void FUNC(weightedInnerProd)(
-            const dlong & Nblocks,
-            const dlong & N,
-            const dfloat * __restrict__ cpu_w,
-            const dfloat * __restrict__ cpu_a,
-            const dfloat * __restrict__ cpu_b,
-            dfloat * __restrict__ cpu_wab){
+extern "C" void FUNC(weightedInnerProd)(const dlong &Nblocks,
+                                        const dlong &N,
+                                        const dfloat *__restrict__ cpu_w,
+                                        const dfloat *__restrict__ cpu_a,
+                                        const dfloat *__restrict__ cpu_b,
+                                        dfloat *__restrict__ cpu_wab)
+{
 
   dfloat wab = 0;
 
 #ifdef __NEKRS__OMP__
-  #pragma omp parallel for reduction(+:wab)
+#pragma omp parallel for reduction(+ : wab)
 #endif
-  for(int i=0;i<N;++i){
+  for (int i = 0; i < N; ++i) {
     const dfloat ai = cpu_a[i];
     const dfloat bi = cpu_b[i];
     const dfloat wi = cpu_w[i];
-    wab += ai*bi*wi;
+    wab += ai * bi * wi;
   }
 
   cpu_wab[0] = wab;
-
 }

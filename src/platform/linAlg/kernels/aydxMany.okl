@@ -25,7 +25,7 @@ SOFTWARE.
 */
 
 @kernel void aydxMany(const dlong N,
-                      const dlong Nfields,
+                      const int Nfields,
                       const dlong fieldOffset,
                       const dlong mode,
                       const dfloat alpha,

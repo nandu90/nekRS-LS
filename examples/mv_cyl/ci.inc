@@ -35,8 +35,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
     options.setArgs("GEOM INITIAL GUESS", "PROJECTION");
     options.setArgs("GEOM RESIDUAL PROJECTION VECTORS", std::string("1"));
-    options.setArgs("GEOM SOLVER", "PCG");
-    options.setArgs("GEOM BLOCK SOLVER", "TRUE");
+    options.setArgs("GEOM SOLVER", "PCG+BLOCK");
     options.setArgs("GEOM SOLVER TOLERANCE", "1e-6");
   }
   if (ciMode == 4) {
@@ -46,8 +45,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     platform->par->set("casedata", "p_rot", 0.5);
   }
   if (ciMode == 6 || ciMode == 8) {
-    options.setArgs("GEOM SOLVER", "PCG");
-    options.setArgs("GEOM BLOCK SOLVER", "TRUE");
+    options.setArgs("GEOM SOLVER", "PCG+BLOCK");
     options.setArgs("GEOM SOLVER TOLERANCE", "1e-6");
     options.setArgs("GEOM INITIAL GUESS", "PROJECTION");
     options.setArgs("GEOM RESIDUAL PROJECTION VECTORS", std::string("1"));

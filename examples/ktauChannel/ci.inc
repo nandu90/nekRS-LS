@@ -22,18 +22,18 @@ void ciSetup(MPI_Comm comm, setupAide &options)
 
   options.setArgs("SUBCYCLING STEPS", std::string("0"));
 
-  options.setArgs("PRESSURE KRYLOV SOLVER", "PGMRES+FLEXIBLE");
-  options.setArgs("PRESSURE SOLVER TOLERANCE", std::string("1e-4"));
-  options.setArgs("PRESSURE PRECONDITIONER", "MULTIGRID");
-  options.setArgs("PRESSURE MULTIGRID COARSE SOLVE", "TRUE");
-  options.setArgs("PRESSURE MULTIGRID SMOOTHER", "FOURTHOPTCHEBYSHEV+ASM");
-  options.setArgs("PRESSURE MULTIGRID CHEBYSHEV DEGREE", std::string("3"));
-  options.setArgs("PRESSURE MULTIGRID CHEBYSHEV MAX EIGENVALUE BOUND FACTOR", std::string("1.1"));
-  options.setArgs("PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
+  options.setArgs("FLUID PRESSURE SOLVER", "GMRES+FLEXIBLE");
+  options.setArgs("FLUID PRESSURE SOLVER TOLERANCE", std::string("1e-4"));
+  options.setArgs("FLUID PRESSURE PRECONDITIONER", "MULTIGRID");
+  options.setArgs("FLUID PRESSURE MULTIGRID COARSE SOLVE", "TRUE");
+  options.setArgs("FLUID PRESSURE MULTIGRID SMOOTHER", "FOURTHOPTCHEBYSHEV+ASM");
+  options.setArgs("FLUID PRESSURE MULTIGRID CHEBYSHEV DEGREE", std::string("3"));
+  options.setArgs("FLUID PRESSURE MULTIGRID CHEBYSHEV MAX EIGENVALUE BOUND FACTOR", std::string("1.1"));
+  options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
 
-  options.setArgs("VELOCITY SOLVER TOLERANCE", std::string("1e-6"));
-  options.setArgs("VELOCITY BLOCK SOLVER", "TRUE");
-  options.setArgs("VELOCITY INITIAL GUESS", "EXTRAPOLATION");
+  options.setArgs("FLUID VELOCITY SOLVER TOLERANCE", std::string("1e-6"));
+  options.setArgs("FLUID VELOCITY SOLVER", "CG+BLOCK");
+  options.setArgs("FLUID VELOCITY INITIAL GUESS", "EXTRAPOLATION");
 
   options.setArgs("SCALAR00 SOLVER TOLERANCE", std::string("1e-6"));
   options.setArgs("SCALAR00 INITIAL GUESS", "EXTRAPOLATION");

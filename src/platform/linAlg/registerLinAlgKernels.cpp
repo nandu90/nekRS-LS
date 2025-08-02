@@ -82,7 +82,9 @@ void registerLinAlgKernels()
     const std::string extension = (serial && nativeSerialImplementation) ? ".c" : ".okl";
     const bool pfloatKernel = (kernelName.front() == 'p') ? true : false;
 
-    if (pfloatKernel && (sizeof(dfloat) == sizeof(pfloat))) continue; 
+    if (pfloatKernel && (sizeof(dfloat) == sizeof(pfloat))) {
+      continue;
+    }
 
     fileName = kernelName;
     occa::properties props = kernelInfo;

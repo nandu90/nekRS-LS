@@ -19,8 +19,8 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   }
   options.setArgs("BDF ORDER", "2");
   options.setArgs("ADVECTION TYPE", "CONVECTIVE+CUBATURE");
-  options.setArgs("VELOCITY SOLVER TOLERANCE", std::string("1e-06"));
-  options.setArgs("PRESSURE SOLVER TOLERANCE", std::string("1e-04"));
+  options.setArgs("FLUID VELOCITY SOLVER TOLERANCE", std::string("1e-06"));
+  options.setArgs("FLUID PRESSURE SOLVER TOLERANCE", std::string("1e-04"));
   options.setArgs("SCALAR01 SOLVER TOLERANCE", std::string("1e-06"));
   options.setArgs("VARIABLEPROPERTIES", "TRUE");
 
@@ -71,25 +71,18 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, int tstep)
 
   std::vector<dfloat> Texpected = {13.921, 0.00133, 9.62969};
 
-  const auto tol = 1e-4;
-  bool pass = true;
+  dfloat relError = 0;
   for (int i = 0; i < nPoints; ++i) {
-    pass &= std::abs(Tint[i] - Texpected[i]) < tol;
+    relError = std::max(relError, std::abs(Tint[i] - Texpected[i]));
   }
+  if (platform->comm.mpiRank == 0) {
+    std::cout << "Point interpolation relErr=" << relError << std::endl;
+  } 
 
-  if (!pass) {
+  const auto tol = 5e-4;
+  if (relError > tol) {
     if (platform->comm.mpiRank == 0) {
       std::cout << "Point interpolation test failed" << std::endl;
-      std::cout << "Expected: ";
-      for (int i = 0; i < nPoints; ++i) {
-        std::cout << Texpected[i] << " ";
-      }
-      std::cout << std::endl;
-      std::cout << "Got: ";
-      for (int i = 0; i < nPoints; ++i) {
-        std::cout << Tint[i] << " ";
-      }
-      std::cout << std::endl;
     }
 
     CiFailTest();

@@ -19,19 +19,16 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+extern "C" void
+FUNC(axmy)(const dlong &N, const dfloat &alpha, const dfloat *__restrict__ cpu_w, dfloat *__restrict__ cpu_a)
+{
 
-extern "C" void FUNC(axmy)(const dlong & N, 
-          const dfloat& alpha,
-                 const dfloat * __restrict__ cpu_w,
-                 dfloat * __restrict__ cpu_a){
- 
-#ifdef __NEKRS__OMP__ 
-  #pragma omp parallel for
+#ifdef __NEKRS__OMP__
+#pragma omp parallel for
 #endif
-  for(int i=0;i<N;++i){
+  for (int i = 0; i < N; ++i) {
     const dfloat ai = cpu_a[i];
     const dfloat wi = cpu_w[i];
-    cpu_a[i] = alpha*ai*wi;
+    cpu_a[i] = alpha * ai * wi;
   }
-
 }

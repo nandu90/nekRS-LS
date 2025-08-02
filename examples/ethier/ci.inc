@@ -125,8 +125,6 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("SUBCYCLING STEPS", std::string("0"));
   options.setArgs("FLUID PRESSURE INITIAL GUESS", "PREVIOUS");
 
-  options.setArgs("FLUID VELOCITY BLOCK SOLVER", "FALSE");
-
   options.setArgs("SCALAR INITIAL GUESS", "PREVIOUS");
   options.setArgs("FLUID VELOCITY INITIAL GUESS", "PREVIOUS");
   options.setArgs("ADVECTION TYPE", "CONVECTIVE+CUBATURE");
@@ -144,7 +142,8 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("SCALAR01 SOLVER TOLERANCE", std::string("1e-12"));
 
   if (ciMode == 2 || ciMode == 19 || ciMode == 22) {
-    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY SOLVER", options.getArgs("FLUID VELOCITY SOLVER") + "+BLOCK");
+
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
 
     if (ciMode == 22) {
@@ -163,7 +162,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   if (ciMode == 3) {
     options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
     options.setArgs("FLUID VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
-    options.setArgs("FLUID PRESSURE PRECONDITIONER", "SEMFEM");
+    options.setArgs("FLUID PRESSURE PRECONDITIONER", "MULTIGRID+SEMFEM");
     options.setArgs("FLUID PRESSURE COARSE SOLVER LOCATION", "DEVICE");
     if (platform->serial) { 
       options.setArgs("FLUID PRESSURE COARSE SOLVER LOCATION", "CPU");
@@ -171,14 +170,14 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   }
   if (ciMode == 4) {
     options.setArgs("END TIME", std::string("0.2"));
-    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY SOLVER", options.getArgs("FLUID VELOCITY SOLVER") + "+BLOCK");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
     options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
     options.setArgs("FLUID VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
   }
   if (ciMode == 5) {
     options.setArgs("END TIME", std::string("0.2"));
-    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY SOLVER", options.getArgs("FLUID VELOCITY SOLVER") + "+BLOCK");
     options.setArgs("SUBCYCLING STEPS", std::string("0"));
     std::string casename = platform->options.getArgs("CASENAME");
     nekrsCheck(casename != "mv_ethier",
@@ -189,7 +188,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   }
   if (ciMode == 6) {
     options.setArgs("END TIME", std::string("0.2"));
-    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY SOLVER", options.getArgs("FLUID VELOCITY SOLVER") + "+BLOCK");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
     std::string casename = platform->options.getArgs("CASENAME");
     nekrsCheck(casename != "mv_ethier",
@@ -221,19 +220,19 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   }
   if (ciMode == 9) {
     options.setArgs("ADVECTION TYPE", "CONVECTIVE");
-    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY SOLVER", options.getArgs("FLUID VELOCITY SOLVER") + "+BLOCK");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
     options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
   }
   if (ciMode == 10) {
     options.setArgs("ADVECTION TYPE", "CONVECTIVE");
-    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY SOLVER", options.getArgs("FLUID VELOCITY SOLVER") + "+BLOCK");
     options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
   }
   if (ciMode == 11) {
     options.setArgs("FLUID PRESSURE MULTIGRID SMOOTHER", "DAMPEDJACOBI,CHEBYSHEV");
     options.setArgs("FLUID PRESSURE MULTIGRID CHEBYSHEV MIN EIGENVALUE BOUND FACTOR", "0.1");
-    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY SOLVER", options.getArgs("FLUID VELOCITY SOLVER") + "+BLOCK");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
     options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
   }
@@ -254,7 +253,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   if (ciMode == 14) {
     options.setArgs("FLUID PRESSURE MULTIGRID SMOOTHER", "ASM");
     options.setArgs("FLUID PRESSURE MGSOLVER CYCLE", "VCYCLE+ADDITIVE+OVERLAPCRS");
-    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
+    options.setArgs("FLUID VELOCITY SOLVER", options.getArgs("FLUID VELOCITY SOLVER") + "+BLOCK");
     options.setArgs("SUBCYCLING STEPS", std::string("1"));
     options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
   }
@@ -1026,17 +1025,17 @@ void ciTestErrors(nrs_t *nrs,
 
     int expectedNiterP = 5; 
 
-    // mode 4 uses SEMFEM
+    // uses SEMFEM
     if (ciMode == 3) {
-      expectedNiterP = 22;
+      expectedNiterP = 7;
     }
 
-    // mode 11 uses Chebyshev+Jacobi smoothing
+    // uses Chebyshev+Jacobi smoothing
     if (ciMode == 11) {
       expectedNiterP = 9;
     }
 
-    // mode 14 uses additive multigrid with Schwarz
+    // uses additive multigrid with Schwarz
     if (ciMode == 14) {
       expectedNiterP = 20;
     }
@@ -1176,7 +1175,7 @@ void ciTestErrors(nrs_t *nrs,
     velIterTest = abs(NiterU - 6) < 2;
     s1Test = abs((err[2] - 5.25E-12) / err[2]) < EPS;
     s2Test = abs((err[3] - 6.09E-12) / err[3]) < EPS;
-    pIterTest = abs(NiterP - 9) < 2;
+    pIterTest = abs(NiterP - 3) < 2;
     vxTest = abs((err[0] - 2.78E-10) / err[0]) < EPS;
     prTest = abs((err[1] - 7.11E-10) / err[1]) < EPS;
     break;
@@ -1323,7 +1322,7 @@ void ciTestErrors(nrs_t *nrs,
 
     s1Test = true;
     s2Test = abs((err[3] - 6.30E-12) / err[3]) < EPS;
-    pIterTest = abs(NiterP - 6) < 2;
+    pIterTest = abs(NiterP - 5) < 2;
 
     vxTest = abs((err[0] - 2.78E-10) / err[0]) < EPS;
     prTest = abs((err[1] - 6.98E-10) / err[1]) < EPS;

@@ -18,21 +18,21 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+extern "C" void FUNC(norm2)(const dlong &Nblocks,
+                            const dlong &N,
+                            const dfloat *__restrict__ cpu_a,
+                            dfloat *__restrict__ normA)
+{
 
-extern "C" void FUNC(norm2)(const dlong & Nblocks, const dlong & N, 
-                   const dfloat * __restrict__ cpu_a,
-                   dfloat * __restrict__ normA){
-  
   dfloat wa2 = 0;
 
 #ifdef __NEKRS__OMP__
-  #pragma omp parallel for reduction(+:wa2)
+#pragma omp parallel for reduction(+ : wa2)
 #endif
-  for(int i=0;i<N;++i){
+  for (int i = 0; i < N; ++i) {
     const dfloat ai = cpu_a[i];
-    wa2 += ai*ai;
+    wa2 += ai * ai;
   }
 
   normA[0] = wa2;
-
 }

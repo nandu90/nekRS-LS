@@ -20,7 +20,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("DT", std::string("6e-3"));
   options.setArgs("SUBCYCLING STEPS", std::string("2"));
 
-  options.setArgs("FLUID PRESSURE KRYLOV SOLVER", "PGMRES+FLEXIBLE");
+  options.setArgs("FLUID PRESSURE SOLVER", "GMRES+FLEXIBLE");
   options.setArgs("FLUID PRESSURE SOLVER TOLERANCE", std::string("1e-4"));
   options.setArgs("FLUID PRESSURE PRECONDITIONER", "MULTIGRID");
   options.setArgs("FLUID PRESSURE MULTIGRID COARSE SOLVE", "TRUE");
@@ -31,7 +31,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("FLUID PRESSURE RESIDUAL PROJECTION VECTORS", std::string("8"));
 
   options.setArgs("FLUID VELOCITY SOLVER TOLERANCE", std::string("1e-6"));
-  options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
+  options.setArgs("FLUID VELOCITY SOLVER", "CG+BLOCK");
   options.setArgs("FLUID VELOCITY INITIAL GUESS", "EXTRAPOLATION");
 
   options.setArgs("FLUID VELOCITY REGULARIZATION METHOD", "HPFRT");

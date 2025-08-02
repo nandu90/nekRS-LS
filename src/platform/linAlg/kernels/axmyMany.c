@@ -19,25 +19,24 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+extern "C" void FUNC(axmyMany)(const dlong &N,
+                               const dlong &Nfields,
+                               const dlong &offset,
+                               const dlong &mode,
+                               const dfloat &alpha,
+                               const dfloat *__restrict__ cpu_w,
+                               dfloat *__restrict__ cpu_a)
+{
 
-extern "C" void FUNC(axmyMany)(const dlong & N, 
-                      const dlong & Nfields,
-                      const dlong & offset,
-                      const dlong & mode,
-                      const dfloat & alpha,
-                      const dfloat * __restrict__ cpu_w,
-                      dfloat * __restrict__ cpu_a){
- 
-#ifdef __NEKRS__OMP__ 
-  #pragma omp parallel for collapse(2)
+#ifdef __NEKRS__OMP__
+#pragma omp parallel for collapse(2)
 #endif
-  for(int fld=0;fld<Nfields;fld++) {
-    for(int i=0;i<N;++i){
-      const dlong id = i + fld*offset;
+  for (int fld = 0; fld < Nfields; fld++) {
+    for (int i = 0; i < N; ++i) {
+      const dlong id = i + fld * offset;
       const dfloat ai = cpu_a[id];
       const dfloat wi = cpu_w[i + mode * fld * offset];
-      cpu_a[id] = alpha*ai*wi;
+      cpu_a[id] = alpha * ai * wi;
     }
   }
-
 }

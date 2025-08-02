@@ -24,17 +24,17 @@ SOFTWARE.
 
 */
 
-@kernel void relativeError(const dlong N, 
-                           const int Nfields, 
-                           const dlong fieldOffset, 
-                           const dfloat absTol, 
-                           @ restrict const dfloat *u, 
-                           @ restrict const dfloat *uRef, 
+@kernel void relativeError(const dlong N,
+                           const int Nfields,
+                           const dlong fieldOffset,
+                           const dfloat absTol,
+                           @ restrict const dfloat *u,
+                           @ restrict const dfloat *uRef,
                            @ restrict dfloat *out)
 {
 
   for (dlong n = 0; n < N; ++n; @tile(p_blockSize, @outer, @inner)) {
-    for(int field = 0; field < Nfields; field++) {
+    for (int field = 0; field < Nfields; field++) {
       const dlong id = n + field * fieldOffset;
       const dfloat absError = fabs(u[id] - uRef[id]);
       const dfloat uRefAbs = fabs(uRef[id]);

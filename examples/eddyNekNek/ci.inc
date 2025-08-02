@@ -19,7 +19,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("BDF ORDER", "3");
   if (ciMode == 1 || ciMode == 3) {
     options.setArgs("NEKNEK BOUNDARY EXT ORDER", "3");
-    if (ciMode == 3) options.setArgs("VELOCITY SOLVER", "NONE");
+    if (ciMode == 3) options.setArgs("FLUID VELOCITY SOLVER", "NONE");
   } else if (ciMode == 2) {
     options.setArgs("NEKNEK BOUNDARY EXT ORDER", "1");
   }

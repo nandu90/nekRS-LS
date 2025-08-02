@@ -26,9 +26,9 @@ SOFTWARE.
 
 @kernel void weightedInnerProdMultiDevice(const dlong Nblock,
                                           const dlong N,
-                                          const dlong Nfields,
+                                          const int Nfields,
                                           const dlong fieldOffset,
-                                          const dlong NVec,
+                                          const int NVec,
                                           const dlong offset,
                                           const int weight,
                                           @ restrict const dfloat *w,
@@ -44,15 +44,18 @@ SOFTWARE.
       @barrier();
       for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
         const dlong id = t + p_blockSize * b;
-        if (b < 1 && t < 1)
+        if (b < 1 && t < 1) {
           wxy[v] = 0.0;
+        }
         s_wxy[t] = 0.0;
         if (id < N) {
           dfloat sum = 0.0;
-          for (dlong fld = 0; fld < Nfields; ++fld)
+          for (dlong fld = 0; fld < Nfields; ++fld) {
             sum += x[id + Nfields * fieldOffset * v + fld * fieldOffset] * y[id + offset + fld * fieldOffset];
-          if (v == 0 && weight)
+          }
+          if (v == 0 && weight) {
             wght = w[id];
+          }
 
           s_wxy[t] = (weight) ? wght * sum : sum;
         }
@@ -60,56 +63,76 @@ SOFTWARE.
       @barrier();
 
 #if p_blockSize > 512
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
-        if (t < 512)
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+        if (t < 512) {
           s_wxy[t] += s_wxy[t + 512];
+        }
+      }
       @barrier();
 #endif
 #if p_blockSize > 256
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
-        if (t < 256)
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+        if (t < 256) {
           s_wxy[t] += s_wxy[t + 256];
+        }
+      }
       @barrier();
 #endif
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
-        if (t < 128)
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+        if (t < 128) {
           s_wxy[t] += s_wxy[t + 128];
+        }
+      }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
-        if (t < 64)
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+        if (t < 64) {
           s_wxy[t] += s_wxy[t + 64];
+        }
+      }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
-        if (t < 32)
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+        if (t < 32) {
           s_wxy[t] += s_wxy[t + 32];
+        }
+      }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
-        if (t < 16)
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+        if (t < 16) {
           s_wxy[t] += s_wxy[t + 16];
+        }
+      }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
-        if (t < 8)
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+        if (t < 8) {
           s_wxy[t] += s_wxy[t + 8];
+        }
+      }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
-        if (t < 4)
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+        if (t < 4) {
           s_wxy[t] += s_wxy[t + 4];
+        }
+      }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
-        if (t < 2)
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+        if (t < 2) {
           s_wxy[t] += s_wxy[t + 2];
+        }
+      }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
-        if (t < 1)
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {
+        if (t < 1) {
           @atomic wxy[v] += s_wxy[0] + s_wxy[1];
+        }
+      }
     }
   }
 }

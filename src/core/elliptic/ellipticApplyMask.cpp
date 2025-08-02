@@ -33,7 +33,7 @@ void ellipticApplyMask(elliptic_t *solver,
   }
 
   if (precision != dfloatString) {
-    platform->linAlg->pmask(Nmasked, o_maskIds, o_x);
+    platform->linAlg->mask<pfloat>(Nmasked, o_maskIds, o_x);
   } else {
     platform->linAlg->mask(Nmasked, o_maskIds, o_x);
   }

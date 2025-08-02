@@ -25,7 +25,7 @@ SOFTWARE.
 */
 
 @kernel void linearCombination(const dlong N,
-                               const dlong Nfields,
+                               const int Nfields,
                                const dlong offset,
                                @ restrict const dfloat *c,
                                @ restrict const dfloat *x,
@@ -36,7 +36,7 @@ SOFTWARE.
     dfloat sum = 0;
     for (int fld = 0; fld < Nfields; ++fld) {
       const dlong id = n + fld * offset;
-      sum += c[fld]* x[id];
+      sum += c[fld] * x[id];
     }
     y[n] = sum;
   }

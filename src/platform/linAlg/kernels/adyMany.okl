@@ -25,7 +25,7 @@ SOFTWARE.
 */
 
 @kernel void
-adyMany(const dlong N, const dlong Nfields, const dlong offset, const dfloat alpha, @ restrict dfloat *y)
+adyMany(const dlong N, const int Nfields, const dlong offset, const dfloat alpha, @ restrict dfloat *y)
 {
 
   for (dlong n = 0; n < N; ++n; @tile(p_blockSize, @outer, @inner)) {

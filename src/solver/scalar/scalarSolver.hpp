@@ -29,10 +29,11 @@ public:
   static constexpr double targetTimeBenchmark{0.2};
 
   scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &geom);
-  void solve(double time, int stage);
   void makeExplicit(int is, double time, int tstep);
   void makeAdvection(int is, double time, int tstep);
   void makeForcing();
+
+  void solve(double time, int stage) override;
 
   void saveSolutionState() override;
   void restoreSolutionState() override;

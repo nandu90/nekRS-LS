@@ -33,9 +33,10 @@ SOFTWARE.
 {
 
   for (dlong n = 0; n < N; ++n; @tile(p_blockSize, @outer, @inner)) {
-    if (beta != 0)
+    if (beta != 0) {
       y[n] = alpha * x[n] / a[n] + beta * y[n];
-    else
+    } else {
       y[n] = alpha * x[n] / a[n];
+    }
   }
 }

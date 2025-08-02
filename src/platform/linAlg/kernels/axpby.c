@@ -18,9 +18,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
-extern "C" void FUNC(axpby)(const dlong & N, const dlong & xOffset, const dlong& yOffset, const dfloat & alpha, const dfloat * __restrict__ cpu_a, 
-               const dfloat &beta, dfloat * __restrict__ cpu_b)
+extern "C" void FUNC(axpby)(const dlong &N,
+                            const dlong &xOffset,
+                            const dlong &yOffset,
+                            const dfloat &alpha,
+                            const dfloat *__restrict__ cpu_a,
+                            const dfloat &beta,
+                            dfloat *__restrict__ cpu_b)
 {
 
   if (beta != 0) {
@@ -28,10 +32,10 @@ extern "C" void FUNC(axpby)(const dlong & N, const dlong & xOffset, const dlong&
 #ifdef __NEKRS__OMP__
 #pragma omp parallel for
 #endif
-    for(dlong i=0;i<N;++i){
+    for (dlong i = 0; i < N; ++i) {
       const dfloat ai = cpu_a[i + xOffset];
       const dfloat bi = cpu_b[i + yOffset];
-      cpu_b[i + yOffset] = alpha*ai + beta*bi;
+      cpu_b[i + yOffset] = alpha * ai + beta * bi;
     }
 
   } else {
@@ -39,11 +43,9 @@ extern "C" void FUNC(axpby)(const dlong & N, const dlong & xOffset, const dlong&
 #ifdef __NEKRS__OMP__
 #pragma omp parallel for
 #endif
-    for(dlong i=0;i<N;++i){
+    for (dlong i = 0; i < N; ++i) {
       const dfloat ai = cpu_a[i + xOffset];
-      cpu_b[i + yOffset] = alpha*ai;
+      cpu_b[i + yOffset] = alpha * ai;
     }
-
   }
-
 }

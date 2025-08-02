@@ -296,7 +296,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
       auto o_tmp = platform->deviceMemoryPool.reserve<pfloat>(o_x.size());
       elliptic->precon->SEMFEMSolver->run(o_res, o_tmp);
 
-      platform->linAlg->paxpby(o_x.size(), 1.0, o_tmp, 1.0, o_x);
+      platform->linAlg->axpby(o_x.size(), 1.0, o_tmp, 1.0, o_x);
       baseLevel->smooth(o_rhs, o_x, false);
     };
   } else if (options.compareArgs("MULTIGRID COARSE GRID DISCRETIZATION", "SEMFEM")) {
@@ -342,8 +342,8 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
 
     precon->MGSolver->coarseLevel->solvePtr =
         [maxNiter, tol, baseLevel, &o_invDiagA](MGSolver_t::coarseLevel_t *coarseLevel,
-                                                  occa::memory &o_rhs,
-                                                  occa::memory &o_x) {
+                                                occa::memory &o_rhs,
+                                                occa::memory &o_x) {
           auto &o_r = baseLevel->o_res;
 #if 0
             baseLevel->residual(o_rhs, o_x, o_r);
@@ -393,7 +393,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
             auto o_tmp = platform->deviceMemoryPool.reserve<pfloat>(baseLevel->Nrows);
             coarseLevel->solve(o_res, o_tmp);
 
-            platform->linAlg->paxpby(baseLevel->Nrows, 1.0, o_tmp, 1.0, o_x);
+            platform->linAlg->axpby(baseLevel->Nrows, 1.0, o_tmp, 1.0, o_x);
             baseLevel->smooth(o_rhs, o_x, false);
           };
     }

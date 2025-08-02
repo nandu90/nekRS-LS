@@ -82,7 +82,7 @@ void schwarzSolve(MGSolver_t *M)
 
 } // namespace
 
-MGSolver_t::MGSolver_t(const std::string& name_, occa::device device_, MPI_Comm comm_, setupAide options_)
+MGSolver_t::MGSolver_t(const std::string &name_, occa::device device_, MPI_Comm comm_, setupAide options_)
 {
   name = name_;
   device = device_;
@@ -191,7 +191,7 @@ void MGSolver_t::runVcycle(int k)
 
   if (k == baseLevel) {
     // zero initialize o_x as we don't solve for masked points
-    platform->linAlg->pfill(o_x.size(), 0.0, o_x);
+    platform->linAlg->fill<pfloat>(o_x.size(), 0.0, o_x);
     coarseLevel->solvePtr(coarseLevel, o_rhs, o_x);
     return;
   }

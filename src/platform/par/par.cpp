@@ -677,9 +677,9 @@ void Par::parse(setupAide &options)
   if (ini->sections.count("fluid velocity")) {
     parsePressureSection(rank, options, ini);
     parseVelocitySection(rank, options, ini);
-    options.setArgs("FLUID SOLVER", "TRUE");
+    options.setArgs("FLUID", "TRUE");
   } else {
-    options.setArgs("FLUID SOLVER", "FALSE");
+    options.setArgs("FLUID", "FALSE");
   }
 
   parseScalarSections(rank, options, ini);

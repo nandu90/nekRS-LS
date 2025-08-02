@@ -38,14 +38,14 @@ void pMGLevel::Ax(occa::memory o_x, occa::memory o_Ax)
 void pMGLevel::residual(occa::memory o_rhs, occa::memory o_x, occa::memory o_res)
 {
   ellipticOperator(elliptic, o_x, o_res, pfloatString);
-  platform->linAlg->paxpbyMany(Nrows, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_rhs, -1.0, o_res);
+  platform->linAlg->axpbyMany<pfloat>(Nrows, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_rhs, -1.0, o_res);
 }
 
 void pMGLevel::coarsen(occa::memory o_x, occa::memory o_Rx)
 {
   double flopCounter = 0.0;
   if (options.compareArgs("DISCRETIZATION", "CONTINUOUS")) {
-    platform->linAlg->paxmy(mesh->Nelements * NpF, 1.0, o_invDegreeFine, o_x);
+    platform->linAlg->axmy<pfloat>(mesh->Nelements * NpF, 1.0, o_invDegreeFine, o_x);
     flopCounter += static_cast<double>(mesh->Nelements) * NpF;
   }
 
@@ -116,8 +116,8 @@ void pMGLevel::smooth(occa::memory o_rhs, occa::memory o_x, bool x_is_zero)
 void pMGLevel::smoother(occa::memory o_x, occa::memory o_Sx, bool x_is_zero)
 {
   if (chebySmootherType == ChebyshevSmootherType::JACOBI) {
-    platform->linAlg->paxmyz(Nrows, 1.0f, o_invDiagA, o_x, o_Sx);
- 
+    platform->linAlg->axmyz<pfloat>(Nrows, 1.0f, o_invDiagA, o_x, o_Sx);
+
     const double factor =
         (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value) ? 0.5 : 1.0;
     platform->flopCounter->add("pMGLevel::smootherJacobi, N=" + std::to_string(mesh->N), factor * Nrows);
@@ -138,14 +138,14 @@ void pMGLevel::smoothJacobi(occa::memory &o_r, occa::memory &o_x, bool xIsZero)
 
   if (xIsZero) { // skip the Ax if x is zero
     // res = Sr
-    platform->linAlg->paxmyz(Nrows, one, o_invDiagA, o_r, o_x);
+    platform->linAlg->axmyz<pfloat>(Nrows, one, o_invDiagA, o_r, o_x);
     flopCount += Nrows;
   } else {
     // res = S(r-Ax)
     this->Ax(o_x, o_res);
-    platform->linAlg->paxpby(Nrows, one, o_r, mone, o_res);
-    platform->linAlg->paxmyz(Nrows, one, o_invDiagA, o_res, o_d);
-    platform->linAlg->paxpby(Nrows, one, o_d, one, o_x);
+    platform->linAlg->axpby<pfloat>(Nrows, one, o_r, mone, o_res);
+    platform->linAlg->axmyz<pfloat>(Nrows, one, o_invDiagA, o_res, o_d);
+    platform->linAlg->axpby<pfloat>(Nrows, one, o_d, one, o_x);
     // two saxpy's + collocation
     flopCount += 7 * Nrows;
   }
@@ -179,13 +179,13 @@ void pMGLevel::smoothChebyshev(occa::memory &o_r, occa::memory &o_x, bool xIsZer
   double flopCount = 0.0;
 
   if (xIsZero) {
-    platform->linAlg->pfill(Nrows, zero, o_x);
+    platform->linAlg->fill<pfloat>(Nrows, zero, o_x);
   }
 
   // res = S(r-Ax)
   if (!xIsZero) {
     this->Ax(o_x, o_res);
-    platform->linAlg->paxpby(Nrows, one, o_r, mone, o_res);
+    platform->linAlg->axpby<pfloat>(Nrows, one, o_r, mone, o_res);
     flopCount += 2 * Nrows;
   } else {
     o_res.copyFrom(o_r, Nrows);
@@ -193,7 +193,7 @@ void pMGLevel::smoothChebyshev(occa::memory &o_r, occa::memory &o_x, bool xIsZer
   this->smoother(o_res, o_res, xIsZero);
 
   // d = invTheta*res
-  platform->linAlg->paxpby(Nrows, invTheta, o_res, zero, o_d);
+  platform->linAlg->axpby<pfloat>(Nrows, invTheta, o_res, zero, o_d);
   flopCount += Nrows;
 
   for (int k = 1; k < ChebyshevDegree; k++) {
@@ -217,7 +217,7 @@ void pMGLevel::smoothChebyshev(occa::memory &o_r, occa::memory &o_x, bool xIsZer
     flopCount += 5 * Nrows;
   }
   // x_k+1 = x_k + d_k
-  platform->linAlg->paxpby(Nrows, one, o_d, one, o_x);
+  platform->linAlg->axpby<pfloat>(Nrows, one, o_d, one, o_x);
   flopCount += Nrows;
   ellipticApplyMask(elliptic, o_x, pfloatString);
 
@@ -248,18 +248,18 @@ void pMGLevel::smoothFourthKindChebyshev(occa::memory &o_r, occa::memory &o_x, b
 
   // r = b - Ax
   if (xIsZero) {
-    platform->linAlg->pfill(Nrows, zero, o_x);
+    platform->linAlg->fill<pfloat>(Nrows, zero, o_x);
     o_res.copyFrom(o_r, Nrows);
   } else {
     this->Ax(o_x, o_res);
-    platform->linAlg->paxpby(Nrows, one, o_r, mone, o_res);
+    platform->linAlg->axpby<pfloat>(Nrows, one, o_r, mone, o_res);
     flopCount += Nrows;
   }
 
   // d = \dfrac{4}{3} \dfrac{1}{\rho(SA)} Sr
   this->smoother(o_res, o_Ad, xIsZero);
   const pfloat coeff = 4.0 / (3.0 * rho);
-  platform->linAlg->paxpby(Nrows, coeff, o_Ad, zero, o_d);
+  platform->linAlg->axpby<pfloat>(Nrows, coeff, o_Ad, zero, o_d);
 
   for (int k = 1; k < ChebyshevDegree; k++) {
 
@@ -275,11 +275,11 @@ void pMGLevel::smoothFourthKindChebyshev(occa::memory &o_r, occa::memory &o_x, b
     // d_k+1 = \dfrac{2k-1}{2k+3} d_k + \dfrac{8k+4}{2k+3} \dfrac{1}{\rho(SA)} S r_k+1
     const pfloat dCoeff = (2.0 * k - 1.0) / (2.0 * k + 3.0);
     const pfloat rCoeff = (8.0 * k + 4.0) / ((2.0 * k + 3.0) * rho);
-    platform->linAlg->paxpby(Nrows, rCoeff, o_Ad, dCoeff, o_d);
+    platform->linAlg->axpby<pfloat>(Nrows, rCoeff, o_Ad, dCoeff, o_d);
   }
 
   // x_k+1 = x_k + \beta_k d_k
-  platform->linAlg->paxpby(Nrows, betas.back(), o_d, one, o_x);
+  platform->linAlg->axpby<pfloat>(Nrows, betas.back(), o_d, one, o_x);
   flopCount += 2 * Nrows;
   ellipticApplyMask(elliptic, o_x, pfloatString);
 

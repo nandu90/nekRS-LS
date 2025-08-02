@@ -27,16 +27,20 @@
 #include "nekrsSys.hpp"
 #include "linAlg.hpp"
 
-std::vector<dfloat> linAlg_t::matrixTranspose(const int N, const std::vector<dfloat>& A)
+std::vector<dfloat> linAlg_t::matrixTranspose(const int N, const std::vector<dfloat> &A)
 {
   const auto M = A.size() / N; // number of rows of A
 
-  if (N < 1 || M < 1) return std::vector<dfloat>{};
+  if (N < 1 || M < 1) {
+    return std::vector<dfloat>{};
+  }
 
   std::vector<dfloat> AT(N * M);
-  for (int n = 0; n < N; n++)
-    for (int m = 0; m < M; m++)
+  for (int n = 0; n < N; n++) {
+    for (int m = 0; m < M; m++) {
       AT[n * M + m] = A[m * N + n];
+    }
+  }
 
   return AT;
 }

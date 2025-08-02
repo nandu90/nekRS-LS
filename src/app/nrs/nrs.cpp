@@ -15,7 +15,7 @@
 int nrs_t::numberActiveFields()
 {
   int fields = 0;
-  if (platform->options.compareArgs("FLUID SOLVER", "TRUE")) {
+  if (platform->options.compareArgs("FLUID", "TRUE")) {
     fields++;
   }
   for (int is = 0; is < Nscalar; ++is) {
@@ -118,7 +118,7 @@ void nrs_t::printSolutionMinMax()
         } else {
           printf(" ");
         }
-        printf("%g %g", minMax[is].first, minMax[is].second);
+        printf("%g %g", minMax[0].first, minMax[0].second);
       }
     }
     if (platform->comm.mpiRank == 0) {
@@ -142,15 +142,6 @@ void nrs_t::setDefaultSettings(setupAide &options)
     options.removeArgs("ADVECTION TYPE");
   }
 
-  options.setArgs("FLUID VELOCITY BLOCK SOLVER", "FALSE");
-  if (options.compareArgs("FLUID VELOCITY SOLVER", "BLOCK")) {
-    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
-  }
-
-  if (options.compareArgs("FLUID STRESSFORMULATION", "TRUE")) {
-    options.setArgs("FLUID VELOCITY BLOCK SOLVER", "TRUE");
-  }
-
   if (options.getArgs("MOVING MESH").empty()) {
     options.setArgs("MOVING MESH", "FALSE");
   }
@@ -163,6 +154,14 @@ nrs_t::nrs_t()
 
 void nrs_t::init()
 {
+  if (platform->options.compareArgs("FLUID STRESSFORMULATION", "TRUE")) {
+    nekrsCheck(!platform->options.compareArgs("FLUID VELOCITY SOLVER", "BLOCK"),
+               platform->comm.mpiComm, 
+               EXIT_FAILURE, 
+               "%s\n", 
+               "stressformulation requires block solver!");
+  }
+
   const auto meshTRequested = [&]() {
     int N;
     platform->options.getArgs("NUMBER OF SCALARS", N);
@@ -264,7 +263,7 @@ void nrs_t::init()
     }();
   }
 
-  if (platform->options.compareArgs("FLUID SOLVER", "TRUE")) {
+  if (platform->options.compareArgs("FLUID", "TRUE")) {
     fluid = [&]() {
       fluidSolverCfg_t cfg;
       cfg.name = "fluid";
@@ -1054,9 +1053,6 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solve
     auto mesh = fluid->mesh;
 
     auto o_divErr = opSEM::strongDivergence(mesh, fluid->fieldOffset, fluid->o_U);
-    oogs::startFinish(o_divErr, 1, 0, ogsDfloat, ogsAdd, mesh->oogs);
-    platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_invLMM, o_divErr);
-
     platform->linAlg->axpby(mesh->Nlocal, 1.0, fluid->o_div, -1.0, o_divErr);
 
     const auto L1 =

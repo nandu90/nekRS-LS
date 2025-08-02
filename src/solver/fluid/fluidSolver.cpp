@@ -362,7 +362,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     o_U.copyFrom(o_Ue, fieldOffsetSum);
   }
 
-  if (platform->options.compareArgs(upperCase(velocityName) + " BLOCK SOLVER", "TRUE")) {
+  if (platform->options.compareArgs(upperCase(velocityName) + " SOLVER", "BLOCK")) {
     ellipticSolver.at(0)->solve(o_lambda0, o_lambda1, o_rhs, o_U.slice(0, fieldOffsetSum));
   } else {
     const auto o_rhsX = o_rhs.slice(0 * fieldOffset, mesh->Nlocal);
@@ -414,7 +414,7 @@ void fluidSolver_t::setupEllipticSolver()
 
   const auto unalignedBoundary = platform->solver->bc->hasUnalignedMixed(velocityName);
 
-  if (platform->options.compareArgs(upperCase(velocityName) + " BLOCK SOLVER", "TRUE")) {
+  if (platform->options.compareArgs(upperCase(velocityName) + " SOLVER", "BLOCK")) {
     platform->options.setArgs(upperCase(velocityName) + " NFIELDS", std::to_string(mesh->dim));
 
     if (platform->options.compareArgs(upperCase(name) + " STRESSFORMULATION", "TRUE")) {
@@ -804,6 +804,18 @@ void fluidSolver_t::advectionSubcycling(int nEXT, double time)
                         o_relUrst,
                         o_U,
                         o_JwF);
+
+  if (platform->verbose()) {
+    const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
+                                                                 mesh->dim,
+                                                                 fieldOffset,
+                                                                 mesh->ogs->o_invDegree,
+                                                                 o_JwF,
+                                                                 platform->comm.mpiComm);
+    if (platform->comm.mpiRank == 0) {
+      printf("%s advSub norm: %.15e\n", name.c_str(), debugNorm);
+    }
+  }
 }
 
 void registerFluidSolverKernels(occa::properties kernelInfoBC)

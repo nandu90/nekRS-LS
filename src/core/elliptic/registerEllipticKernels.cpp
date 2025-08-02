@@ -16,10 +16,10 @@ void registerEllipticKernels(std::string section, bool stressForm)
   kernelInfo["include_paths"].asArray();
   kernelInfo += meshKernelProperties(N);
 
-  const int poisson = platform->options.compareArgs(optionsPrefix + "HELMHOLTZ TYPE", "POISSON");
+  const auto poisson = platform->options.compareArgs(optionsPrefix + "HELMHOLTZ TYPE", "POISSON");
 
-  const bool blockSolver = [&]() {
-    if (platform->options.compareArgs(optionsPrefix + "BLOCK SOLVER", "TRUE")) {
+  const auto blockSolver = [&]() {
+    if (platform->options.compareArgs(optionsPrefix + "SOLVER", "BLOCK")) {
       return true;
     }
     if (stressForm) {

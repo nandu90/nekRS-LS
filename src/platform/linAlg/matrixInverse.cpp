@@ -27,13 +27,12 @@
 #include "nekrsSys.hpp"
 #include "linAlg.hpp"
 
-
 extern "C" {
-  void dgetrf_(int *M, int *N, double *A, int *lda, int *IPIV, int *INFO);
-  void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, int *INFO);
+void dgetrf_(int *M, int *N, double *A, int *lda, int *IPIV, int *INFO);
+void dgetri_(int *N, double *A, int *lda, int *IPIV, double *WORK, int *lwork, int *INFO);
 }
 
-std::vector<dfloat> linAlg_t::matrixInverse(const int N_, const std::vector<dfloat>& A)
+std::vector<dfloat> linAlg_t::matrixInverse(const int N_, const std::vector<dfloat> &A)
 {
   int N = N_;
   int lwork = N * N;
@@ -41,56 +40,60 @@ std::vector<dfloat> linAlg_t::matrixInverse(const int N_, const std::vector<dflo
 
   std::vector<double> invA(N * N, 0.0);
 
-  int* ipiv = (int*) calloc(N, sizeof(int));
-  double* work = (double*) calloc(lwork, sizeof(double));
+  int *ipiv = (int *)calloc(N, sizeof(int));
+  double *work = (double *)calloc(lwork, sizeof(double));
 
-  for(int n = 0; n < N * N; ++n)
+  for (int n = 0; n < N * N; ++n) {
     invA[n] = A[n];
+  }
 
-  dgetrf_ (&N, &N, invA.data(), &N, ipiv, &info);
-  dgetri_ (&N, invA.data(), &N, ipiv, work, &lwork, &info);
+  dgetrf_(&N, &N, invA.data(), &N, ipiv, &info);
+  dgetri_(&N, invA.data(), &N, ipiv, work, &lwork, &info);
 
-  if(info)
+  if (info) {
     printf("inv: dgetrf/dgetri reports info = %d when inverting matrix\n", info);
+  }
 
   free(work);
   free(ipiv);
- 
+
   std::vector<dfloat> out(invA.size());
-  for (int i = 0; i < invA.size(); ++i) out[i] = invA[i];
- 
+  for (int i = 0; i < invA.size(); ++i) {
+    out[i] = invA[i];
+  }
+
   return out;
 }
 
-std::vector<dfloat> linAlg_t::matrixPseudoInverse(const int N, const std::vector<dfloat>& A)
+std::vector<dfloat> linAlg_t::matrixPseudoInverse(const int N, const std::vector<dfloat> &A)
 {
   const int M = A.size() / N; // rows of A
 
   // inv(trans(A)*A)
   std::vector<dfloat> V(M * N);
-  for(int n=0; n<N; n++){
-    for(int m=0; m<N; m++){
-      double tmp = 0; 
-      for(int i = 0; i<M; i++){
-       tmp += A[i*N +n]*A[i*N +m];
+  for (int n = 0; n < N; n++) {
+    for (int m = 0; m < N; m++) {
+      double tmp = 0;
+      for (int i = 0; i < M; i++) {
+        tmp += A[i * N + n] * A[i * N + m];
       }
-      V[n*N + m] = tmp; 
+      V[n * N + m] = tmp;
     }
   }
 
-  auto invV = matrixInverse(N, V); 
+  auto invV = matrixInverse(N, V);
 
   // // (A^T*A)^-1 * A^T
   std::vector<dfloat> invA(N * M);
-  for(int n=0; n<N; n++){
-    for(int m=0; m<M; m++){
-      double tmp = 0; 
-      for(int i=0; i<N; i++){
-        tmp += invV[n*N + i]*A[m*N + i];
+  for (int n = 0; n < N; n++) {
+    for (int m = 0; m < M; m++) {
+      double tmp = 0;
+      for (int i = 0; i < N; i++) {
+        tmp += invV[n * N + i] * A[m * N + i];
       }
-      invA[n*M + m] = tmp; 
+      invA[n * M + m] = tmp;
     }
   }
- 
+
   return invA;
 }
