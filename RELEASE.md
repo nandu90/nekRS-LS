@@ -30,6 +30,7 @@
 * nrsman <par, env>  can be used to display the par file or environment settings
 * HYPRE replaced AmgX
 * Field file extension starts with 0-index
+* nrsqsub scripts are moved to https://github.com/Nek5000/nekRS_HPCsupport
 
 ## Breaking Changes
 
