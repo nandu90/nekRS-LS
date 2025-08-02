@@ -223,7 +223,7 @@ T sum(const dlong N, const occa::memory &o_a, MPI_Comm _comm, const dlong offset
 
   auto o_scratch = getScratch<T>(Nblock);
 
-  auto h_scratch = getScratch<T>(Nblock, true);
+  auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
   
@@ -253,7 +253,7 @@ T sumMany(const dlong N, const int Nfields, const dlong fieldOffset, const occa:
 
   auto o_scratch = getScratch<T>(Nblock);
 
-  auto h_scratch = getScratch<T>(Nblock, true);
+  auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
   if (N > 1 || Nfields > 1) {
@@ -304,7 +304,7 @@ template <typename T = dfloat> T min(const dlong N, const occa::memory &o_a, MPI
 
   auto o_scratch = getScratch<T>(Nblock);
 
-  auto h_scratch = getScratch<T>(Nblock, true);
+  auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
   if (N > 1) {
@@ -341,7 +341,7 @@ template <typename T = dfloat> T max(const dlong N, const occa::memory &o_a, MPI
 
   auto o_scratch = getScratch<T>(Nblock);
 
-  auto h_scratch = getScratch<T>(Nblock, true);
+  auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
   if (N > 1) {
@@ -376,7 +376,7 @@ T amaxMany(const dlong N, const int Nfields, const dlong fieldOffset, const occa
 
   auto o_scratch = getScratch<T>(Nblock);
 
-  auto h_scratch = getScratch<T>(Nblock, true);
+  auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
   if (N > 1) {
@@ -419,7 +419,7 @@ T norm2Many(const dlong N,
 
   auto o_scratch = getScratch<T>(Nblock);
 
-  auto h_scratch = getScratch<T>(Nblock, true);
+  auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
   dfloat norm = 0;
@@ -465,7 +465,7 @@ T norm1Many(const dlong N,
 
   auto o_scratch = getScratch<T>(Nblock);
 
-  auto h_scratch = getScratch<T>(Nblock, true);
+  auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
   dfloat norm = 0;
@@ -508,7 +508,7 @@ T innerProd(const dlong N,
 
   auto o_scratch = getScratch<T>(Nblock);
 
-  auto h_scratch = getScratch<T>(Nblock, true);
+  auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
   dfloat dot = 0;
@@ -569,11 +569,11 @@ void weightedInnerProdMulti(const dlong N,
   const auto knlPrefix = getKnlPrefix<T>();
   const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
 
-  const auto Nblock = (N + blocksize - 1) / blocksize;
+  const int Nblock = (N + blocksize - 1) / blocksize;
 
   auto o_scratch = getScratch<T>(NVec * Nblock);
 
-  auto h_scratch = getScratch<T>(NVec * Nblock, true);
+  auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
   launchKernel(knlPrefix + "weightedInnerProdMulti",
@@ -592,7 +592,7 @@ void weightedInnerProdMulti(const dlong N,
   o_scratch.copyTo(scratch);
 
   for (int field = 0; field < NVec; ++field) {
-    dfloat dot = 0;
+    T dot = 0;
     for (dlong n = 0; n < o_scratch.size() / NVec; ++n) {
       dot += scratch[n + field * Nblock];
     }
@@ -705,7 +705,7 @@ T weightedInnerProdMany(const dlong N,
 
   auto o_scratch = getScratch<T>(Nblock);
 
-  auto h_scratch = getScratch<T>(Nblock, true);
+  auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
   launchKernel(knlPrefix + "weightedInnerProdMany",
@@ -781,7 +781,7 @@ T weightedNorm1Many(const dlong N,
 
   auto o_scratch = getScratch<T>(Nblock);
 
-  auto h_scratch = getScratch<T>(Nblock, true);
+  auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
   dfloat norm = 0;
@@ -813,7 +813,7 @@ dfloat weightedSqrSum(const dlong N, const occa::memory &o_w, const occa::memory
 
   auto o_scratch = getScratch<dfloat>(Nblock);
 
-  auto h_scratch = getScratch<dfloat>(Nblock, true);
+  auto h_scratch = getScratch<dfloat>(o_scratch.size(), true);
   auto scratch = h_scratch.ptr<dfloat>();
 
   dfloat sum = 0;

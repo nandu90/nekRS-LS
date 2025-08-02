@@ -164,7 +164,7 @@ private:
     }
 
     // x <= x + alpha*p
-    platform->linAlg->axpbyMany(this->Nlocal, this->Nfields, this->fieldOffset, alpha, o_p, static_cast<T>(1.0), o_x);
+    platform->linAlg->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, alpha, o_p, static_cast<T>(1.0), o_x);
 
     MPI_Allreduce(MPI_IN_PLACE, &rdotr1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
 #ifdef ELLIPTIC_ENABLE_TIMER
@@ -227,7 +227,7 @@ private:
     dfloat alpha;
 
     /*aux variables */
-    platform->linAlg->fill(o_p.size(), 0.0, o_p);
+    platform->linAlg->fill<T>(o_p.size(), 0.0, o_p);
 
     int iter = 0;
     do {
@@ -236,7 +236,7 @@ private:
       if (preco) {
         preco(o_r, o_z);
 
-        rdotz1 = platform->linAlg->weightedInnerProdMany(this->Nlocal,
+        rdotz1 = platform->linAlg->weightedInnerProdMany<T>(this->Nlocal,
                                                          this->Nfields,
                                                          this->fieldOffset,
                                                          o_weight,
@@ -263,7 +263,7 @@ private:
       if (iter > 1) {
         beta = rdotz1 / rdotz2;
         if (flexible) {
-          const dfloat zdotAp = platform->linAlg->weightedInnerProdMany(this->Nlocal,
+          const dfloat zdotAp = platform->linAlg->weightedInnerProdMany<T>(this->Nlocal,
                                                                         this->Nfields,
                                                                         this->fieldOffset,
                                                                         o_weight,
@@ -281,11 +281,11 @@ private:
       printf("beta: %.15e\n", beta);
 #endif
 
-      platform->linAlg->axpbyMany(this->Nlocal, this->Nfields, this->fieldOffset, static_cast<dfloat>(1.0), o_z, beta, o_p);
+      platform->linAlg->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, static_cast<dfloat>(1.0), o_z, beta, o_p);
 
       Ax(o_p, o_Ap);
 
-      const dfloat pAp = platform->linAlg->weightedInnerProdMany(this->Nlocal,
+      const dfloat pAp = platform->linAlg->weightedInnerProdMany<T>(this->Nlocal,
                                                                  this->Nfields,
                                                                  this->fieldOffset,
                                                                  o_weight,
@@ -335,8 +335,8 @@ private:
 
     /*aux variables */
     auto &o_Minv = (this->o_invDiagA.isInitialized()) ? this->o_invDiagA : o_null;
-    platform->linAlg->fill(o_p.size(), 0.0, o_p);
-    platform->linAlg->fill(o_v.size(), 0.0, o_v);
+    platform->linAlg->fill<T>(o_p.size(), 0.0, o_p);
+    platform->linAlg->fill<T>(o_v.size(), 0.0, o_v);
 
     constexpr int nRed = CombinedPCGId::nReduction;
 

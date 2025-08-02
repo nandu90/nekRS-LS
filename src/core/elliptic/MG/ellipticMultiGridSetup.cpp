@@ -296,7 +296,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
       auto o_tmp = platform->deviceMemoryPool.reserve<pfloat>(o_x.size());
       elliptic->precon->SEMFEMSolver->run(o_res, o_tmp);
 
-      platform->linAlg->axpby(o_x.size(), 1.0, o_tmp, 1.0, o_x);
+      platform->linAlg->axpby<pfloat>(o_x.size(), 1.0, o_tmp, 1.0, o_x);
       baseLevel->smooth(o_rhs, o_x, false);
     };
   } else if (options.compareArgs("MULTIGRID COARSE GRID DISCRETIZATION", "SEMFEM")) {
@@ -351,12 +351,13 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
           o_r.copyFrom(o_rhs); // o_x is ZERO
 #endif
 
-          auto resNorm = platform->linAlg->weightedNorm2Many(baseLevel->elliptic->mesh->Nlocal,
-                                                             baseLevel->elliptic->Nfields,
-                                                             baseLevel->elliptic->fieldOffset,
-                                                             baseLevel->elliptic->o_invDegree,
-                                                             o_r,
-                                                             platform->comm.mpiComm);
+          dfloat resNorm = platform->linAlg->weightedNorm2Many<pfloat>(
+              baseLevel->elliptic->mesh->Nlocal,
+              baseLevel->elliptic->Nfields,
+              baseLevel->elliptic->fieldOffset,
+              baseLevel->elliptic->o_invDegree,
+              o_r,
+              platform->comm.mpiComm);
 
           if (baseLevel->elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
             ellipticUpdateJacobi(baseLevel->elliptic, o_invDiagA);
@@ -393,7 +394,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
             auto o_tmp = platform->deviceMemoryPool.reserve<pfloat>(baseLevel->Nrows);
             coarseLevel->solve(o_res, o_tmp);
 
-            platform->linAlg->axpby(baseLevel->Nrows, 1.0, o_tmp, 1.0, o_x);
+            platform->linAlg->axpby<pfloat>(baseLevel->Nrows, 1.0, o_tmp, 1.0, o_x);
             baseLevel->smooth(o_rhs, o_x, false);
           };
     }

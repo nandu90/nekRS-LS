@@ -135,7 +135,7 @@ private:
                      o_Z,
                      o_x);
       } else {
-        platform->linAlg->fill(this->Nfields * this->fieldOffset, 0.0, o_tmp);
+        platform->linAlg->fill<T>(this->Nfields * this->fieldOffset, 0.0, o_tmp);
         launchKernel(this->knlPrefix + "updatePGMRESSolution",
                      this->Nlocal,
                      this->fieldOffset,
@@ -148,7 +148,7 @@ private:
         if (runPreco) {
           preco(o_tmp, o_tmp2);
         }
-        platform->linAlg->axpbyMany(this->Nlocal, this->Nfields, this->fieldOffset, 1.0, o_tmp2, 1.0, o_x);
+        platform->linAlg->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, 1.0, o_tmp2, 1.0, o_x);
 
         double flopCount =
             this->FPfactor * 2 * gmresUpdateSize * this->Nfields * static_cast<double>(this->Nlocal);
@@ -162,7 +162,7 @@ private:
 
       // normalize
       platform->linAlg
-          ->axpbyMany(this->Nlocal, this->Nfields, this->fieldOffset, 1. / (nr + this->tiny), o_r, 0.0, o_V);
+          ->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, 1. / (nr + this->tiny), o_r, 0.0, o_V);
 
       for (int i = 0; i < nRestartVectors; ++i) {
 
@@ -174,7 +174,7 @@ private:
         // 1 pass classical Gram-Schmidt (project o_w onto o_V)
         {
 #if USE_WEIGHTED_INNER_PROD_MULTI_DEVICE
-          platform->linAlg->weightedInnerProdMulti(this->Nlocal,
+          platform->linAlg->weightedInnerProdMulti<T>(this->Nlocal,
                                                    (i + 1),
                                                    this->Nfields,
                                                    this->fieldOffset,
@@ -185,8 +185,7 @@ private:
                                                    o_y);
           o_y.copyTo(y, (i + 1));
 #else
-          std::vector<dfloat> yDfloat(i + 1);
-          platform->linAlg->weightedInnerProdMulti(this->Nlocal,
+          platform->linAlg->weightedInnerProdMulti<T>(this->Nlocal,
                                                    (i + 1),
                                                    this->Nfields,
                                                    this->fieldOffset,
@@ -194,11 +193,7 @@ private:
                                                    o_V,
                                                    o_w,
                                                    platform->comm.mpiComm,
-                                                   yDfloat.data());
-         
-          for (int n = 0; n < yDfloat.size(); n++) {
-            y[n] = yDfloat[n];
-          } 
+                                                   y);
           o_y.copyFrom(y, (i + 1));
 #endif
 
@@ -233,13 +228,13 @@ private:
         }();
         if (i < nRestartVectors - 1) {
           auto o_Vi = o_V + (i + 1) * offset;
-          platform->linAlg->axpbyMany(this->Nlocal,
-                                      this->Nfields,
-                                      this->fieldOffset,
-                                      1. / (nw + this->tiny),
-                                      o_w,
-                                      0,
-                                      o_Vi);
+          platform->linAlg->axpbyMany<T>(this->Nlocal,
+                                         this->Nfields,
+                                         this->fieldOffset,
+                                         1. / (nw + this->tiny),
+                                         o_w,
+                                         0,
+                                         o_Vi);
         }
 
         // apply Givens rotations to new column
