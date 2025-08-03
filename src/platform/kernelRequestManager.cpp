@@ -195,7 +195,7 @@ void kernelRequestManager_t::compile()
     }
     try {
       if (platform->verbose() || platform->buildOnly) {
-        std::cout << "Compiling request <" << req.requestName << ">";
+        std::cout << "Compiling request <" << req.requestName << ">" << " on rank " << rank << " " << std::flush;
       }
 
       auto knl = device.compileKernel(req.fileName, req.props, req.suffix, MPI_COMM_SELF);
@@ -205,11 +205,12 @@ void kernelRequestManager_t::compile()
       std::strncpy(hashes + reqId * hashLength, hash.c_str(), hashLength);
 
       if (platform->verbose() || platform->buildOnly) {
-        std::cout << " (" << hash << ") on rank " << rank << std::flush << std::endl;
+        const auto binaryFilename = fs::path(getenv("OCCA_CACHE_DIR")) / "cache" / hash / "binary";
+        std::cout << "hash: " << hash << " binary: " << binaryFilename << std::flush << std::endl;
       }
 
     } catch (const std::exception &e) {
-      std::cerr << "Caught exception: " << e.what() << std::endl;
+      throw std::runtime_error(e.what());
     }
   };
 
