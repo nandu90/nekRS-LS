@@ -210,6 +210,15 @@ occa::kernel device_t::compileKernel(const std::string &fileName,
   }
   MPI_Barrier(comm); // finish compilation
 
+  const auto hash = knl.hash().getString();
+
+  const auto binaryFilename = fs::path(getenv("OCCA_CACHE_DIR")) / "cache" / hash / "binary";
+  nekrsCheck(!fs::exists(binaryFilename),
+             comm,
+             EXIT_FAILURE,
+             "cannot find kernel binary <%s>!\n",
+             binaryFilename.c_str());
+
 #if 0
   const std::string binaryFileName = ...;
   if (collective && platform->cacheBcast) {

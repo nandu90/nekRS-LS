@@ -225,6 +225,9 @@ void pMGLevel::Report()
         printf("%s|    AMG     |   SEMFEM Matrix | \n", spaces.c_str());
       } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
         printf("%s|    AMG     |   FEM Matrix    | \n", spaces.c_str());
+      } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "CG")) {
+         printf("|    pMG     |   Matrix-free   | %s\n", "Krylov");
+        printf("     |            |     p = %2d      |\n", degree);
       }
     } else {
       printf("|    pMG     |   Matrix-free   | %s\n", smootherString.c_str());
