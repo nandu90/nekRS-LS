@@ -136,7 +136,7 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
     options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", "JPCG");
     for (std::string entry : entries) {
       checkValidity(rank, validValues, entry);
-      if (entry != "jpcg") continue;
+      if (entry == "jpcg") continue;
       auto val = options.getArgs(parSectionName + "MULTIGRID COARSE SOLVER"); 
       options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", val + upperCase("+" + entry));
     }
