@@ -57,7 +57,8 @@ public:
     o_Z = platform->deviceMemoryPool.reserve<T>(n * ((flexible) ? nRestartVectors : 1));
 
     if (platform->comm.mpiRank == 0 && platform->verbose()) {
-      auto txt = std::string("GMRES") + ((flexible) ? "-flex" : "");
+      auto txt = (preco) ? std::string("P") : std::string(""); 
+      txt += std::string("GMRES") + ((flexible) ? "-flex" : "");
       printf("%s %s: initial res norm %.15e target %e \n", txt.c_str(), this->_name.c_str(), rdotr, tol);
     }
 

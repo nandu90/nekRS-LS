@@ -731,11 +731,10 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
       Ax,
       Pc);
  
-    auto combined = options.compareArgs("SOLVER", "COMBINED");
-    if (combined) {
+    if (options.compareArgs("SOLVER", "COMBINED")) {
       elliptic->KSP->o_invDiagA = (elliptic->precon) ? elliptic->precon->o_invDiagA : o_NULL;
     }
- }
+  }
 
   if (options.compareArgs("INITIAL GUESS", "PROJECTION") ||
       options.compareArgs("INITIAL GUESS", "PROJECTION-ACONJ")) {

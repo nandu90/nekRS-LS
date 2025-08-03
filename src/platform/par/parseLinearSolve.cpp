@@ -96,7 +96,7 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
       {"pcg"},
       {"combined"},
       {"block"},
-      {"maxiterations"},
+      {"maxiter"},
   };
   std::vector<std::string> list = serializeString(p_solver, '+');
   for (const std::string s : list) {

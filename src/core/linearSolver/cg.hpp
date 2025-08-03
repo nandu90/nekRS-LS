@@ -66,6 +66,8 @@ public:
           (this->Nfields > 1) ? this->Nfields * static_cast<size_t>(this->fieldOffset) : this->Nlocal;
 
       o_p = platform->deviceMemoryPool.reserve<T>(n);
+      platform->linAlg->fill<T>(o_p.size(), 0.0, o_p);
+
       o_z = (preco) ? platform->deviceMemoryPool.reserve<T>(n) : o_r;
       o_Ap = platform->deviceMemoryPool.reserve<T>(n);
       if (combined) {
@@ -87,7 +89,8 @@ public:
     o_tmpReductions = platform->deviceMemoryPool.reserve<T>(h_tmpReductions.size());
 
     if (platform->comm.mpiRank == 0 && platform->verbose()) {
-      auto txt = (combined) ? std::string("CCG") : std::string("CG") + ((flexible) ? "-flex" : "");
+      auto txt = (combined && this->o_invDiagA.isInitialized() || preco) ? std::string("P") : std::string(""); 
+      txt += (combined) ? std::string("CCG") : std::string("CG") + ((flexible) ? "-flex" : "");
       printf("%s %s: initial res norm %.15e target %e \n", txt.c_str(), this->_name.c_str(), rdotr, tol);
     }
 
@@ -164,7 +167,7 @@ private:
     }
 
     // x <= x + alpha*p
-    platform->linAlg->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, alpha, o_p, static_cast<T>(1.0), o_x);
+    platform->linAlg->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, static_cast<dfloat>(alpha), o_p, 1.0, o_x);
 
     MPI_Allreduce(MPI_IN_PLACE, &rdotr1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
 #ifdef ELLIPTIC_ENABLE_TIMER
@@ -184,7 +187,6 @@ private:
                           const occa::memory &o_r,
                           std::array<T, CombinedPCGId::nReduction> &reductions)
   {
-    constexpr auto nRed = CombinedPCGId::nReduction;
     const bool serial = platform->serial;
     launchKernel(this->knlPrefix + "combinedPCGPostMatVec",
                  this->Nlocal,
@@ -199,7 +201,7 @@ private:
                  o_tmpReductions);
     if (serial) {
       auto ptr = o_tmpReductions.ptr<T>();
-      std::copy(ptr, ptr + nRed, reductions.begin());
+      std::copy(ptr, ptr + CombinedPCGId::nReduction, reductions.begin());
     } else {
       auto tmp = h_tmpReductions.ptr<T>();
       o_tmpReductions.copyTo(tmp);
@@ -207,7 +209,7 @@ private:
 
       const dlong Nblock = (this->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
-      for (int red = 0; red < nRed; ++red) {
+      for (int red = 0; red < CombinedPCGId::nReduction; ++red) {
         for (int n = 0; n < Nblock; ++n) {
           reductions[red] += tmp[n + Nblock * red];
         }
@@ -215,7 +217,7 @@ private:
     }
 
     const auto mpiType = (std::is_same<T, float>::value) ? MPI_FLOAT : MPI_DFLOAT;
-    MPI_Allreduce(MPI_IN_PLACE, reductions.data(), nRed, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, reductions.data(), CombinedPCGId::nReduction, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
 
     platform->flopCounter->add("CombinedPCGReductions",
                                this->FPfactor * this->Nfields * static_cast<double>(this->Nlocal) * 3 * 7);
@@ -225,9 +227,6 @@ private:
   {
     dfloat rdotz1;
     dfloat alpha;
-
-    /*aux variables */
-    platform->linAlg->fill<T>(o_p.size(), 0.0, o_p);
 
     int iter = 0;
     do {
@@ -263,13 +262,13 @@ private:
       if (iter > 1) {
         beta = rdotz1 / rdotz2;
         if (flexible) {
-          const dfloat zdotAp = platform->linAlg->weightedInnerProdMany<T>(this->Nlocal,
-                                                                        this->Nfields,
-                                                                        this->fieldOffset,
-                                                                        o_weight,
-                                                                        o_z,
-                                                                        o_Ap,
-                                                                        platform->comm.mpiComm);
+          const auto zdotAp = platform->linAlg->weightedInnerProdMany<T>(this->Nlocal,
+                                                                         this->Nfields,
+                                                                         this->fieldOffset,
+                                                                         o_weight,
+                                                                         o_z,
+                                                                         o_Ap,
+                                                                         platform->comm.mpiComm);
           beta = -alpha * zdotAp / rdotz2;
 #ifdef DEBUG
           printf("norm zdotAp: %.15e\n", zdotAp);
@@ -281,7 +280,7 @@ private:
       printf("beta: %.15e\n", beta);
 #endif
 
-      platform->linAlg->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, static_cast<dfloat>(1.0), o_z, beta, o_p);
+      platform->linAlg->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, 1.0, o_z, static_cast<dfloat>(beta), o_p);
 
       Ax(o_p, o_Ap);
 
@@ -331,20 +330,13 @@ private:
     T alphakm1 = 0;
     T alphakm2 = 0;
 
-    occa::memory o_null;
+    std::array<T, CombinedPCGId::nReduction> reductions;
 
-    /*aux variables */
-    auto &o_Minv = (this->o_invDiagA.isInitialized()) ? this->o_invDiagA : o_null;
-    platform->linAlg->fill<T>(o_p.size(), 0.0, o_p);
+    auto &o_Minv = (this->o_invDiagA.isInitialized()) ? this->o_invDiagA : o_NULL;
     platform->linAlg->fill<T>(o_v.size(), 0.0, o_v);
-
-    constexpr int nRed = CombinedPCGId::nReduction;
-
-    std::array<T, nRed> reductions;
 
     int iter = 0;
     do {
-
       iter++;
       const dlong updateX = iter > 1 && iter % 2 == 1;
 

@@ -13,7 +13,11 @@ deviceMemory<dfloat> o_nuAVM;
 
 std::unique_ptr<iofld> io;
 
+#if 1
+std::unique_ptr<tavg> avg;
+#else
 nrs_t::tavgLegacy_t* avg = nullptr;
+#endif
 
 deviceMemory<int> o_bID;
 planarCopy* recyc = nullptr;
@@ -207,9 +211,9 @@ void UDF_Setup()
 #if 1
     std::vector< tavg::field  > tavgFields;
 
-    deviceMemory<dfloat> o_ux(nrs->fluid->o_solution(x));
-    deviceMemory<dfloat> o_uy(nrs->fluid->o_solution(y));
-    deviceMemory<dfloat> o_uz(nrs->fluid->o_solution(z));
+    deviceMemory<dfloat> o_ux(nrs->fluid->o_solution("x"));
+    deviceMemory<dfloat> o_uy(nrs->fluid->o_solution("y"));
+    deviceMemory<dfloat> o_uz(nrs->fluid->o_solution("z"));
 
     deviceMemory<dfloat> o_s00(nrs->scalar->o_solution("s00"));
 
@@ -225,7 +229,7 @@ void UDF_Setup()
 
     tavgFields.push_back({"uxuy", std::vector{o_ux, o_uy}});
     tavgFields.push_back({"uyuz", std::vector{o_uy, o_uz}});
-    tavgFields.push_back({"uzux", std::vector{o_oz, o_ux}});
+    tavgFields.push_back({"uzux", std::vector{o_uz, o_ux}});
 
     avg = std::make_unique<tavg>(nrs->fluid->fieldOffset, tavgFields);
 #else

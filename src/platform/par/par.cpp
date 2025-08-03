@@ -152,7 +152,6 @@ static std::vector<std::string> commonKeys = {
     {"semfemSolver"},
     {"coarseGridDiscretization"},
     {"boundaryTypeMap"},
-    {"maxIterations"},
     {"regularization"},
     {"checkpointing"},
 

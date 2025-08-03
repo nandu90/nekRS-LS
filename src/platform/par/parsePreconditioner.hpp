@@ -55,7 +55,7 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
       {"boomeramg"},
 //      {"amgx"},
       {"combined"},
-      {"maxiterations"},
+      {"maxiter"},
       {"cpu"},
       {"device"},
       {"overlap"},
@@ -124,21 +124,19 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
       }
     }
   } else if (cg) {
-    options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", "PJCG");
-
     const std::vector<std::string> validValues = {
 #if 0 // not supported for now
         "smoother",
 #endif
         {"jpcg"},
-        {"gmres"},
         {"maxiter"},
         {"residualtol"},
     };
 
+    options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", "JPCG");
     for (std::string entry : entries) {
       checkValidity(rank, validValues, entry);
-      if (entry == "jpcg") continue;
+      if (entry != "jpcg") continue;
       auto val = options.getArgs(parSectionName + "MULTIGRID COARSE SOLVER"); 
       options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", val + upperCase("+" + entry));
     }

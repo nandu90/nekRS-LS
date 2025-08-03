@@ -306,17 +306,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
         [elliptic](MGSolver_t::coarseLevel_t *, occa::memory &o_rhs, occa::memory &o_x) {
           elliptic->precon->SEMFEMSolver->run(o_rhs, o_x);
         };
-  } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "CG") ||
-             options.compareArgs("MULTIGRID COARSE SOLVER", "GMRES")) {
-
-    const auto precision = options.getArgs("MULTIGRID COARSE SOLVER PRECISION");
-
-    nekrsCheck(sizeof(pfloat) != ((precision == "FP64") ? sizeof(double) : sizeof(float)),
-               platform->comm.mpiComm,
-               EXIT_FAILURE,
-               "%s!\n",
-               "Krylov based coarse solvers only support pfloat precision");
-
+  } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "JPCG")) { 
     auto baseLevel = (pMGLevel *)levels[numMGLevels - 1];
     auto Ax = [baseLevel](const occa::memory &o_p, occa::memory &o_Ap) { baseLevel->Ax(o_p, o_Ap); };
 
@@ -328,11 +318,8 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
                                                                    baseLevel->elliptic->o_invDegree,
                                                                    Ax);
 
-    occa::memory o_invDiagA;
-    ellipticUpdateJacobi(baseLevel->elliptic, o_invDiagA);
-    auto combined = baseLevel->elliptic->options.compareArgs("SOLVER", "COMBINED");
-    if (combined) {
-      baseLevel->elliptic->KSP->o_invDiagA = o_invDiagA;
+    if (baseLevel->elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "COMBINED")) {
+      ellipticUpdateJacobi(baseLevel->elliptic, baseLevel->elliptic->KSP->o_invDiagA);
     }
 
     const auto maxNiter =
@@ -341,10 +328,11 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
         extractQualifierValue(baseLevel->options.getArgs("MULTIGRID COARSE SOLVER"), "residualTol", 1e-4);
 
     precon->MGSolver->coarseLevel->solvePtr =
-        [maxNiter, tol, baseLevel, &o_invDiagA](MGSolver_t::coarseLevel_t *coarseLevel,
-                                                occa::memory &o_rhs,
-                                                occa::memory &o_x) {
+        [maxNiter, tol, baseLevel](MGSolver_t::coarseLevel_t *coarseLevel,
+                                   occa::memory &o_rhs,
+                                   occa::memory &o_x) {
           auto &o_r = baseLevel->o_res;
+          auto &elliptic = baseLevel->elliptic;
 #if 0
             baseLevel->residual(o_rhs, o_x, o_r);
 #else
@@ -352,17 +340,17 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
 #endif
 
           dfloat resNorm = platform->linAlg->weightedNorm2Many<pfloat>(
-              baseLevel->elliptic->mesh->Nlocal,
-              baseLevel->elliptic->Nfields,
-              baseLevel->elliptic->fieldOffset,
-              baseLevel->elliptic->o_invDegree,
+              elliptic->mesh->Nlocal,
+              elliptic->Nfields,
+              elliptic->fieldOffset,
+              elliptic->o_invDegree,
               o_r,
               platform->comm.mpiComm);
 
-          if (baseLevel->elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
-            ellipticUpdateJacobi(baseLevel->elliptic, o_invDiagA);
+          if (elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
+            ellipticUpdateJacobi(elliptic, elliptic->KSP->o_invDiagA);
           }
-          baseLevel->elliptic->KSP->solve(tol, maxNiter, resNorm, o_r, o_x);
+          elliptic->KSP->solve(tol, maxNiter, resNorm, o_r, o_x);
         };
   } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
     ellipticCoarseFEMGridSetup(elliptic);
@@ -404,6 +392,11 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
         [baseLevel](MGSolver_t::coarseLevel_t *, occa::memory &o_rhs, occa::memory &o_x) {
           baseLevel->smooth(o_rhs, o_x, true);
         };
+  } else {
+    nekrsAbort(MPI_COMM_SELF,
+               EXIT_FAILURE,
+               "%s\n",
+               "unknown MULTIGRID COARSE SOLVER!");
   }
 
   if (platform->comm.mpiRank == 0) {
