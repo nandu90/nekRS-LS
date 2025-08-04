@@ -264,7 +264,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("NUMBER TIMESTEPS", std::string("0"));
     options.setArgs("SCALAR00 SOLVER", "NONE");
     options.setArgs("SCALAR01 SOLVER", "NONE");
-    options.setArgs("FLUID SOLVER", "NONE");
+    options.setArgs("FLUID", "NONE");
   }
 
   // CVODE, both scalars
