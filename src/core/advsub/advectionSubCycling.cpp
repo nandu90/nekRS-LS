@@ -213,7 +213,7 @@ void advectionSubcyclingRK(mesh_t *_meshT,
   o_divUMesh = _o_divUMesh; 
 
         
-  if (platform->verbose()) { 
+  if (platform->verbose() && o_divUMesh.isInitialized()) { 
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(meshV->Nlocal,
                                                                  meshV->dim,
                                                                  meshOffset,
