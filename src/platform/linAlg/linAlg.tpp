@@ -24,7 +24,7 @@ template <typename T = dfloat> void add(const dlong N, const double alpha, occa:
 }
 
 // o_a[n] *= alpha
-void scale(const dlong N, const double alpha, occa::memory &o_a)
+template <typename T = dfloat> void scale(const dlong N, const double alpha, occa::memory &o_a)
 {
   scaleMany(N, 1, 0, alpha, o_a, 0);
 }
@@ -841,3 +841,16 @@ dfloat weightedSqrSum(const dlong N, const occa::memory &o_w, const occa::memory
 
   return sum;
 }
+
+template <typename T = dfloat> void rescale(const double newMin, const double newMax, occa::memory &o_a, MPI_Comm _comm)
+{
+  auto mn = this->min<T>(o_a.size(), o_a, _comm);
+  auto mx = this->max<T>(o_a.size(), o_a, _comm);
+
+  MPI_Allreduce(MPI_IN_PLACE, &mn, 1, MPI_DFLOAT, MPI_MIN, _comm);
+  MPI_Allreduce(MPI_IN_PLACE, &mx, 1, MPI_DFLOAT, MPI_MAX, _comm);
+  const auto fac = (newMax - newMin)/(mx - mn);
+
+  this->add<T>(o_a.size(), (newMin - fac*mn)/fac, o_a);
+  this->scale<T>(o_a.size(), fac, o_a);
+}; 
