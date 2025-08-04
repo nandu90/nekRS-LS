@@ -4,31 +4,31 @@
 
 * FP32 solver mode
 * DPCPP backend to support Intel GPUs
-* Interpolation based velocity recycling
+* Interpolation based recycling + support of arbitrary fields
 * [Ascent](https://ascent.readthedocs.io/en/latest/) in situ visualisation plugin
 * iofld class reading/writing field files including [ADIOS2](https://adios2.readthedocs.io/) support 
 * Addtional output options (element filter and interpolation on uniform grid / different polynomial-order)
 * Multi session nek-nek including multi-rate time stepping
-* Improved memory management
+* Typed device memory and pool allocation 
 * CHT nek-nek support
-* nek-nek support for nrsqsub scripts
+* nrsqsub nek-nek handling
 * Improved JIT compilation performance
 * HIP support for SEMFEM  
 * Aero forces
 * opSEM class
 * Mesh surface ops
-* Improved avm reguarlization using averaged modal decay model 
-* Gradient jump penaltiy reguarlization
+* Gradient jump penalty method and improved avm reguarlization
 * Linear implicit velocity source term
 * T-mesh support for all scalars
+* Robin boundary conditions
 * Various bug fixes
 
 ## Good to know
 
-* GPU aware MPI is disabled by default (to enable set env-var `NEKRS_GPU_MPI=1`)
+* GPU aware MPI is disabled by default (to enable set env-var `NEKRS_GPU_MPI=1`) which may cause a performance regression
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
 * nrsman <par, env>  can be used to display the par file or environment settings
-* HYPRE replaced AmgX
+* AmgX support was removed (replaced by HYPRE)
 * Field file extension starts with 0-index
 * nrsqsub scripts are moved to https://github.com/Nek5000/nekRS_HPCsupport
 
