@@ -21,8 +21,7 @@ regularization = hpfrt + nModes=1 + scalingCoeff=5
 
 [FLUID PRESSURE]
 residualTol = 1e-04
-
-solver = pfcg 
+solver = cg+flexible 
 smootherType = Jac+FourthOptChebyshev
 
 [FLUID VELOCITY]

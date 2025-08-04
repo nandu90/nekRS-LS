@@ -23,7 +23,7 @@ scalars = TEMPERATURE
 equation = navierStokes+variableViscosity
 
 [FLUID PRESSURE]
-solver = pfcg
+solver = cg+flexible 
 residualTol = 1e-04
 preconditioner = multigrid
 smootherType = JAC+Chebyshev

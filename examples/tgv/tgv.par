@@ -22,12 +22,11 @@ regularization = hpfrt + nModes=1 + scalingCoeff=1
 
 [FLUID PRESSURE]
 residualTol = 1e-04
-
-#solver = pfgmres
+#solver = gmres+flexbile
 #smootherType = RAS+OptFourthChebyshev 
 #pMGSchedule = p=7+degree=2, p=3+degree=2, p=1, p=3+degree=2, p=7+degree=2
 
-solver = pfcg 
+solver = cg+flexible 
 smootherType = Jac+Cheby
 
 [FLUID VELOCITY]
