@@ -9,7 +9,7 @@ stopAt = numSteps
 numSteps = 0
 
 [FLUID PRESSURE]
-#solver = pfgmres+nVector=15
+#solver = gmres+flexible+nVector=15
 maxIterations = 200
 residualTol = 1e-8+relative
 
