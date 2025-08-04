@@ -21,8 +21,13 @@ void registerGMRESKernels(int Nfields)
   platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
 
   kernelName = "updatePGMRESSolution";
+  fileName = oklpath + kernelName + ".okl";
+  platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
+
+  kernelName = "PGMRESSolution";
   fileName = oklpath + kernelName + fileNameExtension;
   platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
+
 
   kernelName = "fusedResidualAndNorm";
   fileName = oklpath + kernelName + fileNameExtension;

@@ -206,7 +206,7 @@ void kernelRequestManager_t::compile()
 
       if (platform->verbose() || platform->buildOnly) {
         const auto binaryFilename = fs::path(getenv("OCCA_CACHE_DIR")) / "cache" / hash / "binary";
-        std::cout << "hash: " << hash << " binary: " << binaryFilename << std::flush << std::endl;
+        std::cout << "hash: " << hash << " " << binaryFilename << std::flush << std::endl;
       }
 
     } catch (const std::exception &e) {

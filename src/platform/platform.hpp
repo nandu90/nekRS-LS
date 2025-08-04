@@ -76,6 +76,8 @@ public:
   occa::kernel copyDfloatToFloatKernel;
   occa::kernel copyDoubleToDfloatKernel;
   occa::kernel copyFloatToDfloatKernel;
+  occa::kernel copyFloatToDoubleKernel;
+  occa::kernel copyDoubleToFloatKernel;
 
   bool verbose() const
   {

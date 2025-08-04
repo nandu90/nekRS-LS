@@ -24,9 +24,8 @@
 
  */
 
-// x = x + Zy
-extern "C" void FUNC(updatePGMRESSolution)(const dlong &N,
-                                           const dlong &offset,
+extern "C" void FUNC(PGMRESSolution)(const dlong &N,
+                                          const dlong &offset,
                                            const dlong &gmresSize,
                                            const dfloat *__restrict__ y,
                                            const dfloat *__restrict__ Z,
@@ -35,14 +34,16 @@ extern "C" void FUNC(updatePGMRESSolution)(const dlong &N,
 #ifdef __NEKRS__OMP__
 #pragma omp parallel for collapse(3)
 #endif
-  for (int j = 0; j < gmresSize; ++j) {
+  for (int n = 0; n < N; ++n) {
 #pragma unroll
     for (int fld = 0; fld < p_Nfields; ++fld) {
-      for (int n = 0; n < N; ++n) {
+       dfloat sum = 0.0;
+       for (int j = 0; j < gmresSize; ++j) {
         const dfloat yj = y[j];
         const dfloat Znj = Z[n + fld * offset + j * offset * p_Nfields];
-        x[n + fld * offset] += Znj * yj;
+        sum += Znj * yj;
       }
+      x[n + fld * offset] = sum;
     }
   }
 }
