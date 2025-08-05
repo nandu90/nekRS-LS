@@ -146,7 +146,7 @@ endif()
 
 set(LDFLAGS_ "${BSYMBOLIC_FLAG} ${UNDEFINED_FLAG}")
 if(USING_FLANG)
-  set(LDFLAGS_ " -fuse-ld=ld -Wl,--no-relax")
+  set(LDFLAGS_ " -fuse-ld=bfd -Wl,--no-relax")
 endif()
 
 ExternalProject_Add(
