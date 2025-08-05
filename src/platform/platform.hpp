@@ -58,7 +58,7 @@ public:
   occa::memoryPool memoryPool;
   kernelRequestManager_t kernelRequests;
   Par *par;
-  app_t *solver;
+  app_t *app;
   bool serial;
   linAlg_t *linAlg;
   std::unique_ptr<flopCounter_t> flopCounter;

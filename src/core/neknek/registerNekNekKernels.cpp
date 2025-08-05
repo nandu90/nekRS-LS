@@ -21,7 +21,7 @@ void registerNekNekKernels()
 
   auto surfaceFluxKernelInfo = platform->kernelInfo;
   surfaceFluxKernelInfo += meshKernelProperties(N);
-  platform->solver->bc->addKernelConstants(surfaceFluxKernelInfo);
+  platform->app->bc->addKernelConstants(surfaceFluxKernelInfo);
   kernelName = "computeFlux";
   fileName = oklpath + "/core/neknek/" + kernelName + ".okl";
   platform->kernelRequests.add(prefix + kernelName, fileName, surfaceFluxKernelInfo);

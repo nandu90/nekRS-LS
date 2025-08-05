@@ -710,7 +710,7 @@ void cvode_t::setupDirichletMask()
     for (dlong e = 0; e < NelemT; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
         const int bID = mesh->EToB[f + e * mesh->Nfaces];
-        EToB[f + e * mesh->Nfaces + fOffset] = platform->solver->bc->typeElliptic(bID, "scalar" + sid);
+        EToB[f + e * mesh->Nfaces + fOffset] = platform->app->bc->typeElliptic(bID, "scalar" + sid);
 
         // Since EToB must include all of the faces on the T-mesh, we need to explicitly
         // mark the faces on the V-mesh as not having a boundary
@@ -800,7 +800,7 @@ void cvode_t::applyDirichlet(double time)
                    o_NULL,
                    o_NULL,
                    o_NULL,
-                   platform->solver->o_usrwrk,
+                   platform->app->o_usrwrk,
                    o_Si);
       if (sweep == 0) {
         oogs::startFinish(o_Si, 1, 0, ogsDfloat, ogsMax, mesh->oogs);
@@ -1166,7 +1166,7 @@ void cvode_t::makeq(double time)
                  scalar->o_EToB,
                  scalar->o_diff,
                  scalar->o_rho,
-                 platform->solver->o_usrwrk,
+                 platform->app->o_usrwrk,
                  scalar->o_EXT);
 
     if (detailedTimersEnabled) {
@@ -1242,12 +1242,12 @@ void cvode_t::makeq(double time)
     }
   };
 
-  if (platform->solver->userSource) {
+  if (platform->app->userSource) {
     const auto makeQScope = timerScope;
     timerScope = makeQScope + "::udfSEqnSource";
     platform->callerScope = "cvode";
     platform->timer.tic(timerScope, 0);
-    platform->solver->userSource(time);
+    platform->app->userSource(time);
     platform->timer.toc(timerScope);
     platform->callerScope.clear();
     timerScope = makeQScope;

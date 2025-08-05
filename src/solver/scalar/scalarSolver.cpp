@@ -172,7 +172,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
     if (platform->comm.mpiRank == 0) {
       std::cout << "S" << sid << ": " << name[is] << std::endl;
     }
-    platform->solver->bc->printBcTypeMapping("scalar" + sid);
+    platform->app->bc->printBcTypeMapping("scalar" + sid);
     if (platform->comm.mpiRank == 0) {
       std::cout << std::endl;
     }
@@ -234,7 +234,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
     for (int e = 0; e < mesh->Nelements; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
         EToB[cnt + EToBOffset * is] =
-            platform->solver->bc->typeId(mesh->EToB[f + e * mesh->Nfaces], "scalar" + sid);
+            platform->app->bc->typeId(mesh->EToB[f + e * mesh->Nfaces], "scalar" + sid);
         cnt++;
       }
     }
@@ -322,12 +322,12 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
       }
 
       const std::string field = "scalar" + scalarDigitStr(is);
-      nekrsCheck(_mesh[is]->Nbid != platform->solver->bc->size(field),
+      nekrsCheck(_mesh[is]->Nbid != platform->app->bc->size(field),
                  platform->comm.mpiComm,
                  EXIT_FAILURE,
                  "Size of %s boundaryTypeMap (%d) does not match number of boundary IDs in mesh (%d)!\n",
                  field.c_str(),
-                 platform->solver->bc->size(field),
+                 platform->app->bc->size(field),
                  _mesh[is]->Nbid);
     }
   };
@@ -562,7 +562,7 @@ void scalar_t::applyDirichlet(double time)
     occa::memory o_SiDirichlet = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
     platform->linAlg->fill(o_SiDirichlet.size(), TINY, o_SiDirichlet);
 
-    auto &neknek = platform->solver->neknek;
+    auto &neknek = platform->app->neknek;
 
     auto o_intValU = [&]() {
       if (neknek) {
@@ -615,7 +615,7 @@ void scalar_t::applyDirichlet(double time)
                    o_intValU,
                    o_intVal,
                    intValIdx,
-                   platform->solver->o_usrwrk,
+                   platform->app->o_usrwrk,
                    o_SiDirichlet);
 
       oogs::startFinish(o_SiDirichlet,
@@ -673,7 +673,7 @@ void scalar_t::setupEllipticSolver()
     }
 
     auto EToB = _mesh[is]->createEToB(
-        [&](int bID) -> int { return platform->solver->bc->typeElliptic(bID, "scalar" + sid); });
+        [&](int bID) -> int { return platform->app->bc->typeElliptic(bID, "scalar" + sid); });
 
     auto o_rho_i = o_rho.slice(fieldOffsetScan[is], _mesh[is]->Nlocal);
     auto o_lambda0 = o_diff.slice(fieldOffsetScan[is], _mesh[is]->Nlocal);
@@ -772,7 +772,7 @@ void scalar_t::solve(double time, int stage)
                  o_EToB,
                  o_diff,
                  o_rho,
-                 platform->solver->o_usrwrk,
+                 platform->app->o_usrwrk,
                  o_lhs,
                  o_rhs);
 
@@ -793,7 +793,7 @@ void scalar_t::solve(double time, int stage)
         }
       }
 
-      if (platform->solver->bc->hasRobin("SCALAR" + sid)) {
+      if (platform->app->bc->hasRobin("SCALAR" + sid)) {
         platform->linAlg->axpby(mesh->Nlocal, 1.0, o_lhs, 1.0, o_l);
       }
 

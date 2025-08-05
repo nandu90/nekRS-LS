@@ -24,7 +24,7 @@ static std::string udfFile;
 
 static void verifyOudf()
 {
-  for (auto &[key, value] : platform->solver->bc->bIdToTypeId()) {
+  for (auto &[key, value] : platform->app->bc->bIdToTypeId()) {
     const auto field = key.first;
     const auto typeId = value;
 
@@ -218,9 +218,8 @@ void udfBuild(setupAide &options)
   }
 
   {
-    const auto err = (buildRank == 0 && buildRequired)
-                         ? udfMake(options, platform->solver->id(), platform->comm.mpiRank)
-                         : 0;
+    const auto err =
+        (buildRank == 0 && buildRequired) ? udfMake(options, platform->app->id(), platform->comm.mpiRank) : 0;
     auto log = cmakeBuildDir + "/cmake.log";
     nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "see %s for more details\n", log.c_str());
   }

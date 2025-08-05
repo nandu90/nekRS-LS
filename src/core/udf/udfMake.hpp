@@ -117,7 +117,7 @@ int udfMake(setupAide &options, const std::string &solverName, int rank)
     if (solverName == "nrs") {
       txt = "#include \"nrs.hpp\"";
       txt += "\n";
-      txt += "const auto nrs = dynamic_cast<nrs_t*>(platform->solver);";
+      txt += "const auto nrs = dynamic_cast<nrs_t*>(platform->app);";
       txt += "\n";
     }
 
@@ -137,12 +137,11 @@ int udfMake(setupAide &options, const std::string &solverName, int rank)
       << "#include \"" << udfFile << "\"" << std::endl;
 
     // autoload plugins
-    std::map<std::string, std::string> pluginTable = {
-        {"nekrs_tavg_hpp_", "tavg::registerKernels"},
-        {"nekrs_RANSktau_hpp_", "RANSktau::buildKernel"},
-        {"nekrs_lowMach_hpp_", "lowMach::buildKernel"},
-        {"nekrs_recycling_hpp_", "planarCopy::buildKernel"},
-        {"nekrs_lpm_hpp_", "lpm_t::registerKernels"}};
+    std::map<std::string, std::string> pluginTable = {{"nekrs_tavg_hpp_", "tavg::registerKernels"},
+                                                      {"nekrs_RANSktau_hpp_", "RANSktau::buildKernel"},
+                                                      {"nekrs_lowMach_hpp_", "lowMach::buildKernel"},
+                                                      {"nekrs_recycling_hpp_", "planarCopy::buildKernel"},
+                                                      {"nekrs_lpm_hpp_", "lpm_t::registerKernels"}};
 
     f << "void UDF_AutoLoadPlugins(occa::properties& kernelInfo)" << std::endl << "{" << std::endl;
 

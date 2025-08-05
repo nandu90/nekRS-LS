@@ -881,7 +881,9 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
 
       if (buildRequired) {
         if (rank == 0) {
-          std::cout << "building nekInterface for lx1=" << N + 1 << ", lelt=" << lelt << ", lelg=" << nelgt << " ..." << std::endl << std::flush;
+          std::cout << "building nekInterface for lx1=" << N + 1 << ", lelt=" << lelt << ", lelg=" << nelgt
+                    << " ..." << std::endl
+                    << std::flush;
         }
 
         const double tStart = MPI_Wtime();
@@ -904,7 +906,7 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
                  bufSize,
                  "cd %s"
                  " && cp -f %s/makefile.template makefile"
-                 " && make %s"
+                 " && FFLAGS=\"${NEKRS_FFLAGS}\" make %s"
                  "S=%s "
                  "OPT_INCDIR=\"%s\" "
                  "CASENAME=%s "
@@ -1060,7 +1062,7 @@ int setup(int numberActiveFields)
   options->getArgs("MESH CONNECTIVITY TOL", meshConTol);
 
   int nBcRead = 1; // at the very least we have to read the boundaryIDs
-  if (platform->solver->bc->useNek()) {
+  if (platform->app->bc->useNek()) {
     nBcRead += nscalSolve;
   }
 
@@ -1179,7 +1181,7 @@ int setup(int numberActiveFields)
                "polynomial order does not match");
   }
 
-  if (platform->solver->bc->useNek() && numberActiveFields > 0) {
+  if (platform->app->bc->useNek() && numberActiveFields > 0) {
     if (rank == 0) {
       printf("importing BCs from nek\n");
     }
@@ -1203,7 +1205,7 @@ int setup(int numberActiveFields)
       for (int id = 0; id < nIDs; id++) {
         map[id] = bcmap(id + 1, 1, 0);
       }
-      platform->solver->bc->setBcMap("fluid velocity", true, map);
+      platform->app->bc->setBcMap("fluid velocity", true, map);
 
       if (options->compareArgs("MOVING MESH", "TRUE") && !options->compareArgs("GEOM SOLVER", "NONE")) {
         if (rank == 0) {
@@ -1212,7 +1214,7 @@ int setup(int numberActiveFields)
         for (int id = 0; id < nIDs; id++) {
           map[id] = bcmap(id + 1, 1, 1);
         }
-        platform->solver->bc->setBcMap("mesh", true, map);
+        platform->app->bc->setBcMap("mesh", true, map);
       }
     }
     for (int is = 0; is < nscal; is++) {
@@ -1235,7 +1237,7 @@ int setup(int numberActiveFields)
       for (int id = 0; id < map.size(); id++) {
         map[id] = bcmap(id + 1, is + 2, 0);
       }
-      platform->solver->bc->setBcMap("scalar" + sid, false, map);
+      platform->app->bc->setBcMap("scalar" + sid, false, map);
     }
   }
 

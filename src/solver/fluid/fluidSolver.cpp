@@ -81,7 +81,7 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
   o_rho = o_prop.slice(1 * fieldOffset, mesh->Nlocal);
 
   if (!platform->options.compareArgs(upperCase(velocityName) + " SOLVER", "NONE")) {
-    platform->solver->bc->printBcTypeMapping(velocityName);
+    platform->app->bc->printBcTypeMapping(velocityName);
 
     if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "HPFRT")) {
       int nModes = -1;
@@ -90,23 +90,22 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
     }
 
     o_EToB = [&]() {
-      auto u =
-          mesh->createEToB([&](int bID) -> int { return platform->solver->bc->typeId(bID, velocityName); });
+      auto u = mesh->createEToB([&](int bID) -> int { return platform->app->bc->typeId(bID, velocityName); });
       auto o_u = platform->device.malloc<int>(u.size());
       o_u.copyFrom(u.data());
       return o_u;
     }();
 
     auto verifyBC = [&]() {
-      nekrsCheck(mesh->Nbid != platform->solver->bc->size(velocityName),
+      nekrsCheck(mesh->Nbid != platform->app->bc->size(velocityName),
                  platform->comm.mpiComm,
                  EXIT_FAILURE,
                  "Size of %s boundaryTypeMap (%d) does not match number of boundary IDs in mesh (%d)!\n",
                  velocityName.c_str(),
-                 platform->solver->bc->size(velocityName),
+                 platform->app->bc->size(velocityName),
                  mesh->Nbid);
 
-      platform->solver->bc->checkAlignment(mesh);
+      platform->app->bc->checkAlignment(mesh);
     };
 
     verifyBC();
@@ -333,7 +332,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                  mesh->o_z,
                  o_rho,
                  o_mue,
-                 platform->solver->o_usrwrk,
+                 platform->app->o_usrwrk,
                  o_Ue,
                  o_rhs);
 
@@ -404,15 +403,15 @@ void fluidSolver_t::setupEllipticSolver()
   platform->linAlg->axpby(mesh->Nlocal, *g0 / dt[0], o_rho, 0.0, o_lambda1);
 
   auto EToBx = mesh->createEToB(
-      [&](int bID) -> int { return platform->solver->bc->typeElliptic(bID, velocityName, "x"); });
+      [&](int bID) -> int { return platform->app->bc->typeElliptic(bID, velocityName, "x"); });
 
   auto EToBy = mesh->createEToB(
-      [&](int bID) -> int { return platform->solver->bc->typeElliptic(bID, velocityName, "y"); });
+      [&](int bID) -> int { return platform->app->bc->typeElliptic(bID, velocityName, "y"); });
 
   auto EToBz = mesh->createEToB(
-      [&](int bID) -> int { return platform->solver->bc->typeElliptic(bID, velocityName, "z"); });
+      [&](int bID) -> int { return platform->app->bc->typeElliptic(bID, velocityName, "z"); });
 
-  const auto unalignedBoundary = platform->solver->bc->hasUnalignedMixed(velocityName);
+  const auto unalignedBoundary = platform->app->bc->hasUnalignedMixed(velocityName);
 
   if (platform->options.compareArgs(upperCase(velocityName) + " SOLVER", "BLOCK")) {
     platform->options.setArgs(upperCase(velocityName) + " NFIELDS", std::to_string(mesh->dim));
@@ -466,11 +465,11 @@ void fluidSolver_t::setupEllipticSolver()
     platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda0);
 
     auto EToBP = mesh->createEToB([&](int bID) -> int {
-      auto bcType = platform->solver->bc->typeId(bID, velocityName); // derive from velocity
+      auto bcType = platform->app->bc->typeId(bID, velocityName); // derive from velocity
       if (bID < 1) {
         return ellipticBcType::NO_OP;
       }
-      return platform->solver->bc->isOutflow(bcType) ? ellipticBcType::DIRICHLET : ellipticBcType::NEUMANN;
+      return platform->app->bc->isOutflow(bcType) ? ellipticBcType::DIRICHLET : ellipticBcType::NEUMANN;
     });
 
     ellipticSolverP = new elliptic(pressureName, mesh, fieldOffset, EToBP, o_lambda0, o_NULL);
@@ -483,7 +482,7 @@ void fluidSolver_t::applyDirichlet(double time)
     return;
   }
 
-  if (platform->solver->bc->hasUnalignedMixed(velocityName)) {
+  if (platform->app->bc->hasUnalignedMixed(velocityName)) {
     launchKernel("mesh-applyZeroNormalMask",
                  mesh->Nelements,
                  fieldOffset,
@@ -509,7 +508,7 @@ void fluidSolver_t::applyDirichlet(double time)
   occa::memory o_tmp = platform->deviceMemoryPool.reserve<dfloat>((mesh->dim + 1) * fieldOffset);
   platform->linAlg->fill(o_tmp.size(), TINY, o_tmp);
 
-  auto &neknek = platform->solver->neknek;
+  auto &neknek = platform->app->neknek;
 
   for (int sweep = 0; sweep < 2; sweep++) {
     launchKernel("fluidSolver_t::pressureDirichletBCHex3D",
@@ -526,7 +525,7 @@ void fluidSolver_t::applyDirichlet(double time)
                  o_EToB,
                  o_rho,
                  o_mue,
-                 platform->solver->o_usrwrk,
+                 platform->app->o_usrwrk,
                  o_Ue,
                  o_tmp);
 
@@ -547,7 +546,7 @@ void fluidSolver_t::applyDirichlet(double time)
                  neknek ? neknek->intValOffset() : 0,
                  neknek ? neknek->o_pointMap() : o_NULL,
                  neknek ? neknek->getField(velocityName).o_intVal : o_NULL,
-                 platform->solver->o_usrwrk,
+                 platform->app->o_usrwrk,
                  o_U,
                  o_tmp.slice(fieldOffset));
 

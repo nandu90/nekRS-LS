@@ -51,6 +51,8 @@ public:
 
     o_tmp = platform->deviceMemoryPool.reserve<T>(n);
     o_r0 = platform->deviceMemoryPool.reserve<T>(n);
+    o_r0.copyFrom(o_r, o_r.size());
+
     o_w = platform->deviceMemoryPool.reserve<T>(n);
 
     o_V = platform->deviceMemoryPool.reserve<T>(n * nRestartVectors);
@@ -109,8 +111,6 @@ private:
   {
     const auto offset = this->fieldOffset * this->Nfields;
     const int Nblock = (this->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
-
-    o_r0.copyFrom(o_r, o_r.size());
 
     dfloat nr = rdotr;
 

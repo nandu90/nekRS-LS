@@ -59,7 +59,7 @@ void lowMach::setup(dfloat alpha_, const occa::memory &o_beta_, const occa::memo
   }
   isInitialized = true;
 
-  _nrs = dynamic_cast<nrs_t *>(platform->solver);
+  _nrs = dynamic_cast<nrs_t *>(platform->app);
   ;
 
   alpha0 = alpha_;
@@ -67,11 +67,14 @@ void lowMach::setup(dfloat alpha_, const occa::memory &o_beta_, const occa::memo
   o_beta = o_beta_;
   o_kappa = o_kappa_;
 
-  nekrsCheck(_nrs->scalar->nameToIndex.find("temperature") == _nrs->scalar->nameToIndex.end(), 
-             platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "requires solving for temperature!");
+  nekrsCheck(_nrs->scalar->nameToIndex.find("temperature") == _nrs->scalar->nameToIndex.end(),
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "requires solving for temperature!");
 
   std::vector<int> bID;
-  for (auto &[key, bcID] : platform->solver->bc->bIdToTypeId()) {
+  for (auto &[key, bcID] : platform->app->bc->bIdToTypeId()) {
     const auto field = key.first;
     if (field == "fluid velocity") {
       if (bcID == bdryBase::bcType_udfDirichlet || bcID == bdryBase::bcType_interpolation) {
@@ -160,7 +163,7 @@ void lowMach::qThermalSingleComponent(double time)
 
   double surfaceFlops = 0.0;
 
-  if (!platform->solver->bc->hasOutflow("fluid velocity")) {
+  if (!platform->app->bc->hasOutflow("fluid velocity")) {
     nekrsCheck(rhsCVODE,
                MPI_COMM_SELF,
                EXIT_FAILURE,

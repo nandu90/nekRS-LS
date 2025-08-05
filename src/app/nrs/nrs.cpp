@@ -156,9 +156,9 @@ void nrs_t::init()
 {
   if (platform->options.compareArgs("FLUID STRESSFORMULATION", "TRUE")) {
     nekrsCheck(!platform->options.compareArgs("FLUID VELOCITY SOLVER", "BLOCK"),
-               platform->comm.mpiComm, 
-               EXIT_FAILURE, 
-               "%s\n", 
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "%s\n",
                "stressformulation requires block solver!");
   }
 
@@ -365,8 +365,8 @@ void nrs_t::setupNeknek()
   {
     int intFound = 0;
     for (auto &&field : fieldsToSolve()) {
-      for (int bID = 1; bID <= platform->solver->bc->size(field); ++bID) {
-        if (platform->solver->bc->typeId(bID, field) == bdryBase::bcType_interpolation) {
+      for (int bID = 1; bID <= platform->app->bc->size(field); ++bID) {
+        if (platform->app->bc->typeId(bID, field) == bdryBase::bcType_interpolation) {
           intFound = 1;
         }
       }
@@ -404,7 +404,7 @@ void nrs_t::setupNeknek()
   auto intFound = [&](mesh_t *mesh, const std::string name) {
     int cnt = 0;
     for (dlong f = 0; f < mesh->Nelements * mesh->Nfaces; ++f) {
-      if (platform->solver->bc->typeId(mesh->EToB[f], name) == bdryBase::bcType_interpolation) {
+      if (platform->app->bc->typeId(mesh->EToB[f], name) == bdryBase::bcType_interpolation) {
         cnt = 1;
         break;
       }
@@ -466,9 +466,9 @@ void nrs_t::setupNeknek()
   neknek->setup();
 }
 
-void nrs_t::restartFromFiles(const std::vector<std::string>& fileList)
+void nrs_t::restartFromFiles(const std::vector<std::string> &fileList)
 {
-  for (const std::string& restartStr : fileList) {
+  for (const std::string &restartStr : fileList) {
     auto options = serializeString(restartStr, '+');
     const auto fileName = options[0];
     options.erase(options.begin());
@@ -1761,7 +1761,7 @@ bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter, bo
 
   if (fluid) {
     fluid->applyDirichlet(timeNew);
-    if (neknek && !platform->solver->bc->hasOutflow("fluid velocity")) {
+    if (neknek && !platform->app->bc->hasOutflow("fluid velocity")) {
       neknek->fixCoupledSurfaceFlux(fluid->o_EToB, fluid->fieldOffset, fluid->o_U);
     }
   }
@@ -2222,7 +2222,7 @@ void nrs_t::computeUrst()
 
 nrs_t::tavgLegacy_t::tavgLegacy_t()
 {
-  auto nrs = dynamic_cast<nrs_t *>(platform->solver);
+  auto nrs = dynamic_cast<nrs_t *>(platform->app);
   auto &fluid = nrs->fluid;
 
   std::vector<tavg::field> avgFields;
@@ -2255,12 +2255,12 @@ nrs_t::tavgLegacy_t::tavgLegacy_t()
   _rm2 = std::make_unique<tavg>(fluid->fieldOffset, rm2Fields);
 }
 
-void nrs_t::tavgLegacy_t::outfld(mesh_t *mesh)
+void nrs_t::tavgLegacy_t::writeToFile(mesh_t *mesh)
 {
   static int outfldCounter = 0;
   const auto outXYZ = mesh && outfldCounter == 0;
 
-  auto nrs = dynamic_cast<nrs_t *>(platform->solver);
+  auto nrs = dynamic_cast<nrs_t *>(platform->app);
 
   nekrsCheck(_avg->fieldOffset() < mesh->Nlocal,
              MPI_COMM_SELF,

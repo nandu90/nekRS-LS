@@ -49,18 +49,20 @@ void neknek_t::setup()
     std::set<int> intBIDFields;
     for (auto &&field : fields_) {
       const int nEntries = (field.name == "scalar") ? field.filter.size() : 1;
-     
-      for (int n = 0; n < nEntries; n++) { 
-        auto fieldName = field.name; 
-        if (field.name == "scalar") fieldName += scalarDigitStr(field.filter.at(n));
 
-        for (int bID = 1; bID <= platform->solver->bc->size(fieldName); ++bID) {
-          const auto isInt = (platform->solver->bc->typeId(bID, fieldName) == bdryBase::bcType_interpolation);
-  
+      for (int n = 0; n < nEntries; n++) {
+        auto fieldName = field.name;
+        if (field.name == "scalar") {
+          fieldName += scalarDigitStr(field.filter.at(n));
+        }
+
+        for (int bID = 1; bID <= platform->app->bc->size(fieldName); ++bID) {
+          const auto isInt = (platform->app->bc->typeId(bID, fieldName) == bdryBase::bcType_interpolation);
+
           if (isInt) {
             intBIDFields.insert(bID);
           }
-  
+
           if ((intBIDFields.find(bID) != intBIDFields.end()) && !isInt) {
             errorLogger << "ERROR: expected INT boundary condition on boundary id " << bID << " for field "
                         << fieldName << "\n";
@@ -69,14 +71,20 @@ void neknek_t::setup()
       }
     }
     int errorLength = errorLogger.str().length();
-    nekrsCheck(errorLength > 0, platform->comm.mpiCommParent, EXIT_FAILURE, "%s\n", errorLogger.str().c_str());
+    nekrsCheck(errorLength > 0,
+               platform->comm.mpiCommParent,
+               EXIT_FAILURE,
+               "%s\n",
+               errorLogger.str().c_str());
 
-    for (auto && entry : intBIDFields) intBIDs.push_back(entry);
+    for (auto &&entry : intBIDFields) {
+      intBIDs.push_back(entry);
+    }
   }
 
 #if 0
-  for (int bID = 1; bID <= platform->solver->bc->size(fields_[0].name); ++bID) {
-    if (platform->solver->bc->typeId(bID, fields_[0].name) == bdryBase::bcType_interpolation)
+  for (int bID = 1; bID <= platform->app->bc->size(fields_[0].name); ++bID) {
+    if (platform->app->bc->typeId(bID, fields_[0].name) == bdryBase::bcType_interpolation)
       ;
     intBIDs.push_back(bID);
   }
@@ -87,10 +95,12 @@ void neknek_t::setup()
     for (dlong e = 0; e < mesh->Nelements; ++e) {
       for (dlong f = 0; f < mesh->Nfaces; ++f) {
         auto bID = mesh->EToB[f + mesh->Nfaces * e];
-        auto fieldName = fields_[0].name; 
-        if (fieldName == "scalar") fieldName += scalarDigitStr(fields_[0].filter.at(0));
+        auto fieldName = fields_[0].name;
+        if (fieldName == "scalar") {
+          fieldName += scalarDigitStr(fields_[0].filter.at(0));
+        }
 
-        if (bID > 0 && platform->solver->bc->typeId(bID, fieldName) == bdryBase::bcType_interpolation) {
+        if (bID > 0 && platform->app->bc->typeId(bID, fieldName) == bdryBase::bcType_interpolation) {
           nFaces++;
         }
       }
@@ -101,8 +111,8 @@ void neknek_t::setup()
                EXIT_FAILURE,
                "%s\n",
                "no interpolation boundaries found!");
- 
-      return nFaces * mesh->Nfp;
+
+    return nFaces * mesh->Nfp;
   }();
 
   intValOffset_ = alignStride<dlong>(npt_);
@@ -112,7 +122,9 @@ void neknek_t::setup()
 
   for (auto &&field : fields_) {
     int nStates = nEXT_ + 1;
-    if (multirate()) nStates++;
+    if (multirate()) {
+      nStates++;
+    }
     field.o_intVal = platform->device.malloc<dfloat>(field.o_filter.size() * intValOffset_ * nStates);
   }
 
@@ -121,8 +133,10 @@ void neknek_t::setup()
     for (auto &&field : fields_) {
       const int nEntries = (field.name == "scalar") ? field.filter.size() : 1;
       for (int n = 0; n < nEntries; n++) {
-         auto fieldName = field.name; 
-        if (fieldName == "scalar") fieldName += scalarDigitStr(field.filter.at(n));
+        auto fieldName = field.name;
+        if (fieldName == "scalar") {
+          fieldName += scalarDigitStr(field.filter.at(n));
+        }
         std::cout << fieldName << "  ";
       }
     }
@@ -219,10 +233,12 @@ void neknek_t::findIntPoints()
           dlong idM = mesh->vmapM[id];
 
           auto bID = mesh->EToB[f + mesh->Nfaces * e];
-          auto fieldName = fields_[0].name; 
-          if (fieldName == "scalar") fieldName += scalarDigitStr(fields_[0].filter.at(0));
+          auto fieldName = fields_[0].name;
+          if (fieldName == "scalar") {
+            fieldName += scalarDigitStr(fields_[0].filter.at(0));
+          }
 
-          if (platform->solver->bc->typeId(bID, fieldName) == bdryBase::bcType_interpolation) {
+          if (platform->app->bc->typeId(bID, fieldName) == bdryBase::bcType_interpolation) {
             neknekX[ip] = x[idM];
             neknekY[ip] = y[idM];
             neknekZ[ip] = z[idM];
@@ -409,9 +425,11 @@ void neknek_t::exchange(bool allTimeStates, bool lagState)
 
   platform->timer.tic("neknek exchange");
 
-  auto containsSequence = [](const std::vector<int>& vec, int startValue) {
+  auto containsSequence = [](const std::vector<int> &vec, int startValue) {
     auto it = std::find(vec.begin(), vec.end(), startValue);
-    if (it == vec.end()) return false;
+    if (it == vec.end()) {
+      return false;
+    }
     std::vector<int> sequence(vec.end() - it);
     std::iota(sequence.begin(), sequence.end(), startValue);
     return std::search(vec.begin(), vec.end(), sequence.begin(), sequence.end()) != vec.end();
@@ -419,12 +437,10 @@ void neknek_t::exchange(bool allTimeStates, bool lagState)
 
   for (auto &&field : fields_) {
     const int nFieldsFilter = field.o_filter.size();
-    const int nFields = field.offsetSum/field.offset;
-    auto o_field = [&]() 
-    {
+    const int nFields = field.offsetSum / field.offset;
+    auto o_field = [&]() {
       if (!containsSequence(field.filter, 0) || nFields != nFieldsFilter) {
-        auto o_fld =
-            platform->deviceMemoryPool.reserve<dfloat>(nStates * nFieldsFilter * field.offset);
+        auto o_fld = platform->deviceMemoryPool.reserve<dfloat>(nStates * nFieldsFilter * field.offset);
         launchKernel("neknek::pack",
                      mesh->Nlocal,
                      field.offsetSum,
@@ -496,11 +512,9 @@ double neknek_t::adjustDt(double dt)
   return dt;
 }
 
-void neknek_t::addVariable(const std::string &name,
-                           dlong fieldOffset, 
-                           const occa::memory &o_fld)
+void neknek_t::addVariable(const std::string &name, dlong fieldOffset, const occa::memory &o_fld)
 {
-  std::vector<int> filter = {0}; 
+  std::vector<int> filter = {0};
   addVariable(name, filter, fieldOffset, fieldOffset, o_fld);
 }
 
@@ -519,7 +533,7 @@ void neknek_t::addVariable(const std::string &name,
   if (_filter.size() < 1) {
     auto nFields = (fieldOffset > 0) ? fieldOffsetSum / fieldOffset : 1;
     field.filter.resize(nFields);
-    std::iota(field.filter.begin(), field.filter.end(), 0); 
+    std::iota(field.filter.begin(), field.filter.end(), 0);
   } else {
     field.filter = _filter;
   }
@@ -532,6 +546,6 @@ void neknek_t::addVariable(const std::string &name,
   field.o_filter.copyFrom(field.filter.data());
 
   field.o_field = o_fld;
- 
+
   fields_.push_back(field);
 }

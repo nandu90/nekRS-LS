@@ -219,7 +219,7 @@ void RANSktau::setup(int ifld)
   }
   isInitialized = true;
 
-  nrs = dynamic_cast<nrs_t *>(platform->solver);
+  nrs = dynamic_cast<nrs_t *>(platform->app);
   kFieldIndex = ifld; // tauFieldIndex is assumed to be kFieldIndex+1
 
   auto &scalar = nrs->scalar;

@@ -55,25 +55,25 @@ geomSolver_t::geomSolver_t(const geomSolverCfg_t &cfg)
   mesh->o_invAJw = resize(mesh, mesh->o_invAJw);
 
   if (!platform->options.compareArgs(upperCase(name) + " SOLVER", "NONE")) {
-    platform->solver->bc->printBcTypeMapping(name);
+    platform->app->bc->printBcTypeMapping(name);
 
-    auto EToB = mesh->createEToB([&](int bID) -> int { return platform->solver->bc->typeId(bID, name); });
+    auto EToB = mesh->createEToB([&](int bID) -> int { return platform->app->bc->typeId(bID, name); });
     o_EToB = platform->device.malloc<int>(EToB.size());
     o_EToB.copyFrom(EToB.data());
 
     auto verifyBC = [&]() {
       auto msh = (mesh != meshV) ? mesh : meshV;
-      nekrsCheck(msh->Nbid != platform->solver->bc->size(name),
+      nekrsCheck(msh->Nbid != platform->app->bc->size(name),
                  platform->comm.mpiComm,
                  EXIT_FAILURE,
                  "Size of %s boundaryTypeMap (%d) does not match number of boundary IDs in mesh (%d)!\n",
                  name.c_str(),
-                 platform->solver->bc->size(name),
+                 platform->app->bc->size(name),
                  msh->Nbid);
-        
-      platform->solver->bc->checkAlignment(msh);
+
+      platform->app->bc->checkAlignment(msh);
     };
- 
+
     verifyBC();
   }
 };
@@ -129,7 +129,7 @@ void geomSolver_t::solve(double time, int iter)
   if (platform->options.compareArgs(upperCase(name) + " INITIAL GUESS", "EXTRAPOLATION") && iter == 1) {
     o_U.copyFrom(o_Ue);
   }
- 
+
   ellipticSolver.at(0)->solve(o_lambda0, o_NULL, o_rhs, o_U.slice(0, fieldOffsetSum));
 
   platform->timer.toc("meshSolve");
@@ -144,20 +144,20 @@ void geomSolver_t::setupEllipticSolver()
   if (platform->comm.mpiRank == 0) {
     std::cout << "================ "
               << "ELLIPTIC SETUP " + upperCase(name) << " ================" << std::endl;
-  } 
+  }
 
   if (platform->options.compareArgs(upperCase(name) + " SOLVER", "BLOCK")) {
     platform->options.setArgs(upperCase(name) + " NFIELDS", std::to_string(mesh->dim));
   }
 
   auto EToBx =
-      mesh->createEToB([&](int bID) -> int { return platform->solver->bc->typeElliptic(bID, name, "x"); });
+      mesh->createEToB([&](int bID) -> int { return platform->app->bc->typeElliptic(bID, name, "x"); });
 
   auto EToBy =
-      mesh->createEToB([&](int bID) -> int { return platform->solver->bc->typeElliptic(bID, name, "y"); });
+      mesh->createEToB([&](int bID) -> int { return platform->app->bc->typeElliptic(bID, name, "y"); });
 
   auto EToBz =
-      mesh->createEToB([&](int bID) -> int { return platform->solver->bc->typeElliptic(bID, name, "z"); });
+      mesh->createEToB([&](int bID) -> int { return platform->app->bc->typeElliptic(bID, name, "z"); });
 
   std::vector<int> EToB;
   EToB.insert(std::end(EToB), std::begin(EToBx), std::end(EToBx));
@@ -168,7 +168,7 @@ void geomSolver_t::setupEllipticSolver()
 
   ellipticSolver.push_back(new elliptic(name, mesh, fieldOffset, EToB, o_lambda0, o_NULL));
 
-  const auto unalignedBoundary = platform->solver->bc->hasUnalignedMixed(name);
+  const auto unalignedBoundary = platform->app->bc->hasUnalignedMixed(name);
   if (unalignedBoundary) {
     o_zeroNormalMask = mesh->createZeroNormalMask(fieldOffset, ellipticSolver.at(0)->o_EToB());
 
@@ -193,7 +193,7 @@ void geomSolver_t::applyDirichlet(double time)
     return;
   }
 
-  if (platform->solver->bc->hasUnalignedMixed(name)) {
+  if (platform->app->bc->hasUnalignedMixed(name)) {
     static occa::kernel kernel;
     if (!kernel.isInitialized()) {
       kernel = platform->kernelRequests.load("mesh-applyZeroNormalMask");
@@ -236,7 +236,7 @@ void geomSolver_t::applyDirichlet(double time)
                  mesh->o_EToB,
                  o_EToB,
                  o_prop,
-                 platform->solver->o_usrwrk,
+                 platform->app->o_usrwrk,
                  o_Ufluid,
                  o_UDirichlet);
 
@@ -319,14 +319,16 @@ void geomSolver_t::lagSolution()
 
 void geomSolver_t::updateZeroNormalMask()
 {
-  if (platform->solver->bc->hasUnalignedMixed(name)) {
+  if (platform->app->bc->hasUnalignedMixed(name)) {
     o_zeroNormalMask = mesh->createZeroNormalMask(fieldOffset, ellipticSolver[0]->o_EToB());
   }
 };
 
 void geomSolver_t::computeDiv()
 {
-  if (!o_div.isInitialized()) return;
+  if (!o_div.isInitialized()) {
+    return;
+  }
 
   for (int s = o_coeffEXT.size(); s > 1; s--) {
     o_div.copyFrom(o_div, fieldOffset, (s - 1) * fieldOffset, (s - 2) * fieldOffset);

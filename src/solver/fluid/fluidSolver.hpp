@@ -38,23 +38,31 @@ public:
 
   deviceMemory<dfloat> o_solution(std::string key = "") override
   {
-    if (key.empty()) return deviceMemory<dfloat>(o_U);
+    if (key.empty()) {
+      return deviceMemory<dfloat>(o_U);
+    }
 
-    if (lowerCase(key) == "p" || lowerCase(key) == "pressure") return deviceMemory<dfloat>(o_P);
+    if (lowerCase(key) == "p" || lowerCase(key) == "pressure") {
+      return deviceMemory<dfloat>(o_P);
+    }
 
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? deviceMemory<dfloat>(o_U.slice(idx * fieldOffset, fieldOffset)) : deviceMemory<dfloat>(o_NULL);
+    return (idx >= 0) ? deviceMemory<dfloat>(o_U.slice(idx * fieldOffset, fieldOffset))
+                      : deviceMemory<dfloat>(o_NULL);
   };
 
   deviceMemory<dfloat> o_explicitTerms(std::string key = "") override
   {
-    if (key.empty()) return deviceMemory<dfloat>(o_EXT);
+    if (key.empty()) {
+      return deviceMemory<dfloat>(o_EXT);
+    }
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? deviceMemory<dfloat>(o_EXT.slice(idx * fieldOffset, fieldOffset)) : deviceMemory<dfloat>(o_NULL);
+    return (idx >= 0) ? deviceMemory<dfloat>(o_EXT.slice(idx * fieldOffset, fieldOffset))
+                      : deviceMemory<dfloat>(o_NULL);
   };
-  
+
   deviceMemory<dfloat> o_diffusionCoeff(std::string key = "") override
   {
     return deviceMemory<dfloat>(o_mue);
@@ -87,7 +95,7 @@ public:
 
   void updateZeroNormalMask()
   {
-    if (platform->solver->bc->hasUnalignedMixed(name)) {
+    if (platform->app->bc->hasUnalignedMixed(name)) {
       o_zeroNormalMask = mesh->createZeroNormalMask(fieldOffset, ellipticSolver[0]->o_EToB());
     }
   };

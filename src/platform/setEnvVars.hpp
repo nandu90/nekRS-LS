@@ -41,7 +41,11 @@ static void setEnvVars(const std::string& installDir, inipp::Ini ini)
   setenv("NEKRS_FC", buf.c_str(), 1);
 
   ini.extract("general", "fflags", buf);
-  setenv("NEKRS_FFLAGS", buf.c_str(), 1);
+  if (!getenv("NEKRS_FFLAGS")) {
+    if (!buf.empty()) {
+      setenv("NEKRS_FFLAGS", buf.c_str(), 1);
+    }
+  }
 
   ini.extract("general", "nek5000_pplist", buf);
   setenv("NEKRS_NEK5000_PPLIST", buf.c_str(), 1);

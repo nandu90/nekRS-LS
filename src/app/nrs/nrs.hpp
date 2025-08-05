@@ -172,7 +172,8 @@ public:
   {
   public:
     tavgLegacy_t();
-    void outfld(mesh_t *mesh);
+
+    void writeToFile(mesh_t *mesh);
     void reset();
     void run(double time);
 

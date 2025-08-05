@@ -1,7 +1,7 @@
 #include "tavg.hpp"
 #include <numeric> // For std::accumulate
 
-tavg* avg = nullptr;
+std::unique_ptr<tavg> avg;
 
 static deviceMemory<dfloat> o_divTau;
 
@@ -70,8 +70,8 @@ void udfNeumann(bcData *bc)
   } else if (isField("scalar temperature")) {
     bc->fluxScalar = p_cond * p_TsGrad;
     if (bc->id == 2) {
-      const dfloat thts = bc->urwrk[0];
-      const dfloat dtempWall = fabs(bc->urwrk[2] - (thts - 1));
+      const dfloat thts = bc->usrwrk[0];
+      const dfloat dtempWall = fabs(bc->usrwrk[2] - (thts - 1));
       const dfloat uTau = bc->usrwrk[3];
       const dfloat thetaTau = bc->usrwrk[4];
       const dfloat dtemp = bc->sScalar - (thts - 1);
@@ -341,7 +341,7 @@ void UDF_Setup()
 
   o_divTau.resize(3 * nrs->fieldOffset);
 
-  platform->solver->o_usrwrk.resize(5);
+  platform->app->o_usrwrk.resize(5);
 
   nrs->userSource = &userSource;
 
@@ -360,21 +360,21 @@ void UDF_Setup()
   }
 
   {
-    std::vector<std::vector<deviceMemory<dfloat>>> tavgFields;
+    std::vector< tavg::field > tavgFields;
 
     deviceMemory<dfloat> o_u(nrs->scalar->o_U.slice(0 * nrs->fieldOffset , nrs->fieldOffset));
     deviceMemory<dfloat> o_w(nrs->scalar->o_U.slice(2 * nrs->fieldOffset , nrs->fieldOffset));
     deviceMemory<dfloat> o_temp(nrs->scalar->o_S.slice(nrs->scalar->fieldOffsetScan[0], nrs->scalar->fieldOffset()));
 
-    tavgFields.push_back({o_u});
-    tavgFields.push_back({o_w});
-    tavgFields.push_back({o_temp});
+    tavgFields.push_back({"ux", std::vector{o_u}});
+    tavgFields.push_back({"uz", std::vector{o_w}});
+    tavgFields.push_back({"T", std::vector{o_temp}});
 
-    tavgFields.push_back({o_u, o_temp});
-    tavgFields.push_back({o_w, o_temp});
-    tavgFields.push_back({o_w, o_w, o_temp});
+    tavgFields.push_back({"uxux", std::vector{o_u, o_u}});
+    tavgFields.push_back({"uzuz", std::vector{o_w, o_w}});
+    tavgFields.push_back({"uzuzT", std::vector{o_w, o_w, o_temp}});
 
-    avg = new tavg(nrs->fieldOffset, tavgFields);
+    avg = std::make_unique<tavg>(nrs->fluid->fieldOffset, tavgFields);
   }
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {

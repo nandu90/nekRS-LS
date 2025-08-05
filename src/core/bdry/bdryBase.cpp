@@ -8,13 +8,14 @@ std::map<std::string, bool> bdryBase::fields;
 std::map<std::pair<std::string, int>, int> bdryBase::bToBc;
 bool bdryBase::importFromNek = false;
 
-static boundaryAlignment_t computeAlignment(mesh_t *mesh, std::vector<dfloat>& sgeo, dlong element, dlong face)
-{   
+static boundaryAlignment_t
+computeAlignment(mesh_t *mesh, std::vector<dfloat> &sgeo, dlong element, dlong face)
+{
   const dfloat alignmentTol = 1e-3;
   dfloat nxDiff = 0.0;
   dfloat nyDiff = 0.0;
   dfloat nzDiff = 0.0;
-      
+
   for (int fp = 0; fp < mesh->Nfp; ++fp) {
     const dlong sid = mesh->Nsgeo * (mesh->Nfaces * mesh->Nfp * element + mesh->Nfp * face + fp);
     const dfloat nx = sgeo[sid + NXID];
@@ -23,8 +24,8 @@ static boundaryAlignment_t computeAlignment(mesh_t *mesh, std::vector<dfloat>& s
     nxDiff += std::abs(std::abs(nx) - 1.0);
     nyDiff += std::abs(std::abs(ny) - 1.0);
     nzDiff += std::abs(std::abs(nz) - 1.0);
-  } 
-               
+  }
+
   nxDiff /= mesh->Nfp;
   nyDiff /= mesh->Nfp;
   nzDiff /= mesh->Nfp;
@@ -38,7 +39,7 @@ static boundaryAlignment_t computeAlignment(mesh_t *mesh, std::vector<dfloat>& s
   if (nzDiff < alignmentTol) {
     return boundaryAlignment_t::Z;
   }
-    
+
   return boundaryAlignment_t::UNALIGNED;
 }
 
@@ -46,14 +47,14 @@ bool bdryBase::hasOutflow(const std::string &field) const
 {
   auto retVal = false;
   for (int bID = 1; bID <= size(field); bID++) {
-      auto bcType = platform->solver->bc->typeId(bID, field);
-      if (bcType == bdryBase::bcType_zeroDirichletYZ_zeroNeumann ||
-          bcType == bdryBase::bcType_zeroDirichletXZ_zeroNeumann ||
-          bcType == bdryBase::bcType_zeroDirichletXY_zeroNeumann ||
-          bcType == bdryBase::bcType_zeroDirichletT_zeroNeumann || bcType == bdryBase::bcType_zeroNeumann) {
-        retVal = true;
-      }
-  } 
+    auto bcType = platform->app->bc->typeId(bID, field);
+    if (bcType == bdryBase::bcType_zeroDirichletYZ_zeroNeumann ||
+        bcType == bdryBase::bcType_zeroDirichletXZ_zeroNeumann ||
+        bcType == bdryBase::bcType_zeroDirichletXY_zeroNeumann ||
+        bcType == bdryBase::bcType_zeroDirichletT_zeroNeumann || bcType == bdryBase::bcType_zeroNeumann) {
+      retVal = true;
+    }
+  }
   return retVal;
 }
 
@@ -69,17 +70,17 @@ bool bdryBase::isOutflow(int bcType) const
   return retVal;
 }
 
-void bdryBase::printBcTypeMapping(const std::string &field) const 
+void bdryBase::printBcTypeMapping(const std::string &field) const
 {
   for (int bID = 1; bID <= size(field); bID++) {
     std::string txt(typeText(bID, field));
     if (platform->comm.mpiRank == 0 && txt.size()) {
       printf("bID %d -> bcType %s\n", bID, txt.c_str());
-    }               
+    }
   }
 }
 
-int bdryBase::typeElliptic(int bid, const std::string& field, std::string fieldComponent) const
+int bdryBase::typeElliptic(int bid, const std::string &field, std::string fieldComponent) const
 {
   if (bid < 1) {
     return ellipticBcType::NO_OP;
@@ -390,7 +391,7 @@ void bdryBase::scalarFieldSetup(std::string field, std::vector<std::string> slis
   }
 }
 
-std::string bdryBase::typeText(int bid, const std::string& field) const
+std::string bdryBase::typeText(int bid, const std::string &field) const
 {
   if (bid < 1) {
     return std::string();
@@ -402,7 +403,7 @@ std::string bdryBase::typeText(int bid, const std::string& field) const
     return std::string("");
   }
 
-  auto isVector = fields[field]; 
+  auto isVector = fields[field];
 
   if (isVector) {
     return vBcIDToText.at(bcID);
@@ -422,8 +423,10 @@ void bdryBase::checkAlignment(mesh_t *mesh) const
   mesh->o_sgeo.copyTo(sgeo.data());
 
   bool bail = false;
-  for (auto&& [field, isVector] : fields) {
-    if (!isVector) continue;
+  for (auto &&[field, isVector] : fields) {
+    if (!isVector) {
+      continue;
+    }
 
     const int nid = size(field);
 
