@@ -696,12 +696,12 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
   }
 
   if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "GJP")) {
-    dfloat coef;
-    platform->options.getArgs(upperCase(velocityName) + " REGULARIZATION GJP PENALTY FACTOR", coef);
+    dfloat tauFactor;
+    platform->options.getArgs(upperCase(velocityName) + " REGULARIZATION GJP SCALING COEFF", tauFactor);
 
     for (int i = 0; i < mesh->dim; i++) {
       auto o_EXTi = o_EXT.slice(i * fieldOffset, mesh->Nlocal);
-      addGJP(mesh, o_EToB, coef, fieldOffset, o_U, o_U.slice(i * fieldOffset, mesh->Nlocal), o_EXTi);
+      addGJP(mesh, o_EToB, fieldOffset, o_U, o_U.slice(i * fieldOffset, mesh->Nlocal), o_EXTi, tauFactor);
     }
   }
 

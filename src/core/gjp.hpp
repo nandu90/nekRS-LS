@@ -5,7 +5,7 @@
 #include "mesh.h"
 #include "opSEM.hpp"
 
-static void addGJP(mesh_t *mesh, const occa::memory& o_EToB, const occa::memory& o_coef, dlong fieldOffset, const occa::memory& o_U, const occa::memory& o_S, occa::memory& o_out)
+static void addGJP(mesh_t *mesh, const occa::memory& o_EToB, const occa::memory& o_coef, dlong fieldOffset, const occa::memory& o_U, const occa::memory& o_S, occa::memory& o_out, const dfloat NscalingFactor = 0.8)
 {
    // (n * o_grad)
    auto o_grad = opSEM::strongGrad(mesh, fieldOffset, o_S, false);
@@ -41,13 +41,13 @@ static void addGJP(mesh_t *mesh, const occa::memory& o_EToB, const occa::memory&
    }
    oogs::startFinish(o_jump, 1, 0, ogsDfloat, ogsAdd, gshFace);
 
-   const dfloat NscalingFactor = 1. / std::pow(mesh->Nq, 4);
+   const dfloat tau = NscalingFactor / std::pow(mesh->Nq, 4);
 
    static occa::kernel gjpKernel;
    if (!gjpKernel.isInitialized()) gjpKernel = platform->kernelRequests.load("gjpHex3D"); 
    gjpKernel(mesh->Nelements,
              fieldOffset, 
-             NscalingFactor,
+             tau,
              mesh->o_D,
              mesh->o_vmapM,
              mesh->o_vgeo,
@@ -60,11 +60,11 @@ static void addGJP(mesh_t *mesh, const occa::memory& o_EToB, const occa::memory&
              o_out);
 }
 
-static void addGJP(mesh_t *mesh, const occa::memory& o_EToB, dfloat coef, dlong fieldOffset, const occa::memory& o_U, const occa::memory& o_S, occa::memory& o_out)
+static void addGJP(mesh_t *mesh, const occa::memory& o_EToB, dlong fieldOffset, const occa::memory& o_U, const occa::memory& o_S, occa::memory& o_out, const dfloat NscalingFactor = 0.8)
 {
   auto o_coef = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-  platform->linAlg->fill(o_coef.size(), coef, o_coef);
-  addGJP(mesh, o_EToB, o_coef, fieldOffset, o_U, o_S, o_out); 
+  platform->linAlg->fill(o_coef.size(), 1.0, o_coef);
+  addGJP(mesh, o_EToB, o_coef, fieldOffset, o_U, o_S, o_out, NscalingFactor); 
 }
 
 

@@ -188,7 +188,7 @@ regularization
                               +scalingCoeff=<float>                    filter strength
                             hpfrt                                       stabilization
                             gjp                                        gradient jump penalty
-                              +scalingCoeff=<float>                    penalty factor
+                              +scalingCoeff=<float>                    scaling factor in penalty factor fit
                             avm                                        artificial viscosity method
                                                                        (has to be applied manually in case user user props)
                               +c0                                      make viscosity C0

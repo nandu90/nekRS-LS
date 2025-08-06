@@ -19,7 +19,6 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           {"c0"},
           {"nmodes"},
           {"cutoffratio"},
-          {"penaltyfactor"},
           {"scalingcoeff"},
           {"activationwidth"},
           {"decaythreshold"},
@@ -48,11 +47,11 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
 
       if (usesGJP) {
         options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP");
-        options.setArgs(parPrefix + "REGULARIZATION GJP PENALTY FACTOR", "0.8");
+        options.setArgs(parPrefix + "REGULARIZATION GJP SCALING COEFF", "0.8");
         for (std::string s : list) {
-          const auto penaltyStr = parseValueForKey(s, "penaltyfactor");
+          const auto penaltyStr = parseValueForKey(s, "scalingcoeff");
           if (!penaltyStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION GJP PENALTY FACTOR", penaltyStr);
+            options.setArgs(parPrefix + "REGULARIZATION GJP SCALING COEFF", penaltyStr);
           }
         }
       }
@@ -165,8 +164,8 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         }
 
         if (defaultSettings.find("gjp") != std::string::npos) {
-          options.setArgs(parPrefix + "REGULARIZATION GJP PENALTY FACTOR",
-                          options.getArgs("REGULARIZATION GJP PENALTY FACTOR"));
+          options.setArgs(parPrefix + "REGULARIZATION GJP SCALING COEFF",
+                          options.getArgs("REGULARIZATION GJP SCALING COEFF"));
         }
 
         if (defaultSettings.find("avm") != std::string::npos) {

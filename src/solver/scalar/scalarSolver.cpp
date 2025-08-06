@@ -405,14 +405,14 @@ void scalar_t::makeExplicit(int is, double time, int tstep)
   }
 
   if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "GJP")) {
-    dfloat pFactor;
-    platform->options.getArgs("SCALAR" + sid + " REGULARIZATION GJP PENALTY FACTOR", pFactor);
-    auto o_coef = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->axpby(mesh->Nlocal, pFactor, o_rho, 0, o_coef);
+    dfloat tauFactor;
+    platform->options.getArgs("SCALAR" + sid + " REGULARIZATION GJP SCALING COEFF", tauFactor);
 
     auto o_Si = o_S.slice(fieldOffsetScan[is], mesh->Nlocal);
     auto o_EXTi = o_EXT.slice(fieldOffsetScan[is], mesh->Nlocal);
-    addGJP(mesh, ellipticSolver[is]->o_EToB(), o_coef, vFieldOffset, o_U, o_Si, o_EXTi);
+    auto o_rhoi = o_rho.slice(fieldOffsetScan[is], mesh->Nlocal);
+
+    addGJP(mesh, ellipticSolver[is]->o_EToB(), o_rho, vFieldOffset, o_U, o_Si, o_EXTi, tauFactor);
   }
 
   const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
