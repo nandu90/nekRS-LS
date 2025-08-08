@@ -7,22 +7,27 @@ void re2::nelg(const std::string &meshFile, int &nelgt, int &nelgv, MPI_Comm com
   MPI_Comm_rank(comm, &rank);
 
   if (rank == 0) {
-    const int re2HeaderBytes = 80;
-    char *buf = (char *)calloc(std::max(re2HeaderBytes, (int)meshFile.length() + 1), sizeof(char));
-    strcpy(buf, meshFile.c_str());
-    FILE *fp = fopen(buf, "r");
-    nekrsCheck(!fp, MPI_COMM_SELF, EXIT_FAILURE, "Cannot find %s!\n", buf);
-    fgets(buf, re2HeaderBytes, fp);
-    fclose(fp);
+    const auto hdr = [&]() {
+      auto fp = fopen(meshFile.c_str(), "r");
+      nekrsCheck(!fp, MPI_COMM_SELF, EXIT_FAILURE, "Cannot find %s!\n", meshFile.c_str());
+
+      const auto re2HeaderSize = 80;
+      std::vector<char> buf(re2HeaderSize + 1); // leave space for '\0'
+      nekrsCheck(fgets(buf.data(), static_cast<int>(buf.size()), fp) == nullptr, 
+                 MPI_COMM_SELF, EXIT_FAILURE, "failed to read header of %s!\n", meshFile.c_str());
+
+      fclose(fp);
+      return buf;
+    }();
 
     char ver[6];
-    sscanf(buf, "%5s", ver);
+    sscanf(hdr.data(), "%5s", ver);
 
     int ndim;
     if (strcmp(ver, "#v004") == 0) {
-      sscanf(buf, "%5s %d %d %d", ver, &nelgt, &ndim, &nelgv);
+      sscanf(hdr.data(), "%5s %d %d %d", ver, &nelgt, &ndim, &nelgv);
     } else if (strcmp(ver, "#v001") == 0 || strcmp(ver, "#v002") == 0 || strcmp(ver, "#v003") == 0) {
-      sscanf(buf, "%5s %9d %1d %9d", ver, &nelgt, &ndim, &nelgv);
+      sscanf(hdr.data(), "%5s %9d %1d %9d", ver, &nelgt, &ndim, &nelgv);
     } else {
       nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "Unsupported re2 version %5s!\n", ver);
     }
@@ -35,8 +40,6 @@ void re2::nelg(const std::string &meshFile, int &nelgt, int &nelgv, MPI_Comm com
                "\nInvalid nelgt=%d / nelgv=%d read from re2 header!\n",
                nelgt,
                nelgv);
-
-    free(buf);
   }
 
   MPI_Bcast(&nelgt, 1, MPI_INT, 0, comm);
