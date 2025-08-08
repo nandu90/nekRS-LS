@@ -50,7 +50,7 @@ AeroForce *nrs_t::aeroForces(int nbID, const occa::memory &o_bID, const occa::me
     sum[5] += tmp[i + 5 * mesh->Nelements];
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, sum.data(), sum.size(), MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, sum.data(), sum.size(), MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
 
   af->forceViscous({sum[0], sum[1], sum[2]});
   af->forcePressure({sum[3], sum[4], sum[5]});

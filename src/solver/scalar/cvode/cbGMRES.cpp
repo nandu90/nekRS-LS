@@ -142,7 +142,7 @@ static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory 
   for (int iter = 0; iter < nIterMax; iter++) {
     if (((*new_vk_norm) * Kthres < vk_norm0) || iter == 0) {
       platform->timer.tic(timerName + "solve::cvode::linearSolve::cgsi", 0);
-      innerProdMulti(k + 1, o_V, o_omega, platform->comm.mpiComm, stemp);
+      innerProdMulti(k + 1, o_V, o_omega, platform->comm.mpiComm(), stemp);
       const dfloat omegaDotp = stemp[k];
       vk_norm0 = SUNRsqrt(omegaDotp);
 
@@ -165,12 +165,12 @@ static int CGSI(realtype **h, int k, int p, realtype *new_vk_norm, occa::memory 
       }
       *new_vk_norm = SUNRsqrt(arg);
 #else
-      *new_vk_norm = SUNRsqrt(platform->linAlg->innerProd(N, o_omega, o_omega, platform->comm.mpiComm));
+      *new_vk_norm = SUNRsqrt(platform->linAlg->innerProd(N, o_omega, o_omega, platform->comm.mpiComm()));
 #endif
       platform->timer.toc(timerName + "solve::cvode::linearSolve::cgsi");
 
 #if 0
-      if(platform->comm.mpiRank == 0 && platform->verbose()) {
+      if(platform->comm.mpiRank() == 0 && platform->verbose()) {
         std::cout << "CGSI: vk_norm0/vk_norm= " << vk_norm0/(*new_vk_norm) << ", iter=" << iter << std::endl;
       }
 #endif
@@ -311,7 +311,7 @@ int cbGMRESSolve(SUNLinearSolver S, N_Vector x, N_Vector b, realtype delta)
   /* Set r_norm = beta to L2 norm of V[0] = s1 r_0, and return if small */
   platform->linAlg->axmy(N, ONE, o_s1, o_vtemp);
 
-  realtype rdotr = platform->linAlg->innerProd(N, o_vtemp, o_vtemp, platform->comm.mpiComm);
+  realtype rdotr = platform->linAlg->innerProd(N, o_vtemp, o_vtemp, platform->comm.mpiComm());
   *res_norm = r_norm = beta = SUNRsqrt(rdotr);
 
   if (r_norm <= delta) {

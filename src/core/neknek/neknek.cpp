@@ -26,20 +26,20 @@ neknek_t::neknek_t(mesh_t *_mesh, dlong nsessions, dlong sessionID)
 
 void neknek_t::setup()
 {
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("found %d sessions\n", nsessions_);
     std::fflush(stdout);
   }
 
   nekrsCheck(fields_.size() < 1,
-             platform->comm.mpiCommParent,
+             platform->comm.mpiCommParent(),
              EXIT_FAILURE,
              "%s\n",
              "no neknek fields specified!");
 
   globalMovingMesh = [&]() {
     int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
-    MPI_Allreduce(MPI_IN_PLACE, &movingMesh, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
+    MPI_Allreduce(MPI_IN_PLACE, &movingMesh, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent());
     return movingMesh;
   }();
 
@@ -72,7 +72,7 @@ void neknek_t::setup()
     }
     int errorLength = errorLogger.str().length();
     nekrsCheck(errorLength > 0,
-               platform->comm.mpiCommParent,
+               platform->comm.mpiCommParent(),
                EXIT_FAILURE,
                "%s\n",
                errorLogger.str().c_str());
@@ -107,7 +107,7 @@ void neknek_t::setup()
     }
 
     nekrsCheck(nFaces < 1,
-               platform->comm.mpiCommParent,
+               platform->comm.mpiCommParent(),
                EXIT_FAILURE,
                "%s\n",
                "no interpolation boundaries found!");
@@ -128,7 +128,7 @@ void neknek_t::setup()
     field.o_intVal = platform->device.malloc<dfloat>(field.o_filter.size() * intValOffset_ * nStates);
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "exchanged fields: ";
     for (auto &&field : fields_) {
       const int nEntries = (field.name == "scalar") ? field.filter.size() : 1;
@@ -159,17 +159,17 @@ void neknek_t::setup()
     unsigned long intHashMin;
     unsigned long intHashMax;
 
-    MPI_Allreduce(&intHash, &intHashMin, 1, MPI_UNSIGNED_LONG, MPI_MIN, platform->comm.mpiCommParent);
-    MPI_Allreduce(&intHash, &intHashMax, 1, MPI_UNSIGNED_LONG, MPI_MAX, platform->comm.mpiCommParent);
+    MPI_Allreduce(&intHash, &intHashMin, 1, MPI_UNSIGNED_LONG, MPI_MIN, platform->comm.mpiCommParent());
+    MPI_Allreduce(&intHash, &intHashMax, 1, MPI_UNSIGNED_LONG, MPI_MAX, platform->comm.mpiCommParent());
 
     nekrsCheck(intHashMin != intHashMax,
-               platform->comm.mpiCommParent,
+               platform->comm.mpiCommParent(),
                EXIT_FAILURE,
                "%s\n",
                "neknek fields do not match across all sessions");
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "done\n" << std::flush;
   }
 }
@@ -182,7 +182,7 @@ void neknek_t::updateInterpPoints()
 
   this->interpolator.reset();
   this->interpolator =
-      std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiCommParent, true, intBIDs);
+      std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiCommParent(), true, intBIDs);
   this->interpolator->setTimerName("neknek_t::");
 
   launchKernel("neknek::copyNekNekPoints",
@@ -206,7 +206,7 @@ void neknek_t::findIntPoints()
   const dlong sessionID = sessionID_;
 
   interpolator.reset();
-  interpolator = std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiCommParent, true, intBIDs);
+  interpolator = std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiCommParent(), true, intBIDs);
   interpolator->setTimerName("neknek_t::");
 
   this->o_x_ = platform->device.malloc<dfloat>(this->npt_);
@@ -298,7 +298,7 @@ occa::memory neknek_t::partitionOfUnity()
   }
   recomputePartition = false;
 
-  auto pointInterp = pointInterpolation_t(mesh, platform->comm.mpiCommParent, true, intBIDs);
+  auto pointInterp = pointInterpolation_t(mesh, platform->comm.mpiCommParent(), true, intBIDs);
 
   auto o_dist = pointInterp.distanceINT();
 
@@ -395,7 +395,7 @@ void neknek_t::exchange(bool allTimeStates, bool lagState)
 {
   // do not invoke barrier in timer_t::tic
   platform->timer.tic("neknek sync");
-  MPI_Barrier(platform->comm.mpiCommParent);
+  MPI_Barrier(platform->comm.mpiCommParent());
   platform->timer.toc("neknek sync");
   this->tSync_ = platform->timer.query("neknek sync", "HOST:MAX");
 
@@ -414,7 +414,7 @@ void neknek_t::exchange(bool allTimeStates, bool lagState)
     platform->options.getArgs("EXT ORDER", nEXT);
     auto n = std::max(nBDF, nEXT);
     nekrsCheck(n < this->nEXT_,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "neknek extrapolation order (%d) exceeds (%d)\n",
                this->nEXT_,
@@ -472,13 +472,13 @@ double neknek_t::adjustDt(double dt)
 {
   if (!this->multirate()) {
     double minDt = dt;
-    MPI_Allreduce(MPI_IN_PLACE, &minDt, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiCommParent);
+    MPI_Allreduce(MPI_IN_PLACE, &minDt, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiCommParent());
     double maxDt = dt;
-    MPI_Allreduce(MPI_IN_PLACE, &maxDt, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent);
+    MPI_Allreduce(MPI_IN_PLACE, &maxDt, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent());
 
     const auto relErr = std::abs(maxDt - minDt) / maxDt;
     nekrsCheck(relErr > 100 * std::numeric_limits<double>::epsilon(),
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "Time step size needs to be the same across all sessions.\n"
                "Max dt = %e, Min dt = %e\n",
@@ -489,15 +489,15 @@ double neknek_t::adjustDt(double dt)
   }
 
   double maxDt = dt;
-  MPI_Allreduce(MPI_IN_PLACE, &maxDt, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent);
+  MPI_Allreduce(MPI_IN_PLACE, &maxDt, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent());
 
   double ratio = maxDt / dt;
   int timeStepRatio = std::floor(ratio);
   double maxErr = std::abs(ratio - timeStepRatio);
 
-  MPI_Allreduce(MPI_IN_PLACE, &maxErr, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent);
+  MPI_Allreduce(MPI_IN_PLACE, &maxErr, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiCommParent());
   nekrsCheck(maxErr > 1e-4,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "Multirate time stepping requires a fixed integer time step size ratio\n"
              "Max dt = %e, dt = %e, ratio = %e, ratioErr = %e\n",

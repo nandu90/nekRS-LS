@@ -76,7 +76,7 @@ elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf
 
     if (!ogs) {
       nekrsCheck(elliptic->Nfields > 1,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "%s\n",
                  "Creating a masked gs handle for nFields > 1 is currently not supported!");
@@ -90,7 +90,7 @@ elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf
       }
       ogs = ogsSetup(mesh->Nlocal,
                      maskedGlobalIds.data(),
-                     platform->comm.mpiComm,
+                     platform->comm.mpiComm(),
                      1,
                      platform->device.occaDevice());
     }
@@ -107,13 +107,12 @@ elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf
 
   std::string kernelName;
 
-  MPI_Barrier(platform->comm.mpiComm);
+  MPI_Barrier(platform->comm.mpiComm());
   double tStartLoadKernel = MPI_Wtime();
 
   ellipticBuildMultigridLevelKernels(elliptic);
 
-  elliptic->AxKernel = [&]()
-  {
+  elliptic->AxKernel = [&]() {
     if (Nc > 1 || (elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER") ||
                    elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "CG") ||
                    elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "GMRES"))) {
@@ -131,7 +130,7 @@ elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf
         kernelName += "Trilinear";
       }
       kernelName += "Hex3D" + gen_suffix(elliptic, pfloatString);
-  
+
       return platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
     }
     return occa::kernel();
@@ -174,8 +173,8 @@ elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf
 
   free(fToCInterp);
 
-  MPI_Barrier(platform->comm.mpiComm);
-  if (platform->comm.mpiRank == 0) {
+  MPI_Barrier(platform->comm.mpiComm());
+  if (platform->comm.mpiRank() == 0) {
     printf("done (%gs)\n", MPI_Wtime() - tStartLoadKernel);
   }
   fflush(stdout);

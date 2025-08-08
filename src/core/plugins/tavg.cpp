@@ -22,34 +22,33 @@ void tavg::E2(dlong N, dfloat a, dfloat b, int nflds, occa::memory o_x, occa::me
 }
 
 void tavg::E3(dlong N,
-               dfloat a,
-               dfloat b,
-               int nflds,
-               occa::memory o_x,
-               occa::memory o_y,
-               occa::memory o_z,
-               occa::memory &o_EXYZ)
+              dfloat a,
+              dfloat b,
+              int nflds,
+              occa::memory o_x,
+              occa::memory o_y,
+              occa::memory o_z,
+              occa::memory &o_EXYZ)
 {
   E3Kernel(N, fieldOffset_, nflds, a, b, o_x, o_y, o_z, o_EXYZ);
 }
 
 void tavg::E4(dlong N,
-               dfloat a,
-               dfloat b,
-               int nflds,
-               occa::memory o_1,
-               occa::memory o_2,
-               occa::memory o_3,
-               occa::memory o_4,
-               occa::memory &o_E4)
+              dfloat a,
+              dfloat b,
+              int nflds,
+              occa::memory o_1,
+              occa::memory o_2,
+              occa::memory o_3,
+              occa::memory o_4,
+              occa::memory &o_E4)
 {
   E4Kernel(N, fieldOffset_, nflds, a, b, o_1, o_2, o_3, o_4, o_E4);
 }
 
 void tavg::registerKernels(occa::properties &kernelInfo)
 {
-  auto buildKernel = [&kernelInfo](const std::string& kernelName)
-  {
+  auto buildKernel = [&kernelInfo](const std::string &kernelName) {
     const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/core/plugins/");
     const auto fileName = path + "E.okl";
     const auto reqName = "tavg::";
@@ -117,22 +116,26 @@ void tavg::run(double time)
   timel = time;
 }
 
-tavg::tavg(dlong fieldOffsetIn, const std::vector<tavg::field>& flds, std::string ioEngine)
+tavg::tavg(dlong fieldOffsetIn, const std::vector<tavg::field> &flds, std::string ioEngine)
 {
-  nekrsCheck(!buildKernelCalled, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "called prior tavg::registerKernels()!");
+  nekrsCheck(!buildKernelCalled,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "called prior tavg::registerKernels()!");
 
   userFieldList = flds;
 
   for (auto [name, entry] : userFieldList) {
     nekrsCheck(entry.size() < 1 || entry.size() > 4,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "invalid number of vectors in one of the user list entries!");
 
     for (auto &entry_i : entry) {
       nekrsCheck(entry_i.length() < fieldOffsetIn,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "%s\n",
                  "vector size in one of the user list entries smaller than fieldOffset");
@@ -147,9 +150,11 @@ tavg::tavg(dlong fieldOffsetIn, const std::vector<tavg::field>& flds, std::strin
 
 void tavg::writeToFile(mesh_t *mesh, bool reset)
 {
-  if (userFieldList.size() == 0) return;
+  if (userFieldList.size() == 0) {
+    return;
+  }
 
-  const bool outXYZ = mesh && outfldCounter == 0; 
+  const bool outXYZ = mesh && outfldCounter == 0;
 
   if (!fldWriter->isInitialized()) {
     fldWriter->open(mesh, iofld::mode::write, "tavg");
@@ -162,18 +167,20 @@ void tavg::writeToFile(mesh_t *mesh, bool reset)
 
     fldWriter->addVariable("time", atime);
 
-    const auto engineTypeIsNek = (dynamic_cast<iofldNek*>(fldWriter.get())) ? true : false; 
+    const auto engineTypeIsNek = (dynamic_cast<iofldNek *>(fldWriter.get())) ? true : false;
 
-    for(int i = 0; i < userFieldList.size(); i++) {
+    for (int i = 0; i < userFieldList.size(); i++) {
       const auto name = engineTypeIsNek ? "scalar" + scalarDigitStr(i) : std::get<0>(userFieldList.at(i));
       fldWriter->addVariable(name, std::vector<occa::memory>{o_AVG.slice(i * fieldOffset_, mesh->Nlocal)});
-    }  
+    }
   }
 
   fldWriter->writeAttribute("outputmesh", (outXYZ) ? "true" : "false");
-  fldWriter->process(); 
+  fldWriter->process();
 
-  if (reset) atime = 0;
+  if (reset) {
+    atime = 0;
+  }
   outfldCounter++;
 }
 

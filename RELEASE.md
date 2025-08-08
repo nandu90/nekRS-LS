@@ -89,10 +89,13 @@ This list provides an overview of the most significant changes in this release, 
 * par section `SCALAR01` -> `SCALAR FOO`
 * par `SCALAR` key `diffusivity` -> `diffusionCoeff`
 * par `SCALAR`key `density` -> `transportCoeff`
+* `comm.mpiRank` -> `comm.mpiRank()`
+* `comm.mpiComm` -> `comm.mpiComm()`
 
 ## Known Bugs / Restrictions
 
 * Code is not fully optimized on CPUs and Intel GPUs
+* [606](https://github.com/Nek5000/nekRS/issues/606)
 * [507](https://github.com/Nek5000/nekRS/issues/507)
 * [485](https://github.com/Nek5000/nekRS/issues/485)
 * [258](https://github.com/Nek5000/nekRS/issues/258)

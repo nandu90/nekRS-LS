@@ -25,7 +25,9 @@ public:
 
     this->tiny = 10 * std::numeric_limits<T>::min();
     this->FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
-    auto type = ((std::is_same<T, pfloat>::value && !std::is_same<dfloat, pfloat>::value) ? std::string("pfloat") : std::string(""));
+    auto type =
+        ((std::is_same<T, pfloat>::value && !std::is_same<dfloat, pfloat>::value) ? std::string("pfloat")
+                                                                                  : std::string(""));
     this->knlPrefix = std::string("gmres::") + type + std::to_string(this->Nfields) + "-";
   };
 
@@ -58,8 +60,8 @@ public:
     o_V = platform->deviceMemoryPool.reserve<T>(n * nRestartVectors);
     o_Z = platform->deviceMemoryPool.reserve<T>(n * ((flexible) ? nRestartVectors : 1));
 
-    if (platform->comm.mpiRank == 0 && platform->verbose()) {
-      auto txt = (preco) ? std::string("P") : std::string(""); 
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+      auto txt = (preco) ? std::string("P") : std::string("");
       txt += std::string("GMRES") + ((flexible) ? "-flex" : "");
       printf("%s %s: initial res norm %.15e target %e \n", txt.c_str(), this->_name.c_str(), rdotr, tol);
     }
@@ -162,8 +164,13 @@ private:
       s[0] = nr;
 
       // normalize
-      platform->linAlg
-          ->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, 1. / (nr + this->tiny), o_r, 0.0, o_V);
+      platform->linAlg->axpbyMany<T>(this->Nlocal,
+                                     this->Nfields,
+                                     this->fieldOffset,
+                                     1. / (nr + this->tiny),
+                                     o_r,
+                                     0.0,
+                                     o_V);
 
       for (int i = 0; i < nRestartVectors; ++i) {
 
@@ -176,25 +183,25 @@ private:
         {
 #if USE_WEIGHTED_INNER_PROD_MULTI_DEVICE
           platform->linAlg->weightedInnerProdMulti<T>(this->Nlocal,
-                                                   (i + 1),
-                                                   this->Nfields,
-                                                   this->fieldOffset,
-                                                   o_weight,
-                                                   o_V,
-                                                   o_w,
-                                                   platform->comm.mpiComm,
-                                                   o_y);
+                                                      (i + 1),
+                                                      this->Nfields,
+                                                      this->fieldOffset,
+                                                      o_weight,
+                                                      o_V,
+                                                      o_w,
+                                                      platform->comm.mpiComm(),
+                                                      o_y);
           o_y.copyTo(y, (i + 1));
 #else
           platform->linAlg->weightedInnerProdMulti<T>(this->Nlocal,
-                                                   (i + 1),
-                                                   this->Nfields,
-                                                   this->fieldOffset,
-                                                   o_weight,
-                                                   o_V,
-                                                   o_w,
-                                                   platform->comm.mpiComm,
-                                                   y);
+                                                      (i + 1),
+                                                      this->Nfields,
+                                                      this->fieldOffset,
+                                                      o_weight,
+                                                      o_V,
+                                                      o_w,
+                                                      platform->comm.mpiComm(),
+                                                      y);
           o_y.copyFrom(y, (i + 1));
 #endif
 
@@ -224,7 +231,7 @@ private:
               norm += scratch[k];
             }
           }
-          MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
+          MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
           return std::sqrt(norm);
         }();
         if (i < nRestartVectors - 1) {
@@ -272,7 +279,7 @@ private:
         iter++;
         rdotr = std::abs(s[i + 1]);
 
-        if (platform->comm.mpiRank == 0) {
+        if (platform->comm.mpiRank() == 0) {
           nekrsCheck(std::isnan(rdotr),
                      MPI_COMM_SELF,
                      EXIT_FAILURE,
@@ -280,7 +287,7 @@ private:
                      "Detected invalid resiual norm while running linear solver!");
         }
 
-        if (platform->verbose() && (platform->comm.mpiRank == 0)) {
+        if (platform->verbose() && (platform->comm.mpiRank() == 0)) {
           printf("it %d r norm %.15e\n", iter, rdotr);
         }
 
@@ -325,7 +332,7 @@ private:
           nr += scratch[n];
         }
       }
-      MPI_Allreduce(MPI_IN_PLACE, &nr, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
+      MPI_Allreduce(MPI_IN_PLACE, &nr, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
       nr = std::sqrt(nr);
       rdotr = nr;
 

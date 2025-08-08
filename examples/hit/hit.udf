@@ -45,7 +45,7 @@ void linearForcing(dfloat time)
 
   auto avg = [&](auto o_u)
   { 
-    return platform->linAlg->innerProd(mesh->Nlocal, mesh->o_Jw, o_u, platform->comm.mpiComm) / mesh->volume;
+    return platform->linAlg->innerProd(mesh->Nlocal, mesh->o_Jw, o_u, platform->comm.mpiComm()) / mesh->volume;
   };
 
   std::vector<dfloat> Uavg(mesh->dim);
@@ -101,7 +101,7 @@ void linearForcing(dfloat time)
     platform->linAlg->fill(mesh->Nlocal, -A*Uavg[i], o_ext); 
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     const auto uRms = std::sqrt(2./3 * kVolAvg);
     std::cout << "A=" << A 
               << "  k=" << kVolAvg 
@@ -134,9 +134,9 @@ void UDF_Setup()
   nrs->userSource = &linearForcing;
   nrs->fluid->userImplicitLinearTerm = &implicitForcing;
 
-  platform->linAlg->rescale(-L/2, L/2, mesh->o_x, platform->comm.mpiComm);
-  platform->linAlg->rescale(-L/2, L/2, mesh->o_y, platform->comm.mpiComm);
-  platform->linAlg->rescale(-L/2, L/2, mesh->o_z, platform->comm.mpiComm);
+  platform->linAlg->rescale(-L/2, L/2, mesh->o_x, platform->comm.mpiComm());
+  platform->linAlg->rescale(-L/2, L/2, mesh->o_y, platform->comm.mpiComm());
+  platform->linAlg->rescale(-L/2, L/2, mesh->o_z, platform->comm.mpiComm());
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
     const auto eps = 0.1;

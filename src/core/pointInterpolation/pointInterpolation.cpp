@@ -14,13 +14,17 @@ pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
 
     : mesh(mesh_), mySession(mySession_), nPoints(0)
 {
-  if (localHashSize == 0) localHashSize = mesh->Nlocal; 
-  if (globalHashSize == 0) globalHashSize = mesh->Nlocal;
+  if (localHashSize == 0) {
+    localHashSize = mesh->Nlocal;
+  }
+  if (globalHashSize == 0) {
+    globalHashSize = mesh->Nlocal;
+  }
 
-  // communicator is implicitly required to be either platform->comm.mpiComm or platform->comm.mpiCommParent
-  // due to other communicator synchronous calls, such as platform->timer.tic
+  // communicator is implicitly required to be either platform->comm.mpiComm()()or
+  // platform->comm.mpiComm()Parent due to other communicator synchronous calls, such as platform->timer.tic
   bool supported = false;
-  for (auto &&supportedCommunicator : {platform->comm.mpiComm, platform->comm.mpiCommParent}) {
+  for (auto &&supportedCommunicator : {platform->comm.mpiComm(), platform->comm.mpiCommParent()}) {
     int same = 0;
     MPI_Comm_compare(comm, supportedCommunicator, &same);
     supported |= (same != MPI_UNEQUAL);
@@ -29,10 +33,10 @@ pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
              comm,
              EXIT_FAILURE,
              "%s\n",
-             "Communicator must be either platform->comm.mpiComm or platform->comm.mpiCommParent");
+             "Communicator must be either platform->comm.mpiComm()()or platform->comm.mpiComm()Parent");
 
   newton_tol =
-    (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(1e-6, newton_tol_);
+      (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(1e-6, newton_tol_);
 
   auto x = platform->memoryPool.reserve<dfloat>(mesh->Nlocal);
   auto y = platform->memoryPool.reserve<dfloat>(mesh->Nlocal);
@@ -82,7 +86,7 @@ pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
 occa::memory pointInterpolation_t::distanceINT()
 {
   nekrsCheck(!_o_distanceINT.isInitialized(),
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "No INT boundary IDs provided on setup!");
@@ -98,7 +102,7 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
 
   int iErr = 0;
   iErr += !pointsAdded;
-  nekrsCheck(iErr, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "find called without any points added!");
+  nekrsCheck(iErr, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "find called without any points added!");
 
   const auto n = nPoints;
   const dlong sessionIDMatch = matchSession;
@@ -150,10 +154,10 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
     }
 
     std::array<hlong, 3> counts = {n, nBoundary, nOutside};
-    MPI_Allreduce(MPI_IN_PLACE, counts.data(), counts.size(), MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
-    MPI_Allreduce(MPI_IN_PLACE, &maxDistNorm, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, counts.data(), counts.size(), MPI_HLONG, MPI_SUM, platform->comm.mpiComm());
+    MPI_Allreduce(MPI_IN_PLACE, &maxDistNorm, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
 
-    if (platform->comm.mpiRank == 0 && verbosity == VerbosityLevel::Detailed) {
+    if (platform->comm.mpiRank() == 0 && verbosity == VerbosityLevel::Detailed) {
       std::cout << "pointInterpolation_t::find:"
                 << " total= " << counts[0] << " boundary= " << counts[1] << " (max distNorm=" << maxDistNorm
                 << ")"
@@ -211,7 +215,8 @@ void pointInterpolation_t::eval(dlong nFields,
              "pointInterpolation_t::eval input size (%" PRId64 ") is smaller than expected\n",
              o_in.byte_size());
 
-  nekrsCheck(o_out.byte_size() == 0 && nPoints_ || (o_out.byte_size() < nFields * outputFieldOffset * sizeof(dfloat)),
+  nekrsCheck(o_out.byte_size() == 0 && nPoints_ ||
+                 (o_out.byte_size() < nFields * outputFieldOffset * sizeof(dfloat)),
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "pointInterpolation_t::eval output size (%" PRId64 ") is smaller than expected\n",

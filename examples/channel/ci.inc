@@ -35,7 +35,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
     return;
   }
 
-  const int rank = platform->comm.mpiRank;
+  const int rank = platform->comm.mpiRank();
 
   nrs->copyToNek(time, tstep);
   nek::userchk();

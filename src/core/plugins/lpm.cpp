@@ -9,21 +9,22 @@
 
 #include "gslib.h" // needed for sarray_transfer
 
-lpm_t::lpm_t(mesh_t* mesh_, dfloat* dt_, dfloat bb_tol_, dfloat newton_tol_)
-    : mesh(mesh_),
-      dtOuter(dt_),
-      bb_tol(bb_tol_),
-      newton_tol(newton_tol_), 
-      interp(std::make_unique<pointInterpolation_t>(mesh, platform->comm.mpiComm, 
-                                                    true, std::vector<int>{}, bb_tol, newton_tol))
+lpm_t::lpm_t(mesh_t *mesh_, dfloat *dt_, dfloat bb_tol_, dfloat newton_tol_)
+    : mesh(mesh_), dtOuter(dt_), bb_tol(bb_tol_), newton_tol(newton_tol_),
+      interp(std::make_unique<pointInterpolation_t>(mesh,
+                                                    platform->comm.mpiComm(),
+                                                    true,
+                                                    std::vector<int>{},
+                                                    bb_tol,
+                                                    newton_tol))
 {
   nekrsCheck(!kernelsRegistered_,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "lpm_t::registerKernels has not been called prior to constructing lpm_t!");
 
-  platform->options.getArgs("EXT ORDER", nEXT);   
+  platform->options.getArgs("EXT ORDER", nEXT);
 
   dtEXT.resize(nEXT + 1);
   coeffEXT.resize(nEXT);
@@ -53,11 +54,11 @@ lpm_t::lpm_t(mesh_t* mesh_, dfloat* dt_, dfloat bb_tol_, dfloat newton_tol_)
 void lpm_t::extOrder(int order)
 {
   nekrsCheck(order < 1 || order > 3,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "Invalid extrpolation order (%d)!\n",
              order);
- 
+
   nEXT = order;
 
   dtEXT.resize(nEXT + 1);
@@ -68,11 +69,11 @@ void lpm_t::extOrder(int order)
 void lpm_t::abOrder(int order)
 {
   nekrsCheck(order < 1 || order > 3,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "Invalid integration order (%d)!\n",
              order);
-  nekrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
+  nekrsCheck(initialized_, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
   solverOrder = order;
 
   dt.resize(solverOrder + 1);
@@ -88,7 +89,7 @@ void lpm_t::abOrder(int order)
 void lpm_t::rkOrder(int order)
 {
   nekrsCheck(order < 1,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "Integration order (%d) must be positive!\n",
              order);
@@ -99,8 +100,8 @@ void lpm_t::rkOrder(int order)
     supported |= order == ord;
   }
 
-  nekrsCheck(!supported, platform->comm.mpiComm, EXIT_FAILURE, "RK order (%d) is not supported!\n", order);
-  nekrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
+  nekrsCheck(!supported, platform->comm.mpiComm(), EXIT_FAILURE, "RK order (%d) is not supported!\n", order);
+  nekrsCheck(initialized_, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
   solverOrder = order;
 
   dt.resize(solverOrder + 1);
@@ -132,7 +133,7 @@ void lpm_t::setSolver(const std::string &_solver)
   auto solver = lowerCase(_solver);
   this->solverType = stringToSolverType(solver);
   nekrsCheck(this->solverType == SolverType::INVALID,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "Solver (%s) is not supported.!",
              solver.c_str());
@@ -232,10 +233,10 @@ int lpm_t::numProps(const std::string &_propName) const
 }
 
 void lpm_t::addInterpField(const std::string &_interpFieldName,
-                                int Nfields,
-                                dlong fieldOffset,
-                                const occa::memory &o_fld,
-                                bool output)
+                           int Nfields,
+                           dlong fieldOffset,
+                           const occa::memory &o_fld,
+                           bool output)
 {
   auto interpFieldName = lowerCase(_interpFieldName);
   nekrsCheck(this->initialized(),
@@ -372,9 +373,9 @@ void lpm_t::handleAllocation(size_t offset)
 
 void lpm_t::initialize(int nParticles, double t0, const std::vector<dfloat> &y0)
 {
-  nekrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
+  nekrsCheck(initialized_, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
   nekrsCheck(y0.size() != nParticles * nDOFs_,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "y0.size() = %ld, while expecting %d entries!\n",
              y0.size(),
@@ -387,9 +388,9 @@ void lpm_t::initialize(int nParticles, double t0, const std::vector<dfloat> &y0)
 
 void lpm_t::initialize(int nParticles, double t0, const occa::memory &o_y0)
 {
-  nekrsCheck(initialized_, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
+  nekrsCheck(initialized_, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "lpm_t already initialized!");
   nekrsCheck(o_y0.length() != nParticles * nDOFs_,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "o_y0.length() = %llu , while expecting %d words!\n",
              o_y0.length(),
@@ -466,12 +467,12 @@ void lpm_t::interpolate(const std::string &interpFieldName)
 void lpm_t::integrate(double tf)
 {
   nekrsCheck(!initialized_,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "cannot call integrate before calling initialize!");
   nekrsCheck(!userRHS_,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "cannot call integrate without setting a userRHS!");
@@ -505,8 +506,12 @@ void lpm_t::integrate(double tf)
   if (platform->options.compareArgs("MOVING MESH", "TRUE")) {
     interp.reset();
 
-    interp = std::make_unique<pointInterpolation_t>(mesh, platform->comm.mpiComm,
-     true, std::vector<int>{}, bb_tol, newton_tol);
+    interp = std::make_unique<pointInterpolation_t>(mesh,
+                                                    platform->comm.mpiComm(),
+                                                    true,
+                                                    std::vector<int>{},
+                                                    bb_tol,
+                                                    newton_tol);
   }
 
   // set extrapolated state to t^n (copy from laggedInterpFields)
@@ -662,7 +667,11 @@ void lpm_t::integrateRK()
     return;
   }
 
-  nekrsCheck(false, platform->comm.mpiComm, EXIT_FAILURE, "RK solver order %d not supported!\n", solverOrder);
+  nekrsCheck(false,
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "RK solver order %d not supported!\n",
+             solverOrder);
 }
 
 void lpm_t::integrateRK1()
@@ -867,7 +876,7 @@ std::set<std::string> lpm_t::nonCoordinateOutputDOFs() const
 long long int lpm_t::numGlobalParticles() const
 {
   long long int numGlobalParticles = this->numParticles();
-  MPI_Allreduce(MPI_IN_PLACE, &numGlobalParticles, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, &numGlobalParticles, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm());
   return numGlobalParticles;
 }
 
@@ -877,7 +886,7 @@ int lpm_t::numNonLocalParticles() const
 
   int numNonLocal = 0;
   for (int i = 0; i < this->numParticles(); ++i) {
-    numNonLocal += (data.proc[i] != platform->comm.mpiRank);
+    numNonLocal += (data.proc[i] != platform->comm.mpiRank());
   }
 
   return numNonLocal;
@@ -1016,7 +1025,7 @@ void lpm_t::migrate()
 
   const int entriesPerParticle = nDOFs_ + solverOrder * nDOFs_ + nProps_ + nInterpFields_;
   nekrsCheck(entriesPerParticle > lpm_t::maxEntriesPerParticleMigration,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "entriesPerParticle (%d) > lpm_t::maxEntriesPerParticleMigration (%d)!\n",
              entriesPerParticle,
@@ -1083,7 +1092,7 @@ void lpm_t::migrate()
     std::vector<dlong> sendRankMap(this->numParticles(), -1);
     unsigned ctr = 0;
     for (int pid = 0; pid < this->numParticles(); ++pid) {
-      if (data.proc[pid] != platform->comm.mpiRank && data.code[pid] != findpts::CODE_NOT_FOUND) {
+      if (data.proc[pid] != platform->comm.mpiRank() && data.code[pid] != findpts::CODE_NOT_FOUND) {
         sendRankMap[pid] = ctr;
         r[3 * ctr + 0] = data.r[3 * pid + 0];
         r[3 * ctr + 1] = data.r[3 * pid + 1];
@@ -1207,7 +1216,7 @@ void lpm_t::migrate()
       std::vector<dlong> migrateMap(this->numParticles(), -1);
       // map local particles to new location first
       for (int pid = 0; pid < this->numParticles(); ++pid) {
-        if (data.proc[pid] == platform->comm.mpiRank && data.code[pid] != findpts::CODE_NOT_FOUND) {
+        if (data.proc[pid] == platform->comm.mpiRank() && data.code[pid] != findpts::CODE_NOT_FOUND) {
           migrateMap[pid] = ctr;
           ctr++;
         }
@@ -1401,9 +1410,9 @@ void lpm_t::addParticles(int newNParticles,
   }
 
   std::array<dlong, 2> counts = {newNParticles, this->numParticles()};
-  MPI_Allreduce(MPI_IN_PLACE, counts.data(), 2, MPI_DLONG, MPI_SUM, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, counts.data(), 2, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "Adding " << counts[0] << " to " << counts[1] << " particles!\n";
   }
 
@@ -1567,11 +1576,11 @@ void lpm_t::deleteParticles()
 
   int nDelete = numUnfoundParticles();
   long long int nDeleteGlobal = nDelete;
-  MPI_Allreduce(MPI_IN_PLACE, &nDeleteGlobal, 2, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, &nDeleteGlobal, 2, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm());
 
   const auto nParticlesGlobal = numGlobalParticles();
 
-  if (platform->comm.mpiRank == 0 && nDeleteGlobal > 0) {
+  if (platform->comm.mpiRank() == 0 && nDeleteGlobal > 0) {
     std::cout << "Deleting " << nDeleteGlobal << " of " << nParticlesGlobal << " particles!\n";
   }
 
@@ -1719,14 +1728,14 @@ void lpm_t::writeToFile()
   static int out_step = 0;
   ++out_step;
 
-  const auto mpi_comm = platform->comm.mpiComm;
+  const auto mpi_comm = platform->comm.mpiComm();
 
   long long int globalNPartOutput = nPartOutput;
 
-  MPI_Allreduce(MPI_IN_PLACE, &globalNPartOutput, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, &globalNPartOutput, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm());
 
   if (globalNPartOutput == 0) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << "No particles to output, skipping output step " << out_step << std::endl;
     }
     return;
@@ -1739,7 +1748,7 @@ void lpm_t::writeToFile()
   long long int pOffset = 0;
   MPI_Exscan(&nPartOutput, &pOffset, 1, MPI_LONG_LONG_INT, MPI_SUM, mpi_comm);
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::ofstream file(fname, std::ios::trunc);
     file.close();
   }
@@ -1809,21 +1818,21 @@ void lpm_t::writeToFile()
   message += "\t<AppendedData encoding=\"raw\">\n";
   message += "_";
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     MPI_File_write(file_out, message.c_str(), message.length(), MPI_CHAR, MPI_STATUS_IGNORE);
   }
 
   auto writeField = [&](int nFields, std::vector<float> &field) {
-    MPI_Barrier(platform->comm.mpiComm);
+    MPI_Barrier(platform->comm.mpiComm());
     MPI_Offset position;
     MPI_File_get_size(file_out, &position);
     MPI_File_set_view(file_out, position, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       unsigned long long int nbyte = nFields * globalNPartOutput * sizeof(float);
       MPI_File_write(file_out, &nbyte, 1, MPI_UNSIGNED_LONG_LONG, MPI_STATUS_IGNORE);
     }
 
-    MPI_Barrier(platform->comm.mpiComm);
+    MPI_Barrier(platform->comm.mpiComm());
     MPI_File_get_size(file_out, &position);
 
     position += sizeof(float) * (nFields * pOffset);
@@ -1915,11 +1924,11 @@ void lpm_t::writeToFile()
     writeField(Nfields, interpFieldFloat);
   }
 
-  MPI_Barrier(platform->comm.mpiComm);
+  MPI_Barrier(platform->comm.mpiComm());
   MPI_Offset position;
   MPI_File_get_size(file_out, &position);
   MPI_File_set_view(file_out, position, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     message = "";
     message += "</AppendedData>\n";
     message += "</VTKFile>";
@@ -1987,9 +1996,9 @@ long long int parseNumParticles(const std::string &restartfile, const std::strin
 
   auto errorString = errorLogger.str();
   int errorLength = errorString.length();
-  MPI_Allreduce(MPI_IN_PLACE, &errorLength, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, &errorLength, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
 
-  nekrsCheck(errorLength > 0, platform->comm.mpiComm, EXIT_FAILURE, "%s", errorString.c_str());
+  nekrsCheck(errorLength > 0, platform->comm.mpiComm(), EXIT_FAILURE, "%s", errorString.c_str());
 
   return nparticles;
 }
@@ -2036,9 +2045,9 @@ auto parsePointData(const std::string &restartfile, const std::string &pointData
 
   auto errorString = errorLogger.str();
   int errorLength = errorString.length();
-  MPI_Allreduce(MPI_IN_PLACE, &errorLength, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, &errorLength, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
 
-  nekrsCheck(errorLength > 0, platform->comm.mpiComm, EXIT_FAILURE, "%s", errorString.c_str());
+  nekrsCheck(errorLength > 0, platform->comm.mpiComm(), EXIT_FAILURE, "%s", errorString.c_str());
 
   return std::make_tuple(fieldName, numComponents, offset);
 }
@@ -2089,7 +2098,7 @@ void lpm_t::restart(const std::string &restartFile)
 {
   bool fileExists = fs::exists(restartFile);
   nekrsCheck(!fileExists,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "Restart file %s does not exist!\n",
              restartFile.c_str());
@@ -2099,10 +2108,10 @@ void lpm_t::restart(const std::string &restartFile)
 
   // from header, extract number of particles stored in NumberOfPoints
   const auto nPartGlobal = parseNumParticles(restartFile, header);
-  long long int nPartLocal = nPartGlobal / platform->comm.mpiCommSize;
+  long long int nPartLocal = nPartGlobal / platform->comm.mpiCommSize();
   // distribute remaining particles
-  const auto remainder = nPartGlobal % platform->comm.mpiCommSize;
-  if (platform->comm.mpiRank < remainder) {
+  const auto remainder = nPartGlobal % platform->comm.mpiCommSize();
+  if (platform->comm.mpiRank() < remainder) {
     nPartLocal++;
   }
 
@@ -2116,7 +2125,7 @@ void lpm_t::restart(const std::string &restartFile)
   }
 
   long long int pOffset = 0;
-  MPI_Exscan(&nPartLocal, &pOffset, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm);
+  MPI_Exscan(&nPartLocal, &pOffset, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm());
 
   std::map<std::string, std::tuple<long long int, long long int>> fieldToInfo;
   for (auto &&field : pointData) {
@@ -2126,7 +2135,7 @@ void lpm_t::restart(const std::string &restartFile)
 
   // start by reading coordinates, starting at the position left by the header
   MPI_File file_in;
-  MPI_File_open(platform->comm.mpiComm, restartFile.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &file_in);
+  MPI_File_open(platform->comm.mpiComm(), restartFile.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &file_in);
 
   MPI_Offset position = header.length();
   MPI_File_set_view(file_in, position, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
@@ -2138,7 +2147,7 @@ void lpm_t::restart(const std::string &restartFile)
   nPointData /= sizeof(float);
 
   nekrsCheck(nPointData != nPartGlobal,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "Number of particles in header (%lld) does not match number of particles in file (%lld)",
              nPartGlobal,
@@ -2173,7 +2182,7 @@ void lpm_t::restart(const std::string &restartFile)
                                          long long int expectedNumComponents,
                                          long long int offset) {
     nekrsCheck(fieldType.count(fieldName) == 0,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "Encountered unregisterd field %s while reading restart %s!\n",
                fieldName.c_str(),
@@ -2196,7 +2205,7 @@ void lpm_t::restart(const std::string &restartFile)
 
     nekrsCheck(
         nComponents != expectedNumComponents,
-        platform->comm.mpiComm,
+        platform->comm.mpiComm(),
         EXIT_FAILURE,
         "Expected number of components for field %s (%lld) does not match number of components (%lld) in "
         "restart file %s!\n",
@@ -2217,7 +2226,7 @@ void lpm_t::restart(const std::string &restartFile)
     nPointData /= sizeof(float);
 
     nekrsCheck(nPointData != nPartGlobal,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "Number of particles in header (%lld) does not match number of particles in file (%lld) when "
                "reading field %s!\n",
@@ -2282,7 +2291,7 @@ void lpm_t::printTimers()
   printTree = [&](std::string tag, int level) {
     if (level > 0) {
       const auto tTag = platform->timer.query(tag, "DEVICE:MAX");
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         for (int i = 0; i < level; ++i) {
           std::cout << "> ";
         }
@@ -2298,14 +2307,14 @@ void lpm_t::printTimers()
   auto pos = timerName.rfind("::");
   const auto start = timerName.substr(0, pos);
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "\n";
     std::cout << "Detailed timers for particles " << start << ":\n";
   }
 
   printTree(start, 0);
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "\n";
   }
 }

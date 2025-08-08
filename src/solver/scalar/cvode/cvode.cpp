@@ -75,7 +75,7 @@ cvode_t::cvode_t(scalar_t *_scalar)
 {
   this->scalar = _scalar;
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "initializing CVODE ...\n";
   }
 
@@ -136,7 +136,7 @@ cvode_t::cvode_t(scalar_t *_scalar)
     valid &= scalar->cvodeSolve[is];
   }
 
-  nekrsCheck(!valid, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "CVODE scalars must be contiguous");
+  nekrsCheck(!valid, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "CVODE scalars must be contiguous");
 
   std::vector<mesh_t *> meshes;
 
@@ -188,7 +188,7 @@ cvode_t::cvode_t(scalar_t *_scalar)
 
   mixedPrecisionJtvEnabled = platform->options.compareArgs("CVODE MIXED PRECISION JTV", "TRUE");
   nekrsCheck(mixedPrecisionJtvEnabled,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "CVODE MIXED PRECISION JTV = TRUE not supported yet");
@@ -201,7 +201,7 @@ cvode_t::cvode_t(scalar_t *_scalar)
 
   o_rhoCpAvg = platform->deviceMemoryPool.reserve<dfloat>(scalar->mesh(0)->Nlocal);
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "done\n";
   }
 }
@@ -268,8 +268,8 @@ int cvode_t::jtv(double t,
 
   static dfloat sig;
   if (platform->options.compareArgs("CVODE UPDATE SIGMA", "TRUE")) {
-    const auto v_wrms = sqrt(platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_v, platform->comm.mpiComm) /
-                             this->nEqTotal);
+    const auto v_wrms = sqrt(
+        platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_v, platform->comm.mpiComm()) / this->nEqTotal);
 
     auto sigBar = [&]() {
       if (this->sigScale > 0) {
@@ -277,9 +277,9 @@ int cvode_t::jtv(double t,
       }
 
       const auto y_wrms = sqrt(
-          platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_y, platform->comm.mpiComm) / this->nEqTotal);
+          platform->linAlg->weightedSqrSum(this->nEq, o_ewt, o_y, platform->comm.mpiComm()) / this->nEqTotal);
       const auto sig = sqrt((1 + y_wrms) * std::numeric_limits<dfloat>::epsilon()) / v_wrms;
-      if (platform->verbose() && platform->comm.mpiRank == 0) {
+      if (platform->verbose() && platform->comm.mpiRank() == 0) {
         std::cout << "sigma= " << sig << std::endl;
       }
       return sig;
@@ -392,7 +392,7 @@ void cvode_t::initialize()
       };
 
   SUNContext sunctx = nullptr;
-  retval = SUNContext_Create((void *)&platform->comm.mpiComm, &sunctx);
+  retval = SUNContext_Create((void *)&platform->comm.mpiComm(), &sunctx);
   check_retval(&retval, "SUNContext_Create", 1);
 
   const int blockSize = BLOCKSIZE;
@@ -418,7 +418,7 @@ void cvode_t::initialize()
       check_retval(&retval, "N_VEnableFusedOps_Cuda", 1);
 #else
       nekrsCheck(true,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "%s",
                  "CVODE ENABLE_CUDA not enabled, despite mode being CUDA!\n");
@@ -440,7 +440,7 @@ void cvode_t::initialize()
       check_retval(&retval, "N_VEnableFusedOps_Hip", 1);
 #else
       nekrsCheck(true,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "%s",
                  "CVODE ENABLE_HIP not enabled, despite mode being HIP!\n");
@@ -452,7 +452,7 @@ void cvode_t::initialize()
       retval = N_VEnableFusedOps_Serial(this->y, SUNTRUE);
       check_retval(&retval, "N_VEnableFusedOps_Serial", 1);
     }
-    this->cvodeY = N_VMake_MPIPlusX(platform->comm.mpiComm, this->y, sunctx);
+    this->cvodeY = N_VMake_MPIPlusX(platform->comm.mpiComm(), this->y, sunctx);
     this->nEqTotal = N_VGetLength(this->cvodeY);
 
     retval = N_VEnableFusedOps_MPIPlusX(this->cvodeY, SUNTRUE);
@@ -486,7 +486,7 @@ void cvode_t::initialize()
   } else if (platform->options.compareArgs("CVODE INTEGRATOR", "ADAMS")) {
     integrator = CV_ADAMS;
   } else {
-    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "Invalid CVODE INTEGRATOR!\n");
+    nekrsAbort(platform->comm.mpiComm(), EXIT_FAILURE, "%s", "Invalid CVODE INTEGRATOR!\n");
   }
 
   this->cvodeMem = CVodeCreate(integrator, sunctx);
@@ -568,7 +568,7 @@ void cvode_t::initialize()
     LS->ops->solve = fwdLinearSolve;
   } else {
     nekrsCheck(true,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "CVODE linear solver %s is not supported!\n",
                linearSolverType.c_str());
@@ -591,12 +591,12 @@ void cvode_t::initialize()
       check_retval(&retval, "SUNLinSol_SPGMRSetGSType", 1);
     } else if (gsType == "MODIFIED") {
       nekrsCheck(this->linearSolverType == "CBGMRES",
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "%s",
                  "CVODE GS TYPE MODIFIED not available for CBGMRES!\n");
     } else {
-      nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "Invalid CVODE GS TYPE %s!\n", gsType.c_str());
+      nekrsAbort(platform->comm.mpiComm(), EXIT_FAILURE, "Invalid CVODE GS TYPE %s!\n", gsType.c_str());
     }
   }
 
@@ -648,14 +648,14 @@ void cvode_t::initialize()
   retval = CVodeSetUserData(this->cvodeMem, this);
   check_retval(&retval, "CVodeSetUserData", 1);
 
-  if (platform->comm.mpiRank != 0) {
+  if (platform->comm.mpiRank() != 0) {
     CVodeSetErrFile(this->cvodeMem, NULL);
   }
 
   resetCounters();
 
 #else
-  nekrsCheck(true, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "cvode was not enabled");
+  nekrsCheck(true, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "cvode was not enabled");
 #endif
 }
 
@@ -887,7 +887,7 @@ void cvode_t::defaultRHS(double time, double t0, const LVector_t<dfloat> &o_y, L
       platform->timer.tic(timerScope + "::extrapolate", 0);
     }
 
-    if (platform->comm.mpiRank == 0 && time - tprev > 0 && verboseCVODE) {
+    if (platform->comm.mpiRank() == 0 && time - tprev > 0 && verboseCVODE) {
       std::cout << "tCv= " << time << ", dt= " << time - tprev << std::endl;
     }
 
@@ -1397,7 +1397,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
     int cnt = 0;
     while (retval != CV_SUCCESS) {
       cnt++;
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         std::cout << "restarting CVODE ...\n";
       }
       retval = CVodeReInit(cvodeMem, t, cvodeY);
@@ -1409,7 +1409,7 @@ void cvode_t::solve(double t0, double t1, int tstep)
       updateCounters();
 
       nekrsCheck(cnt > maxRestarts,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "%s",
                  "Reached maximum number of allowed CVODE restarts! Giving up ...\n");
@@ -1558,7 +1558,7 @@ void cvode_t::printTimers()
 {
   auto mesh = scalar->meshV;
   long long int NglobalElements = mesh->Nelements;
-  MPI_Allreduce(MPI_IN_PLACE, &NglobalElements, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, &NglobalElements, 1, MPI_LONG_LONG_INT, MPI_SUM, platform->comm.mpiComm());
   const long long int DOF = (NglobalElements * std::pow(mesh->N, 3) * this->cvodeScalarIds.size());
   platform->timer.print(timerName, DOF);
 }
@@ -1578,7 +1578,7 @@ void cvode_t::setLocalPointSource(userLocalPointSourceE_t _userLocalPointSource)
   userLocalPointSourceE = _userLocalPointSource;
 
   nekrsCheck(!o_pointSource.isInitialized(),
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s",
              "o_pointSource not initialized!\n");
@@ -1589,7 +1589,7 @@ void cvode_t::setLocalPointSource(userLocalPointSourceL_t _userLocalPointSource)
   userLocalPointSourceL = _userLocalPointSource;
 
   nekrsCheck(!o_pointSource.isInitialized(),
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s",
              "o_pointSource not initialized!\n");

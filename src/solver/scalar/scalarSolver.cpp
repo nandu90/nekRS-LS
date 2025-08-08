@@ -73,8 +73,8 @@ void scalar_t::advectionSubcycling(int nEXT, double time, int is)
                                                                  0,
                                                                  mesh->ogs->o_invDegree,
                                                                  o_JwFi,
-                                                                 platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+                                                                 platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       printf("%s%s advSub norm: %.15e\n", "scalar", scalarDigitStr(is).c_str(), debugNorm);
     }
   }
@@ -83,7 +83,7 @@ void scalar_t::advectionSubcycling(int nEXT, double time, int is)
 scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_geom) : geom(_geom)
 {
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "================ " << "SETUP SCALAR" << " ===============\n";
   }
 
@@ -170,16 +170,16 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
     }
 
     nekrsCheck(options.compareArgs("SCALAR" + sid + " SOLVER", "BLOCK"),
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "scalar does not support BLOCK solver!");
 
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << "S" << sid << ": " << name[is] << std::endl;
     }
     platform->app->bc->printBcTypeMapping("scalar" + sid);
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << std::endl;
     }
 
@@ -329,7 +329,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
       const std::string field = "scalar" + scalarDigitStr(is);
       nekrsCheck(_mesh[is]->Nbid != platform->app->bc->size(field),
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "Size of %s boundaryTypeMap (%d) does not match number of boundary IDs in mesh (%d)!\n",
                  field.c_str(),
@@ -477,7 +477,7 @@ void scalar_t::applyAVM()
       if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD",
                                         "AVM_AVERAGED_MODAL_DECAY")) {
         nekrsCheck(mesh->N < 5,
-                   platform->comm.mpiComm,
+                   platform->comm.mpiComm(),
                    EXIT_FAILURE,
                    "%s\n",
                    "AVM requires polynomialOrder >= 5!");
@@ -518,13 +518,13 @@ void scalar_t::applyAVM()
     auto o_eps = avm::viscosity(vFieldOffset, o_U, o_Si, absTol, scalingCoeff, logS0, kappa, makeCont);
 
     if (verbose) {
-      const dfloat maxEps = platform->linAlg->max(mesh->Nlocal, o_eps, platform->comm.mpiComm);
-      const dfloat minEps = platform->linAlg->min(mesh->Nlocal, o_eps, platform->comm.mpiComm);
+      const dfloat maxEps = platform->linAlg->max(mesh->Nlocal, o_eps, platform->comm.mpiComm());
+      const dfloat minEps = platform->linAlg->min(mesh->Nlocal, o_eps, platform->comm.mpiComm());
       occa::memory o_S_slice = o_diff + fieldOffsetScan[scalarIndex];
-      const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, o_S_slice, platform->comm.mpiComm);
-      const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, o_S_slice, platform->comm.mpiComm);
+      const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, o_S_slice, platform->comm.mpiComm());
+      const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, o_S_slice, platform->comm.mpiComm());
 
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         printf("applying a min/max artificial viscosity of (%f,%f) to scalar%s with min/max visc (%f,%f)\n",
                minEps,
                maxEps,
@@ -538,10 +538,10 @@ void scalar_t::applyAVM()
 
     if (verbose) {
       occa::memory o_S_slice = o_diff + fieldOffsetScan[scalarIndex];
-      const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, o_S_slice, platform->comm.mpiComm);
-      const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, o_S_slice, platform->comm.mpiComm);
+      const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, o_S_slice, platform->comm.mpiComm());
+      const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, o_S_slice, platform->comm.mpiComm());
 
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         printf("scalar%s now has a min/max visc: (%f,%f)\n", sid.c_str(), minDiff, maxDiff);
       }
     }
@@ -670,7 +670,7 @@ void scalar_t::setupEllipticSolver()
     }
 
     const auto solverName = cvodeSolve[is] ? "CVODE" : "ELLIPTIC";
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << "================= " << solverName << " SETUP SCALAR" << sid << " ===============\n";
     }
 
@@ -678,15 +678,12 @@ void scalar_t::setupEllipticSolver()
       continue;
     }
 
-    auto EToB = _mesh[is]->createEToB(
-        [&](int bID) -> int { return platform->app->bc->typeElliptic(bID, "scalar" + sid); });
-
     auto o_rho_i = o_rho.slice(fieldOffsetScan[is], _mesh[is]->Nlocal);
     auto o_lambda0 = o_diff.slice(fieldOffsetScan[is], _mesh[is]->Nlocal);
     auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(_mesh[is]->Nlocal);
     platform->linAlg->axpby(_mesh[is]->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_lambda1);
 
-    ellipticSolver[is] = new elliptic("scalar" + sid, _mesh[is], _fieldOffset, EToB, o_lambda0, o_lambda1);
+    ellipticSolver[is] = new elliptic("scalar" + sid, _mesh[is], _fieldOffset, o_lambda0, o_lambda1);
   }
 }
 
@@ -722,8 +719,8 @@ void scalar_t::makeForcing()
                                                                    0,
                                                                    _mesh[is]->ogs->o_invDegree,
                                                                    o_JwF + fieldOffsetScan[is],
-                                                                   platform->comm.mpiComm);
-      if (platform->comm.mpiRank == 0) {
+                                                                   platform->comm.mpiComm());
+      if (platform->comm.mpiRank() == 0) {
         printf("%s%s Jwf norm: %.15e\n", "scalar", scalarDigitStr(is).c_str(), debugNorm);
       }
     }

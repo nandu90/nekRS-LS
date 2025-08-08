@@ -53,7 +53,7 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, int tstep)
   }
 
   auto& scalar = nrs->scalar;
-  auto interp = pointInterpolation_t(scalar->mesh(1), platform->comm.mpiComm);
+  auto interp = pointInterpolation_t(scalar->mesh(1), platform->comm.mpiComm());
 
   std::vector<dfloat> x = {4, 4, 4};
   std::vector<dfloat> y = {-0.25, 0.25, 1.0};
@@ -75,18 +75,18 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, int tstep)
   for (int i = 0; i < nPoints; ++i) {
     relError = std::max(relError, std::abs(Tint[i] - Texpected[i]));
   }
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "Point interpolation relErr=" << relError << std::endl;
   } 
 
   const auto tol = 5e-4;
   if (relError > tol) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << "Point interpolation test failed" << std::endl;
     }
 
     CiFailTest();
-    nekrsCheck(platform->exitValue, platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+    nekrsCheck(platform->exitValue, platform->comm.mpiComm(), EXIT_FAILURE, "%s", "");
   }
 }
 
@@ -107,7 +107,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
 
   ciTestPointInterpolation(nrs, time, tstep);
 
-  const int rank = platform->comm.mpiRank;
+  const int rank = platform->comm.mpiRank();
 
   nrs->copyToNek(time, tstep);
   nek::userchk();

@@ -51,7 +51,7 @@ void uservp(double time)
   auto& scalar = nrs->scalar;
 
   if (updateProperties) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << "updating properties"
                 << "\n";
     }

@@ -23,13 +23,13 @@ static void checkEToB(mesh_t *mesh)
         break;
       }
     }
-    MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
     err += (found ? 0 : 1);
-    if (err && platform->comm.mpiRank == 0) {
+    if (err && platform->comm.mpiRank() == 0) {
       printf("Cannot find boundary ID %d in EToB!\n", id);
     }
   }
-  nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "");
+  nekrsCheck(err, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "");
 
   found = 0;
   for (int f = 0; f < mesh->Nelements * mesh->Nfaces; f++) {
@@ -37,8 +37,8 @@ static void checkEToB(mesh_t *mesh)
       found = 1;
     }
   }
-  MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-  nekrsCheck(found, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "EToB has invalid entries!");
+  MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
+  nekrsCheck(found, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "EToB has invalid entries!");
 }
 
 static void meshVOccaSetup3D(mesh_t *mesh, occa::properties &kernelInfo);
@@ -182,23 +182,23 @@ void meshLoadKernels(mesh_t *mesh)
   mesh->distanceKernel = platform->kernelRequests.load(meshPrefix + "distanceHex3D");
   mesh->hlongSumKernel = platform->kernelRequests.load("linAlg::hlong-sum");
 
-  { 
+  {
     const auto prefix = "coarsenHex3D_Nf_" + std::to_string(mesh->N);
     for (int N = 1; N < mesh->N; N++) {
-      mesh->intpKernel[N] = 
-        platform->kernelRequests.load(meshPrefix + prefix + std::string("_Nc_") + std::to_string(N));
+      mesh->intpKernel[N] =
+          platform->kernelRequests.load(meshPrefix + prefix + std::string("_Nc_") + std::to_string(N));
     }
   }
-  { 
+  {
     for (int N = mesh->N; N < mesh->maxNqIntp; N++) {
       const auto prefix = "prolongateHex3D_Nf_" + std::to_string(N);
-      mesh->intpKernel[N] = 
-        platform->kernelRequests.load(meshPrefix + prefix + std::string("_Nc_") + std::to_string(mesh->N));
+      mesh->intpKernel[N] =
+          platform->kernelRequests.load(meshPrefix + prefix + std::string("_Nc_") + std::to_string(mesh->N));
     }
   }
 }
 
-std::pair<mesh_t*, mesh_t*> createMesh(MPI_Comm comm, int N, int cubN, occa::properties &kernelInfo)
+std::pair<mesh_t *, mesh_t *> createMesh(MPI_Comm comm, int N, int cubN, occa::properties &kernelInfo)
 {
   int rank, size;
   MPI_Comm_rank(comm, &rank);
@@ -207,20 +207,20 @@ std::pair<mesh_t*, mesh_t*> createMesh(MPI_Comm comm, int N, int cubN, occa::pro
   mesh_t *mesh = new mesh_t();
 
   mesh->solid = [&]() {
-    int nelgt, nelgv; 
+    int nelgt, nelgv;
     const std::string meshFile = platform->options.getArgs("MESH FILE");
-    re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm);
+    re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
     return nelgt != nelgv;
   }();
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("generating mesh ...\n");
   }
 
   meshNekReaderHex3D(N, mesh);
 
   nekrsCheck(static_cast<size_t>(mesh->Nelements) * mesh->Nvgeo * cubN > std::numeric_limits<int>::max(),
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "mesh->Nelements * mesh->Nvgeo * mesh->cubN exceeds int limit!");
@@ -230,7 +230,7 @@ std::pair<mesh_t*, mesh_t*> createMesh(MPI_Comm comm, int N, int cubN, occa::pro
 
   // load reference (r,s,t) element nodes
   meshLoadReferenceNodesHex3D(mesh, N, cubN);
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("polynomial order N: %d", mesh->N);
     if (cubN) {
       printf(", over-integration order cubN: %d", mesh->cubNq - 1);
@@ -238,7 +238,7 @@ std::pair<mesh_t*, mesh_t*> createMesh(MPI_Comm comm, int N, int cubN, occa::pro
     printf("\n");
   }
 
-  if (platform->comm.mpiRank == 0 && mesh->N < 5) {
+  if (platform->comm.mpiRank() == 0 && mesh->N < 5) {
     std::cout << std::endl << "    WARNING: N < 5 may degrade performance!\n" << std::endl;
   }
 
@@ -259,7 +259,7 @@ std::pair<mesh_t*, mesh_t*> createMesh(MPI_Comm comm, int N, int cubN, occa::pro
   meshParallelGatherScatterSetup(mesh,
                                  mesh->Nelements * mesh->Np,
                                  mesh->globalIds,
-                                 platform->comm.mpiComm,
+                                 platform->comm.mpiComm(),
                                  OOGS_AUTO,
                                  0);
 
@@ -279,9 +279,9 @@ std::pair<mesh_t*, mesh_t*> createMesh(MPI_Comm comm, int N, int cubN, occa::pro
     for (int i = 0; i < mesh->Nlocal; i++) {
       sum1 += std::abs(tmp[i] - static_cast<dfloat>(mult[i]));
     }
-    MPI_Allreduce(MPI_IN_PLACE, &sum1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &sum1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
     if (sum1 > 10 * std::numeric_limits<dfloat>::epsilon()) {
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         printf("multiplicity test err=%g!\n", sum1);
       }
       fflush(stdout);
@@ -289,7 +289,7 @@ std::pair<mesh_t*, mesh_t*> createMesh(MPI_Comm comm, int N, int cubN, occa::pro
     }
     free(tmp);
   }
-  nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "");
+  nekrsCheck(err, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "");
 
   {
     std::vector<dfloat> tmp(mesh->Nlocal);
@@ -299,30 +299,30 @@ std::pair<mesh_t*, mesh_t*> createMesh(MPI_Comm comm, int N, int cubN, occa::pro
     for (int i = 0; i < mesh->Nlocal; i++) {
       sum += tmp[i];
     }
-    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, platform->comm.mpiComm());
     auto Nglobal = static_cast<hlong>(sum + 0.1);
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("unique number of gridpoints: : %lld\n", Nglobal);
     }
     mesh->Nglobal = Nglobal;
 
     hlong NelementsGlobal = mesh->Nelements;
-    MPI_Allreduce(MPI_IN_PLACE, &NelementsGlobal, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &NelementsGlobal, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm());
     mesh->NelementsGlobal = NelementsGlobal;
   }
 
   {
     double valMin = (double)mesh->NlocalGatherElements / mesh->Nelements;
     double valMax = (double)mesh->NlocalGatherElements / mesh->Nelements;
-    MPI_Allreduce(MPI_IN_PLACE, &valMin, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm);
-    MPI_Allreduce(MPI_IN_PLACE, &valMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &valMin, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm());
+    MPI_Allreduce(MPI_IN_PLACE, &valMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm());
 
-    if (platform->comm.mpiRank == 0 && platform->comm.mpiCommSize > 1) {
+    if (platform->comm.mpiRank() == 0 && platform->comm.mpiCommSize() > 1) {
       printf("number of interior elements min/max: %2.0f%%  %2.0f%%\n", 100 * valMin, 100 * valMax);
     }
   }
 
-  mesh_t* meshV = mesh;
+  mesh_t *meshV = mesh;
   if (mesh->solid) {
     meshV = createMeshV(comm, N, cubN, mesh, kernelInfo);
   }
@@ -377,7 +377,7 @@ mesh_t *createMeshMG(mesh_t *_mesh, int Nc)
 
   meshGlobalIds(mesh);
 
-  meshParallelGatherScatterSetup(mesh, mesh->Nlocal, mesh->globalIds, platform->comm.mpiComm, OOGS_AUTO, 0);
+  meshParallelGatherScatterSetup(mesh, mesh->Nlocal, mesh->globalIds, platform->comm.mpiComm(), OOGS_AUTO, 0);
 
   {
     auto retVal = mesh->geometricFactors();
@@ -385,7 +385,7 @@ mesh_t *createMeshMG(mesh_t *_mesh, int Nc)
       platform->options.setArgs("GALERKIN COARSE OPERATOR", "TRUE");
     } else {
       nekrsCheck(retVal,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "%s\n",
                  "Invalid element Jacobian < 0 found!");
@@ -429,7 +429,7 @@ mesh_t *createMeshMG(mesh_t *_mesh, int Nc)
 mesh_t *createMeshV(MPI_Comm comm, int N, int cubN, mesh_t *meshT, occa::properties &kernelInfo)
 {
   mesh_t *mesh = new mesh_t();
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("generating v-mesh ...\n");
   }
 
@@ -452,7 +452,7 @@ mesh_t *createMeshV(MPI_Comm comm, int N, int cubN, mesh_t *meshT, occa::propert
   free(mesh->EZ);
   mesh->EZ = meshT->EZ;
 
-  meshGlobalFaceIds(mesh); 
+  meshGlobalFaceIds(mesh);
 
   // find mesh->EToP, mesh->EToE and mesh->EToF, required mesh->EToV
   meshParallelConnect(mesh);
@@ -464,7 +464,7 @@ mesh_t *createMeshV(MPI_Comm comm, int N, int cubN, mesh_t *meshT, occa::propert
 
   meshVOccaSetup3D(mesh, kernelInfo);
 
-  meshParallelGatherScatterSetup(mesh, mesh->Nlocal, mesh->globalIds, platform->comm.mpiComm, OOGS_AUTO, 0);
+  meshParallelGatherScatterSetup(mesh, mesh->Nlocal, mesh->globalIds, platform->comm.mpiComm(), OOGS_AUTO, 0);
 
   int err = 0;
   int Nfine;
@@ -477,9 +477,9 @@ mesh_t *createMeshV(MPI_Comm comm, int N, int cubN, mesh_t *meshT, occa::propert
     for (int i = 0; i < mesh->Nlocal; i++) {
       sum1 += std::abs(tmp[i] - static_cast<dfloat>(mult[i]));
     }
-    MPI_Allreduce(MPI_IN_PLACE, &sum1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &sum1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
     if (sum1 > 10 * std::numeric_limits<dfloat>::epsilon()) {
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         printf("matching invDegree test failed, err=%g!\n", sum1);
       }
       fflush(stdout);
@@ -487,14 +487,14 @@ mesh_t *createMeshV(MPI_Comm comm, int N, int cubN, mesh_t *meshT, occa::propert
     }
     free(tmp);
   }
-  nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "");
+  nekrsCheck(err, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "");
 
   mesh->oogs = oogs::setup(mesh->ogs, 1, mesh->Nlocal, ogsDfloat, NULL, OOGS_AUTO);
   mesh->oogs3 = oogs::setup(mesh->ogs, 3, mesh->Nlocal, ogsDfloat, NULL, OOGS_AUTO);
 
   mesh->computeInvLMM();
 
-  mesh->volume = platform->linAlg->sum(mesh->Nlocal, mesh->o_LMM, platform->comm.mpiComm);
+  mesh->volume = platform->linAlg->sum(mesh->Nlocal, mesh->o_LMM, platform->comm.mpiComm());
 
   {
     std::vector<dfloat> tmp(mesh->Nlocal);
@@ -504,8 +504,8 @@ mesh_t *createMeshV(MPI_Comm comm, int N, int cubN, mesh_t *meshT, occa::propert
     for (int i = 0; i < mesh->Nlocal; i++) {
       sum += tmp[i];
     }
-    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       printf("unique number of gridpoints: : %lld\n", static_cast<hlong>(sum + 0.1));
     }
   }
@@ -513,10 +513,10 @@ mesh_t *createMeshV(MPI_Comm comm, int N, int cubN, mesh_t *meshT, occa::propert
   {
     double valMin = (double)mesh->NlocalGatherElements / mesh->Nelements;
     double valMax = (double)mesh->NlocalGatherElements / mesh->Nelements;
-    MPI_Allreduce(MPI_IN_PLACE, &valMin, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm);
-    MPI_Allreduce(MPI_IN_PLACE, &valMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &valMin, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm());
+    MPI_Allreduce(MPI_IN_PLACE, &valMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm());
 
-    if (platform->comm.mpiRank == 0 && platform->comm.mpiCommSize > 1) {
+    if (platform->comm.mpiRank() == 0 && platform->comm.mpiCommSize() > 1) {
       printf("number of interior elements min/max: %2.0f%%  %2.0f%%\n", 100 * valMin, 100 * valMax);
     }
   }

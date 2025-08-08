@@ -44,7 +44,7 @@ void UDF_Setup()
   }
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
-    platform->linAlg->rescale(0.0, zLength, mesh->o_z, platform->comm.mpiComm);
+    platform->linAlg->rescale(0.0, zLength, mesh->o_z, platform->comm.mpiComm());
 
     auto [x, y, z] = mesh->xyzHost();
 

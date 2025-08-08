@@ -65,11 +65,13 @@ extCoeffs(int nEXT, double time, dfloat tstage, dfloat sdt, dfloat *dt, dfloat *
   return extC;
 }
 
-static void
-applyOperator(int nFields, dfloat *extC, const occa::memory &o_Urst, const occa::memory &o_u1, occa::memory &o_rhs)
+static void applyOperator(int nFields,
+                          dfloat *extC,
+                          const occa::memory &o_Urst,
+                          const occa::memory &o_u1,
+                          occa::memory &o_rhs)
 {
-  auto run = [&](dlong Nelements, const occa::memory& gatherElementList)
-  {
+  auto run = [&](dlong Nelements, const occa::memory &gatherElementList) {
     if (Nelements) {
       if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
         opKernel(Nelements,
@@ -150,7 +152,15 @@ static void rk44(int nFields,
     auto extC = extCoeffs(nEXT, time, tstage, sdt, dt, nodes, rk);
 
     if (movingMesh) {
-      launchKernel("core-nStagesSum3", meshV->Nlocal, meshOffset, nEXT, extC[0], extC[1], extC[2], meshV->o_LMM, o_LMMe);
+      launchKernel("core-nStagesSum3",
+                   meshV->Nlocal,
+                   meshOffset,
+                   nEXT,
+                   extC[0],
+                   extC[1],
+                   extC[2],
+                   meshV->o_LMM,
+                   o_LMMe);
       linAlg->aydxMany(meshV->Nlocal, nFields, fieldOffset, 0, 1.0, o_LMMe, o_u1);
     }
 
@@ -161,7 +171,8 @@ static void rk44(int nFields,
     }
 
     if (rk != nRK - 1) {
-      linAlg->axpbyzMany(meshV->Nlocal, nFields, fieldOffset, 1.0, o_u0, -sdt * nodes[rk + 1], o_rhs[rk], o_u1);
+      linAlg
+          ->axpbyzMany(meshV->Nlocal, nFields, fieldOffset, 1.0, o_u0, -sdt * nodes[rk + 1], o_rhs[rk], o_u1);
     } else {
       launchKernel("core-subCycleRK",
                    meshV->Nlocal,
@@ -185,19 +196,19 @@ void advectionSubcyclingRK(mesh_t *_meshT,
                            double time,
                            dfloat *dt,
                            int Nsubsteps,
-                           const occa::memory& o_coeffBDF, 
+                           const occa::memory &o_coeffBDF,
                            int nEXT,
                            int nFields,
-                           const occa::kernel& kernel,
+                           const occa::kernel &kernel,
                            oogs_t *_gsh,
                            dlong _meshOffset,
                            dlong _fieldOffset,
                            dlong _cubatureOffset,
                            dlong fieldOffsetSum,
-                           const occa::memory& _o_divUMesh, 
-                           const occa::memory& o_Urst,
-                           const occa::memory& o_U,
-                           occa::memory& o_out)
+                           const occa::memory &_o_divUMesh,
+                           const occa::memory &o_Urst,
+                           const occa::memory &o_U,
+                           occa::memory &o_out)
 {
   const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
 
@@ -205,22 +216,21 @@ void advectionSubcyclingRK(mesh_t *_meshT,
   meshV = _meshV;
 
   gsh = _gsh;
-  opKernel = kernel;  
+  opKernel = kernel;
 
   meshOffset = _meshOffset;
   fieldOffset = _fieldOffset;
   cubatureOffset = _cubatureOffset;
-  o_divUMesh = _o_divUMesh; 
+  o_divUMesh = _o_divUMesh;
 
-        
-  if (platform->verbose() && o_divUMesh.isInitialized()) { 
+  if (platform->verbose() && o_divUMesh.isInitialized()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(meshV->Nlocal,
                                                                  meshV->dim,
                                                                  meshOffset,
                                                                  meshV->ogs->o_invDegree,
                                                                  o_divUMesh,
-                                                                 platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+                                                                 platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       printf("geom o_div norm: %.15e\n", debugNorm);
     }
   }

@@ -76,7 +76,7 @@ void bdryBase::printBcTypeMapping(const std::string &field) const
 {
   for (int bID = 1; bID <= size(field); bID++) {
     std::string txt(typeText(bID, field));
-    if (platform->comm.mpiRank == 0 && txt.size()) {
+    if (platform->comm.mpiRank() == 0 && txt.size()) {
       printf("bID %d -> bcType %s\n", bID, txt.c_str());
     }
   }
@@ -313,7 +313,7 @@ void bdryBase::vectorFieldSetup(std::string field, std::vector<std::string> slis
 #endif
 
     nekrsCheck(vBcTextToID.find(lowerCase(key)) == vBcTextToID.end(),
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "Invalid vector field bcType (%s)\n",
                key.c_str());
@@ -321,7 +321,7 @@ void bdryBase::vectorFieldSetup(std::string field, std::vector<std::string> slis
     bToBc[make_pair(lowerCase(field), bid)] = vBcTextToID.at(lowerCase(key));
 
     nekrsCheck(foundAligned && foundUnaligned,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "Aligned together with unaligned mixed boundary types are not supported!");
@@ -386,7 +386,7 @@ void bdryBase::scalarFieldSetup(std::string field, std::vector<std::string> slis
     }
 
     nekrsCheck(sBcTextToID.find(lowerCase(key)) == sBcTextToID.end(),
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "Invalid scalar field bcType (%s)\n",
                key.c_str());
@@ -493,7 +493,7 @@ void bdryBase::checkAlignment(mesh_t *mesh) const
     }
 
     int err = expectedAlignmentInvalidBIDs.size();
-    MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &err, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
     if (err > 0) {
       bail = true;
 
@@ -516,16 +516,16 @@ void bdryBase::checkAlignment(mesh_t *mesh) const
             (alignments.count(boundaryAlignment_t::UNALIGNED));
         expectedAlignments[(bid - 1)] = static_cast<int>(expectedAlignmentInvalidBIDs[bid]);
       }
-      MPI_Allreduce(MPI_IN_PLACE, valid.data(), nid, MPI_INT, MPI_MIN, platform->comm.mpiComm);
+      MPI_Allreduce(MPI_IN_PLACE, valid.data(), nid, MPI_INT, MPI_MIN, platform->comm.mpiComm());
       MPI_Allreduce(MPI_IN_PLACE,
                     encounteredAlignments.data(),
                     nid * nAlignments,
                     MPI_INT,
                     MPI_MAX,
-                    platform->comm.mpiComm);
-      MPI_Allreduce(MPI_IN_PLACE, expectedAlignments.data(), nid, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+                    platform->comm.mpiComm());
+      MPI_Allreduce(MPI_IN_PLACE, expectedAlignments.data(), nid, MPI_INT, MPI_MAX, platform->comm.mpiComm());
 
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         std::cout << "Encountered incorrectly aligned boundaries in field \"" << field << "\":\n";
         for (int bid = 1; bid <= nid; bid++) {
           if (valid[bid - 1] == 0) {
@@ -550,9 +550,9 @@ void bdryBase::checkAlignment(mesh_t *mesh) const
       }
 
       fflush(stdout);
-      MPI_Barrier(platform->comm.mpiComm);
+      MPI_Barrier(platform->comm.mpiComm());
     }
   }
 
-  nekrsCheck(bail, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "");
+  nekrsCheck(bail, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "");
 }

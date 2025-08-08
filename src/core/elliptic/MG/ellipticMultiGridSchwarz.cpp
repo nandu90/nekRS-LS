@@ -200,7 +200,7 @@ static void compute_element_lengths(ElementLengths *lengths, elliptic_t *ellipti
   }
 
   std::array<int, 3> errors = {errZero, errNegative, errInvalid};
-  MPI_Allreduce(MPI_IN_PLACE, errors.data(), 3, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, errors.data(), 3, MPI_INT, MPI_MAX, platform->comm.mpiComm());
   std::ostringstream errorLogger;
   if (errors[0]) {
     errorLogger << "\tEncountered " << errors[0] << " elements with zero length!" << std::endl;
@@ -221,7 +221,7 @@ static void compute_element_lengths(ElementLengths *lengths, elliptic_t *ellipti
       txt << "}\n";
       return txt.str();
     };
-    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s\n", errTxt().c_str());
+    nekrsAbort(platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", errTxt().c_str());
   }
 
   // In Nq == 2 case, there are no interior points to use for obtaining
@@ -301,13 +301,13 @@ static void compute_element_lengths(ElementLengths *lengths, elliptic_t *ellipti
 }
 
 static void compute_element_boundary_conditions(int *lbr,
-                                         int *rbr,
-                                         int *lbs,
-                                         int *rbs,
-                                         int *lbt,
-                                         int *rbt,
-                                         const int e,
-                                         elliptic_t *elliptic)
+                                                int *rbr,
+                                                int *lbs,
+                                                int *rbs,
+                                                int *lbt,
+                                                int *rbt,
+                                                const int e,
+                                                elliptic_t *elliptic)
 {
   int fbc[6];
   const int lookup[] = {4, 2, 1, 3, 0, 5};
@@ -332,13 +332,13 @@ static void row_zero(dfloat *S, const int nl, const int offset)
 }
 
 static void compute_1d_stiffness_matrix(dfloat *a,
-                                 const int lbc,
-                                 const int rbc,
-                                 const double ll,
-                                 const double lm,
-                                 const double lr,
-                                 const dlong e,
-                                 elliptic_t *elliptic)
+                                        const int lbc,
+                                        const int rbc,
+                                        const double ll,
+                                        const double lm,
+                                        const double lr,
+                                        const dlong e,
+                                        elliptic_t *elliptic)
 {
   const int n = elliptic->mesh->N;
   const int nl = n + 3;
@@ -408,22 +408,21 @@ static void compute_1d_stiffness_matrix(dfloat *a,
 
 #if 1
   {
-    auto& mesh = elliptic->mesh;
+    auto &mesh = elliptic->mesh;
     std::vector<pfloat> lambda0(mesh->Np);
- 
-    const auto lambda0AvgE = [&]()
-    {
-      elliptic->o_lambda0.copyTo(lambda0.data(), lambda0.size(), e*mesh->Np);
+
+    const auto lambda0AvgE = [&]() {
+      elliptic->o_lambda0.copyTo(lambda0.data(), lambda0.size(), e * mesh->Np);
       dfloat sum = 0;
-      for(int i = 0; i < lambda0.size(); i++) {
+      for (int i = 0; i < lambda0.size(); i++) {
         sum += lambda0[i];
       }
       return sum / lambda0.size();
     }();
- 
+
     for (int i = 0; i < n + 1; ++i) {
       for (int j = 0; j < n + 1; ++j) {
-        a[i * (n + 1) + j] *= lambda0AvgE; 
+        a[i * (n + 1) + j] *= lambda0AvgE;
       }
     }
   }
@@ -436,13 +435,13 @@ static void compute_1d_stiffness_matrix(dfloat *a,
 }
 
 static void compute_1d_mass_matrix(dfloat *b,
-                            const int lbc,
-                            const int rbc,
-                            const double ll,
-                            const double lm,
-                            const double lr,
-                            const dlong e,
-                            elliptic_t *elliptic)
+                                   const int lbc,
+                                   const int rbc,
+                                   const double ll,
+                                   const double lm,
+                                   const double lr,
+                                   const dlong e,
+                                   elliptic_t *elliptic)
 {
   const int n = elliptic->mesh->Nq - 1;
   const int nl = n + 3;
@@ -551,7 +550,6 @@ static void solve_generalized_ev(dfloat *a, dfloat *b, dfloat *lam, int n)
     throw std::runtime_error(err_logger.str().c_str());
   }
 
-
   for (int i = 0; i < a_double.size(); i++) {
     a[i] = a_double[i];
   }
@@ -564,16 +562,16 @@ static void solve_generalized_ev(dfloat *a, dfloat *b, dfloat *lam, int n)
 }
 
 static void compute_1d_matrices(dfloat *S,
-                         dfloat *lam,
-                         const int lbc,
-                         const int rbc,
-                         const double ll,
-                         const double lm,
-                         const double lr,
-                         const dlong e,
-                         elliptic_t *elliptic,
-                         std::string direction,
-                         const int nl)
+                                dfloat *lam,
+                                const int lbc,
+                                const int rbc,
+                                const double ll,
+                                const double lm,
+                                const double lr,
+                                const dlong e,
+                                elliptic_t *elliptic,
+                                std::string direction,
+                                const int nl)
 {
   dfloat *b = (dfloat *)calloc(nl * nl, sizeof(dfloat));
   compute_1d_stiffness_matrix(S, lbc, rbc, ll, lm, lr, e, elliptic);
@@ -621,7 +619,7 @@ static void genFDMoperators(FDMOperators *op, ElementLengths *lengths, elliptic_
   op->Sz = (dfloat *)calloc(Nq_e * Nq_e * Nelements, sizeof(dfloat));
   op->D = (dfloat *)calloc(Np_e * Nelements, sizeof(dfloat));
 
-#define df(a, b) (op->D[((a) + (b)*Np_e)])
+#define df(a, b) (op->D[((a) + (b) * Np_e)])
   const double eps = 1e-5;
   dfloat *lr = (dfloat *)calloc(Nq_e, sizeof(dfloat));
   dfloat *ls = (dfloat *)calloc(Nq_e, sizeof(dfloat));
@@ -738,7 +736,7 @@ static mesh_t *create_extended_mesh(elliptic_t *elliptic, hlong *maskedGlobalIds
 
   mesh->ogs = ogsSetup(mesh->Nelements * mesh->Np,
                        mesh->globalIds,
-                       platform->comm.mpiComm,
+                       platform->comm.mpiComm(),
                        1,
                        platform->device.occaDevice());
 
@@ -831,12 +829,12 @@ static void to_reg(pfloat *arr1, pfloat *arr2, mesh_t *mesh)
 }
 
 static void extrude(pfloat *arr1,
-             const int l1,
-             const pfloat f1,
-             const pfloat *arr2,
-             const int l2,
-             const pfloat f2,
-             mesh_t *mesh)
+                    const int l1,
+                    const pfloat f1,
+                    const pfloat *arr2,
+                    const int l2,
+                    const pfloat f2,
+                    mesh_t *mesh)
 {
   const dlong Nelements = mesh->Nelements;
   const int nx = mesh->Nq + 2;
@@ -945,7 +943,11 @@ void pMGLevel::updateSmootherSchwarz(elliptic_t *baseElliptic)
     foundInvalidValues |= std::isnan(op->Sz[i]) || std::isinf(op->Sz[i]);
     casted_Sz[i] = static_cast<pfloat>(op->Sz[i]);
   }
-  nekrsCheck(foundInvalidValues, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "found invalid Sx,Sy,Sz values!");
+  nekrsCheck(foundInvalidValues,
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "%s\n",
+             "found invalid Sx,Sy,Sz values!");
 
   o_Sx.copyFrom(casted_Sx);
   o_Sy.copyFrom(casted_Sy);
@@ -957,10 +959,13 @@ void pMGLevel::updateSmootherSchwarz(elliptic_t *baseElliptic)
     foundInvalidValues |= std::isnan(op->D[i]) || std::isinf(op->D[i]);
     casted_D[i] = static_cast<pfloat>(op->D[i]);
   }
-  nekrsCheck(foundInvalidValues, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "found invalid invL values!");
+  nekrsCheck(foundInvalidValues,
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "%s\n",
+             "found invalid invL values!");
 
   o_invL.copyFrom(casted_D);
-
 
   free(casted_Sx);
   free(casted_Sy);
@@ -976,19 +981,20 @@ void pMGLevel::updateSmootherSchwarz(elliptic_t *baseElliptic)
 
 void pMGLevel::setupSmootherSchwarz(elliptic_t *baseElliptic)
 {
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "setup Schwarz smoother ..." << std::endl;
   }
 
   nekrsCheck(elliptic->elementType != HEXAHEDRA,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "Unsupported element type!");
 
-  nekrsCheck(!elliptic->poisson, 
-             platform->comm.mpiComm, 
-             EXIT_FAILURE, "%s\n", 
+  nekrsCheck(!elliptic->poisson,
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "%s\n",
              "Schwarz smoother only supported for type Poisson!");
 
   const dlong Nelements = elliptic->mesh->Nelements;
@@ -1035,7 +1041,7 @@ void pMGLevel::setupSmootherSchwarz(elliptic_t *baseElliptic)
       smoothSchwarz(o_u, o_Su, false);
 
       platform->device.finish();
-      MPI_Barrier(platform->comm.mpiComm);
+      MPI_Barrier(platform->comm.mpiComm());
       const double start = MPI_Wtime();
 
       for (int test = 0; test < Nsamples; ++test) {
@@ -1044,7 +1050,7 @@ void pMGLevel::setupSmootherSchwarz(elliptic_t *baseElliptic)
 
       platform->device.finish();
       double elapsed = (MPI_Wtime() - start) / Nsamples;
-      MPI_Allreduce(MPI_IN_PLACE, &elapsed, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
+      MPI_Allreduce(MPI_IN_PLACE, &elapsed, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm());
 
       return elapsed;
     };
@@ -1101,7 +1107,7 @@ void pMGLevel::setupSmootherSchwarz(elliptic_t *baseElliptic)
                                          1,
                                          0,
                                          ogsPfloat,
-                                         platform->comm.mpiComm,
+                                         platform->comm.mpiComm(),
                                          1,
                                          platform->device.occaDevice(),
                                          callback,
@@ -1118,7 +1124,7 @@ void pMGLevel::setupSmootherSchwarz(elliptic_t *baseElliptic)
                                             1,
                                             0,
                                             ogsPfloat,
-                                            platform->comm.mpiComm,
+                                            platform->comm.mpiComm(),
                                             1,
                                             platform->device.occaDevice(),
                                             callback,
@@ -1134,7 +1140,7 @@ void pMGLevel::setupSmootherSchwarz(elliptic_t *baseElliptic)
       o_u.free();
       o_Su.free();
 
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         printf("testing overlap in smoothSchwarz: %.2es %.2es ", nonOverlappedTime, overlappedTime);
         if (overlapEnabled) {
           printf("(overlap enabled)");
@@ -1149,7 +1155,7 @@ void pMGLevel::setupSmootherSchwarz(elliptic_t *baseElliptic)
                                1,
                                0,
                                ogsPfloat,
-                               platform->comm.mpiComm,
+                               platform->comm.mpiComm(),
                                1,
                                platform->device.occaDevice(),
                                nullptr,

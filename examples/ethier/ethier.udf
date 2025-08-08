@@ -268,8 +268,8 @@ void userq(double time)
 
 void UDF_LoadKernels(deviceKernelProperties& kernelInfo)
 {
-  int maxRank = platform->comm.mpiRank;
-  MPI_Allreduce(MPI_IN_PLACE, &maxRank, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+  int maxRank = platform->comm.mpiRank();
+  MPI_Allreduce(MPI_IN_PLACE, &maxRank, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
 
   setupAide &options = platform->options;
 
@@ -378,7 +378,7 @@ void UDF_Setup()
       for (auto &&y : yPoint) {
         for (auto &&z : zPoint) {
           // only add particles to rank 0
-          if (platform->comm.mpiRank == 0) {
+          if (platform->comm.mpiRank() == 0) {
             xp0.push_back(x);
             yp0.push_back(y);
             zp0.push_back(z);

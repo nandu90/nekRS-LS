@@ -58,8 +58,8 @@ void UDF_ExecuteStep(double time, int tstep)
   if (nrs->checkpointStep) {
     std::vector<float> hist(o_hist.size());
     o_hist.copyTo(hist);
-    MPI_Allreduce(MPI_IN_PLACE, hist.data(), hist.size(), MPI_FLOAT, MPI_SUM, platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+    MPI_Allreduce(MPI_IN_PLACE, hist.data(), hist.size(), MPI_FLOAT, MPI_SUM, platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       std::ofstream outputFile("pdf_scalar00.dat");
       for (auto& entry : hist) outputFile << entry / mesh->volume << std::endl;
       outputFile.close();

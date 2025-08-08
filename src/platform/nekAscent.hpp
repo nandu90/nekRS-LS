@@ -54,7 +54,7 @@ void initializeAscent()
   conduit::utils::set_error_handler(errHandler);
 
   MPI_Comm comm;
-  MPI_Comm_dup(platform->comm.mpiCommParent, &comm);
+  MPI_Comm_dup(platform->comm.mpiCommParent(), &comm);
   ascent_opts["mpi_comm"] = MPI_Comm_c2f(comm);
   // ascent_opts["runtime/vtkm/backend"] = "serial";
   //  ascent_opts["exceptions"] = "forward";
@@ -62,7 +62,7 @@ void initializeAscent()
 
   mAscent.open(ascent_opts);
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     conduit::Node about;
     ascent::about(about);
     about.remove_child("license");
@@ -220,7 +220,7 @@ void updateFieldData()
 
   platform->timer.toc("nekAscent::run::update");
 
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "---------------- Ascent mesh_data ----------------" << std::endl;
     conduit::Node mesh_copy;
     mesh_copy.set(mesh_data);
@@ -255,7 +255,8 @@ void setup(mesh_t *mesh_,
            const std::string &actionFile,
            int Nin_ = 0,
            bool uniform_ = false,
-           bool stageThroughHost_ = false, bool async_ = false)
+           bool stageThroughHost_ = false,
+           bool async_ = false)
 {
   mesh_in = mesh_;
   const int Nin = (Nin_) ? Nin_ : mesh_in->N;
@@ -285,7 +286,7 @@ void setup(mesh_t *mesh_,
   interpolate = (Nin != mesh_in->N);
 
   const auto tStart = MPI_Wtime();
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("initializing nekAscent ");
     if (interpolate || uniform) {
       printf("(Nviz=%d", Nin);
@@ -297,7 +298,7 @@ void setup(mesh_t *mesh_,
     }
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     nekrsCheck(!fs::exists(actionFile), MPI_COMM_SELF, EXIT_FAILURE, "Cannot find %s\n", actionFile.c_str());
   }
 
@@ -393,7 +394,7 @@ void setup(mesh_t *mesh_,
 
   const auto tSetup = MPI_Wtime() - tStart;
   platform->timer.set("nekAscent::setup", tSetup);
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("\ndone (%gs)\n\n", tSetup);
     if (platform->verbose()) {
       conduit::Node mesh_copy;
@@ -418,7 +419,7 @@ void run(const double time, const int tstep)
     platform->timer.toc("nekAscent::run::execute");
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "processing Ascent action file ..." << std::endl << std::flush;
   }
 

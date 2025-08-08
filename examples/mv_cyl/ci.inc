@@ -77,7 +77,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
 
   numCVODERHS /= tstep;
 
-  const int rank = platform->comm.mpiRank;
+  const int rank = platform->comm.mpiRank();
   auto mesh = nrs->meshV;
 
   nrs->copyToNek(time, tstep);

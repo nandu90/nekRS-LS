@@ -9,7 +9,7 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
 {
   name = cfg.name;
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "================ "
               << "SETUP " + upperCase(name) << " ================" << std::endl;
   }
@@ -98,7 +98,7 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
 
     auto verifyBC = [&]() {
       nekrsCheck(mesh->Nbid != platform->app->bc->size(velocityName),
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "Size of %s boundaryTypeMap (%d) does not match number of boundary IDs in mesh (%d)!\n",
                  velocityName.c_str(),
@@ -244,8 +244,8 @@ void fluidSolver_t::solvePressure(double time, int stage)
                                                                  fieldOffset,
                                                                  mesh->ogs->o_invDegree,
                                                                  o_P,
-                                                                 platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+                                                                 platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       printf("p norm: %.15e\n", debugNorm);
     }
   }
@@ -361,7 +361,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     o_U.copyFrom(o_Ue, fieldOffsetSum);
   }
 
-  if (platform->options.compareArgs(upperCase(velocityName) + " SOLVER", "BLOCK")) {
+  if (ellipticSolver.at(0)->Nfields() > 1) {
     ellipticSolver.at(0)->solve(o_lambda0, o_lambda1, o_rhs, o_U.slice(0, fieldOffsetSum));
   } else {
     const auto o_rhsX = o_rhs.slice(0 * fieldOffset, mesh->Nlocal);
@@ -378,8 +378,8 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                                                                  fieldOffset,
                                                                  mesh->ogs->o_invDegree,
                                                                  o_U,
-                                                                 platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+                                                                 platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       printf("U norm: %.15e\n", debugNorm);
     }
   }
@@ -393,7 +393,7 @@ void fluidSolver_t::setupEllipticSolver()
     return;
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "================ "
               << "ELLIPTIC SETUP " + upperCase(velocityName) << " ================" << std::endl;
   }
@@ -402,15 +402,6 @@ void fluidSolver_t::setupEllipticSolver()
   auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
   platform->linAlg->axpby(mesh->Nlocal, *g0 / dt[0], o_rho, 0.0, o_lambda1);
 
-  auto EToBx = mesh->createEToB(
-      [&](int bID) -> int { return platform->app->bc->typeElliptic(bID, velocityName, "x"); });
-
-  auto EToBy = mesh->createEToB(
-      [&](int bID) -> int { return platform->app->bc->typeElliptic(bID, velocityName, "y"); });
-
-  auto EToBz = mesh->createEToB(
-      [&](int bID) -> int { return platform->app->bc->typeElliptic(bID, velocityName, "z"); });
-
   const auto unalignedBoundary = platform->app->bc->hasUnalignedMixed(velocityName);
 
   if (platform->options.compareArgs(upperCase(velocityName) + " SOLVER", "BLOCK")) {
@@ -418,12 +409,7 @@ void fluidSolver_t::setupEllipticSolver()
       platform->options.setArgs(upperCase(velocityName) + " STRESSFORMULATION", "TRUE");
     }
 
-    std::vector<int> EToB;
-    EToB.insert(std::end(EToB), std::begin(EToBx), std::end(EToBx));
-    EToB.insert(std::end(EToB), std::begin(EToBy), std::end(EToBy));
-    EToB.insert(std::end(EToB), std::begin(EToBz), std::end(EToBz));
-
-    ellipticSolver.push_back(new elliptic(velocityName, mesh, fieldOffset, EToB, o_lambda0, o_lambda1));
+    ellipticSolver.push_back(new elliptic(velocityName, mesh, fieldOffset, o_lambda0, o_lambda1));
 
     if (unalignedBoundary) {
       o_zeroNormalMask = mesh->createZeroNormalMask(fieldOffset, ellipticSolver[0]->o_EToB());
@@ -443,10 +429,18 @@ void fluidSolver_t::setupEllipticSolver()
     }
   } else {
     nekrsCheck(unalignedBoundary,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "unaligned mixed boundary conditions require using block solver for %s\n",
                velocityName.c_str());
+    auto EToBx = mesh->createEToB(
+        [&](int bID) -> int { return platform->app->bc->typeElliptic(bID, velocityName, "x"); });
+
+    auto EToBy = mesh->createEToB(
+        [&](int bID) -> int { return platform->app->bc->typeElliptic(bID, velocityName, "y"); });
+
+    auto EToBz = mesh->createEToB(
+        [&](int bID) -> int { return platform->app->bc->typeElliptic(bID, velocityName, "z"); });
 
     ellipticSolver.push_back(new elliptic(velocityName, mesh, fieldOffset, EToBx, o_lambda0, o_lambda1));
     ellipticSolver.push_back(new elliptic(velocityName, mesh, fieldOffset, EToBy, o_lambda0, o_lambda1));
@@ -454,7 +448,7 @@ void fluidSolver_t::setupEllipticSolver()
   }
 
   {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << "================ "
                 << "ELLIPTIC SETUP " + upperCase(pressureName) << " ================" << std::endl;
     }
@@ -615,8 +609,8 @@ void fluidSolver_t::makeForcing()
                                                                  fieldOffset,
                                                                  mesh->ogs->o_invDegree,
                                                                  o_JwF,
-                                                                 platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+                                                                 platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       printf("%s JwF norm: %.15e\n", name.c_str(), debugNorm);
     }
   }
@@ -808,8 +802,8 @@ void fluidSolver_t::advectionSubcycling(int nEXT, double time)
                                                                  fieldOffset,
                                                                  mesh->ogs->o_invDegree,
                                                                  o_JwF,
-                                                                 platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+                                                                 platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       printf("%s advSub norm: %.15e\n", name.c_str(), debugNorm);
     }
   }

@@ -269,7 +269,7 @@ void writeFld(const std::string &filename,
 
   auto copyField = [&](occa::memory o_fldIn, double *fldOut, std::string tag) {
     nekrsCheck(o_fldIn.size() < Nlocal,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s%s%s\n",
                "outfld: ",
@@ -289,7 +289,7 @@ void writeFld(const std::string &filename,
   std::vector<double> zm;
   if (o_x.size()) {
     nekrsCheck(o_x.size() < 3,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "Mesh coordinates must have 3 components");
@@ -309,7 +309,7 @@ void writeFld(const std::string &filename,
   std::vector<double> vz;
   if (o_u.size()) {
     nekrsCheck(o_u.size() < 3,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "Velocity must have 3 components");
@@ -377,7 +377,7 @@ void writeFld(const std::string &filename,
 
     // filter elements
     int filterEnabled = elementMask.size() ? 1 : 0;
-    MPI_Allreduce(MPI_IN_PLACE, &filterEnabled, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &filterEnabled, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
     if (filterEnabled) {
       for (int i = 0; i < nekData.lelt; i++) {
         nek_out_mask[i] = 0;
@@ -537,7 +537,7 @@ void set_usr_handles(const char *session_in, int verbose)
 
   const std::string lib = cache_dir + "/nek5000/lib" + session_in + ".so";
 
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "\nloading " << lib << std::endl;
   }
   void *handle = dlopen(lib.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -820,7 +820,7 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
   int buildRank = rank;
   const bool buildNodeLocal = platform->cacheLocal;
   if (buildNodeLocal) {
-    MPI_Comm_rank(platform->comm.mpiCommLocal, &buildRank);
+    MPI_Comm_rank(platform->comm.mpiCommLocal(), &buildRank);
   }
 
   const int verbose = platform->verbose();
@@ -835,23 +835,23 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
   const std::string usrFileCache = cache_dir / fs::path(usrCaseName).filename();
   const std::string libFile = cache_dir + "/lib" + casename + ".so";
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     usrFileExists = fs::exists(usrFile) && fs::file_size(usrFile) > 0;
   }
-  MPI_Bcast(&usrFileExists, 1, MPI_INT, 0, platform->comm.mpiComm);
+  MPI_Bcast(&usrFileExists, 1, MPI_INT, 0, platform->comm.mpiComm());
   if (!usrFileExists) {
     usrFile = nek5000_dir + "/core/zero.usr";
   }
 
   int buildRequired = 0;
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     if (platform->options.compareArgs("BUILD ONLY", "TRUE")) {
       buildRequired = 1;
     } else if (isFileNewer(usrFile.c_str(), libFile.c_str())) {
       buildRequired = 1;
     }
   }
-  MPI_Bcast(&buildRequired, 1, MPI_INT, 0, platform->comm.mpiComm);
+  MPI_Bcast(&buildRequired, 1, MPI_INT, 0, platform->comm.mpiComm());
 
   int err = [&]() {
     if (buildRank == 0) {
@@ -951,14 +951,14 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
     if (platform->cacheBcast) {
       fileBcast(libFile,
                 fs::path(platform->tmpDir) / fs::path("nek5000"),
-                platform->comm.mpiComm,
+                platform->comm.mpiComm(),
                 platform->verbose());
     }
 
     return 0;
   }();
 
-  nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "");
+  nekrsCheck(err, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "");
 }
 
 namespace nek
@@ -978,13 +978,13 @@ void bootstrap()
   options = &platform->options;
 
   int size;
-  MPI_Comm_rank(platform->comm.mpiComm, &rank);
-  MPI_Comm_size(platform->comm.mpiComm, &size);
+  MPI_Comm_rank(platform->comm.mpiComm(), &rank);
+  MPI_Comm_size(platform->comm.mpiComm(), &size);
 
   int buildRank = rank;
   const bool buildNodeLocal = platform->cacheLocal;
   if (buildNodeLocal) {
-    MPI_Comm_rank(platform->comm.mpiCommLocal, &buildRank);
+    MPI_Comm_rank(platform->comm.mpiCommLocal(), &buildRank);
   }
 
   int N;
@@ -1011,7 +1011,7 @@ void bootstrap()
 
     std::string cwd(fs::current_path());
 
-    MPI_Fint nek_comm = MPI_Comm_c2f(platform->comm.mpiComm);
+    MPI_Fint nek_comm = MPI_Comm_c2f(platform->comm.mpiComm());
 
     set_usr_handles(usrname.c_str(), platform->verbose());
 
@@ -1031,7 +1031,7 @@ void bootstrap()
 
 int setup(int numberActiveFields)
 {
-  MPI_Comm_rank(platform->comm.mpiComm, &rank);
+  MPI_Comm_rank(platform->comm.mpiComm(), &rank);
 
   std::string casename;
   options->getArgs("CASENAME", casename);
@@ -1084,7 +1084,7 @@ int setup(int numberActiveFields)
   int velocityExists = (options->getArgs("FLUID").empty()) ? 0 : 1;
 
   int nelgt, nelgv;
-  re2::nelg(options->getArgs("MESH FILE"), nelgt, nelgv, platform->comm.mpiComm);
+  re2::nelg(options->getArgs("MESH FILE"), nelgt, nelgv, platform->comm.mpiComm());
 
   const auto cht = [&]() {
     for (int is = 0; is < nscal; is++) {
@@ -1252,12 +1252,12 @@ int setup(int numberActiveFields)
 
   {
     hlong NelementsV = nekData.nelv;
-    MPI_Allreduce(MPI_IN_PLACE, &NelementsV, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &NelementsV, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm());
     nekrsCheck(NelementsV != nelgv, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "Invalid element partitioning");
 
     if (cht) {
       hlong NelementsT = nekData.nelt;
-      MPI_Allreduce(MPI_IN_PLACE, &NelementsT, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
+      MPI_Allreduce(MPI_IN_PLACE, &NelementsT, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm());
       nekrsCheck(NelementsT <= NelementsV || NelementsT != nelgt,
                  MPI_COMM_SELF,
                  EXIT_FAILURE,

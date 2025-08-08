@@ -36,8 +36,8 @@ int mesh_t::geometricFactors()
 
   geometricFactorsKernel(Nelements, o_D, o_gllw, o_x, o_y, o_z, o_LMM, o_vgeo, o_ggeo, o_J);
 
-  const dfloat minJ = platform->linAlg->min(Nlocal, o_J, platform->comm.mpiComm);
-  const dfloat maxJ = platform->linAlg->max(Nlocal, o_J, platform->comm.mpiComm);
+  const dfloat minJ = platform->linAlg->min(Nlocal, o_J, platform->comm.mpiComm());
+  const dfloat maxJ = platform->linAlg->max(Nlocal, o_J, platform->comm.mpiComm());
 
   double flopsCubatureGeometricFactors = 0.0;
   if (cubNq > 1) {

@@ -123,7 +123,7 @@ void udfBuild(setupAide &options)
   options.getArgs("UDF FILE", udfFile);
 
   udfFile = fs::absolute(udfFile);
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     nekrsCheck(!fs::exists(udfFile), MPI_COMM_SELF, EXIT_FAILURE, "Cannot find %s!\n", udfFile.c_str());
   }
 
@@ -148,12 +148,12 @@ void udfBuild(setupAide &options)
   options.getArgs("UDF OKL FILE", oudfFile);
   oudfFile = fs::absolute(oudfFile);
 
-  MPI_Comm comm = (platform->cacheLocal) ? platform->comm.mpiCommLocal : platform->comm.mpiComm;
+  MPI_Comm comm = (platform->cacheLocal) ? platform->comm.mpiCommLocal() : platform->comm.mpiComm();
   int buildRank;
   MPI_Comm_rank(comm, &buildRank);
 
   int buildRequired = 0;
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
 
     auto getHash = [&](const std::string &fname) {
       std::ifstream f(fname);
@@ -201,7 +201,7 @@ void udfBuild(setupAide &options)
   MPI_Bcast(&buildRequired, 1, MPI_INT, 0, comm);
 
   int oudfFileExists;
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     oudfFileExists = fs::exists(oudfFile);
   }
   MPI_Bcast(&oudfFileExists, 1, MPI_INT, 0, comm);
@@ -218,10 +218,11 @@ void udfBuild(setupAide &options)
   }
 
   {
-    const auto err =
-        (buildRank == 0 && buildRequired) ? udfMake(options, platform->app->id(), platform->comm.mpiRank) : 0;
+    const auto err = (buildRank == 0 && buildRequired)
+                         ? udfMake(options, platform->app->id(), platform->comm.mpiRank())
+                         : 0;
     auto log = cmakeBuildDir + "/cmake.log";
-    nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "see %s for more details\n", log.c_str());
+    nekrsCheck(err, platform->comm.mpiComm(), EXIT_FAILURE, "see %s for more details\n", log.c_str());
   }
 
   if (buildRank == 0) {
@@ -262,7 +263,7 @@ void *udfLoadFunction(const char *fname, int errchk)
 
     const auto udfLib = std::string(fs::path(cache_dir) / "udf/libudf.so");
 
-    if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
       std::cout << "loading " << udfLib << std::endl;
     }
 

@@ -59,7 +59,8 @@ void timer_t::printStatSetElapsedTimeSolve(double time)
   tElapsedTimeSolve = time;
 }
 
-std::tuple<double, long long int> timer_t::sumAllMatchingTags(std::function<bool(std::string)> predicate, const std::string metric)
+std::tuple<double, long long int> timer_t::sumAllMatchingTags(std::function<bool(std::string)> predicate,
+                                                              const std::string metric)
 {
   long long int count = 0;
   double elapsed = 0;
@@ -79,7 +80,6 @@ std::tuple<double, long long int> timer_t::sumAllMatchingTags(std::function<bool
 
   return std::make_tuple(elapsed, count);
 }
-
 
 timer_t::timer_t(MPI_Comm comm, occa::device device, int ifSyncDefault, int enableSync)
 {
@@ -191,7 +191,9 @@ void timer_t::deviceToc(const std::string tag)
   nekrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE, "Invalid tag name %s\n", tag.c_str());
 
   auto timeBetween = device_.timeBetween(it->second.startTag, stopTag);
-  if (platform->device.mode() == "dpcpp") timeBetween = -1; // until upstream bug is fixed
+  if (platform->device.mode() == "dpcpp") {
+    timeBetween = -1; // until upstream bug is fixed
+  }
 
   it->second.deviceElapsed += timeBetween;
   it->second.count++;
@@ -246,7 +248,9 @@ void timer_t::toc(const std::string tag)
   nekrsCheck(it == m_.end(), MPI_COMM_SELF, EXIT_FAILURE, "Invalid tag name %s\n", tag.c_str());
 
   auto timeBetween = device_.timeBetween(it->second.startTag, stopTag);
-  if (platform->device.mode() == "dpcpp") timeBetween = -1; // until upstream bug is fixed
+  if (platform->device.mode() == "dpcpp") {
+    timeBetween = -1; // until upstream bug is fixed
+  }
 
   it->second.hostElapsed += (stopTime - it->second.startTime);
   it->second.deviceElapsed += timeBetween;
@@ -466,7 +470,7 @@ void timer_t::print(std::string timerName, long long int DOF)
       auto pos = tag.rfind(parentTag);
       auto trimmedTag = tag.substr(pos + parentTag.length() + 2);
 
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         std::ostringstream ss;
         for (int i = 0; i < level; ++i) {
           ss << "> ";
@@ -495,7 +499,7 @@ void timer_t::print(std::string timerName, long long int DOF)
         absPercentage.push_back(ss.str());
 
         if (DOF) {
-          const double GDOFs = DOF/(1e9 * platform->comm.mpiCommSize);
+          const double GDOFs = DOF / (1e9 * platform->comm.mpiCommSize());
           ss.str("");
           ss.clear();
           ss << std::setprecision(3) << std::scientific << GDOFs / tCall;
@@ -529,12 +533,16 @@ void timer_t::print(std::string timerName, long long int DOF)
   table[2] = calls;
   table[3] = relPercentage;
   table[4] = absPercentage;
-  if (DOF) table[5] = throughputs;
+  if (DOF) {
+    table[5] = throughputs;
+  }
 
   std::vector<std::string> headers = {"name", "time", "calls", "rel %", "abs %"};
-  if (DOF) headers.push_back("GDOF/s/rank");
+  if (DOF) {
+    headers.push_back("GDOF/s/rank");
+  }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "\n";
     std::cout << "timers for " << start << ":\n";
     printTable(table, headers, "    ");
@@ -552,14 +560,14 @@ std::vector<std::string> timer_t::tags()
   return entries;
 }
 
-void timer_t::addUserStat(const std::string& tag)
+void timer_t::addUserStat(const std::string &tag)
 {
   userStat.push_back(tag);
 }
 
 void timer_t::printUserStat()
 {
-  for(const auto& entry : userStat) { 
+  for (const auto &entry : userStat) {
     platform->timer.print(entry);
   }
 }

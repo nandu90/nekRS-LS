@@ -2,7 +2,7 @@
 
 void registerMeshKernels(occa::properties kernelInfoBC)
 {
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "registerMeshKernels" << std::endl;
   }
 
@@ -26,7 +26,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
     std::string kernelName;
 
     occa::properties meshKernelInfo = kernelInfo;
-    
+
     kernelName = "geometricFactorsHex3D";
     fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
     platform->kernelRequests.add(meshPrefix + kernelName + orderSuffix, fileName, meshKernelInfo);
@@ -47,21 +47,23 @@ void registerMeshKernels(occa::properties kernelInfoBC)
     platform->kernelRequests.add(meshPrefix + kernelName + orderSuffix, fileName, meshCubKernelInfo);
 
     if (N == p) {
-      auto addIntpKernels = [&] (int Nf, int Nc, std::string kernelName)
-      {
-        if (Nf < Nc) return;
+      auto addIntpKernels = [&](int Nf, int Nc, std::string kernelName) {
+        if (Nf < Nc) {
+          return;
+        }
 
         auto props = kernelInfo;
         props["defines/p_NqFine"] = Nf + 1;
         props["defines/p_NqCoarse"] = Nc + 1;
         props["defines/pfloat"] = dfloatString;
 
-        props["defines/p_NpFine"] = (Nf + 1) * (Nf + 1) * (Nf + 1); 
-        props["defines/p_NpCoarse"] = (Nc + 1) * (Nc + 1) * (Nc + 1);;
+        props["defines/p_NpFine"] = (Nf + 1) * (Nf + 1) * (Nf + 1);
+        props["defines/p_NpCoarse"] = (Nc + 1) * (Nc + 1) * (Nc + 1);
+        ;
 
         const std::string ext = platform->serial ? ".c" : ".okl";
         const std::string orderSuffix =
-          std::string("_Nf_") + std::to_string(Nf) + std::string("_Nc_") + std::to_string(Nc);
+            std::string("_Nf_") + std::to_string(Nf) + std::string("_Nc_") + std::to_string(Nc);
 
         fileName = oklpath + "/core/mesh/" + kernelName + ext;
         platform->kernelRequests.add(meshPrefix + kernelName + orderSuffix, fileName, props);
@@ -69,7 +71,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
 
       // N to M
       for (int M = 1; M < mesh_t::maxNqIntp; M++) {
-        //if (M == N) continue;
+        // if (M == N) continue;
 
         {
           auto transpose = false;
@@ -79,7 +81,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
           kernelName = condition ? "prolongateHex3D" : "coarsenHex3D";
           addIntpKernels(Nf, Nc, kernelName);
         }
- 
+
         {
           auto transpose = true;
           bool condition = transpose ? (M > N) : (M <= N);
@@ -92,7 +94,9 @@ void registerMeshKernels(occa::properties kernelInfoBC)
 
       // M to N
       for (int M = 1; M < mesh_t::maxNqIntp; M++) {
-        if (M == N) continue;
+        if (M == N) {
+          continue;
+        }
 
         {
           auto transpose = false;
@@ -102,7 +106,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
           kernelName = condition ? "prolongateHex3D" : "coarsenHex3D";
           addIntpKernels(Nf, Nc, kernelName);
         }
- 
+
         {
           auto transpose = true;
           bool condition = transpose ? (M > N) : (M <= N);
@@ -118,7 +122,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
       kernelName = "surfaceAreaNormalMultiplyIntegrateHex3D";
       fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, prop);
- 
+
       prop["defines/p_ndot"] = 1;
       kernelName = "surfaceAreaNormalMultiplyIntegrateHex3D-ndot";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, prop);
@@ -130,13 +134,15 @@ void registerMeshKernels(occa::properties kernelInfoBC)
       kernelName = "setBIDHex3D";
       fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, kernelInfo);
- 
+
       kernelName = "distanceHex3D";
       fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, kernelInfo);
 
       for (const std::string dir : {"XY", "XZ", "YZ"}) {
-        if (!platform->device.deviceAtomic) continue; 
+        if (!platform->device.deviceAtomic) {
+          continue;
+        }
 
         auto props = kernelInfo;
         props["includes"].asArray();
@@ -145,7 +151,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
         kernelName = "gatherPlanarValues" + dir;
         fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
         platform->kernelRequests.add(kernelName, fileName, props);
- 
+
         kernelName = "scatterPlanarValues" + dir;
         fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
         platform->kernelRequests.add(kernelName, fileName, props);
@@ -157,15 +163,15 @@ void registerMeshKernels(occa::properties kernelInfoBC)
       kernelName = "applyZeroNormalMask";
       fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, zeroNormalProps);
- 
+
       kernelName = "averageNormalBcType";
       fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, zeroNormalProps);
- 
+
       kernelName = "fixZeroNormalMask";
       fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, zeroNormalProps);
- 
+
       kernelName = "initializeZeroNormalMask";
       fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, zeroNormalProps);

@@ -55,7 +55,7 @@ void SolutionProjection::updateProjectionSpace()
       o_invDegree,
       o_xx,
       o_bb,
-      platform->comm.mpiComm,
+      platform->comm.mpiComm(),
       o_alpha,
       (type == ProjectionType::CLASSIC) ? Nfields * (numVecsProjection - 1) * fieldOffset : 0);
   o_alpha.copyTo(alpha, numVecsProjection);
@@ -68,7 +68,7 @@ void SolutionProjection::updateProjectionSpace()
       o_invDegree,
       o_xx,
       o_bb,
-      platform->comm.mpiComm,
+      platform->comm.mpiComm(),
       alpha,
       (type == ProjectionType::CLASSIC) ? Nfields * (numVecsProjection - 1) * fieldOffset : 0);
   o_alpha.copyFrom(alpha, numVecsProjection);
@@ -126,7 +126,7 @@ void SolutionProjection::updateProjectionSpace()
     flopCount += static_cast<double>(Nlocal) * Nfields;
     flopCount *= (type == ProjectionType::CLASSIC) ? 2 : 1;
   } else {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << "solutionProjection " << solverName
                 << ": Discard new solution as it is linearly dependent!\n";
     }
@@ -155,7 +155,7 @@ void SolutionProjection::computePreProjection(occa::memory &o_r)
                                            o_invDegree,
                                            o_xx,
                                            o_r,
-                                           platform->comm.mpiComm,
+                                           platform->comm.mpiComm(),
                                            o_alpha,
                                            Nfields * 0 * fieldOffset);
 #else
@@ -166,7 +166,7 @@ void SolutionProjection::computePreProjection(occa::memory &o_r)
                                            o_invDegree,
                                            o_xx,
                                            o_r,
-                                           platform->comm.mpiComm,
+                                           platform->comm.mpiComm(),
                                            alpha,
                                            Nfields * 0 * fieldOffset);
   o_alpha.copyFrom(alpha, numVecsProjection);
@@ -241,7 +241,7 @@ SolutionProjection::SolutionProjection(elliptic_t &elliptic,
 
   nekrsCheck(Nfields * maxNumVecsProjection * static_cast<size_t>(fieldOffset) >
                  std::numeric_limits<int>::max(),
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "Nfields * maxNumVecsProjection * fieldOffset exceeds int limit!");

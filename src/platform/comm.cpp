@@ -1,17 +1,16 @@
 #include "platform.hpp"
 #include "comm.hpp"
 
-comm_t::comm_t(MPI_Comm _commg, MPI_Comm _comm)
+comm_t::comm_t(MPI_Comm commParentIn, MPI_Comm commIn)
 {
+  _mpiCommParent = commParentIn;
+  MPI_Comm_rank(_mpiCommParent, &_mpiRankParent);
 
-  mpiCommParent = _commg;
-  mpiComm = _comm;
-  MPI_Comm_rank(_comm, &mpiRank);
-  MPI_Comm_size(_comm, &mpiCommSize);
+  _mpiComm = commIn;
+  MPI_Comm_rank(_mpiComm, &_mpiRank);
 
-  MPI_Comm_split_type(_comm, MPI_COMM_TYPE_SHARED, mpiRank, MPI_INFO_NULL, &mpiCommLocal);
-  MPI_Comm_rank(mpiCommLocal, &localRank);
-  MPI_Comm_size(mpiCommLocal, &mpiCommLocalSize);
+  MPI_Comm_split_type(_mpiComm, MPI_COMM_TYPE_SHARED, _mpiRank, MPI_INFO_NULL, &_mpiCommLocal);
+  MPI_Comm_rank(_mpiCommLocal, &_mpiRankLocal);
 
   useGPUAware = true;
   const char *gpuMPIEnv = getenv("NEKRS_GPU_MPI");

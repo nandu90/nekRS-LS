@@ -191,10 +191,10 @@ occa::kernel device_t::compileKernel(const std::string &fileName,
   MPI_Comm comm = commIn;
   if (collective) {
     if (platform->cacheLocal) {
-      comm = _comm.mpiCommLocal;
+      comm = _comm.mpiCommLocal();
     }
     if (platform->cacheBcast) {
-      comm = _comm.mpiComm;
+      comm = _comm.mpiComm();
     }
   }
 
@@ -236,7 +236,7 @@ occa::kernel device_t::loadKernel(const std::string &fileName,
                                   const std::string &suffix) const
 {
   if (_compileWhenLoad) {
-    this->compileKernel(fileName, props, suffix, platform->comm.mpiComm);
+    this->compileKernel(fileName, props, suffix, platform->comm.mpiComm());
   }
 
   return this->wrapperLoadKernel(fileName, kernelName, props, suffix);
@@ -307,12 +307,12 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
   // OCCA build stuff
   int deviceConfigSize = 4096;
   char deviceConfig[deviceConfigSize];
-  int worldRank = _comm.mpiRank;
+  int worldRank = _comm.mpiRank();
 
   int device_id = 0;
 
   if (options.compareArgs("DEVICE NUMBER", "LOCAL-RANK")) {
-    device_id = _comm.localRank;
+    device_id = _comm.mpiRankLocal();
   } else {
     options.getArgs("DEVICE NUMBER", device_id);
   }
@@ -345,7 +345,7 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
              device_id,
              plat);
   } else if (strcasecmp(requestedOccaMode.c_str(), "OPENMP") == 0) {
-    nekrsCheck(true, _comm.mpiComm, EXIT_FAILURE, "%s\n", "OpenMP backend currently not supported!");
+    nekrsCheck(true, _comm.mpiComm(), EXIT_FAILURE, "%s\n", "OpenMP backend currently not supported!");
     snprintf(deviceConfig, deviceConfigSize, "{mode: 'OpenMP'}");
   } else if (strcasecmp(requestedOccaMode.c_str(), "CPU") == 0 ||
              strcasecmp(requestedOccaMode.c_str(), "SERIAL") == 0) {
@@ -353,7 +353,7 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
     options.setArgs("THREAD MODEL", "SERIAL");
     options.getArgs("THREAD MODEL", requestedOccaMode);
   } else {
-    nekrsCheck(true, _comm.mpiComm, EXIT_FAILURE, "%s\n", "Invalid requested backend!");
+    nekrsCheck(true, _comm.mpiComm(), EXIT_FAILURE, "%s\n", "Invalid requested backend!");
   }
 
 #if 1
@@ -377,7 +377,7 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
   }
 
   nekrsCheck(strcasecmp(requestedOccaMode.c_str(), this->mode().c_str()) != 0,
-             _comm.mpiComm,
+             _comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "Active occa mode does not match selected backend!");
@@ -396,7 +396,7 @@ device_t::device_t(setupAide &options, comm_t &comm) : _comm(comm)
   _compileWhenLoad = false;
   _device_id = device_id;
 
-  deviceAtomic = atomicsAvailable(*this, _comm.mpiComm);
+  deviceAtomic = atomicsAvailable(*this, _comm.mpiComm());
 }
 
 size_t device_t::memoryUsage() const

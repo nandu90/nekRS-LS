@@ -28,7 +28,7 @@ void udfDirichlet(bcData *bc)
 
 void extractLine(nrs_t *nrs, double time)
 {
-  const auto np = (platform->comm.mpiRank == 0) ? 200 : 0;
+  const auto np = (platform->comm.mpiRank() == 0) ? 200 : 0;
   const auto offset = np;
 
   static pointInterpolation_t *interpolator = nullptr;
@@ -37,8 +37,8 @@ void extractLine(nrs_t *nrs, double time)
 
   if (!interpolator) {
     auto mesh = nrs->meshV;
-    const auto yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
-    const auto yMax = platform->linAlg->max(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
+    const auto yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm());
+    const auto yMax = platform->linAlg->max(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm());
 
     if (np) {
       const auto x0 = 7.0;
@@ -62,14 +62,14 @@ void extractLine(nrs_t *nrs, double time)
       o_Up.resize(mesh->dim * offset);
     }
 
-    interpolator = new pointInterpolation_t(mesh, platform->comm.mpiComm);
+    interpolator = new pointInterpolation_t(mesh, platform->comm.mpiComm());
     interpolator->setPoints(xp, yp, zp);
     interpolator->find();
   }
 
   interpolator->eval(nrs->meshV->dim, nrs->fluid->fieldOffset, nrs->fluid->o_U, offset, o_Up);
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::vector<dfloat> Up(nrs->meshV->dim * np);
     o_Up.copyTo(Up);
 
@@ -106,8 +106,8 @@ void uservp(double time)
                                                                  nrs->fluid->fieldOffset,
                                                                  mesh->ogs->o_invDegree,
                                                                  o_mue_t,
-                                                                 platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+                                                                 platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       printf("mue_t norm: %.15e\n", debugNorm);
     }                                   
   }

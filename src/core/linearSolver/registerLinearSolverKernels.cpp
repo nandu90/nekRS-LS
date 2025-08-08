@@ -82,7 +82,7 @@ void registerCGKernels(int Nfields, bool usePfloat = false)
 
 void registerLinearSolverKernels()
 {
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "registerLinearSolverKernels" << std::endl;
   }
 

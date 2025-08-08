@@ -40,7 +40,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
 #if 0
   const std::string casename = platform->options.getArgs("CASENAME");
   nekrsCheck(ciMode == 2 && (casename != "insidemv" && casename != "outside"), 
-             platform->comm.mpiComm, EXIT_FAILURE, 
+             platform->comm.mpiComm(), EXIT_FAILURE, 
              "%s\n", "Unexpected input file for current CI mode!");
 #endif
 
@@ -51,8 +51,8 @@ void ciTestPartitionOfUnity(nrs_t *nrs, double time, int tstep)
   if(nrs->neknek->multirate()) return;
   auto mesh = nrs->meshV;
   auto minMaxFld = [&](occa::memory o_a) {
-    const auto minFld = platform->linAlg->min(mesh->Nlocal, o_a, platform->comm.mpiCommParent);
-    const auto maxFld = platform->linAlg->max(mesh->Nlocal, o_a, platform->comm.mpiCommParent);
+    const auto minFld = platform->linAlg->min(mesh->Nlocal, o_a, platform->comm.mpiComm()Parent);
+    const auto maxFld = platform->linAlg->max(mesh->Nlocal, o_a, platform->comm.mpiComm()Parent);
     return std::make_tuple(minFld, maxFld);
   };
 
@@ -66,7 +66,7 @@ void ciTestPartitionOfUnity(nrs_t *nrs, double time, int tstep)
 
   platform->linAlg->axmyz(mesh->Nlocal, 1.0, o_partition, mesh->o_Jw, o_volume);
 
-  const auto globalVolume = platform->linAlg->sum(mesh->Nlocal, o_volume, platform->comm.mpiCommParent);
+  const auto globalVolume = platform->linAlg->sum(mesh->Nlocal, o_volume, platform->comm.mpiComm()Parent);
 
   const auto relErr = abs(globalVolume - expectedGlobalVolume) / expectedGlobalVolume;
   CiEvalTest("Partition of unity volume", relErr < 5e-6, "with LinfErr: " + to_string_f(relErr));
@@ -103,7 +103,7 @@ void ciTestPointInterp(nrs_t *nrs, double time, int tstep)
   std::vector<dfloat> UouterExact(mesh->dim * n);
   o_UouterExact.copyTo(UouterExact.data(), mesh->dim * n);
 
-  auto interp = pointInterpolation_t(nrs->meshV, platform->comm.mpiCommParent);
+  auto interp = pointInterpolation_t(nrs->meshV, platform->comm.mpiComm()Parent);
   interp.setPoints(o_xinterp, o_yinterp, o_zinterp);
   interp.find(pointInterpolation_t::VerbosityLevel::Detailed);
   auto o_Uouter = platform->device.malloc<dfloat>(mesh->dim * n);
@@ -114,7 +114,7 @@ void ciTestPointInterp(nrs_t *nrs, double time, int tstep)
 
   auto uErr = platform->linAlg->maxRelativeError(
                 n, mesh->dim, n, 1e-6,
-                o_Uouter, o_UouterExact, platform->comm.mpiCommParent);
+                o_Uouter, o_UouterExact, platform->comm.mpiComm()Parent);
 
   
   CiEvalTest("velocity remote session", uErr < 100 * std::numeric_limits<dfloat>::epsilon(), 
@@ -178,10 +178,10 @@ void ciTestInitialStep(nrs_t *nrs, double time, int tstep)
   platform->linAlg->axpbyMany(neknek->npt(), mesh->dim, neknekFieldOffset, 1.0, o_Uneknek, -1.0, o_Uex);
   platform->linAlg->aydxMany(neknek->npt(), mesh->dim, neknekFieldOffset, 1, 1.0, o_Uneknek, o_Uex);
   platform->linAlg->abs(mesh->dim * neknekFieldOffset, o_Uex);
-  auto maxRelErr = platform->linAlg->max(mesh->dim * neknekFieldOffset, o_Uex, platform->comm.mpiComm);
+  auto maxRelErr = platform->linAlg->max(mesh->dim * neknekFieldOffset, o_Uex, platform->comm.mpiComm());
   auto maxRelErrGlob =
-      platform->linAlg->max(mesh->dim * neknekFieldOffset, o_Uex, platform->comm.mpiCommParent);
-  if (platform->comm.mpiRank == 0) {
+      platform->linAlg->max(mesh->dim * neknekFieldOffset, o_Uex, platform->comm.mpiComm()Parent);
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "NekNek interpolation errors:\n";
     std::cout << "  maxRelErr = " << maxRelErr << "\n";
     std::cout << "  maxRelErrGlob = " << maxRelErrGlob << "\n";
@@ -194,7 +194,7 @@ void ciTestInitialStep(nrs_t *nrs, double time, int tstep)
   if (!passed) {
     vizNekNekField(nrs);
     CiFailTest();
-    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s", "");
+    nekrsAbort(platform->comm.mpiComm(), EXIT_FAILURE, "%s", "");
   }
 }
 
@@ -206,7 +206,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
     ciTestPointInterp(nrs, time, tstep);
   }
 
-  const auto rank = platform->comm.mpiRank;
+  const auto rank = platform->comm.mpiRank();
  
   if (!nrs->lastStep || !nrs->timeStepConverged) {
     return;
@@ -236,7 +236,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
 
   auto uErr = platform->linAlg->maxRelativeError(
                 mesh->Nlocal, mesh->dim, nrs->fieldOffset, 1e-6,
-                nrs->fluid->o_U, o_Uexact, platform->comm.mpiCommParent);
+                nrs->fluid->o_U, o_Uexact, platform->comm.mpiComm()Parent);
 
   auto o_Sexact = platform->deviceMemoryPool.reserve<dfloat>(nrs->fieldOffset);
   o_Sexact.copyFrom(o_Uexact, nrs->fieldOffset);
@@ -244,7 +244,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
   auto o_s00 = nrs->scalar->o_S.slice(nrs->scalar->fieldOffsetScan[0], mesh->Nlocal);
   auto s00Err = platform->linAlg->maxRelativeError(
                 mesh->Nlocal, 1, nrs->fieldOffset, 1e-6,
-                o_s00, o_Sexact, platform->comm.mpiCommParent);
+                o_s00, o_Sexact, platform->comm.mpiComm()Parent);
 
   switch(ciMode) {
     case 1:

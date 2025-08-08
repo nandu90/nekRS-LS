@@ -120,8 +120,8 @@ void UDF_ExecuteStep(double time, int tstep)
                              mesh->o_y,
                              o_height);
 
-    const dfloat hmin = platform->linAlg->min(mesh->Nlocal, o_height, platform->comm.mpiComm);
-    const dfloat hmax = platform->linAlg->max(mesh->Nlocal, o_height, platform->comm.mpiComm);
+    const dfloat hmin = platform->linAlg->min(mesh->Nlocal, o_height, platform->comm.mpiComm());
+    const dfloat hmax = platform->linAlg->max(mesh->Nlocal, o_height, platform->comm.mpiComm());
 
     userMeshVelocity(mesh->Nelements,
                      nrs->fieldOffset,

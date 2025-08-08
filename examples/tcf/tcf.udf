@@ -39,13 +39,13 @@ void UDF_Setup()
       rMax = std::max(rMax, r);
     }
   }
-  MPI_Allreduce(MPI_IN_PLACE, &rMin, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm);
-  MPI_Allreduce(MPI_IN_PLACE, &rMax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, &rMin, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, &rMax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
 
   const auto eta = rMin / rMax;
   const auto Ri = eta / (1 - eta);
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "eta: " << std::setprecision(4) << eta << std::endl;
   }
 

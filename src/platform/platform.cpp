@@ -48,11 +48,11 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
     options.setArgs("ENABLE GS COMM OVERLAP", "FALSE");
   }
 
-  if (comm.mpiCommSize == 1) {
+  if (comm.mpiCommSize() == 1) {
     options.setArgs("ENABLE GS COMM OVERLAP", "FALSE");
   }
 
-  if (comm.mpiRank == 0 && options.compareArgs("ENABLE GS COMM OVERLAP", "FALSE")) {
+  if (comm.mpiRank() == 0 && options.compareArgs("ENABLE GS COMM OVERLAP", "FALSE")) {
     std::cout << "ENABLE GS COMM OVERLAP disabled\n\n";
   }
 
@@ -112,11 +112,11 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
     if (getenv("NEKRS_LOCAL_TMP_DIR")) {
       tmpDir = getenv("NEKRS_LOCAL_TMP_DIR");
     } else {
-      nekrsAbort(comm.mpiComm, EXIT_FAILURE, "%s\n", "NEKRS_LOCAL_TMP_DIR undefined!");
+      nekrsAbort(comm.mpiComm(), EXIT_FAILURE, "%s\n", "NEKRS_LOCAL_TMP_DIR undefined!");
     }
 
     int rankLocal;
-    MPI_Comm_rank(comm.mpiCommLocal, &rankLocal);
+    MPI_Comm_rank(comm.mpiCommLocal(), &rankLocal);
 
     if (rankLocal == 0) {
       nekrsCheck(!fs::exists(tmpDir),
@@ -128,7 +128,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 
     const auto multiSession = [&]() {
       int retVal;
-      MPI_Comm_compare(comm.mpiComm, comm.mpiCommParent, &retVal);
+      MPI_Comm_compare(comm.mpiComm(), comm.mpiCommParent(), &retVal);
       return (retVal == MPI_IDENT) ? false : true;
     }();
 
@@ -143,7 +143,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
   {
     int rankLocal = rank;
     if (cacheLocal) {
-      MPI_Comm_rank(comm.mpiCommLocal, &rankLocal);
+      MPI_Comm_rank(comm.mpiCommLocal(), &rankLocal);
     }
 
     if (rankLocal == 0) {
@@ -233,7 +233,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
 // input files required for JIT kernel compilation or load
 void platform_t::bcastJITKernelSourceFiles()
 {
-  if (verbose() && comm.mpiRank == 0) {
+  if (verbose() && comm.mpiRank() == 0) {
     std::cout << "broadcast kernel sources to " << platform->tmpDir << std::endl;
   }
 
@@ -241,7 +241,7 @@ void platform_t::bcastJITKernelSourceFiles()
   const auto srcPath = fs::path(getenv("NEKRS_HOME"));
   for (auto &entry : {fs::path("include"), fs::path("kernels")}) {
 
-    fileBcast(srcPath / entry, NEKRS_HOME_NEW, comm.mpiComm, verbose());
+    fileBcast(srcPath / entry, NEKRS_HOME_NEW, comm.mpiComm(), verbose());
   }
 
   setenv("NEKRS_HOME", std::string(NEKRS_HOME_NEW).c_str(), 1);

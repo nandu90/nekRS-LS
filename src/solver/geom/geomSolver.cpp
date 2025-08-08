@@ -5,7 +5,7 @@ geomSolver_t::geomSolver_t(const geomSolverCfg_t &cfg)
 {
   name = cfg.name;
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "================ "
               << "SETUP " + upperCase(name) << " ================" << std::endl;
   }
@@ -64,7 +64,7 @@ geomSolver_t::geomSolver_t(const geomSolverCfg_t &cfg)
     auto verifyBC = [&]() {
       auto msh = (mesh != meshV) ? mesh : meshV;
       nekrsCheck(msh->Nbid != platform->app->bc->size(name),
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "Size of %s boundaryTypeMap (%d) does not match number of boundary IDs in mesh (%d)!\n",
                  name.c_str(),
@@ -141,32 +141,16 @@ void geomSolver_t::setupEllipticSolver()
     return;
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "================ "
               << "ELLIPTIC SETUP " + upperCase(name) << " ================" << std::endl;
   }
 
   nekrsCheck(!platform->options.compareArgs(upperCase(name) + " SOLVER", "BLOCK"),
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "geom requires block solver!");
-
-#if 0
-  auto EToBx =
-      mesh->createEToB([&](int bID) -> int { return platform->app->bc->typeElliptic(bID, name, "x"); });
-
-  auto EToBy =
-      mesh->createEToB([&](int bID) -> int { return platform->app->bc->typeElliptic(bID, name, "y"); });
-
-  auto EToBz =
-      mesh->createEToB([&](int bID) -> int { return platform->app->bc->typeElliptic(bID, name, "z"); });
-
-  std::vector<int> EToB;
-  EToB.insert(std::end(EToB), std::begin(EToBx), std::end(EToBx));
-  EToB.insert(std::end(EToB), std::begin(EToBy), std::end(EToBy));
-  EToB.insert(std::end(EToB), std::begin(EToBz), std::end(EToBz));
-#endif
 
   auto o_lambda0 = o_prop;
 

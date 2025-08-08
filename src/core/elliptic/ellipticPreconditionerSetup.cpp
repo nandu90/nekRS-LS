@@ -34,13 +34,13 @@ void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs)
 
   setupAide &options = elliptic->options;
 
-  MPI_Barrier(platform->comm.mpiComm);
+  MPI_Barrier(platform->comm.mpiComm());
   const double tStart = MPI_Wtime();
 
   if (options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
 
     if (options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG") &&
-          options.compareArgs("ELLIPTIC COARSE COEFF FIELD", "TRUE")) {
+        options.compareArgs("ELLIPTIC COARSE COEFF FIELD", "TRUE")) {
       options.setArgs("GALERKIN COARSE OPERATOR", "TRUE");
     }
 
@@ -53,14 +53,14 @@ void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs)
 
     ellipticMultiGridSetup(elliptic);
   } else if (options.getArgs("PRECONDITIONER") == "SEMFEM") {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("building SEMFEM preconditioner ...\n");
     }
     fflush(stdout);
     elliptic->precon = new precon_t();
     elliptic->precon->SEMFEMSolver = new SEMFEMSolver_t(elliptic);
   } else if (options.compareArgs("PRECONDITIONER", "JACOBI")) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("building Jacobi preconditioner ... ");
     }
     fflush(stdout);
@@ -69,11 +69,11 @@ void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs)
   } else if (options.compareArgs("PRECONDITIONER", "NONE")) {
     // nothing
   } else {
-    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Unknown preconditioner!");
+    nekrsAbort(platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "Unknown preconditioner!");
   }
 
-  MPI_Barrier(platform->comm.mpiComm);
-  if (platform->comm.mpiRank == 0) {
+  MPI_Barrier(platform->comm.mpiComm());
+  if (platform->comm.mpiRank() == 0) {
     printf("done (%gs)\n", MPI_Wtime() - tStart);
   }
   fflush(stdout);

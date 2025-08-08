@@ -54,13 +54,13 @@ void runBenchmarks(nrs_t *nrs)
     benchmarks.push_back("BP6_PCGC");
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "\nrunning benchmarks\n";
   }
 
   for (auto &benchmark : benchmarks) {
-    MPI_Barrier(platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+    MPI_Barrier(platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       std::cout << "\n" << benchmark << "\n";
     }
 
@@ -118,7 +118,7 @@ void runBenchmarks(nrs_t *nrs)
       platform->flopCounter->clear();
 
       platform->device.finish();
-      MPI_Barrier(platform->comm.mpiComm);
+      MPI_Barrier(platform->comm.mpiComm());
 
       occa::memory o_r;
       occa::memory o_U;
@@ -146,23 +146,23 @@ void runBenchmarks(nrs_t *nrs)
       }
       crsTime.push_back(platform->timer.query("coarseSolve", "DEVICE:MAX"));
     }
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("\n");
     }
 
     hlong Ntotal = mesh->Nelements * pow(mesh->N, mesh->dim);
-    MPI_Allreduce(MPI_IN_PLACE, &Ntotal, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &Ntotal, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm());
 
     const auto minEntry = std::distance(eTime.begin(), std::min_element(eTime.begin(), eTime.end()));
     const double solveTime = eTime.at(minEntry);
     const double solveTimeMax = *std::max_element(eTime.begin(), eTime.end());
     const double solveTimeAvg = std::accumulate(eTime.begin(), eTime.end(), 0.0) / Nrep;
-    const double throughput = ((solver->Nfields() * Ntotal) / solveTime) / platform->comm.mpiCommSize;
-    const double flopsPerSecond = platform->flopCounter->get(platform->comm.mpiComm) / solveTime;
+    const double throughput = ((solver->Nfields() * Ntotal) / solveTime) / platform->comm.mpiCommSize();
+    const double flopsPerSecond = platform->flopCounter->get(platform->comm.mpiComm()) / solveTime;
 
     const int iterAvg = std::accumulate(iter.begin(), iter.end(), 0.0) / Nrep;
 
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("repetitions: %d\n", Nrep);
       printf("solve time: min: %gs  max: %gs stdev: %gs\n", solveTime, solveTimeMax, stdDev(eTime));
       if (precoTime.at(minEntry) > 0) {
@@ -188,7 +188,7 @@ void runBenchmarks(nrs_t *nrs)
         printf("throughput: %g DOF/s/rank\n", throughput);
       }
       if (!solver->options().compareArgs("PRECONDITIONER", "SEMFEM")) {
-        printf("flops/rank: %g \n", flopsPerSecond / platform->comm.mpiCommSize);
+        printf("flops/rank: %g \n", flopsPerSecond / platform->comm.mpiCommSize());
       }
     }
   }

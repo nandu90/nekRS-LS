@@ -9,7 +9,7 @@ constexpr int Nwarmup{500};
 double run(int Nsamples, std::function<void(occa::kernel &)> kernelRunner, occa::kernel &kernel)
 {
   platform->device.finish();
-  MPI_Barrier(platform->comm.mpiComm);
+  MPI_Barrier(platform->comm.mpiComm());
   const double start = MPI_Wtime();
 
   for (int test = 0; test < Nsamples; ++test) {
@@ -36,7 +36,7 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
 
   for (auto &&kernelVariant : kernelVariants) {
 
-    MPI_Barrier(platform->comm.mpiComm);
+    MPI_Barrier(platform->comm.mpiComm());
     auto candidateKernel = kernelBuilder(kernelVariant);
 
     if (!candidateKernel.isInitialized()) {
@@ -47,14 +47,14 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
       // warmup
       run(Nwarmup, kernelRunner, candidateKernel);
       double candidateKernelTiming = run(Ntests, kernelRunner, candidateKernel);
-      
+
       double tMax;
       double tMin;
-      MPI_Allreduce(&candidateKernelTiming, &tMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
-      MPI_Allreduce(&candidateKernelTiming, &tMin, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm);
+      MPI_Allreduce(&candidateKernelTiming, &tMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm());
+      MPI_Allreduce(&candidateKernelTiming, &tMin, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm());
 
       const double tRatio = tMax / tMin;
-      if (platform->comm.mpiRank == 0 && tRatio > 1.1) {
+      if (platform->comm.mpiRank() == 0 && tRatio > 1.1) {
         printf("WARNING: kernel[%d] timings differ by up to %.2f across ranks!\n", kernelVariant, tRatio);
       }
 
@@ -84,11 +84,12 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
   occa::kernel fastestKernel;
   double fastestTime = std::numeric_limits<double>::max();
 
-  const auto check = !platform->options.compareArgs("REGISTER ONLY", "TRUE") && !platform->options.compareArgs("BUILD ONLY", "TRUE");
+  const auto check = !platform->options.compareArgs("REGISTER ONLY", "TRUE") &&
+                     !platform->options.compareArgs("BUILD ONLY", "TRUE");
 
   for (auto &&kernelVariant : kernelVariants) {
 
-    MPI_Barrier(platform->comm.mpiComm);
+    MPI_Barrier(platform->comm.mpiComm());
     auto candidateKernel = kernelBuilder(kernelVariant);
 
     if (!candidateKernel.isInitialized()) {
@@ -98,17 +99,17 @@ benchmarkKernel(std::function<occa::kernel(int kernelVariant)> kernelBuilder,
     if (check) {
       double elapsed = run(Nbaseline, kernelRunner, candidateKernel);
       int Ntests = std::max(1, static_cast<int>(targetTime / elapsed));
-      MPI_Allreduce(MPI_IN_PLACE, &Ntests, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+      MPI_Allreduce(MPI_IN_PLACE, &Ntests, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
 
       double candidateKernelTiming = run(Ntests, kernelRunner, candidateKernel);
 
       double tMax;
       double tMin;
-      MPI_Allreduce(&candidateKernelTiming, &tMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
-      MPI_Allreduce(&candidateKernelTiming, &tMin, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm);
+      MPI_Allreduce(&candidateKernelTiming, &tMax, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm());
+      MPI_Allreduce(&candidateKernelTiming, &tMin, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm());
 
       const double tRatio = tMax / tMin;
-      if (platform->comm.mpiRank == 0 && tRatio > 1.1) {
+      if (platform->comm.mpiRank() == 0 && tRatio > 1.1) {
         printf("WARNING: kernel[%d] timings differ by up to %.2f across ranks!\n", kernelVariant, tRatio);
       }
 

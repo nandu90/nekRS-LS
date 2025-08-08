@@ -12,18 +12,18 @@
 template <typename T> std::vector<T> randomVector(int N, T min = 0, T max = 1, bool deterministic = false)
 {
   unsigned int seed;
-  if(deterministic) {
-    seed = platform->comm.mpiRank; 
+  if (deterministic) {
+    seed = platform->comm.mpiRank();
   } else {
     // std::random_device is a non-deterministic uniform random bit generator,
     // although implementations are allowed to implement std::random_device using
-    // a pseudo-random number engine if there is no support for non-deterministic 
+    // a pseudo-random number engine if there is no support for non-deterministic
     // random number generation.
     std::random_device rd;
 
     // poor man solution to ensure random seed values across all mpi ranks
-    for(int i = 0; i < platform->comm.mpiRank; i++) {
-      seed = rd(); 
+    for (int i = 0; i < platform->comm.mpiRank(); i++) {
+      seed = rd();
     }
   }
 

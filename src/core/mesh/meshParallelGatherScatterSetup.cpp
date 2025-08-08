@@ -35,7 +35,7 @@
 void meshParallelGatherScatterSetup(mesh_t *mesh,
                                     dlong N,
                                     hlong *globalIds,
-                                    MPI_Comm &comm,
+                                    MPI_Comm comm,
                                     oogs_mode gsMode,
                                     int verbose)
 {
@@ -44,7 +44,7 @@ void meshParallelGatherScatterSetup(mesh_t *mesh,
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &size);
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "meshParallelGatherScatterSetup N=" << mesh->N << "\n";
   }
   mesh->ogs = ogsSetup(N, globalIds, comm, verbose, platform->device.occaDevice());
@@ -140,7 +140,7 @@ void meshParallelGatherScatterSetup(mesh_t *mesh,
   { // sanity check
     int err = 0;
     hlong NpGlobal = static_cast<hlong>(mesh->Nelements) * mesh->Np;
-    MPI_Allreduce(MPI_IN_PLACE, &NpGlobal, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &NpGlobal, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm());
 
     occa::memory o_tmp = platform->device.malloc<dfloat>(mesh->Nlocal);
     platform->linAlg->fill(mesh->Nlocal, 1.0, o_tmp);
@@ -156,11 +156,11 @@ void meshParallelGatherScatterSetup(mesh_t *mesh,
       hlong valInt = val / (abs(val)) * (abs(val) + 0.5); // rounded to nearest integer
       sum += valInt;
     }
-    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm());
 
     if (sum - NpGlobal != 0) {
       err++;
     }
-    nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "invDegree sanity check failed");
+    nekrsCheck(err, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "invDegree sanity check failed");
   }
 }

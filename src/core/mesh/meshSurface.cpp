@@ -74,7 +74,7 @@ std::vector<dfloat> integral(mesh_t *mesh,
       sum[j] += sumFace[i + j * mesh->Nelements];
     }
   }
-  MPI_Allreduce(MPI_IN_PLACE, sum, Nfields, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, sum, Nfields, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
 
   std::vector<dfloat> out;
   for (int i = 0; i < Nfields; ++i) {

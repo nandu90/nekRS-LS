@@ -52,14 +52,16 @@ void nrs_t::bdry::setup()
     }
   };
 
-  for (auto&& [sectionPar, isVector] : sectionsPar) {
+  for (auto &&[sectionPar, isVector] : sectionsPar) {
     process(sectionPar, isVector);
   }
 
   nekrsCheck(count > 0 && count != expectedCount,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
-             "boundaryTypeMap specfied for %d fields but not all %d fields!", count, expectedCount);
+             "boundaryTypeMap specfied for %d fields but not all %d fields!",
+             count,
+             expectedCount);
 
   addKernelConstants(platform->kernelInfo);
 }
@@ -124,7 +126,7 @@ void nrs_t::bdry::deriveGeomBoundaryConditions(std::vector<std::string> velocity
     }
 
     nekrsCheck(vBcTextToID.find(key) == vBcTextToID.end(),
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "Invalid bcType (%s)\n",
                key.c_str());
@@ -132,8 +134,6 @@ void nrs_t::bdry::deriveGeomBoundaryConditions(std::vector<std::string> velocity
     bToBc[make_pair(field, bid)] = vBcTextToID.at(key);
   }
 }
-
-
 
 bool nrs_t::bdry::useDerivedGeomBoundaryConditions()
 {

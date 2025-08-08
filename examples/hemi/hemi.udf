@@ -120,7 +120,7 @@ auto generateInflowPoints(nrs_t *nrs)
 
   for (auto &&y : yPoint) {
     for (auto &&z : zPoint) {
-      if (numGlobalParticles % platform->comm.mpiCommSize == platform->comm.mpiRank) {
+      if (numGlobalParticles % platform->comm.mpiCommSize() == platform->comm.mpiRank()) {
         xPart.push_back(xMin);
         yPart.push_back(y);
         zPart.push_back(z);
@@ -150,13 +150,13 @@ void UDF_Setup()
     nrs->fluid->o_U.copyFrom(U.data(), U.size());
   }
 
-  xMin = platform->linAlg->min(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm);
-  yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
-  zMin = platform->linAlg->min(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm);
+  xMin = platform->linAlg->min(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm());
+  yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm());
+  zMin = platform->linAlg->min(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm());
 
-  xMax = platform->linAlg->max(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm);
-  yMax = platform->linAlg->max(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
-  zMax = platform->linAlg->max(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm);
+  xMax = platform->linAlg->max(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm());
+  yMax = platform->linAlg->max(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm());
+  zMax = platform->linAlg->max(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm());
 
   const dfloat newton_tol = 5e-13;
   const dfloat bb_tol = 1e-4;
@@ -179,7 +179,7 @@ void UDF_Setup()
   const dlong nParticles = xPart.size();
 
   // interpolate initial fluid velocity onto particle positions
-  auto interpolator = pointInterpolation_t(mesh, platform->comm.mpiComm);
+  auto interpolator = pointInterpolation_t(mesh, platform->comm.mpiComm());
   interpolator.setPoints(xPart, yPart, zPart);
   interpolator.find();
 
@@ -256,7 +256,7 @@ void addNewParticles(nrs_t *nrs, double time, int tstep)
   platform->linAlg->fill(nPartAdd, Stk, o_propNewPart);
 
   // interpolate fluid velocity onto new particle positions (set initial velocity as fluid velocity)
-  auto interpolator = pointInterpolation_t(nrs->meshV, platform->comm.mpiComm);
+  auto interpolator = pointInterpolation_t(nrs->meshV, platform->comm.mpiComm());
   interpolator.setPoints(xPart, yPart, zPart);
   interpolator.find();
 
@@ -293,8 +293,8 @@ void UDF_ExecuteStep(double time, int tstep)
                 maxFractions.size(),
                 MPI_DFLOAT,
                 MPI_MAX,
-                platform->comm.mpiComm);
-  if (platform->comm.mpiRank == 0) {
+                platform->comm.mpiComm());
+  if (platform->comm.mpiRank() == 0) {
     printf("nonLocalParticleFraction = %f, unfoundParticleFraction = %f\n", maxFractions[0], maxFractions[1]);
   }
 

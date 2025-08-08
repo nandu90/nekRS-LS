@@ -180,7 +180,7 @@ void setup(MPI_Comm commg_in,
   }
 
   nekrsCheck(platform->app == nullptr,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "Invalid platform->app!");
@@ -206,7 +206,11 @@ void setup(MPI_Comm commg_in,
   {
     int nelgt, nelgv;
     re2::nelg(platform->options.getArgs("MESH FILE"), nelgt, nelgv, comm);
-    nekrsCheck(size > nelgv, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "MPI tasks > number of elements!");
+    nekrsCheck(size > nelgv,
+               platform->comm.mpiComm(),
+               EXIT_FAILURE,
+               "%s\n",
+               "MPI tasks > number of elements!");
   }
 
   setenv("PARRSB_FIND_DISCONNECTED_COMPONENTS", "0", 1);
@@ -266,17 +270,17 @@ void setup(MPI_Comm commg_in,
   // JIT compile kernels
   {
     const double tStart = MPI_Wtime();
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("JIT compiling kernels (this may take awhile if they are not in cache) ...\n");
       fflush(stdout);
     }
 
     platform->kernelRequests.compile();
 
-    MPI_Barrier(platform->comm.mpiComm);
+    MPI_Barrier(platform->comm.mpiComm());
     const double loadTime = MPI_Wtime() - tStart;
     platform->timer.set("compileKernels", loadTime);
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::ofstream ofs;
       ofs.open(occa::env::OCCA_CACHE_DIR + "cache/request.timestamp",
                std::ofstream::out | std::ofstream::trunc);
@@ -290,7 +294,7 @@ void setup(MPI_Comm commg_in,
   if (buildOnly) {
     int buildRank = rank;
     if (platform->cacheLocal) {
-      MPI_Comm_rank(platform->comm.mpiCommLocal, &buildRank);
+      MPI_Comm_rank(platform->comm.mpiCommLocal(), &buildRank);
     }
 
     if (buildRank == 0) {
@@ -312,15 +316,15 @@ void setup(MPI_Comm commg_in,
   // now just load compiled kernels
   {
     const auto tStart = MPI_Wtime();
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << "loading kernels ...\n";
     }
 
     loadComponents(false);
 
-    MPI_Barrier(platform->comm.mpiComm);
+    MPI_Barrier(platform->comm.mpiComm());
     const double loadTime = MPI_Wtime() - tStart;
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("done (%gs)\n", MPI_Wtime() - tStart);
     }
   }
@@ -338,7 +342,7 @@ void setup(MPI_Comm commg_in,
     std::cout << "\noptions:\n" << platform->options << std::endl;
   }
 
-  platform->device.printMemoryUsage(platform->comm.mpiComm);
+  platform->device.printMemoryUsage(platform->comm.mpiComm());
 
   platform->flopCounter->clear();
 
@@ -361,13 +365,13 @@ void udfExecuteStep(double time, int tstep, int checkpointStep)
 
   platform->timer.tic("udfExecuteStep", 1);
   if (udf.executeStep) {
-    if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
       std::cout << "calling udfExecuteStep ..." << std::flush << std::endl;
-    } 
+    }
     udf.executeStep(time, tstep);
-    if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
       std::cout << "done" << std::endl;
-    } 
+    }
   }
   platform->timer.toc("udfExecuteStep");
 
@@ -688,8 +692,8 @@ int finalize()
     nek::finalize();
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, &exitValue, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
-  if (platform->comm.mpiRank == 0) {
+  MPI_Allreduce(MPI_IN_PLACE, &exitValue, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent());
+  if (platform->comm.mpiRank() == 0) {
     std::cout << std::endl << "finished with exit code " << exitValue << std::endl;
   }
 

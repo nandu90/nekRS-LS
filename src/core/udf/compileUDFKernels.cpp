@@ -11,9 +11,9 @@ occa::properties registerUDFKernels()
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
   deviceKernelProperties kernelInfo(platform->kernelInfo + meshKernelProperties(N));
 
-  MPI_Barrier(platform->comm.mpiComm);
+  MPI_Barrier(platform->comm.mpiComm());
   const double tStart = MPI_Wtime();
-  if (platform->comm.mpiRank == 0 && !registerOnly) {
+  if (platform->comm.mpiRank() == 0 && !registerOnly) {
     std::cout << "loading udf kernels ... " << std::endl;
   }
 
@@ -37,9 +37,9 @@ occa::properties registerUDFKernels()
 
   udf.autoloadPlugins(kernelInfo);
 
-  MPI_Barrier(platform->comm.mpiComm);
+  MPI_Barrier(platform->comm.mpiComm());
   const double loadTime = MPI_Wtime() - tStart;
-  if (platform->comm.mpiRank == 0 && !registerOnly) {
+  if (platform->comm.mpiRank() == 0 && !registerOnly) {
     printf("done (%gs)\n", loadTime);
   }
   fflush(stdout);
@@ -61,7 +61,7 @@ occa::kernel oudfBuildKernel(occa::properties kernelInfo, const std::string &ker
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
     } else {
-      if (platform->verbose() && platform->comm.mpiRank == 0) {
+      if (platform->verbose() && platform->comm.mpiRank() == 0) {
         std::cout << kernelName << std::endl;
       }
       static int idx = 0;

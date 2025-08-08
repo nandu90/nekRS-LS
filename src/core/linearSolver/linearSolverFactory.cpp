@@ -29,14 +29,7 @@ linearSolverFactory<T>::create(const std::string &_solver,
         combined = true;
       }
 
-      return std::make_unique<cg<T>>(Nlocal,
-                                     Nfields,
-                                     fieldOffset,
-                                     o_weight,
-                                     flexible,
-                                     combined,
-                                     Ax,
-                                     Pc);
+      return std::make_unique<cg<T>>(Nlocal, Nfields, fieldOffset, o_weight, flexible, combined, Ax, Pc);
     } else if (solver.find("gmres") != std::string::npos) {
       int nRestartVectors = 15;
       std::regex pattern("nvector=([0-9]+)");
@@ -54,7 +47,7 @@ linearSolverFactory<T>::create(const std::string &_solver,
                                         Ax,
                                         Pc);
     } else {
-      nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "Unknown linear solver %s!\n", solver.c_str());
+      nekrsAbort(platform->comm.mpiComm(), EXIT_FAILURE, "Unknown linear solver %s!\n", solver.c_str());
       return nullptr;
     }
   }();

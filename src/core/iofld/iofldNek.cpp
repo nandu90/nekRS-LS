@@ -49,7 +49,7 @@ void iofldNek::openEngine()
 {
   if (engineMode == iofld::mode::read) {
     const auto fileName = fileNameBase + fileSuffix();
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << "reading checkpoint ..." << std::endl;
       std::cout << " fileName: " << fileName << std::endl << std::flush;
     }
@@ -61,7 +61,7 @@ size_t iofldNek::write()
 {
   const auto fileName = fileNameBase + fileSuffix();
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << " fileName: " << fileName << std::endl << std::flush;
   }
 
@@ -128,7 +128,7 @@ size_t iofldNek::write()
                 uniform);
 
   // metadata file
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::string casename;
     platform->options.getArgs("CASENAME", casename);
 
@@ -139,7 +139,7 @@ size_t iofldNek::write()
     outFile.close();
   }
 
-  return (platform->comm.mpiRank == 0) ? fs::file_size(fileName) : 0;
+  return (platform->comm.mpiRank() == 0) ? fs::file_size(fileName) : 0;
 }
 
 size_t iofldNek::read()
@@ -160,7 +160,7 @@ size_t iofldNek::read()
   }
 
   auto populateVariable = [&](const std::string &name, const std::vector<occa::memory> &o_src) {
-    if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
       std::cout << " reading " << name << std::endl;
     }
     auto &o_buf = inquireVariable<std::vector<occa::memory>>(name)->get();

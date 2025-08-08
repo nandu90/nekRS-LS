@@ -46,13 +46,13 @@ cheapDist(mesh_t *mesh, int nbID, const occa::memory &o_bID, dlong offsetFld, bo
 {
   bool verbose = platform->verbose();
   const auto [minCoord, maxCoord] = [&]() {
-    const auto xMin = platform->linAlg->min(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm);
-    const auto yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
-    const auto zMin = platform->linAlg->min(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm);
+    const auto xMin = platform->linAlg->min(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm());
+    const auto yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm());
+    const auto zMin = platform->linAlg->min(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm());
 
-    const auto xMax = platform->linAlg->max(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm);
-    const auto yMax = platform->linAlg->max(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
-    const auto zMax = platform->linAlg->max(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm);
+    const auto xMax = platform->linAlg->max(mesh->Nlocal, mesh->o_x, platform->comm.mpiComm());
+    const auto yMax = platform->linAlg->max(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm());
+    const auto zMax = platform->linAlg->max(mesh->Nlocal, mesh->o_z, platform->comm.mpiComm());
 
     return std::make_tuple(std::min({xMin, yMin, zMin}), std::max({xMax, yMax, zMax}));
   }();
@@ -100,13 +100,13 @@ cheapDist(mesh_t *mesh, int nbID, const occa::memory &o_bID, dlong offsetFld, bo
                          o_changed);
     oogs::startFinish(o_dist, Nfields, offsetFld, ogsDfloat, ogsMin, mesh->oogs);
 
-    const auto nchange = hsum(mesh, mesh->Nlocal, o_changed, platform->comm.mpiComm);
+    const auto nchange = hsum(mesh, mesh->Nlocal, o_changed, platform->comm.mpiComm());
 
     // only compute dmax if verbose is true
     double dmax = 0.0;
     if (verbose) {
-      dmax = platform->linAlg->amaxMany(mesh->Nlocal, Nfields, offsetFld, o_dist, platform->comm.mpiComm);
-      if (platform->comm.mpiRank == 0) {
+      dmax = platform->linAlg->amaxMany(mesh->Nlocal, Nfields, offsetFld, o_dist, platform->comm.mpiComm());
+      if (platform->comm.mpiRank() == 0) {
         std::cout << "distance: " << iter << " " << nchange << " " << dmax << std::endl;
       }
     }
@@ -133,7 +133,7 @@ mesh_t::distance(int nbID, const occa::memory &o_bID, dlong offsetFld, std::stri
   if (type.find("cheap") != std::string::npos) {
     o_dist = cheapDist(this, nbID, o_bID, offsetFld, false, maxIter);
   } else {
-    nekrsAbort(platform->comm.mpiComm,
+    nekrsAbort(platform->comm.mpiComm(),
                EXIT_FAILURE,
                "distance function type %s not supported!\n",
                type.c_str());
@@ -150,7 +150,7 @@ occa::memory mesh_t::minDistance(int nbID, const occa::memory &o_bID, std::strin
   if (type.find("cheap") != std::string::npos) {
     o_dist = cheapDist(this, nbID, o_bID, this->Nlocal, true, maxIter);
   } else {
-    nekrsAbort(platform->comm.mpiComm,
+    nekrsAbort(platform->comm.mpiComm(),
                EXIT_FAILURE,
                "distance function type %s not supported!\n",
                type.c_str());

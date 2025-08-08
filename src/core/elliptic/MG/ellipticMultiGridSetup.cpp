@@ -58,7 +58,7 @@ void ellipticCoarseFEMGridSetup(elliptic_t *elliptic, bool update)
   MGSolver_t::multigridLevel **levels = precon->MGSolver->levels;
   auto ellipticCoarse = dynamic_cast<pMGLevel *>(levels[elliptic->nLevels - 1])->elliptic;
 
-  auto coarseGlobalStarts = (hlong *)calloc(platform->comm.mpiCommSize + 1, sizeof(hlong));
+  auto coarseGlobalStarts = (hlong *)calloc(platform->comm.mpiCommSize() + 1, sizeof(hlong));
   dlong nnzCoarseA = 0;
   nonZero_t *coarseA;
 
@@ -103,7 +103,7 @@ void ellipticCoarseFEMGridSetup(elliptic_t *elliptic, bool update)
 
 void ellipticMultiGridSetup(elliptic_t *elliptic_)
 {
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("building MG preconditioner ... \n");
   }
   fflush(stdout);
@@ -141,7 +141,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
   int Nmin = levelDegree[numMGLevels - 1];
 
   precon->MGSolver =
-      new MGSolver_t(elliptic->name, platform->device.occaDevice(), platform->comm.mpiComm, options);
+      new MGSolver_t(elliptic->name, platform->device.occaDevice(), platform->comm.mpiComm(), options);
   MGSolver_t::multigridLevel **levels = precon->MGSolver->levels;
 
   oogs_mode oogsMode = OOGS_AUTO;
@@ -159,7 +159,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
       ellipticOperator(elliptic, o_p, o_Ap, pfloatString);
 
       platform->device.finish();
-      MPI_Barrier(platform->comm.mpiComm);
+      MPI_Barrier(platform->comm.mpiComm());
       const double start = MPI_Wtime();
 
       for (int test = 0; test < Nsamples; ++test) {
@@ -168,7 +168,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
 
       platform->device.finish();
       double elapsed = (MPI_Wtime() - start) / Nsamples;
-      MPI_Allreduce(MPI_IN_PLACE, &elapsed, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
+      MPI_Allreduce(MPI_IN_PLACE, &elapsed, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm());
 
       return elapsed;
     };
@@ -191,7 +191,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
         elliptic->oogsAx = elliptic->oogs;
       }
 
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         printf("testing overlap in ellipticOperator: %.2es %.2es ", nonOverlappedTime, overlappedTime);
         if (elliptic->oogsAx != elliptic->oogs) {
           printf("(overlap enabled)");
@@ -204,14 +204,14 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
 
   // set up the finest level 0
   if (Nmax > Nmin) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("============= BUILDING pMG%d ==================\n", Nmax);
     }
 
     elliptic->oogs = oogs::setup(elliptic->ogs, 1, 0, ogsPfloat, NULL, oogsMode);
     elliptic->oogsAx = elliptic->oogs;
 
-    levels[0] = new pMGLevel(elliptic, Nmax, options, platform->comm.mpiComm);
+    levels[0] = new pMGLevel(elliptic, Nmax, options, platform->comm.mpiComm());
     precon->MGSolver->numLevels++;
 
     autoOverlap(elliptic);
@@ -222,7 +222,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
     int Nc = levelDegree[n];
     int Nf = levelDegree[n - 1];
     elliptic_t *ellipticFine = ((pMGLevel *)levels[n - 1])->elliptic;
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("============= BUILDING pMG%d ==================\n", Nc);
     }
 
@@ -238,7 +238,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
                              Nf,
                              Nc,
                              options,
-                             platform->comm.mpiComm);
+                             platform->comm.mpiComm());
     precon->MGSolver->numLevels++;
 
     autoOverlap(ellipticC);
@@ -246,7 +246,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
 
   // set up coarse level numMGLevels - 1
   elliptic_t *ellipticCoarse;
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("============= BUILDING COARSE pMG%d ==================\n", Nmin);
   }
 
@@ -267,7 +267,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
                                            Nf,
                                            Nc,
                                            options,
-                                           platform->comm.mpiComm,
+                                           platform->comm.mpiComm(),
                                            true);
 
     if (options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER") ||
@@ -278,7 +278,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
     }
   } else {
     ellipticCoarse = elliptic;
-    levels[numMGLevels - 1] = new pMGLevel(ellipticCoarse, Nmin, options, platform->comm.mpiComm, true);
+    levels[numMGLevels - 1] = new pMGLevel(ellipticCoarse, Nmin, options, platform->comm.mpiComm(), true);
   }
   precon->MGSolver->baseLevel = precon->MGSolver->numLevels;
   precon->MGSolver->numLevels++;
@@ -306,7 +306,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
         [elliptic](MGSolver_t::coarseLevel_t *, occa::memory &o_rhs, occa::memory &o_x) {
           elliptic->precon->SEMFEMSolver->run(o_rhs, o_x);
         };
-  } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "JPCG")) { 
+  } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "JPCG")) {
     auto baseLevel = (pMGLevel *)levels[numMGLevels - 1];
     auto Ax = [baseLevel](const occa::memory &o_p, occa::memory &o_Ap) { baseLevel->Ax(o_p, o_Ap); };
 
@@ -339,13 +339,12 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
           o_r.copyFrom(o_rhs); // o_x is ZERO
 #endif
 
-          dfloat resNorm = platform->linAlg->weightedNorm2Many<pfloat>(
-              elliptic->mesh->Nlocal,
-              elliptic->Nfields,
-              elliptic->fieldOffset,
-              elliptic->o_invDegree,
-              o_r,
-              platform->comm.mpiComm);
+          dfloat resNorm = platform->linAlg->weightedNorm2Many<pfloat>(elliptic->mesh->Nlocal,
+                                                                       elliptic->Nfields,
+                                                                       elliptic->fieldOffset,
+                                                                       elliptic->o_invDegree,
+                                                                       o_r,
+                                                                       platform->comm.mpiComm());
 
           if (elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
             ellipticUpdateJacobi(elliptic, elliptic->KSP->o_invDiagA);
@@ -393,13 +392,10 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
           baseLevel->smooth(o_rhs, o_x, true);
         };
   } else {
-    nekrsAbort(MPI_COMM_SELF,
-               EXIT_FAILURE,
-               "%s\n",
-               "unknown MULTIGRID COARSE SOLVER!");
+    nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "unknown MULTIGRID COARSE SOLVER!");
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("-----------------------------------------------------------------------\n");
     printf("level|    Type    |                 |     Smoother                    |\n");
     printf("     |            |                 |                                 |\n");
@@ -407,13 +403,13 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
   }
 
   for (int lev = 0; lev < precon->MGSolver->numLevels; lev++) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf(" %3d ", lev);
     }
     levels[lev]->Report();
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("-----------------------------------------------------------------------\n");
   }
 

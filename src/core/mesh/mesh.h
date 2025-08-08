@@ -309,7 +309,7 @@ void meshPartitionStatistics(mesh_t *mesh);
 void meshParallelGatherScatterSetup(mesh_t *mesh,
                                     dlong N,
                                     hlong *globalIds,
-                                    MPI_Comm &comm,
+                                    MPI_Comm comm,
                                     oogs_mode gsMode,
                                     int verbose);
 

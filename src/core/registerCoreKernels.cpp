@@ -4,7 +4,7 @@
 
 void registerCoreKernels(occa::properties kernelInfoBC)
 {
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "registerCoreKernels" << std::endl;
   }
 
@@ -195,7 +195,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
       {
         int nelgt, nelgv;
         const std::string meshFile = platform->options.getArgs("MESH FILE");
-        re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm);
+        re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
 
         bool verbose = platform->verbose();
         const int verbosity = verbose ? 2 : 1;
@@ -204,7 +204,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
 
         auto subCycleKernel =
             benchmarkAdvsub(nVFields,
-                            nelgv / platform->comm.mpiCommSize,
+                            nelgv / platform->comm.mpiCommSize(),
                             Nq,
                             cubNq,
                             nEXT,
@@ -219,7 +219,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
 
         auto subCycleScalarKernel =
             benchmarkAdvsub(1,
-                            nelgv / platform->comm.mpiCommSize,
+                            nelgv / platform->comm.mpiCommSize(),
                             Nq,
                             cubNq,
                             nEXT,
@@ -335,7 +335,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
       platform->kernelRequests.add(kernelName, fileName, props);
 
       nekrsCheck(BLOCKSIZE < Nq * Nq,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "gjpHelper kernel requires BLOCKSIZE >= Nq * Nq\nBLOCKSIZE = %d, Nq*Nq = %d\n",
                  BLOCKSIZE,

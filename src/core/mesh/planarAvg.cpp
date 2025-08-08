@@ -80,7 +80,7 @@ oogs_t *gtpp_gs_setup(mesh_t *mesh, int nelgx, int nelgy, int nelgz, std::string
     }
   }
 
-  auto ogsh = ogsSetup(mesh->Nlocal, ids, platform->comm.mpiComm, 1, platform->device.occaDevice());
+  auto ogsh = ogsSetup(mesh->Nlocal, ids, platform->comm.mpiComm(), 1, platform->device.occaDevice());
   free(ids);
   auto oogsh = oogs::setup(ogsh, 6, /* dummy */ mesh->Nlocal, ogsDfloat, NULL, OOGS_AUTO);
   return oogsh;
@@ -97,7 +97,7 @@ void fusedPlanarAvg(mesh_t *mesh,
 {
   if (!platform->device.deviceAtomic) {
     static bool issueWarning = true;
-    if (platform->comm.mpiRank == 0 && issueWarning) {
+    if (platform->comm.mpiRank() == 0 && issueWarning) {
       std::cout << "Device atomics are not supported!\n";
       std::cout << "Relying on slower, separate planar averaging operations.\n";
     }
@@ -125,25 +125,24 @@ void fusedPlanarAvg(mesh_t *mesh,
     elemDir = NELGX;
   }
 
-  auto [gatherKernel, scatterKernel] = [&]()
-  {
+  auto [gatherKernel, scatterKernel] = [&]() {
     if (dir == "XY") {
-      static occa::kernel gatherXYKernel, scatterXYKernel; 
+      static occa::kernel gatherXYKernel, scatterXYKernel;
       if (!gatherXYKernel.isInitialized()) {
         gatherXYKernel = platform->kernelRequests.load("gatherPlanarValues" + dir);
         scatterXYKernel = platform->kernelRequests.load("scatterPlanarValues" + dir);
       }
       return std::tuple(gatherXYKernel, scatterXYKernel);
     } else if (dir == "XZ") {
-       static occa::kernel gatherXZKernel, scatterXZKernel; 
-       if (!gatherXZKernel.isInitialized()) {
+      static occa::kernel gatherXZKernel, scatterXZKernel;
+      if (!gatherXZKernel.isInitialized()) {
         gatherXZKernel = platform->kernelRequests.load("gatherPlanarValues" + dir);
         scatterXZKernel = platform->kernelRequests.load("scatterPlanarValues" + dir);
       }
       return std::tuple(gatherXZKernel, scatterXZKernel);
     } else {
-       static occa::kernel gatherYZKernel, scatterYZKernel; 
-       if (!gatherYZKernel.isInitialized()) {
+      static occa::kernel gatherYZKernel, scatterYZKernel;
+      if (!gatherYZKernel.isInitialized()) {
         gatherYZKernel = platform->kernelRequests.load("gatherPlanarValues" + dir);
         scatterYZKernel = platform->kernelRequests.load("scatterPlanarValues" + dir);
       }
@@ -166,27 +165,11 @@ void fusedPlanarAvg(mesh_t *mesh,
   auto o_scratch = platform->deviceMemoryPool.reserve<dfloat>(Nlocal);
   platform->linAlg->fill(o_scratch.size(), 0, o_scratch);
 
-  gatherKernel(mesh->Nelements,
-               nflds,
-               fldOffset,
-               NELGX,
-               NELGY,
-               NELGZ,
-               o_locToGlobE,
-               o_avg,
-               o_scratch);
+  gatherKernel(mesh->Nelements, nflds, fldOffset, NELGX, NELGY, NELGZ, o_locToGlobE, o_avg, o_scratch);
 
-  platform->comm.allreduce(o_scratch, o_scratch.size(), comm_t::op::sum, platform->comm.mpiComm);
+  platform->comm.allreduce(o_scratch, o_scratch.size(), comm_t::op::sum, platform->comm.mpiComm());
 
-  scatterKernel(mesh->Nelements,
-                nflds,
-                fldOffset,
-                NELGX,
-                NELGY,
-                NELGZ,
-                o_locToGlobE,
-                o_scratch,
-                o_avg);
+  scatterKernel(mesh->Nelements, nflds, fldOffset, NELGX, NELGY, NELGZ, o_locToGlobE, o_scratch, o_avg);
 }
 
 } // namespace
@@ -231,7 +214,7 @@ void planarAvg(mesh_t *mesh,
   } else if (dir == "yz" || dir == "zy") {
     o_wghts = o_avgWeight_yz;
   } else {
-    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "Invalid direction  <%s>!", dir.c_str());
+    nekrsAbort(platform->comm.mpiComm(), EXIT_FAILURE, "Invalid direction  <%s>!", dir.c_str());
   }
 
   if (!gsh && !o_wghts.isInitialized()) {

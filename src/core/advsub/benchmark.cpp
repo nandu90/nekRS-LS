@@ -88,12 +88,12 @@ occa::kernel benchmarkAdvsub(int Nfields,
     return cachedResults.at(params);
   }
 
-  nekrsCheck(Nq > 14, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Nq > 14 is unsupported");
+  nekrsCheck(Nq > 14, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "Nq > 14 is unsupported");
 
   const auto largestCubNq = maximumCubaturePoints.at(Nq);
 
   nekrsCheck(cubNq > largestCubNq,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "cubNq > %d is unsupported\n",
              largestCubNq);
@@ -109,7 +109,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
 
   const int cubN = cubNq - 1;
   const int cubNp = cubNq * cubNq * cubNq;
-  const dlong cubatureOffset = alignStride<dfloat>(cubNp * Nelements); 
+  const dlong cubatureOffset = alignStride<dfloat>(cubNp * Nelements);
 
   const int NVfields = 3;
 
@@ -142,12 +142,10 @@ occa::kernel benchmarkAdvsub(int Nfields,
   }
 
   const std::string ext = (platform->device.mode() == "Serial" && dealias) ? ".c" : ".okl";
-  const std::string kernelName = std::string("subCycleStrong") + 
-                                 (dealias ? std::string("Cubature") : std::string("")) + 
-                                 std::string("Volume") + 
-                                 (isScalar ? std::string("Scalar") : std::string("")) +
-                                 std::string("Hex3D");
-  const std::string fileName = oklpath + "/core/" +  kernelName + ext;
+  const std::string kernelName =
+      std::string("subCycleStrong") + (dealias ? std::string("Cubature") : std::string("")) +
+      std::string("Volume") + (isScalar ? std::string("Scalar") : std::string("")) + std::string("Hex3D");
+  const std::string fileName = oklpath + "/core/" + kernelName + ext;
 
   std::vector<int> kernelVariants = {0};
   if (!platform->serial && dealias) {
@@ -178,8 +176,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
     }
   }
 
-  auto buildKernel = [&props, &fileName, &kernelName, &isScalar](int ver)
-  {
+  auto buildKernel = [&props, &fileName, &kernelName, &isScalar](int ver) {
     auto newProps = props;
     newProps["defines/p_knl"] = ver;
     const auto verSuffix = "_v" + std::to_string(ver);
@@ -208,16 +205,13 @@ occa::kernel benchmarkAdvsub(int Nfields,
   std::vector<dfloat> lambda(4, 1.0);
 #endif
 
-  auto generateField = [&](const int Nfields, const int Nq, const dlong offset, const dfloat lambda)
-  {
+  auto generateField = [&](const int Nfields, const int Nq, const dlong offset, const dfloat lambda) {
     const dlong Np = Nq * Nq * Nq;
-    const dlong Nlocal = Nelements * Np; 
+    const dlong Nlocal = Nelements * Np;
     std::vector<dfloat> out((Nfields > 1) ? Nfields * offset : Nlocal, 0.0);
 
-   // convert to [-1, 1] 
-    auto convertToRange =  [&](int n) {
-      return 2.0 * (static_cast<double>(n) / Nq) - 1;
-    };
+    // convert to [-1, 1]
+    auto convertToRange = [&](int n) { return 2.0 * (static_cast<double>(n) / Nq) - 1; };
 
     for (int f = 0; f < Nfields; f++) {
       for (int e = 0; e < Nelements; e++) {
@@ -229,8 +223,8 @@ occa::kernel benchmarkAdvsub(int Nfields,
               const auto z = convertToRange(k);
 
               const auto id = i * j * k + e * Np + f * offset;
-              out[id] = (f+1) * lambda * sin(M_PI * x + e) * sin(M_PI * y) * sin(M_PI * z);
-            }   
+              out[id] = (f + 1) * lambda * sin(M_PI * x + e) * sin(M_PI * y) * sin(M_PI * z);
+            }
           }
         }
       }
@@ -272,12 +266,12 @@ occa::kernel benchmarkAdvsub(int Nfields,
   std::vector<dfloat> NU(Nfields * fieldOffset, 0);
   auto o_NU = platform->device.malloc(NU.size() * wordSize, NU.data());
 
-  auto buildKernel2 = [&props, &oklpath](const std::string& _fileName)
-  {
+  auto buildKernel2 = [&props, &oklpath](const std::string &_fileName) {
     const auto fileName = oklpath + _fileName;
 
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
-      const auto reqName = std::string(fs::path(fileName).filename()) + "::" + std::string(props.hash().getString());
+      const auto reqName =
+          std::string(fs::path(fileName).filename()) + "::" + std::string(props.hash().getString());
       platform->kernelRequests.add(reqName, fileName, props);
       return occa::kernel();
     } else {
@@ -287,7 +281,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
 
   auto readCubDMatrixKernel = buildKernel2("/core/readCubDMatrix.okl");
   auto readIMatrixKernel = buildKernel2("/core/readIMatrix.okl");
-  if(readCubDMatrixKernel.isInitialized() && readIMatrixKernel.isInitialized()) {
+  if (readCubDMatrixKernel.isInitialized() && readIMatrixKernel.isInitialized()) {
     readCubDMatrixKernel(o_cubD);
     readIMatrixKernel(o_cubInterpT);
   }
@@ -332,7 +326,9 @@ occa::kernel benchmarkAdvsub(int Nfields,
 
   auto advSubKernelBuilder = [&](int kernelVariant) {
     auto kernel = buildKernel(kernelVariant);
-    if (!kernel.isInitialized()) return occa::kernel();
+    if (!kernel.isInitialized()) {
+      return occa::kernel();
+    }
 
     kernelRunner(referenceKernel);
     auto o_NUref = platform->device.malloc(o_NU.size());
@@ -340,31 +336,31 @@ occa::kernel benchmarkAdvsub(int Nfields,
 
     kernelRunner(kernel);
 
-    for(int i = 0; i < Nfields; i++) {
+    for (int i = 0; i < Nfields; i++) {
       std::vector<dfloat> referenceResults(Ntotal);
       std::vector<dfloat> results(referenceResults.size());
 
-      o_NUref.copyTo(referenceResults.data(), referenceResults.size() * wordSize, i*fieldOffset * wordSize);
-      o_NU.copyTo(results.data(), results.size() * wordSize, i*fieldOffset * wordSize);
+      o_NUref.copyTo(referenceResults.data(), referenceResults.size() * wordSize, i * fieldOffset * wordSize);
+      o_NU.copyTo(results.data(), results.size() * wordSize, i * fieldOffset * wordSize);
 
       const auto absTol = 1.0;
-      const auto err = maxRelErr<dfloat>(referenceResults, results, platform->comm.mpiComm, absTol);
+      const auto err = maxRelErr<dfloat>(referenceResults, results, platform->comm.mpiComm(), absTol);
 
       double scale = 100 * range<dfloat>(referenceResults, absTol);
-      MPI_Allreduce(MPI_IN_PLACE, &scale, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm);
+      MPI_Allreduce(MPI_IN_PLACE, &scale, 1, MPI_DOUBLE, MPI_MIN, platform->comm.mpiComm());
 
       if ((err > scale * std::numeric_limits<dfloat>::epsilon()) || std::isnan(err)) {
-        if (platform->comm.mpiRank == 0 && verbosity > 1) {
-          std::cout << "advSub: Ignore version " << kernelVariant << " as correctness check failed with err=" << err
-                    << std::endl;
+        if (platform->comm.mpiRank() == 0 && verbosity > 1) {
+          std::cout << "advSub: Ignore version " << kernelVariant
+                    << " as correctness check failed with err=" << err << std::endl;
         }
- 
+
         // pass un-initialized kernel to skip this kernel variant
         return occa::kernel();
       } else {
-        if (platform->comm.mpiRank == 0 && verbosity > 1) {
-          std::cout << "advSub: kernel version " << kernelVariant << " passed correctness check with err=" << err
-                    << std::endl;
+        if (platform->comm.mpiRank() == 0 && verbosity > 1) {
+          std::cout << "advSub: kernel version " << kernelVariant
+                    << " passed correctness check with err=" << err << std::endl;
         }
       }
     }
@@ -403,14 +399,14 @@ occa::kernel benchmarkAdvsub(int Nfields,
     const int Nthreads = 1;
 #endif
 
-    if (platform->comm.mpiRank == 0 && !skipPrint) {
+    if (platform->comm.mpiRank() == 0 && !skipPrint) {
 
       if (verbosity > 0) {
         std::cout << "advSub:";
       }
 
       if (verbosity > 1) {
-        std::cout << " MPItasks=" << platform->comm.mpiCommSize << " OMPthreads=" << Nthreads
+        std::cout << " MPItasks=" << platform->comm.mpiCommSize() << " OMPthreads=" << Nthreads
                   << " NRepetitions=" << Ntests;
       }
       if (verbosity > 0) {

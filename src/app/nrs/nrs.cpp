@@ -29,7 +29,7 @@ int nrs_t::numberActiveFields()
 
 void nrs_t::printSolutionMinMax()
 {
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("================= INITIAL CONDITION ====================\n");
   }
 
@@ -40,9 +40,9 @@ void nrs_t::printSolutionMinMax()
     auto o_z = mesh->o_z;
 
     const auto minMax =
-        platform->linAlg->minMax(mesh->Nlocal, {mesh->o_x, mesh->o_y, mesh->o_z}, platform->comm.mpiComm);
+        platform->linAlg->minMax(mesh->Nlocal, {mesh->o_x, mesh->o_y, mesh->o_z}, platform->comm.mpiComm());
 
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("%-15s min/max: %g %g  %g %g  %g %g\n",
              "MESH X",
              minMax[0].first,
@@ -60,9 +60,9 @@ void nrs_t::printSolutionMinMax()
     auto o_uy = geom->o_U + 1 * geom->fieldOffset;
     auto o_uz = geom->o_U + 2 * geom->fieldOffset;
 
-    const auto minMax = platform->linAlg->minMax(mesh->Nlocal, {o_ux, o_uy, o_uz}, platform->comm.mpiComm);
+    const auto minMax = platform->linAlg->minMax(mesh->Nlocal, {o_ux, o_uy, o_uz}, platform->comm.mpiComm());
 
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("%-15s min/max: %g %g  %g %g  %g %g\n",
              "GEOM U",
              minMax[0].first,
@@ -81,9 +81,9 @@ void nrs_t::printSolutionMinMax()
     auto o_uz = fluid->o_U + 2 * fluid->fieldOffset;
 
     const auto minMax =
-        platform->linAlg->minMax(mesh->Nlocal, {o_ux, o_uy, o_uz, fluid->o_P}, platform->comm.mpiComm);
+        platform->linAlg->minMax(mesh->Nlocal, {o_ux, o_uy, o_uz, fluid->o_P}, platform->comm.mpiComm());
 
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("%-15s min/max: %g %g  %g %g  %g %g\n",
              "FLUID U",
              minMax[0].first,
@@ -94,13 +94,13 @@ void nrs_t::printSolutionMinMax()
              minMax[2].second);
     }
 
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("%-15s min/max: %g %g\n", "FLUID p", minMax[3].first, minMax[3].second);
     }
   }
 
   if (Nscalar) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("%-15s min/max:", "SCALAR s");
     }
 
@@ -110,9 +110,9 @@ void nrs_t::printSolutionMinMax()
 
       auto mesh = scalar->mesh(is);
       auto o_si = scalar->o_S + scalar->fieldOffsetScan[is];
-      const auto minMax = platform->linAlg->minMax(mesh->Nlocal, {o_si}, platform->comm.mpiComm);
+      const auto minMax = platform->linAlg->minMax(mesh->Nlocal, {o_si}, platform->comm.mpiComm());
 
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         if (cnt > 1) {
           printf("  ");
         } else {
@@ -121,7 +121,7 @@ void nrs_t::printSolutionMinMax()
         printf("%g %g", minMax[0].first, minMax[0].second);
       }
     }
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("\n");
     }
   }
@@ -156,7 +156,7 @@ void nrs_t::init()
 {
   if (platform->options.compareArgs("FLUID STRESSFORMULATION", "TRUE")) {
     nekrsCheck(!platform->options.compareArgs("FLUID VELOCITY SOLVER", "BLOCK"),
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "stressformulation requires block solver!");
@@ -176,12 +176,16 @@ void nrs_t::init()
   if (meshTRequested) {
     int nelgt, nelgv;
     const std::string meshFile = platform->options.getArgs("MESH FILE");
-    re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm);
+    re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
 
-    nekrsCheck(nelgt == nelgv, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "No solid mesh elements found!");
+    nekrsCheck(nelgt == nelgv,
+               platform->comm.mpiComm(),
+               EXIT_FAILURE,
+               "%s\n",
+               "No solid mesh elements found!");
 
     nekrsCheck(platform->options.compareArgs("MOVING MESH", "TRUE"),
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "moving mesh not supported for mesh type fluid + solid");
@@ -196,7 +200,7 @@ void nrs_t::init()
     platform->options.getArgs("POLYNOMIAL DEGREE", N);
     platform->options.getArgs("CUBATURE POLYNOMIAL DEGREE", cubN);
 
-    auto [meshT, meshV] = createMesh(platform->comm.mpiComm, N, cubN, platform->kernelInfo);
+    auto [meshT, meshV] = createMesh(platform->comm.mpiComm(), N, cubN, platform->kernelInfo);
 
     // use same fieldOffset
     auto offset = meshT->Np * (meshT->Nelements);
@@ -237,7 +241,7 @@ void nrs_t::init()
   }
 
   nekrsCheck(nEXT < nBDF,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "EXT order needs to be >= BDF order!");
@@ -373,26 +377,26 @@ void nrs_t::setupNeknek()
     }
 
     // findpts functions have to be called collectively across all sessions
-    MPI_Allreduce(MPI_IN_PLACE, &intFound, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent);
+    MPI_Allreduce(MPI_IN_PLACE, &intFound, 1, MPI_INT, MPI_MAX, platform->comm.mpiCommParent());
     if (!intFound) {
       return;
     }
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "============= NEKNEK ==================" << std::endl;
   }
 
   if (fluid->ellipticSolverP) {
     nekrsCheck(fluid->ellipticSolverP->nullSpace() && platform->options.compareArgs("LOWMACH", "TRUE"),
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "variable p0th is not supported!");
   }
 
   nekrsCheck(platform->options.compareArgs("CONSTANT FLOW RATE", "TRUE"),
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "constant flow rate support not supported");
@@ -409,7 +413,7 @@ void nrs_t::setupNeknek()
         break;
       }
     }
-    MPI_Allreduce(MPI_IN_PLACE, &cnt, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &cnt, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
     return (cnt != 0) ? true : false;
   };
 
@@ -473,7 +477,7 @@ void nrs_t::restartFromFiles(const std::vector<std::string> &fileList)
     const auto fileName = options[0];
     options.erase(options.begin());
 
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       if (options.size()) {
         std::cout << "restart options: ";
       }
@@ -565,7 +569,7 @@ void nrs_t::restartFromFiles(const std::vector<std::string> &fileList)
     iofld->open(meshT, iofld::mode::read, fileName, requestedStep);
 
     const auto avaiableFields = iofld->availableVariables();
-    if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
       for (const auto &entry : avaiableFields) {
         std::cout << " found variable " << entry << std::endl;
       }
@@ -646,7 +650,7 @@ void nrs_t::setIC()
 {
   const auto tStart = MPI_Wtime();
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "setting IC ... \n" << std::flush;
   }
 
@@ -671,7 +675,7 @@ void nrs_t::setIC()
     copyFromNek();
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "calling UDF_Setup ... \n" << std::flush;
   }
   udf.setup();
@@ -707,20 +711,20 @@ void nrs_t::setIC()
   copyToNek(startTime, 0, true); // in case IC was updated in udf_setup
 
   nekrsCheck(platform->options.compareArgs("LOWMACH", "TRUE") && p0th[0] <= 1e-6,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "Unreasonable p0th value %g!",
              p0th[0]);
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("done (%gs)\n", MPI_Wtime() - tStart);
   }
 }
 
 void nrs_t::printRunStat(int step)
 {
-  const int rank = platform->comm.mpiRank;
-  auto comm_ = platform->comm.mpiComm;
+  const int rank = platform->comm.mpiRank();
+  auto comm_ = platform->comm.mpiComm();
 
   platform->timer.set("velocity proj",
                       platform->timer.query("velocity proj pre", "DEVICE:MAX") +
@@ -776,8 +780,8 @@ void nrs_t::printRunStat(int step)
   bool printFlops =
       !platform->options.compareArgs("FLUID PRESSURE PRECONDITIONER", "SEMFEM") && tScalarCvode < 0;
 
-  const double flops =
-      platform->flopCounter->get(platform->comm.mpiComm) / (tElapsedTimeSolve * platform->comm.mpiCommSize);
+  const double flops = platform->flopCounter->get(platform->comm.mpiComm()) /
+                       (tElapsedTimeSolve * platform->comm.mpiCommSize());
 
   platform->timer.printStatEntry("  solve                 ", tElapsedTimeSolve, tElapsedTimeSolve);
   if (tElapsedTimeSolve > 0 && rank == 0) {
@@ -986,11 +990,11 @@ void nrs_t::printRunStat(int step)
 
   platform->timer.printStatEntry("    dotp multi          ", "dotpMulti", "DEVICE:MAX", tElapsedTimeSolve);
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << std::endl;
   }
-  platform->device.printMemoryUsage(platform->comm.mpiComm);
-  if (platform->comm.mpiRank == 0) {
+  platform->device.printMemoryUsage(platform->comm.mpiComm());
+  if (platform->comm.mpiRank() == 0) {
     std::cout << std::endl;
   }
 
@@ -1056,14 +1060,14 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solve
     platform->linAlg->axpby(mesh->Nlocal, 1.0, fluid->o_div, -1.0, o_divErr);
 
     const auto L1 =
-        std::abs(platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_divErr, platform->comm.mpiComm));
+        std::abs(platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_divErr, platform->comm.mpiComm()));
     const auto L2 =
-        platform->linAlg->weightedNorm2(mesh->Nlocal, mesh->o_LMM, o_divErr, platform->comm.mpiComm);
+        platform->linAlg->weightedNorm2(mesh->Nlocal, mesh->o_LMM, o_divErr, platform->comm.mpiComm());
 
     return std::make_tuple(L1 / mesh->volume, L2 / sqrt(mesh->volume));
   }();
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     if (solverInfo) {
       bool cvodePrinted = false;
       for (int is = 0; is < Nscalar; is++) {
@@ -1291,7 +1295,7 @@ void nrs_t::copyToNek(double time, int tstep, bool updateMesh)
 
 void nrs_t::copyToNek(double time, bool updateMesh_)
 {
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("copying solution to nek\n");
     fflush(stdout);
   }
@@ -1376,7 +1380,7 @@ void nrs_t::copyFromNek()
 
 void nrs_t::copyFromNek(double &time)
 {
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("copying solution from nek\n");
     fflush(stdout);
   }
@@ -1518,15 +1522,15 @@ dfloat nrs_t::adjustDt(int tstep)
           occa::memory o_FUy = fluid->o_EXT + 1 * fluid->fieldOffset;
           occa::memory o_FUz = fluid->o_EXT + 2 * fluid->fieldOffset;
 
-          const auto maxFUx = platform->linAlg->max(mesh->Nlocal, o_FUx, platform->comm.mpiComm);
-          const auto maxFUy = platform->linAlg->max(mesh->Nlocal, o_FUy, platform->comm.mpiComm);
-          const auto maxFUz = platform->linAlg->max(mesh->Nlocal, o_FUz, platform->comm.mpiComm);
+          const auto maxFUx = platform->linAlg->max(mesh->Nlocal, o_FUx, platform->comm.mpiComm());
+          const auto maxFUy = platform->linAlg->max(mesh->Nlocal, o_FUy, platform->comm.mpiComm());
+          const auto maxFUz = platform->linAlg->max(mesh->Nlocal, o_FUz, platform->comm.mpiComm());
 
           return std::max({maxFUx, maxFUy, maxFUz}) /
-                 platform->linAlg->min(mesh->Nlocal, fluid->o_rho, platform->comm.mpiComm);
+                 platform->linAlg->min(mesh->Nlocal, fluid->o_rho, platform->comm.mpiComm());
         }();
         nekrsCheck(absRhoFMax <= TOLToZero,
-                   platform->comm.mpiComm,
+                   platform->comm.mpiComm(),
                    EXIT_FAILURE,
                    "%s\n",
                    "Zero velocity and body force! Please specify an initial timestep!");
@@ -1539,7 +1543,7 @@ dfloat nrs_t::adjustDt(int tstep)
           for (int i = 0; i < Jw.size(); i++) {
             scale = std::min(std::cbrt(Jw[i]), scale);
           }
-          MPI_Allreduce(MPI_IN_PLACE, &scale, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm);
+          MPI_Allreduce(MPI_IN_PLACE, &scale, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm());
           return scale;
         }();
 
@@ -1595,7 +1599,7 @@ dfloat nrs_t::adjustDt(int tstep)
   }
   firstTime = false;
 
-  if (platform->verbose() && platform->comm.mpiRank == 0) {
+  if (platform->verbose() && platform->comm.mpiRank() == 0) {
     printf("adjustDt: dt=%g CFL= %g CFLpred= %g CFLmax= %g CFLmin= %g\n", dt_, CFL, CFLpred, CFLmax, CFLmin);
   }
 
@@ -1815,7 +1819,7 @@ bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter, bo
 
   platform->timer.tic("udfExecuteStep");
   if (udf.executeStep) {
-    if (platform->verbose() && platform->comm.mpiRank == 0) {
+    if (platform->verbose() && platform->comm.mpiRank() == 0) {
       std::cout << "calling UDF_ExecuteStep ...\n";
     }
 
@@ -1910,7 +1914,7 @@ dfloat nrs_t::computeCFL(mesh_t *mesh, const occa::memory &o_U, dfloat dt)
     cflMax = std::max(cflMax, scratchPtr[n]);
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, &cflMax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm);
+  MPI_Allreduce(MPI_IN_PLACE, &cflMax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
   return cflMax;
 }
 
@@ -1951,7 +1955,7 @@ void nrs_t::evaluateDivergence(const double time)
 
 void nrs_t::registerKernels(occa::properties kernelInfoBC)
 {
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "registerNrsKernels" << std::endl;
   }
 
@@ -2007,7 +2011,7 @@ void nrs_t::registerKernels(occa::properties kernelInfoBC)
       platform->options.getArgs("POLYNOMIAL DEGREE", N);
       const int Nq = N + 1;
       nekrsCheck(BLOCKSIZE < Nq * Nq,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "computeFaceCentroid kernel requires BLOCKSIZE >= Nq * Nq\nBLOCKSIZE = %d, Nq*Nq = %d\n",
                  BLOCKSIZE,
@@ -2043,7 +2047,7 @@ void nrs_t::registerKernels(occa::properties kernelInfoBC)
       platform->options.getArgs("POLYNOMIAL DEGREE", N);
       const int Nq = N + 1;
       nekrsCheck(BLOCKSIZE < Nq * Nq,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "CFL kernel requires BLOCKSIZE >= Nq * Nq\nBLOCKSIZE = %d, Nq*Nq = %d\n",
                  BLOCKSIZE,
@@ -2086,7 +2090,7 @@ void nrs_t::registerKernels(occa::properties kernelInfoBC)
     auto list = serializeString(platform->options.getArgs("USER ELLIPTIC FIELDS"), ' ');
     for (auto &&entry : list) {
       if (!platform->options.compareArgs(std::string("ELLIPTIC ") + upperCase(entry) + " SOLVER", "NONE")) {
-          ellipticFieldsToRegister.push_back("elliptic " + lowerCase(entry));
+        ellipticFieldsToRegister.push_back("elliptic " + lowerCase(entry));
       }
     }
 
@@ -2225,8 +2229,8 @@ void nrs_t::computeUrst()
                                                                  fieldOffset,
                                                                  mesh->ogs->o_invDegree,
                                                                  o_relUrst,
-                                                                 platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+                                                                 platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       printf("relUrst norm: %.15e\n", debugNorm);
     }
   }

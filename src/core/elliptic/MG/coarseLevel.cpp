@@ -66,7 +66,7 @@ void MGSolver_t::coarseLevel_t::updateMatrix(
     boomerAMG->setMatrix(nnz, Ai, Aj, Av.data());
     boomerAMG->setup();
   } else {
-    nekrsAbort(platform->comm.mpiComm,
+    nekrsAbort(platform->comm.mpiComm(),
                EXIT_FAILURE,
                "MULTIGRID COARSE SOLVER <%s> is not supported!\n",
                crsSolver.c_str());
@@ -192,7 +192,7 @@ void MGSolver_t::coarseLevel_t::setupSolver(
   } else {
     std::string amgSolver;
     options.getArgs("MULTIGRID COARSE SOLVER", amgSolver);
-    nekrsAbort(platform->comm.mpiComm,
+    nekrsAbort(platform->comm.mpiComm(),
                EXIT_FAILURE,
                "MULTIGRID COARSE SOLVER <%s> is not supported!\n",
                amgSolver.c_str());

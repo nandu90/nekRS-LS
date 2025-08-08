@@ -30,8 +30,8 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
 
   int nelgt, nelgv;
   const std::string meshFile = platform->options.getArgs("MESH FILE");
-  re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm);
-  const int NelemBenchmark = nelgv / platform->comm.mpiCommSize;
+  re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
+  const int NelemBenchmark = nelgv / platform->comm.mpiCommSize();
 
   occa::properties AxKernelInfo = kernelInfo;
   const auto Nq = N + 1;
@@ -73,7 +73,7 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
       kernelName += "Trilinear";
     }
     kernelName += "Hex3D" + kernelSuffix;
- 
+
     platform->kernelRequests.add(kernelNamePrefix + "Partial" + kernelName, axKernel);
   }
 }
@@ -193,8 +193,8 @@ void registerSchwarzKernels(const std::string &section, int N)
 
     int nelgt, nelgv;
     const std::string meshFile = platform->options.getArgs("MESH FILE");
-    re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm);
-    const int NelemBenchmark = nelgv / platform->comm.mpiCommSize;
+    re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
+    const int NelemBenchmark = nelgv / platform->comm.mpiCommSize();
 
     bool verbose = platform->verbose();
     const int verbosity = verbose ? 2 : 1;
@@ -233,7 +233,11 @@ void registerFineLevelKernels(const std::string &section, int N, int poissonEqua
 
 void registerSEMFEMKernels(const std::string &section, int N, int poissonEquation);
 
-void registerMultigridLevelKernels(const std::string &section, int Nf, int N, int poissonEquation, bool coarseLevel)
+void registerMultigridLevelKernels(const std::string &section,
+                                   int Nf,
+                                   int N,
+                                   int poissonEquation,
+                                   bool coarseLevel)
 {
   const std::string optionsPrefix = createOptionsPrefix(section);
 
@@ -283,11 +287,11 @@ void registerMultigridLevelKernels(const std::string &section, int Nf, int N, in
   }
 
   auto smoothedSEMFEM = platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "MULTIGRID+SEMFEM");
- 
+
   if (coarseLevel && !smoothedSEMFEM) {
     if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "SMOOTHER") ||
-                  platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "CG") ||   
-                  platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "GMRES")) {
+        platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "CG") ||
+        platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "GMRES")) {
       registerAxKernels(section, N, poissonEquation);
     }
     if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "SMOOTHER")) {
@@ -323,7 +327,7 @@ void registerMultiGridKernels(const std::string &section, int poissonEquation)
   if (platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "SEMFEM")) {
     const int coarseLevelN = levels.back();
     registerSEMFEMKernels(section, coarseLevelN, poissonEquation);
-  } 
+  }
 
   if (platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
     const std::string oklpath = getenv("NEKRS_KERNEL_DIR");
@@ -339,7 +343,8 @@ void registerSEMFEMKernels(const std::string &section, int N, int poissonEquatio
   const int Nq = N + 1;
   const int Np = Nq * Nq * Nq;
   const std::string optionsPrefix = createOptionsPrefix(section);
-  const int useFP32 = platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER PRECISION", "FP32");
+  const int useFP32 =
+      platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER PRECISION", "FP32");
   occa::properties SEMFEMKernelProps = platform->kernelInfo;
   if (useFP32) {
     SEMFEMKernelProps["defines/pfloat"] = "float";
@@ -373,8 +378,8 @@ void registerEllipticPreconditionerKernels(std::string section)
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
   const std::string optionsPrefix = createOptionsPrefix(section);
 
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
-    std::cout << "registerEllipticPreconditionerKernels for " << section << std::endl; 
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+    std::cout << "registerEllipticPreconditionerKernels for " << section << std::endl;
   }
 
   const int poisson = platform->options.compareArgs(optionsPrefix + "HELMHOLTZ TYPE", "POISSON");

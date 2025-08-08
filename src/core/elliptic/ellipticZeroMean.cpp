@@ -34,12 +34,12 @@ void ellipticZeroMean(elliptic_t *elliptic, occa::memory &o_q)
   const auto Nglobal = mesh->NelementsGlobal * mesh->Np;
 
   if (elliptic->Nfields > 1) {
-    nekrsAbort(platform->comm.mpiComm,
+    nekrsAbort(platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "NULL space handling for Block solver current not supported!");
   } else {
-    auto qmeanGlobal = platform->linAlg->sum(mesh->Nlocal, o_q, platform->comm.mpiComm);
+    auto qmeanGlobal = platform->linAlg->sum(mesh->Nlocal, o_q, platform->comm.mpiComm());
     platform->linAlg->add(mesh->Nlocal, -qmeanGlobal / Nglobal, o_q);
   }
 }

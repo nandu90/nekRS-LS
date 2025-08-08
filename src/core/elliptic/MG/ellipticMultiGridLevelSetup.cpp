@@ -44,7 +44,7 @@ ChebyshevSmootherType convertSmootherType(SmootherType s)
   case SmootherType::JACOBI:
     return ChebyshevSmootherType::JACOBI;
   default:
-    nekrsAbort(platform->comm.mpiComm,
+    nekrsAbort(platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "Invalid configuration hit in convertSmootherType!");
@@ -148,7 +148,7 @@ void pMGLevel::setupSmoother(elliptic_t *ellipticBase)
     o_invDiagA = platform->device.malloc<pfloat>(mesh->Nlocal);
     ellipticUpdateJacobi(elliptic, o_invDiagA); // required to compute eigenvalues
   } else {
-    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "No supported pMGLevel smoother found!");
+    nekrsAbort(platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "No supported pMGLevel smoother found!");
   }
 
   if (options.compareArgs("MULTIGRID SMOOTHER", "CHEBYSHEV")) {
@@ -210,23 +210,23 @@ void pMGLevel::Report()
     }
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     if (isCoarse) {
       std::string spaces = "";
-      if (options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER") || 
+      if (options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER") ||
           options.compareArgs("PRECONDITIONER", "SEMFEM")) {
         printf("|    pMG     |   Matrix-free   | %s\n", smootherString.c_str());
         printf("     |            |     p = %2d      |\n", degree);
-        spaces = "     "; 
+        spaces = "     ";
       }
- 
+
       if (options.compareArgs("PRECONDITIONER", "SEMFEM") ||
           options.compareArgs("MULTIGRID COARSE GRID DISCRETIZATION", "SMEFEM")) {
         printf("%s|    AMG     |   SEMFEM Matrix | \n", spaces.c_str());
       } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
         printf("%s|    AMG     |   FEM Matrix    | \n", spaces.c_str());
       } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "CG")) {
-         printf("|    pMG     |   Matrix-free   | %s\n", "Krylov");
+        printf("|    pMG     |   Matrix-free   | %s\n", "Krylov");
         printf("     |            |     p = %2d      |\n", degree);
       }
     } else {
@@ -276,12 +276,12 @@ static void eigenValue(const int Nrows, double *A, double *WR, double *WI)
   for (int i = 0; i < Nrows * Nrows; i++) {
     invalid |= std::isnan(A[i]) || std::isinf(A[i]);
   }
-  nekrsCheck(invalid, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "invalid matrix entries!");
+  nekrsCheck(invalid, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "invalid matrix entries!");
 
   int INFO = -999;
   dgeev_(&JOBVL, &JOBVR, &N, A, &LDA, WR, WI, VL, &LDA, VR, &LDA, WORK, &LWORK, &INFO);
 
-  nekrsCheck(INFO != 0, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "dgeev failed");
+  nekrsCheck(INFO != 0, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "dgeev failed");
 
   delete[] VL;
   delete[] VR;
@@ -290,9 +290,9 @@ static void eigenValue(const int Nrows, double *A, double *WR, double *WI)
 
 dfloat pMGLevel::maxEigSmoothAx()
 {
-  MPI_Barrier(platform->comm.mpiComm);
+  MPI_Barrier(platform->comm.mpiComm());
   const double tStart = MPI_Wtime();
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("estimating maxEigenvalue ... ");
   }
   fflush(stdout);
@@ -301,7 +301,7 @@ dfloat pMGLevel::maxEigSmoothAx()
 
   hlong Nlocal = (hlong)Nrows;
   hlong Nglobal = 0;
-  MPI_Allreduce(&Nlocal, &Nglobal, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm);
+  MPI_Allreduce(&Nlocal, &Nglobal, 1, MPI_HLONG, MPI_SUM, platform->comm.mpiComm());
 
   auto o_invDegree = platform->deviceMemoryPool.reserve<dfloat>(Nlocal);
   o_invDegree.copyFrom(elliptic->ogs->invDegree);
@@ -344,7 +344,7 @@ dfloat pMGLevel::maxEigSmoothAx()
                                                            o_invDegree,
                                                            o_Vx,
                                                            o_Vx,
-                                                           platform->comm.mpiComm);
+                                                           platform->comm.mpiComm());
   nekrsCheck(norm_v0 <= 0, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "invalid v0 norm!");
   norm_v0 = sqrt(norm_v0);
 
@@ -371,7 +371,7 @@ dfloat pMGLevel::maxEigSmoothAx()
                                                                o_invDegree,
                                                                o_V[i],
                                                                o_V[j + 1],
-                                                               platform->comm.mpiComm);
+                                                               platform->comm.mpiComm());
 
       // v[j+1] = v[j+1] - hij*v[i]
       platform->linAlg
@@ -388,7 +388,7 @@ dfloat pMGLevel::maxEigSmoothAx()
                                                              o_invDegree,
                                                              o_V[j + 1],
                                                              o_V[j + 1],
-                                                             platform->comm.mpiComm);
+                                                             platform->comm.mpiComm());
 
       nekrsCheck(norm_vj <= 0, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "invalid vj norm!");
       norm_vj = sqrt(norm_vj);
@@ -413,8 +413,8 @@ dfloat pMGLevel::maxEigSmoothAx()
     }
   }
 
-  MPI_Barrier(platform->comm.mpiComm);
-  if (platform->comm.mpiRank == 0) {
+  MPI_Barrier(platform->comm.mpiComm());
+  if (platform->comm.mpiRank() == 0) {
     printf("value=%g done (%gs)\n", rho, MPI_Wtime() - tStart);
   }
   fflush(stdout);

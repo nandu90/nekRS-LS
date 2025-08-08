@@ -12,16 +12,17 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
   const int useFP32 = elliptic->options.compareArgs("MULTIGRID COARSE SOLVER PRECISION", "FP32");
   const bool useDevice = elliptic->options.compareArgs("MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
 
-  MPI_Barrier(platform->comm.mpiComm);
+  MPI_Barrier(platform->comm.mpiComm());
   double tStart = MPI_Wtime();
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("setup SEMFEM solver (lambdaAvg=%g) ... \n", lambda0);
   }
   fflush(stdout);
 
-  nekrsCheck(!elliptic->poisson, 
-             platform->comm.mpiComm, 
-             EXIT_FAILURE, "%s\n", 
+  nekrsCheck(!elliptic->poisson,
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "%s\n",
              "SEMFEM only supported for type Poisson!");
 
   const auto mask = [&]() {
@@ -67,7 +68,8 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
     settings[12] = 0.3; /* chebyRelaxFraction */
 
     // ensure smoother is compatible to smoother on pMG Levels
-    if (elliptic->options.compareArgs("MULTIGRID COARSE GRID DISCRETIZATION", "SEMFEM") && elliptic->mesh->N == 1) {
+    if (elliptic->options.compareArgs("MULTIGRID COARSE GRID DISCRETIZATION", "SEMFEM") &&
+        elliptic->mesh->N == 1) {
       settings[6] = 16; // Cheby
       settings[4] = settings[6];
     }
@@ -93,7 +95,7 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
                                                       matrix.Aj.data(),
                                                       matrix.Av.data(),
                                                       (int)elliptic->nullspace,
-                                                      platform->comm.mpiComm,
+                                                      platform->comm.mpiComm(),
                                                       platform->device.occaDevice(),
                                                       useFP32,
                                                       settings,
@@ -105,7 +107,7 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
                                                 matrix.Aj.data(),
                                                 matrix.Av.data(),
                                                 (int)elliptic->nullspace,
-                                                platform->comm.mpiComm,
+                                                platform->comm.mpiComm(),
                                                 1, /* Nthreads */
                                                 useFP32,
                                                 settings,
@@ -113,7 +115,7 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
     }
   } else if (elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "AMGX")) {
     nekrsCheck(platform->device.mode() != "CUDA",
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "AmgX only supports CUDA!");
@@ -130,7 +132,7 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
                       matrix.Aj.data(),
                       matrix.Av.data(),
                       (int)elliptic->nullspace,
-                      platform->comm.mpiComm,
+                      platform->comm.mpiComm(),
                       platform->device.id(),
                       useFP32,
                       std::stoi(getenv("NEKRS_GPU_MPI")),
@@ -138,13 +140,13 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
   } else {
     std::string amgSolver;
     elliptic->options.getArgs("MULTIGRID COARSE SOLVER", amgSolver);
-    nekrsAbort(platform->comm.mpiComm,
+    nekrsAbort(platform->comm.mpiComm(),
                EXIT_FAILURE,
                "MULTIGRID COARSE SOLVER %s is not supported!\n",
                amgSolver.c_str());
   }
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("done (%gs)\n", MPI_Wtime() - tStart);
   }
   fflush(stdout);
@@ -209,7 +211,7 @@ void SEMFEMSolver_t::run(const occa::memory &o_r, occa::memory &o_z)
 
   } else {
 
-    nekrsAbort(platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Unknown solver!");
+    nekrsAbort(platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "Unknown solver!");
   }
 
   static occa::kernel scatterKernel;

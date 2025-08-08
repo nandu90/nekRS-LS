@@ -42,10 +42,10 @@ void kernelRequestManager_t::add(kernelRequest_t request, bool checkUnique)
   // (source file + properties) multiple times.
   if (checkUnique) {
     int unique = (inserted) ? 1 : 0;
-    MPI_Allreduce(MPI_IN_PLACE, &unique, 1, MPI_INT, MPI_MIN, platformRef.comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &unique, 1, MPI_INT, MPI_MIN, platformRef.comm.mpiComm());
 
     nekrsCheck(!unique,
-               platformRef.comm.mpiComm,
+               platformRef.comm.mpiComm(),
                EXIT_FAILURE,
                "request already exists:\n%s",
                request.to_string().c_str());
@@ -60,7 +60,7 @@ void kernelRequestManager_t::add(kernelRequest_t request, bool checkUnique)
                MPI_COMM_SELF,
                EXIT_FAILURE,
                "request exists already but with a different hash %s\n%s",
-               exisitingProps.hash().getFullString().c_str(), 
+               exisitingProps.hash().getFullString().c_str(),
                request.to_string().c_str());
 
     auto exisitingFileName = (requestMap.find(request.requestName)->second).fileName;
@@ -158,17 +158,17 @@ void kernelRequestManager_t::compile()
 
   constexpr int maxCompilingRanks{
       32}; // large enough to speed things up, small enough to control pressure on filesystem
-  const int rank = platform->cacheLocal ? platformRef.comm.localRank : platformRef.comm.mpiRank;
+  const int rank = platform->cacheLocal ? platformRef.comm.mpiRankLocal() : platformRef.comm.mpiRank();
   const int ranksCompiling =
       std::min(maxCompilingRanks,
-               platform->cacheLocal ? platformRef.comm.mpiCommLocalSize : platformRef.comm.mpiCommSize);
+               platform->cacheLocal ? platformRef.comm.mpiCommLocalSize() : platformRef.comm.mpiCommSize());
 
   auto Nthreads = 1;
   if (getenv("NEKRS_JITC_NTHREADS")) {
     Nthreads = std::stoi(getenv("NEKRS_JITC_NTHREADS"));
   }
 
-  if (platformRef.comm.mpiRank == 0 && (platform->verbose() || platform->buildOnly)) {
+  if (platformRef.comm.mpiRank() == 0 && (platform->verbose() || platform->buildOnly)) {
     std::cout << "requests.size(): " << requests.size() << std::endl;
     std::cout << "Nthreads: " << Nthreads << std::endl;
   }
@@ -190,15 +190,15 @@ void kernelRequestManager_t::compile()
   constexpr int hashLength = 16 + 1; // null-terminated
   auto hashes = (char *)std::calloc(requests.size() * hashLength, sizeof(char));
 
-  auto compile = [&](const kernelRequest_t& req)
-  {
+  auto compile = [&](const kernelRequest_t &req) {
     const auto reqId = std::distance(requests.begin(), requests.find(req));
     if (reqId % ranksCompiling != rank) {
       return;
     }
     try {
       if (platform->verbose() || platform->buildOnly) {
-        std::cout << "Compiling request <" << req.requestName << ">" << " on rank " << rank << " " << std::flush;
+        std::cout << "Compiling request <" << req.requestName << ">" << " on rank " << rank << " "
+                  << std::flush;
       }
 
       auto knl = device.compileKernel(req.fileName, req.props, req.suffix, MPI_COMM_SELF);
@@ -217,7 +217,7 @@ void kernelRequestManager_t::compile()
     }
   };
 
-  ThreadPool* pool = (Nthreads > 1) ? new ThreadPool(Nthreads) : nullptr;
+  ThreadPool *pool = (Nthreads > 1) ? new ThreadPool(Nthreads) : nullptr;
 
   if (rank < ranksCompiling) {
     for (auto &&req : requests) {
@@ -230,14 +230,16 @@ void kernelRequestManager_t::compile()
   }
 
   // finish compilation
-  if (pool) pool->finish();
-  MPI_Barrier(platform->comm.mpiComm);
+  if (pool) {
+    pool->finish();
+  }
+  MPI_Barrier(platform->comm.mpiComm());
 
   // a-posteriori check for duplicated hash causing a potential race condition
   // no parallel version available yet
-  if (platform->comm.mpiCommSize == 1) {
+  if (platform->comm.mpiCommSize() == 1) {
     const auto duplicateHashFound = [&]() {
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         std::unordered_set<std::string> encounteredHashes;
         for (const auto &req : requests) {
           const auto reqId = distance(requests.begin(), requests.find(req));
@@ -254,7 +256,7 @@ void kernelRequestManager_t::compile()
       return false;
     }();
     nekrsCheck(duplicateHashFound,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "More than one compile request is using the same hash!");
@@ -268,7 +270,7 @@ void kernelRequestManager_t::compile()
   if (platform->cacheBcast && !platform->buildOnly) {
     const auto srcPath = fs::path(getenv("OCCA_CACHE_DIR"));
     const std::string cacheDir = platform->tmpDir / fs::path("occa/");
-    fileBcast(srcPath, fs::path(cacheDir) / "..", platform->comm.mpiComm, platform->verbose());
+    fileBcast(srcPath, fs::path(cacheDir) / "..", platform->comm.mpiComm(), platform->verbose());
 
     // redirect
     occa::env::OCCA_CACHE_DIR = cacheDir;

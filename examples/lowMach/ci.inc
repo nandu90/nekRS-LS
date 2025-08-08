@@ -56,7 +56,7 @@ dfloat computeLInfError(nrs_t *nrs, occa::memory o_a, occa::memory o_b)
   for (int fld = 0; fld < mesh->dim; ++fld) {
     auto o_fld_slice = o_tmp + fld * nrs->fieldOffset;
     platform->linAlg->abs(mesh->Nlocal, o_fld_slice);
-    LInfError = std::max(LInfError, platform->linAlg->max(mesh->Nlocal, o_fld_slice, platform->comm.mpiComm));
+    LInfError = std::max(LInfError, platform->linAlg->max(mesh->Nlocal, o_fld_slice, platform->comm.mpiComm()));
   }
 
   o_tmp.free();
@@ -149,7 +149,7 @@ void testFusedPlanarAvg(nrs_t *nrs, std::string dir)
 
   const auto tol = 50. * std::numeric_limits<dfloat>::epsilon();
 
-  auto LInfError = platform->linAlg->maxRelativeError(mesh->Nlocal, mesh->dim, mesh->fieldOffset, tol, o_fields, o_refFields, platform->comm.mpiComm);
+  auto LInfError = platform->linAlg->maxRelativeError(mesh->Nlocal, mesh->dim, mesh->fieldOffset, tol, o_fields, o_refFields, platform->comm.mpiComm());
   CiEvalTest("planarAvg_ordering" + dir + " relLinf = " + to_string_f(LInfError), LInfError < tol);
 
   // (2) xz == x, z, e.g.
@@ -164,7 +164,7 @@ void testFusedPlanarAvg(nrs_t *nrs, std::string dir)
   planarAvg(mesh, firstDir, NELGX, NELGY, NELGZ, mesh->dim, mesh->fieldOffset, o_refFields);
   planarAvg(mesh, secondDir, NELGX, NELGY, NELGZ, mesh->dim, mesh->fieldOffset, o_refFields);
 
-  LInfError = platform->linAlg->maxRelativeError(mesh->Nlocal, mesh->dim, mesh->fieldOffset, tol, o_fields, o_refFields, platform->comm.mpiComm);
+  LInfError = platform->linAlg->maxRelativeError(mesh->Nlocal, mesh->dim, mesh->fieldOffset, tol, o_fields, o_refFields, platform->comm.mpiComm());
   CiEvalTest("planarAvgFused2_" + dir + " relLinf = " + to_string_f(LInfError), LInfError < tol);
 
   // (3) xz, zx both work
@@ -179,14 +179,14 @@ void testFusedPlanarAvg(nrs_t *nrs, std::string dir)
   planarAvg(mesh, firstDir, NELGX, NELGY, NELGZ, mesh->dim, mesh->fieldOffset, o_refFields);
   planarAvg(mesh, secondDir, NELGX, NELGY, NELGZ, mesh->dim, mesh->fieldOffset, o_refFields);
 
-  LInfError = platform->linAlg->maxRelativeError(mesh->Nlocal, mesh->dim, mesh->fieldOffset, tol, o_fields, o_refFields, platform->comm.mpiComm);
+  LInfError = platform->linAlg->maxRelativeError(mesh->Nlocal, mesh->dim, mesh->fieldOffset, tol, o_fields, o_refFields, platform->comm.mpiComm());
   CiEvalTest("planarAvgFused3_" + dir + " relLinf = " + to_string_f(LInfError), LInfError < tol);
 }
 
 void ciTestPlanarAvg(nrs_t *nrs)
 {
   const auto mesh = nrs->meshV;
-  const int rank = platform->comm.mpiRank;
+  const int rank = platform->comm.mpiRank();
 
   platform->par->extract("casedata", "number_elements_x", NELGX);
   platform->par->extract("casedata", "number_elements_y", NELGY);
@@ -218,7 +218,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
 
   numCVODERHS /= tstep;
 
-  const int rank = platform->comm.mpiRank;
+  const int rank = platform->comm.mpiRank();
 
   nrs->copyToNek(time, tstep);
   nek::userchk();

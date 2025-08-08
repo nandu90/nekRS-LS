@@ -37,10 +37,10 @@ public:
     return singleton;
   }
 
-  bool multiSession() 
+  bool multiSession()
   {
     int result = 0;
-    MPI_Comm_compare(comm.mpiCommParent, comm.mpiComm, &result);
+    MPI_Comm_compare(comm.mpiCommParent(), comm.mpiComm(), &result);
     return (result != 0) ? true : false;
   }
 
@@ -80,7 +80,7 @@ public:
   bool verbose() const
   {
     return options.compareArgs("VERBOSE", "TRUE");
-  } 
+  }
 };
 #endif
 

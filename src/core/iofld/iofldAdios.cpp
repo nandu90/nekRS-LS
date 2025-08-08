@@ -18,9 +18,9 @@ void iofldAdios::validateUserFields(const std::string &name) {}
 void iofldAdios::openEngine()
 {
   if (fs::exists(configFile)) {
-    adios = new adios2::ADIOS(configFile, platform->comm.mpiComm);
+    adios = new adios2::ADIOS(configFile, platform->comm.mpiComm());
   } else {
-    adios = new adios2::ADIOS(platform->comm.mpiComm);
+    adios = new adios2::ADIOS(platform->comm.mpiComm());
   }
 
   streamName = "default";
@@ -34,12 +34,16 @@ void iofldAdios::openEngine()
   if (engineMode == iofld::mode::write) {
     const std::string extension = ".bp";
 
-    auto endsWithBp = [&](const std::string& filename) {
-      if (filename.length() < extension.length()) return false;
+    auto endsWithBp = [&](const std::string &filename) {
+      if (filename.length() < extension.length()) {
+        return false;
+      }
       return filename.compare(filename.length() - extension.length(), extension.length(), extension) == 0;
     };
 
-    if (!endsWithBp(fileNameBase)) fileNameBase += extension;
+    if (!endsWithBp(fileNameBase)) {
+      fileNameBase += extension;
+    }
     adiosIO.DefineAttribute<uint32_t>("dimension", static_cast<uint32_t>(mesh_vis->dim));
     if (getStepCounter() < 1) {
       adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::Write);
@@ -47,7 +51,7 @@ void iofldAdios::openEngine()
       adiosEngine = adiosIO.Open(fileNameBase, adios2::Mode::Append);
     }
   } else {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << "reading checkpoint ..." << std::endl;
       std::cout << " fileName: " << fileNameBase << std::endl << std::flush;
     }
@@ -56,12 +60,12 @@ void iofldAdios::openEngine()
       step = adiosEngine.Steps() - 1; // last
     }
     nekrsCheck(step + 1 > adiosEngine.Steps(),
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "step number %d has to be smaller than %zu!\n",
                step,
                adiosEngine.Steps());
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << " requested step: " << step;
       if (step + 1 == adiosEngine.Steps()) {
         std::cout << " (last) ";
@@ -205,7 +209,7 @@ size_t iofldAdios::write()
 
 template <typename OutputType> size_t iofldAdios::write_()
 {
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << " fileName: " << fileNameBase << std::endl << std::flush;
   }
 
@@ -352,7 +356,7 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
                   work.size(),
                   MPI_INT,
                   MPI_MAX,
-                  platform->comm.mpiComm); // ensure win is large enough on all ranks
+                  platform->comm.mpiComm()); // ensure win is large enough on all ranks
     return std::make_pair(work[0], work[1]);
   }();
 
@@ -375,7 +379,7 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
   MPI_Type_size(mpiType, &typeSize);
 
   MPI_Win win;
-  MPI_Win_create(o_win.ptr(), o_win.byte_size(), typeSize, MPI_INFO_NULL, platform->comm.mpiComm, &win);
+  MPI_Win_create(o_win.ptr(), o_win.byte_size(), typeSize, MPI_INFO_NULL, platform->comm.mpiComm(), &win);
 
   MPI_Win_lock_all(MPI_MODE_NOCHECK, win);
   if (o_inEntrySize) {
@@ -524,7 +528,7 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
       mesh_vis->o_y.copyFrom(o_work.at(1));
       mesh_vis->o_z.copyFrom(o_work.at(2));
 
-      interp = std::make_unique<pointInterpolation_t>(mesh_vis, platform->comm.mpiComm);
+      interp = std::make_unique<pointInterpolation_t>(mesh_vis, platform->comm.mpiComm());
       interp->setPoints(mesh->o_x, mesh->o_y, mesh->o_z);
       const auto verbosity = pointInterpolation_t::VerbosityLevel::Detailed;
       interp->find(verbosity);
@@ -536,7 +540,7 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
         const int pointBlockSize = alignStride<dlong>(128 * mesh->Np);
 
         int nPointsBlocks = (interp->numPoints() + pointBlockSize - 1) / pointBlockSize;
-        MPI_Allreduce(MPI_IN_PLACE, &nPointsBlocks, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+        MPI_Allreduce(MPI_IN_PLACE, &nPointsBlocks, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
 
         for (int block = 0; block < nPointsBlocks; block++) {
           const auto nPoints = std::max(std::min(interp->numPoints() - pointOffset, pointBlockSize), 0);
@@ -573,10 +577,10 @@ template <typename Tadios> void iofldAdios::getData(const std::string &name, var
 #define HANDLE_TYPE(TYPE, MPI_TYPE)                                                                          \
   if (std::holds_alternative<std::reference_wrapper<TYPE>>(variant)) {                                       \
     auto &value = std::get<std::reference_wrapper<TYPE>>(variant).get();                                     \
-    if (platform->comm.mpiRank == 0) {                                                                       \
+    if (platform->comm.mpiRank() == 0) {                                                                     \
       value = *(variables[name].data.ptr<Tadios>());                                                         \
     }                                                                                                        \
-    MPI_Bcast(&value, 1, MPI_TYPE, 0, platform->comm.mpiComm);                                               \
+    MPI_Bcast(&value, 1, MPI_TYPE, 0, platform->comm.mpiComm());                                             \
   }
 
   HANDLE_TYPE(int, MPI_INT)
@@ -613,7 +617,7 @@ template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::str
           offset += var.blocks.at(b).second;
         }
       } else {
-        if (platform->comm.mpiRank == 0) {
+        if (platform->comm.mpiRank() == 0) {
           adiosEngine.Get(name, varDataPtr, getMode);
         }
       }
@@ -630,8 +634,8 @@ template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::str
 
   var.blocks = std::vector<std::pair<size_t, size_t>>();
   for (auto &block : blocks) {
-    if ((block.BlockID % static_cast<size_t>(platform->comm.mpiCommSize)) ==
-        static_cast<size_t>(platform->comm.mpiRank)) {
+    if ((block.BlockID % static_cast<size_t>(platform->comm.mpiCommSize())) ==
+        static_cast<size_t>(platform->comm.mpiRank())) {
       size_t NlocalBlock = 0;
       if (block.Count.size() == 0) { // scalar
         var.dim = 0;
@@ -663,7 +667,7 @@ template <class T> int iofldAdios::getVariable(bool allocateOnly, const std::str
   }
 
   if (platform->verbose() && var.blocks.size()) {
-    std::cout << " " << name << " on rank " << platform->comm.mpiRank << " is of type " << var.type;
+    std::cout << " " << name << " on rank " << platform->comm.mpiRank() << " is of type " << var.type;
 
     if (var.dim) {
       std::cout << " has " << var.blocks.size() << " out of " << blocks.size() << " blocks in step "
@@ -696,7 +700,7 @@ size_t iofldAdios::read()
     auto exists =
         std::find(_availableVariables.begin(), _availableVariables.end(), name) != _availableVariables.end();
     nekrsCheck(!exists && abort,
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "requested variable %s not found in file!\n",
                name.c_str());
@@ -736,12 +740,12 @@ size_t iofldAdios::read()
 #undef HANDLE_TYPE
 
       nekrsCheck(err,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "requested variable %s not found in file!\n",
                  name.c_str());
       nekrsCheck(!typeFound,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "ADIOS variable %s has unsupported type %s!\n",
                  name.c_str(),
@@ -750,14 +754,14 @@ size_t iofldAdios::read()
   }
 
   adiosEngine.PerformGets();
-  MPI_Barrier(platform->comm.mpiComm);
+  MPI_Barrier(platform->comm.mpiComm());
 
   for (auto &entry : userSingleValues) {
     const auto &name = entry.first;
     auto &variant = entry.second;
 
     nekrsCheck(!isAvailable(name),
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "requested variable %s not found in file!\n",
                name.c_str());

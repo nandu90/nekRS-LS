@@ -211,14 +211,14 @@ void writeProfiles(double time, int tstep)
 
   static pointInterpolation_t *interpolator = nullptr;
   if (!interpolator) {
-    const auto np = (platform->comm.mpiRank == 0) ? NUMBER_ELEMENTS_Y * mesh->N : 0;
+    const auto np = (platform->comm.mpiRank() == 0) ? NUMBER_ELEMENTS_Y * mesh->N : 0;
 
     xp.resize(np);
     yp.resize(np);
     zp.resize(np);
 
-    const auto yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
-    const auto yMax = platform->linAlg->max(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm);
+    const auto yMin = platform->linAlg->min(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm());
+    const auto yMax = platform->linAlg->max(mesh->Nlocal, mesh->o_y, platform->comm.mpiComm());
 
     if (np) {
       const auto x0 = 0.0;
@@ -231,11 +231,11 @@ void writeProfiles(double time, int tstep)
       }
     }
 
-    interpolator = new pointInterpolation_t(mesh, platform->comm.mpiComm);
+    interpolator = new pointInterpolation_t(mesh, platform->comm.mpiComm());
     interpolator->setPoints(xp, yp, zp);
     interpolator->find(pointInterpolation_t::VerbosityLevel::Detailed);
 
-    if (platform->comm.mpiRank == 0) { 
+    if (platform->comm.mpiRank() == 0) { 
       std::ofstream f(fname, std::ios::app);
       f << R"(#  time  y  <u>  <w>  <T>  <dudy>  <dwdy>  <dTdy>  <u'T'>  <w'T'>  <w'w'T'>)" << std::endl;
       f.close();
@@ -250,7 +250,7 @@ void writeProfiles(double time, int tstep)
                      yp.size(), 
                      o_fields1D);
 
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::vector<dfloat> fields1D(o_fields1D.size());
     o_fields1D.copyTo(fields1D);
 
@@ -351,7 +351,7 @@ void UDF_Setup()
   platform->options.getArgs("MAX DT", maxDt0);
   if (maxDt0 > 0) {
     const double maxDt = 0.25 * maxDt0;
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("\n"
              "reseting MAX DT = %g\n",
              maxDt);
@@ -378,9 +378,9 @@ void UDF_Setup()
   }
 
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
-    platform->linAlg->rescale(0.0, XLEN, mesh->o_x, platform->comm.mpiComm);
-    platform->linAlg->rescale(0.0, YLEN, mesh->o_y, platform->comm.mpiComm);
-    platform->linAlg->rescale(0.0, ZLEN, mesh->o_z, platform->comm.mpiComm);
+    platform->linAlg->rescale(0.0, XLEN, mesh->o_x, platform->comm.mpiComm());
+    platform->linAlg->rescale(0.0, YLEN, mesh->o_y, platform->comm.mpiComm());
+    platform->linAlg->rescale(0.0, ZLEN, mesh->o_z, platform->comm.mpiComm());
 
     auto [x, y, z] = mesh->xyzHost();
     std::vector<dfloat> U(mesh->dim * nrs->fieldOffset, 0.0);
@@ -415,7 +415,7 @@ void UDF_ExecuteStep(double time, int tstep)
   {
     static auto firstTime = true;
     if (maxDt0 > 0 && time > 100 && firstTime) {
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         printf("restore original MAX DT = %g\n", maxDt0);
       }
       platform->options.setArgs("MAX DT", to_string_f(maxDt0));
@@ -518,7 +518,7 @@ void UDF_ExecuteStep(double time, int tstep)
   o_avg.clear();
 
   if (nrs->checkpointStep) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("uAvgWall: %g  wAvgWall: %g  magUWall: %g  tempAvgWall: %g\n"
              "uTau: %g  thetaTau: %g  rLength: %g\n",
              avgUWallValues[0],

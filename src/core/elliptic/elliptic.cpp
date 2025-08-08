@@ -8,26 +8,18 @@
 static std::vector<int> generateEllipticEToB(const std::string &name, mesh_t *mesh)
 {
   std::vector<int> EToB;
-  std::cout << "generateEllipticEToB" << std::endl; 
+  std::cout << "generateEllipticEToB" << std::endl;
 
   if (platform->options.compareArgs(upperCase(name) + " SOLVER", "BLOCK")) {
-    auto EToBx = mesh->createEToB([&](int bID) {
-      return platform->app->bc->typeElliptic(bID, name, "x");
-    });
-    auto EToBy = mesh->createEToB([&](int bID) {
-      return platform->app->bc->typeElliptic(bID, name, "y");
-    });
-    auto EToBz = mesh->createEToB([&](int bID) {
-      return platform->app->bc->typeElliptic(bID, name, "z");
-    });
+    auto EToBx = mesh->createEToB([&](int bID) { return platform->app->bc->typeElliptic(bID, name, "x"); });
+    auto EToBy = mesh->createEToB([&](int bID) { return platform->app->bc->typeElliptic(bID, name, "y"); });
+    auto EToBz = mesh->createEToB([&](int bID) { return platform->app->bc->typeElliptic(bID, name, "z"); });
 
     EToB.insert(EToB.end(), EToBx.begin(), EToBx.end());
     EToB.insert(EToB.end(), EToBy.begin(), EToBy.end());
     EToB.insert(EToB.end(), EToBz.begin(), EToBz.end());
   } else {
-    auto EToBx = mesh->createEToB([&](int bID) {
-      return platform->app->bc->typeElliptic(bID, name);
-    });
+    auto EToBx = mesh->createEToB([&](int bID) { return platform->app->bc->typeElliptic(bID, name); });
     EToB.insert(EToB.end(), EToBx.begin(), EToBx.end());
   }
 
@@ -71,9 +63,9 @@ elliptic::~elliptic()
 
 void elliptic::updatePreconditioner()
 {
-  MPI_Barrier(platform->comm.mpiComm);
+  MPI_Barrier(platform->comm.mpiComm());
   auto tStart = MPI_Wtime();
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     printf("updating preconditioner for %s ... \n", solver->name.c_str());
   }
   auto precon = solver->precon;
@@ -106,8 +98,8 @@ void elliptic::updatePreconditioner()
     }
   }
 
-  MPI_Barrier(platform->comm.mpiComm);
-  if (platform->comm.mpiRank == 0) {
+  MPI_Barrier(platform->comm.mpiComm());
+  if (platform->comm.mpiRank() == 0) {
     printf("done (%gs)\n", MPI_Wtime() - tStart);
   }
   fflush(stdout);
@@ -245,8 +237,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   auto &precon = elliptic->precon;
   auto &mesh = elliptic->mesh;
 
-  const auto maxIter = [&]()
-  {
+  const auto maxIter = [&]() {
     auto val = 500;
 
     std::regex pattern("maxiter=([0-9]+)");
@@ -271,8 +262,8 @@ void elliptic::_solve(const occa::memory &o_lambda0,
                                                             elliptic->fieldOffset,
                                                             elliptic->o_invDegree,
                                                             o_u,
-                                                            platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+                                                            platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       printf("%s %s norm: %.15e\n", elliptic->name.c_str(), txt.c_str(), norm);
     }
     nekrsCheck(std::isnan(norm),
@@ -340,7 +331,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
                                                elliptic->fieldOffset,
                                                elliptic->o_invDegree,
                                                o_r,
-                                               platform->comm.mpiComm);
+                                               platform->comm.mpiComm());
   };
 
   if (options.compareArgs("INITIAL GUESS", "PROJECTION") ||
@@ -386,7 +377,8 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     elliptic->resNorm = elliptic->res0Norm;
     platform->linAlg->fill(o_x.size(), 0.0, o_x);
 
-    elliptic->Niter = elliptic->KSP->solve(tol * std::sqrt(mesh->volume), maxIter, elliptic->resNorm, o_r, o_x);
+    elliptic->Niter =
+        elliptic->KSP->solve(tol * std::sqrt(mesh->volume), maxIter, elliptic->resNorm, o_r, o_x);
   }
 
   if (options.compareArgs("INITIAL GUESS", "PROJECTION") ||
@@ -417,28 +409,28 @@ void checkConfig(elliptic_t *elliptic)
   int err = 0;
 
   if (!options.compareArgs("DISCRETIZATION", "CONTINUOUS")) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("solver only supports CG\n");
     }
     err++;
   }
 
   if (elliptic->elementType != HEXAHEDRA) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("solver only supports HEX elements\n");
     }
     err++;
   }
 
   if (elliptic->userAx && !elliptic->userPreconditioner) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("userAx requires userPreconditioner!\n");
     }
     err++;
   }
 
   if (elliptic->Nfields > 1 && options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("Block solver does not support multigrid preconditioner\n");
     }
     err++;
@@ -446,35 +438,35 @@ void checkConfig(elliptic_t *elliptic)
 
   if (!elliptic->poisson && options.compareArgs("PRECONDITIONER", "MULTIGRID") &&
       !options.compareArgs("MULTIGRID SMOOTHER", "DAMPEDJACOBI")) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("Non-Poisson type equations require Jacobi multigrid smoother\n");
     }
     err++;
   }
 
   if (options.compareArgs("SOLVER", "PCG+COMBINED") && !options.compareArgs("PRECONDITIONER", "JACO")) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("combinedPCG requires Jacobi preconditioner!\n");
     }
     err++;
   }
 
   if (elliptic->mesh->ogs == NULL) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("mesh->ogs == NULL!");
     }
     err++;
   }
 
   if (elliptic->Nfields < 1 || elliptic->Nfields > 3) {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("Invalid Nfields = %d!", elliptic->Nfields);
     }
     err++;
   }
 
   nekrsCheck(elliptic->EToB == nullptr,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s",
              "elliptic->EToB not allocated!\n");
@@ -492,27 +484,27 @@ void checkConfig(elliptic_t *elliptic)
         }
       }
     }
-    MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
     if (found && !(elliptic->Nfields > 1)) {
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         printf("Unaligned BCs require block solver!\n");
       }
       err++;
     }
   }
 
-  nekrsCheck(err, platform->comm.mpiComm, EXIT_FAILURE, "%s", "\n");
+  nekrsCheck(err, platform->comm.mpiComm(), EXIT_FAILURE, "%s", "\n");
 }
 
 void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambda1)
 {
   auto &elliptic = solver;
 
-  MPI_Barrier(platform->comm.mpiComm);
+  MPI_Barrier(platform->comm.mpiComm());
   const double tStart = MPI_Wtime();
 
   nekrsCheck(elliptic->name.size() == 0,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "Empty elliptic solver name!");
@@ -523,14 +515,14 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   elliptic->lambda0Avg = platform->linAlg->innerProd(elliptic->mesh->Nlocal,
                                                      elliptic->mesh->o_LMM,
                                                      elliptic->o_lambda0,
-                                                     platform->comm.mpiComm) /
+                                                     platform->comm.mpiComm()) /
                          elliptic->mesh->volume;
 
   if (elliptic->o_lambda1.isInitialized()) {
     elliptic->lambda1Avg = platform->linAlg->innerProd(elliptic->mesh->Nlocal,
                                                        elliptic->mesh->o_LMM,
                                                        elliptic->o_lambda1,
-                                                       platform->comm.mpiComm) /
+                                                       platform->comm.mpiComm()) /
                            elliptic->mesh->volume;
   }
 
@@ -555,11 +547,12 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     }
   }
 
-  if (platform->device.mode() == "Serial" || elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
+  if (platform->device.mode() == "Serial" ||
+      elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
     elliptic->options.setArgs("MULTIGRID COARSE SOLVER LOCATION", "CPU");
   }
 
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << elliptic->options << std::endl;
   }
 
@@ -572,7 +565,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   if (elliptic->options.compareArgs("SOLVER", "BLOCK")) {
     elliptic->Nfields = elliptic->mesh->dim;
   }
-  if (platform->comm.mpiRank == 0) {
+  if (platform->comm.mpiRank() == 0) {
     std::cout << "Nfields: " << elliptic->Nfields << std::endl;
   }
 
@@ -605,9 +598,9 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
         }
       }
     }
-    MPI_Allreduce(MPI_IN_PLACE, &nullspace, 1, MPI_INT, MPI_MIN, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &nullspace, 1, MPI_INT, MPI_MIN, platform->comm.mpiComm());
     elliptic->nullspace = nullspace;
-    if (platform->comm.mpiRank == 0 && elliptic->nullspace) {
+    if (platform->comm.mpiRank() == 0 && elliptic->nullspace) {
       printf("non-trivial nullSpace detected\n");
     }
   }
@@ -631,7 +624,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
 
     if (!ogs) {
       nekrsCheck(elliptic->Nfields > 1,
-                 platform->comm.mpiComm,
+                 platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "%s\n",
                  "Creating a masked gs handle for nFields > 1 is currently not supported!");
@@ -645,7 +638,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
       }
       ogs = ogsSetup(mesh->Nlocal,
                      maskedGlobalIds.data(),
-                     platform->comm.mpiComm,
+                     platform->comm.mpiComm(),
                      1,
                      platform->device.occaDevice());
     }
@@ -703,7 +696,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
       ellipticOperator(elliptic, o_p, o_Ap, dfloatString);
 
       platform->device.finish();
-      MPI_Barrier(platform->comm.mpiComm);
+      MPI_Barrier(platform->comm.mpiComm());
       const double start = MPI_Wtime();
 
       for (int test = 0; test < Nsamples; ++test) {
@@ -712,7 +705,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
 
       platform->device.finish();
       double elapsed = (MPI_Wtime() - start) / Nsamples;
-      MPI_Allreduce(MPI_IN_PLACE, &elapsed, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm);
+      MPI_Allreduce(MPI_IN_PLACE, &elapsed, 1, MPI_DOUBLE, MPI_MAX, platform->comm.mpiComm());
 
       return elapsed;
     };
@@ -734,7 +727,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
       elliptic->oogsAx = elliptic->oogs;
     }
 
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("testing Ax overlap %.2es %.2es ", nonOverlappedTime, overlappedTime);
       if (elliptic->oogsAx != elliptic->oogs) {
         printf("(overlap enabled)");
@@ -771,15 +764,15 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   };
 
   {
-   elliptic->KSP = linearSolverFactory<dfloat>::create(options.getArgs("SOLVER"),
-      elliptic->name,
-      elliptic->mesh->Nlocal,
-      elliptic->Nfields,
-      elliptic->fieldOffset,
-      elliptic->o_invDegree,
-      Ax,
-      Pc);
- 
+    elliptic->KSP = linearSolverFactory<dfloat>::create(options.getArgs("SOLVER"),
+                                                        elliptic->name,
+                                                        elliptic->mesh->Nlocal,
+                                                        elliptic->Nfields,
+                                                        elliptic->fieldOffset,
+                                                        elliptic->o_invDegree,
+                                                        Ax,
+                                                        Pc);
+
     if (options.compareArgs("SOLVER", "COMBINED")) {
       elliptic->KSP->o_invDiagA = (elliptic->precon) ? elliptic->precon->o_invDiagA : o_NULL;
     }
@@ -806,8 +799,8 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   elliptic->o_lambda0 = nullptr;
   elliptic->o_lambda1 = nullptr;
 
-  MPI_Barrier(platform->comm.mpiComm);
-  if (platform->comm.mpiRank == 0) {
+  MPI_Barrier(platform->comm.mpiComm());
+  if (platform->comm.mpiRank() == 0) {
     printf("done (%gs)\n", MPI_Wtime() - tStart);
   }
   fflush(stdout);

@@ -8,7 +8,8 @@
 #include <tuple>
 #include <map>
 
-namespace {
+namespace
+{
 struct CallParameters {
   int Nelements;
   int Nq_e;
@@ -18,7 +19,8 @@ struct CallParameters {
 };
 } // namespace
 
-namespace std {
+namespace std
+{
 template <> struct less<CallParameters> {
   bool operator()(const CallParameters &lhs, const CallParameters &rhs) const
   {
@@ -30,7 +32,8 @@ template <> struct less<CallParameters> {
 };
 } // namespace std
 
-namespace {
+namespace
+{
 std::map<CallParameters, occa::kernel> cachedResults;
 }
 
@@ -61,18 +64,18 @@ occa::kernel benchmarkFDM(int Nelements,
   const auto Np_e = Nq_e * Nq_e * Nq_e;
 
   occa::properties props = platform->kernelInfo + meshKernelProperties(N); // regular, non-extended mesh
-  if (wordSize == 4)
+  if (wordSize == 4) {
     props["defines/pfloat"] = "float";
-  else
+  } else {
     props["defines/pfloat"] = "dfloat";
+  }
 
   props["defines/p_Nq_e"] = Nq_e;
   props["defines/p_Np_e"] = Np_e;
 
   if (useRAS) {
     props["defines/p_restrict"] = 1;
-  }
-  else {
+  } else {
     props["defines/p_restrict"] = 0;
   }
 
@@ -87,13 +90,12 @@ occa::kernel benchmarkFDM(int Nelements,
 
     std::vector<int> kernelVariants;
     if (platform->serial) {
-     kernelVariants = {0};
+      kernelVariants = {0};
     } else {
-      kernelVariants = {0,1,2,3,4,11};
+      kernelVariants = {0, 1, 2, 3, 4, 11};
     }
 
-    auto buildKernel = [&props, &fileName, &ext, &kernelName, &suffix](int ver)
-    {
+    auto buildKernel = [&props, &fileName, &ext, &kernelName, &suffix](int ver) {
       auto newProps = props;
       newProps["defines/p_knl"] = ver;
       const auto verSuffix = "_v" + std::to_string(ver);
@@ -137,28 +139,30 @@ occa::kernel benchmarkFDM(int Nelements,
     auto o_invDegree = platform->device.malloc(invDegree.size() * wordSize, invDegree.data());
 
     auto resetFields = [&]() {
-      o_u.copyFrom(u.data()); // kernel reads and writes o_u 
+      o_u.copyFrom(u.data()); // kernel reads and writes o_u
     };
 
     auto kernelRunner = [&](occa::kernel &kernel) {
       // resetFields(); // disabling otherwise it would be included in the timer
 
-      if (useRAS)
+      if (useRAS) {
         kernel(Nelements, o_elementList, o_Su, o_Sx, o_Sy, o_Sz, o_invL, o_invDegree, o_u);
-      else
+      } else {
         kernel(Nelements, o_elementList, o_Su, o_Sx, o_Sy, o_Sz, o_invL, o_u);
+      }
     };
 
     auto fdmKernelBuilder = [&](int kernelVariant) {
       auto kernel = buildKernel(kernelVariant);
-      if (!kernel.isInitialized()) return occa::kernel();
+      if (!kernel.isInitialized()) {
+        return occa::kernel();
+      }
 
       auto dumpResult = [&]() {
         std::vector<FPType> res;
         if (useRAS) {
           res.resize(Nelements * Np);
-        }
-        else {
+        } else {
           res.resize(Nelements * Np_e);
         }
         o_Su.copyTo(res.data());
@@ -175,13 +179,13 @@ occa::kernel benchmarkFDM(int Nelements,
       auto result = dumpResult();
 
       const auto absTol = 1e-2;
-      const auto err = maxRelErr<FPType>(referenceResult, result, platform->comm.mpiComm, absTol);
+      const auto err = maxRelErr<FPType>(referenceResult, result, platform->comm.mpiComm(), absTol);
       const auto scale = 10 * range<FPType>(referenceResult, absTol);
 
       if (err > scale * std::numeric_limits<FPType>::epsilon() || std::isnan(err)) {
-        if (platform->comm.mpiRank == 0 && verbosity > 1) {
-          std::cout << "fdm: Ignore version " << kernelVariant
-                    << " as correctness check failed with " << err << std::endl;
+        if (platform->comm.mpiRank() == 0 && verbosity > 1) {
+          std::cout << "fdm: Ignore version " << kernelVariant << " as correctness check failed with " << err
+                    << std::endl;
         }
 
         // pass un-initialized kernel to skip this kernel variant
@@ -207,12 +211,12 @@ occa::kernel benchmarkFDM(int Nelements,
       const int Nthreads = 1;
 #endif
 
-      if (platform->comm.mpiRank == 0 && !skipPrint) {
+      if (platform->comm.mpiRank() == 0 && !skipPrint) {
         if (verbosity > 0) {
           std::cout << "fdm:";
         }
         if (verbosity > 1) {
-          std::cout << "MPItasks=" << platform->comm.mpiCommSize << " OMPthreads=" << Nthreads
+          std::cout << "MPItasks=" << platform->comm.mpiCommSize() << " OMPthreads=" << Nthreads
                     << " NRepetitions=" << Ntests;
         }
         if (verbosity > 0) {
@@ -246,7 +250,7 @@ occa::kernel benchmarkFDM(int Nelements,
         printPerformanceInfo(bestKernelVariant, kernelAndTime.second, 0, false);
       }
     }
- 
+
     return kernelAndTime;
   };
 
@@ -256,8 +260,7 @@ occa::kernel benchmarkFDM(int Nelements,
     float p = 0.0;
     auto kernelAndTime = benchmarkFDMWithPrecision(p);
     kernel = kernelAndTime.first;
-  }
-  else {
+  } else {
     double p = 0.0;
     auto kernelAndTime = benchmarkFDMWithPrecision(p);
     kernel = kernelAndTime.first;

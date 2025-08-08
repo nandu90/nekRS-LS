@@ -44,13 +44,13 @@ void UDF_Setup()
 #if 1
     const auto xmin = 0.0;
     const auto xmax = 9.0;
-    platform->linAlg->rescale(xmin, xmax, mesh->o_x, platform->comm.mpiComm);
+    platform->linAlg->rescale(xmin, xmax, mesh->o_x, platform->comm.mpiComm());
     const auto ymin = 0.0;
     const auto ymax = 3.035;
-    platform->linAlg->rescale(ymin, ymax, mesh->o_y, platform->comm.mpiComm);
+    platform->linAlg->rescale(ymin, ymax, mesh->o_y, platform->comm.mpiComm());
     const auto zmin = 0.0;
     const auto zmax = 4.5;
-    platform->linAlg->rescale(zmin, zmax, mesh->o_z, platform->comm.mpiComm);
+    platform->linAlg->rescale(zmin, zmax, mesh->o_z, platform->comm.mpiComm());
 
 #if 1
     const auto hmax = 28.0;

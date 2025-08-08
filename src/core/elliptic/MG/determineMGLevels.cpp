@@ -18,7 +18,7 @@ std::vector<int> determineMGLevels(std::string section)
     // We just need the levels, not the degree.
     auto [scheduleMap, errorString] = ellipticParseMultigridSchedule(p_mgschedule, platform->options, 3);
 
-    nekrsCheck(errorString.size(), platform->comm.mpiComm, EXIT_FAILURE, "%s\n", errorString.c_str());
+    nekrsCheck(errorString.size(), platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", errorString.c_str());
 
     for (auto &&[cyclePosition, smootherOrder] : scheduleMap) {
       auto [order, isDownLeg] = cyclePosition;
@@ -28,10 +28,11 @@ std::vector<int> determineMGLevels(std::string section)
     }
 
     std::sort(levels.rbegin(), levels.rend());
-   
+
     const auto coarseLevelN = levels.back();
-    nekrsCheck(coarseLevelN > 1 && platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "BOOMERAMG"),
-               platform->comm.mpiComm,
+    nekrsCheck(coarseLevelN > 1 &&
+                   platform->options.compareArgs(optionsPrefix + "MULTIGRID COARSE SOLVER", "BOOMERAMG"),
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "coarseSolver does not support pCoarse > 1!");
@@ -60,8 +61,8 @@ std::vector<int> determineMGLevels(std::string section)
     };
 
     if (platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "MULTIGRID+SEMFEM")) {
-      return std::vector<int> {N}; 
-    } else { 
+      return std::vector<int>{N};
+    } else {
       return mg_level_lookup.at(N);
     }
   }
@@ -85,8 +86,8 @@ std::vector<int> determineMGLevels(std::string section)
   };
 
   if (platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "MULTIGRID+SEMFEM")) {
-    return std::vector<int> {N}; 
-  } else { 
+    return std::vector<int>{N};
+  } else {
     return mg_level_lookup.at(N);
   }
 }

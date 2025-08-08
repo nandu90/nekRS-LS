@@ -29,7 +29,7 @@
 #include "platform.hpp"
 #include "linAlg.hpp"
 
-//#define DEBUG
+// #define DEBUG
 
 template <typename T> class cg : public linearSolver
 {
@@ -55,7 +55,9 @@ public:
 
     this->tiny = 10 * std::numeric_limits<T>::min();
     this->FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
-    auto type = ((std::is_same<T, pfloat>::value && !std::is_same<dfloat, pfloat>::value) ? std::string("pfloat") : std::string(""));
+    auto type =
+        ((std::is_same<T, pfloat>::value && !std::is_same<dfloat, pfloat>::value) ? std::string("pfloat")
+                                                                                  : std::string(""));
     this->knlPrefix = std::string("cg::") + type + std::to_string(this->Nfields) + "-";
   };
 
@@ -88,8 +90,8 @@ public:
     h_tmpReductions = platform->memoryPool.reserve<T>(Nreductions * Nblock);
     o_tmpReductions = platform->deviceMemoryPool.reserve<T>(h_tmpReductions.size());
 
-    if (platform->comm.mpiRank == 0 && platform->verbose()) {
-      auto txt = (combined && this->o_invDiagA.isInitialized() || preco) ? std::string("P") : std::string(""); 
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+      auto txt = (combined && this->o_invDiagA.isInitialized() || preco) ? std::string("P") : std::string("");
       txt += (combined) ? std::string("CCG") : std::string("CG") + ((flexible) ? "-flex" : "");
       printf("%s %s: initial res norm %.15e target %e \n", txt.c_str(), this->_name.c_str(), rdotr, tol);
     }
@@ -167,9 +169,15 @@ private:
     }
 
     // x <= x + alpha*p
-    platform->linAlg->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, static_cast<dfloat>(alpha), o_p, 1.0, o_x);
+    platform->linAlg->axpbyMany<T>(this->Nlocal,
+                                   this->Nfields,
+                                   this->fieldOffset,
+                                   static_cast<dfloat>(alpha),
+                                   o_p,
+                                   1.0,
+                                   o_x);
 
-    MPI_Allreduce(MPI_IN_PLACE, &rdotr1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE, &rdotr1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
 #ifdef ELLIPTIC_ENABLE_TIMER
     platform->timer.toc("dotp");
 #endif
@@ -217,7 +225,12 @@ private:
     }
 
     const auto mpiType = (std::is_same<T, float>::value) ? MPI_FLOAT : MPI_DFLOAT;
-    MPI_Allreduce(MPI_IN_PLACE, reductions.data(), CombinedPCGId::nReduction, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm);
+    MPI_Allreduce(MPI_IN_PLACE,
+                  reductions.data(),
+                  CombinedPCGId::nReduction,
+                  MPI_DFLOAT,
+                  MPI_SUM,
+                  platform->comm.mpiComm());
 
     platform->flopCounter->add("CombinedPCGReductions",
                                this->FPfactor * this->Nfields * static_cast<double>(this->Nlocal) * 3 * 7);
@@ -236,17 +249,17 @@ private:
         preco(o_r, o_z);
 
         rdotz1 = platform->linAlg->weightedInnerProdMany<T>(this->Nlocal,
-                                                         this->Nfields,
-                                                         this->fieldOffset,
-                                                         o_weight,
-                                                         o_r,
-                                                         o_z,
-                                                         platform->comm.mpiComm);
+                                                            this->Nfields,
+                                                            this->fieldOffset,
+                                                            o_weight,
+                                                            o_r,
+                                                            o_z,
+                                                            platform->comm.mpiComm());
       } else {
         rdotz1 = rdotr;
       }
 
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         nekrsCheck(std::isnan(rdotz1),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
@@ -268,7 +281,7 @@ private:
                                                                          o_weight,
                                                                          o_z,
                                                                          o_Ap,
-                                                                         platform->comm.mpiComm);
+                                                                         platform->comm.mpiComm());
           beta = -alpha * zdotAp / rdotz2;
 #ifdef DEBUG
           printf("norm zdotAp: %.15e\n", zdotAp);
@@ -280,17 +293,23 @@ private:
       printf("beta: %.15e\n", beta);
 #endif
 
-      platform->linAlg->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, 1.0, o_z, static_cast<dfloat>(beta), o_p);
+      platform->linAlg->axpbyMany<T>(this->Nlocal,
+                                     this->Nfields,
+                                     this->fieldOffset,
+                                     1.0,
+                                     o_z,
+                                     static_cast<dfloat>(beta),
+                                     o_p);
 
       Ax(o_p, o_Ap);
 
       const dfloat pAp = platform->linAlg->weightedInnerProdMany<T>(this->Nlocal,
-                                                                 this->Nfields,
-                                                                 this->fieldOffset,
-                                                                 o_weight,
-                                                                 o_p,
-                                                                 o_Ap,
-                                                                 platform->comm.mpiComm);
+                                                                    this->Nfields,
+                                                                    this->fieldOffset,
+                                                                    o_weight,
+                                                                    o_p,
+                                                                    o_Ap,
+                                                                    platform->comm.mpiComm());
       alpha = rdotz1 / (pAp + this->tiny);
 
 #ifdef DEBUG
@@ -305,7 +324,7 @@ private:
 #ifdef DEBUG
       printf("rdotr: %.15e\n", rdotr);
 #endif
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         nekrsCheck(std::isnan(rdotr),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
@@ -313,7 +332,7 @@ private:
                    "Detected invalid resiual norm while running linear solver!");
       }
 
-      if (platform->verbose() && (platform->comm.mpiRank == 0)) {
+      if (platform->verbose() && (platform->comm.mpiRank() == 0)) {
         printf("it %d r norm %.15e\n", iter, rdotr);
       }
     } while (rdotr > tol && iter < MAXIT);
@@ -374,7 +393,7 @@ private:
 
       alphak = dk / (ak + this->tiny);
 
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         nekrsCheck(std::isnan(dk),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
@@ -394,21 +413,21 @@ private:
 #ifdef DEBUG
       printf("rdotr: %.15e\n", rdotr);
 #endif
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         nekrsCheck(std::isnan(rdotr),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
                    "%s\n",
                    "Detected invalid resiual norm while running linear solver!");
       }
-      if (platform->verbose() && (platform->comm.mpiRank == 0)) {
+      if (platform->verbose() && (platform->comm.mpiRank() == 0)) {
         printf("it %d r norm %.15e\n", iter, rdotr);
       }
 
       // converged, update solution prior to exit
       if (rdotr <= tol) {
         const dlong singleVectorUpdate = iter % 2 == 1;
-        if (platform->comm.mpiRank == 0) {
+        if (platform->comm.mpiRank() == 0) {
           nekrsCheck(!singleVectorUpdate && betakm1 == 0,
                      MPI_COMM_SELF,
                      EXIT_FAILURE,

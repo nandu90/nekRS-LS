@@ -4,7 +4,7 @@
 
 void registerEllipticKernels(std::string section, bool stressForm)
 {
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "registerEllipticKernels for " << section << std::endl;
   }
 
@@ -65,14 +65,13 @@ void registerEllipticKernels(std::string section, bool stressForm)
 
   int nelgt, nelgv;
   const std::string meshFile = platform->options.getArgs("MESH FILE");
-  re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm);
+  re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
 
-//  if (section.find("elliptic") != std::string::npos) return;
+  //  if (section.find("elliptic") != std::string::npos) return;
 
-  const int NelemBenchmark = nelgv / platform->comm.mpiCommSize;
+  const int NelemBenchmark = nelgv / platform->comm.mpiCommSize();
   bool verbose = platform->verbose();
   const int verbosity = verbose ? 2 : 1;
-
 
   for (auto &&coeffField : {true, false}) {
     if (platform->options.compareArgs(optionsPrefix + "ELLIPTIC COEFF FIELD", "TRUE") != coeffField) {

@@ -4,7 +4,7 @@
 
 void registerNekNekKernels()
 {
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "registerNekNekKernels" << std::endl;
   }
 

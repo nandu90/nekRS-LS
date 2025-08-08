@@ -68,7 +68,7 @@ void lowMach::setup(dfloat alpha_, const occa::memory &o_beta_, const occa::memo
   o_kappa = o_kappa_;
 
   nekrsCheck(_nrs->scalar->nameToIndex.find("temperature") == _nrs->scalar->nameToIndex.end(),
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "requires solving for temperature!");
@@ -173,7 +173,7 @@ void lowMach::qThermalSingleComponent(double time)
     const auto termQ = [&]() {
       auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(nrs->fluid->fieldOffset);
       linAlg->axmyz(mesh->Nlocal, 1.0, mesh->o_LMM, o_div, o_tmp);
-      return linAlg->sum(mesh->Nlocal, o_tmp, platform->comm.mpiComm);
+      return linAlg->sum(mesh->Nlocal, o_tmp, platform->comm.mpiComm());
     }();
 
     auto o_tmp1 = platform->deviceMemoryPool.reserve<dfloat>(nrs->fluid->fieldOffset);
@@ -199,7 +199,7 @@ void lowMach::qThermalSingleComponent(double time)
     double surfaceFluxFlops = 13 * mesh->Nq * mesh->Nq;
     surfaceFluxFlops *= static_cast<double>(mesh->Nelements);
 
-    const auto prhs = (termQ - termV) / linAlg->sum(mesh->Nlocal, o_tmp1, platform->comm.mpiComm);
+    const auto prhs = (termQ - termV) / linAlg->sum(mesh->Nlocal, o_tmp1, platform->comm.mpiComm());
     linAlg->axpby(mesh->Nlocal, -prhs, o_tmp2, 1.0, o_div);
     o_tmp1.free();
     o_tmp2.free();

@@ -55,9 +55,9 @@ void ellipticPreconditioner(elliptic_t *elliptic, const occa::memory &o_r, occa:
   } else if (options.compareArgs("PRECONDITIONER", "NONE")) {
     o_z.copyFrom(o_r, elliptic->fieldOffset * elliptic->Nfields);
   } else {
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       printf("ERROR: Unknown preconditioner\n");
     }
-    MPI_Abort(platform->comm.mpiComm, 1);
+    MPI_Abort(platform->comm.mpiComm(), 1);
   }
 }

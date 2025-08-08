@@ -115,7 +115,7 @@ void RANSktau::buildKernel(occa::properties _kernelInfo)
     kernelInfo["defines/p_pope"] = coeff[14];
   }
 
-  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "\nRANSktau settings\n";
     std::cout << kernelInfo << std::endl;
   }
@@ -143,7 +143,7 @@ void RANSktau::buildKernel(occa::properties _kernelInfo)
   int Nscalar;
   platform->options.getArgs("NUMBER OF SCALARS", Nscalar);
 
-  nekrsCheck(Nscalar < 2, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", "Nscalar needs to be >= 2!");
+  nekrsCheck(Nscalar < 2, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", "Nscalar needs to be >= 2!");
   platform->options.setArgs("FLUID STRESSFORMULATION", "TRUE");
 }
 
@@ -224,7 +224,7 @@ void RANSktau::setup(int ifld)
 
   auto &scalar = nrs->scalar;
   nekrsCheck(scalar->NSfields < kFieldIndex + 1,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "number of scalar fields too low!");
@@ -240,7 +240,7 @@ void RANSktau::setup(int ifld)
     const std::string sid = scalarDigitStr(kFieldIndex + i);
     nekrsCheck(!platform->options.getArgs("SCALAR" + sid + " DIFFUSIVITY").empty() ||
                    !platform->options.getArgs("SCALAR" + sid + " DENSITY").empty(),
-               platform->comm.mpiComm,
+               platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
                "illegal property specification for k/tau in par!");

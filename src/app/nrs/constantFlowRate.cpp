@@ -156,7 +156,7 @@ void nrs_t::computeHomogenousStokesSolution(double time)
 
 void nrs_t::computeBaseFlowRate(double time, int tstep)
 {
-  if (platform->verbose() && platform->comm.mpiRank == 0) {
+  if (platform->verbose() && platform->comm.mpiRank() == 0) {
     printf("computing base flow rate (dir: %g, %g, %g)\n",
            flowDirection[0],
            flowDirection[1],
@@ -222,14 +222,14 @@ void nrs_t::computeBaseFlowRate(double time, int tstep)
   flops += 5 * mesh->Nlocal;
 
   platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_baseFlowRate);
-  baseFlowRate = platform->linAlg->sum(mesh->Nlocal, o_baseFlowRate, platform->comm.mpiComm) / lengthScale;
+  baseFlowRate = platform->linAlg->sum(mesh->Nlocal, o_baseFlowRate, platform->comm.mpiComm()) / lengthScale;
 }
 
 void nrs_t::flowRatePrintInfo(int tstep, bool verboseInfo)
 {
   auto mesh = this->meshV;
 
-  if (platform->comm.mpiRank != 0) {
+  if (platform->comm.mpiRank() != 0) {
     return;
   }
 
@@ -279,7 +279,7 @@ void nrs_t::adjustFlowRate(int tstep, double time)
   const bool directionAligned = X_aligned || Y_aligned || Z_aligned;
 
   nekrsCheck(!directionAligned,
-             platform->comm.mpiComm,
+             platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s\n",
              "Flow direction is not aligned in (X,Y,Z)");
@@ -317,8 +317,8 @@ void nrs_t::adjustFlowRate(int tstep, double time)
         flowDirection[2] = 1.0;
       }
 
-      const dfloat maxCoord = platform->linAlg->max(mesh->Nlocal, o_coord, platform->comm.mpiComm);
-      const dfloat minCoord = platform->linAlg->min(mesh->Nlocal, o_coord, platform->comm.mpiComm);
+      const dfloat maxCoord = platform->linAlg->max(mesh->Nlocal, o_coord, platform->comm.mpiComm());
+      const dfloat minCoord = platform->linAlg->min(mesh->Nlocal, o_coord, platform->comm.mpiComm());
       lengthScale = maxCoord - minCoord;
     } else {
 
@@ -345,18 +345,18 @@ void nrs_t::adjustFlowRate(int tstep, double time)
       flops += 3 * mesh->Nlocal;
 
       dfloat NfacesContrib =
-          platform->linAlg->sum(mesh->Nelements * mesh->Nfaces, o_counts, platform->comm.mpiComm);
+          platform->linAlg->sum(mesh->Nelements * mesh->Nfaces, o_counts, platform->comm.mpiComm());
       dfloat sumFaceAverages_x = platform->linAlg->sum(mesh->Nelements * mesh->Nfaces,
                                                        o_centroid,
-                                                       platform->comm.mpiComm,
+                                                       platform->comm.mpiComm(),
                                                        0 * mesh->Nelements * mesh->Nfaces);
       dfloat sumFaceAverages_y = platform->linAlg->sum(mesh->Nelements * mesh->Nfaces,
                                                        o_centroid,
-                                                       platform->comm.mpiComm,
+                                                       platform->comm.mpiComm(),
                                                        1 * mesh->Nelements * mesh->Nfaces);
       dfloat sumFaceAverages_z = platform->linAlg->sum(mesh->Nelements * mesh->Nfaces,
                                                        o_centroid,
-                                                       platform->comm.mpiComm,
+                                                       platform->comm.mpiComm(),
                                                        2 * mesh->Nelements * mesh->Nfaces);
 
       const dfloat centroidFrom_x = sumFaceAverages_x / NfacesContrib;
@@ -378,18 +378,19 @@ void nrs_t::adjustFlowRate(int tstep, double time)
 
       flops += 3 * mesh->Nlocal;
 
-      NfacesContrib = platform->linAlg->sum(mesh->Nelements * mesh->Nfaces, o_counts, platform->comm.mpiComm);
+      NfacesContrib =
+          platform->linAlg->sum(mesh->Nelements * mesh->Nfaces, o_counts, platform->comm.mpiComm());
       sumFaceAverages_x = platform->linAlg->sum(mesh->Nelements * mesh->Nfaces,
                                                 o_centroid,
-                                                platform->comm.mpiComm,
+                                                platform->comm.mpiComm(),
                                                 0 * mesh->Nelements * mesh->Nfaces);
       sumFaceAverages_y = platform->linAlg->sum(mesh->Nelements * mesh->Nfaces,
                                                 o_centroid,
-                                                platform->comm.mpiComm,
+                                                platform->comm.mpiComm(),
                                                 1 * mesh->Nelements * mesh->Nfaces);
       sumFaceAverages_z = platform->linAlg->sum(mesh->Nelements * mesh->Nfaces,
                                                 o_centroid,
-                                                platform->comm.mpiComm,
+                                                platform->comm.mpiComm(),
                                                 2 * mesh->Nelements * mesh->Nfaces);
 
       const dfloat centroidTo_x = sumFaceAverages_x / NfacesContrib;
@@ -417,7 +418,7 @@ void nrs_t::adjustFlowRate(int tstep, double time)
                                                           0,
                                                           o_prevProp,
                                                           fluid->o_prop,
-                                                          platform->comm.mpiComm);
+                                                          platform->comm.mpiComm());
 
     if (delta > 10 * std::numeric_limits<dfloat>::epsilon()) {
       o_prevProp.copyFrom(fluid->o_prop);
@@ -457,7 +458,7 @@ void nrs_t::adjustFlowRate(int tstep, double time)
 
     platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_currentFlowRate);
     currentFlowRate =
-        platform->linAlg->sum(mesh->Nlocal, o_currentFlowRate, platform->comm.mpiComm) / lengthScale;
+        platform->linAlg->sum(mesh->Nlocal, o_currentFlowRate, platform->comm.mpiComm()) / lengthScale;
 
     const auto targetRate = platform->options.compareArgs("CONSTANT FLOW RATE TYPE", "VOLUMETRIC")
                                 ? flowRate
@@ -486,7 +487,7 @@ void nrs_t::adjustFlowRate(int tstep, double time)
     flops += 5 * mesh->Nlocal;
 
     platform->linAlg->axmy(mesh->Nlocal, 1.0, mesh->o_LMM, o_currentFlowRate);
-    return platform->linAlg->sum(mesh->Nlocal, o_currentFlowRate, platform->comm.mpiComm) / lengthScale;
+    return platform->linAlg->sum(mesh->Nlocal, o_currentFlowRate, platform->comm.mpiComm()) / lengthScale;
   }();
 
   platform->flopCounter->add("ConstantFlowRate::adjust", flops);

@@ -116,7 +116,7 @@ public:
   {
     const auto tStart = MPI_Wtime();
 
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       if (engineMode == iofld::mode::write) {
         std::cout << "writing to field file ..." << std::endl << std::flush;
       }
@@ -124,7 +124,7 @@ public:
 
     nekrsCheck(!initialized, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "illegal to call prior to iofld::open()!");
 
-    if (platform->comm.mpiRank == 0) {
+    if (platform->comm.mpiRank() == 0) {
       std::cout << " user variables: ";
       for (const auto &entry : userSingleValues) {
         std::cout << entry.first << " ";
@@ -146,7 +146,7 @@ public:
     }
 
     if (engineMode == iofld::mode::write) {
-      if (platform->comm.mpiRank == 0) {
+      if (platform->comm.mpiRank() == 0) {
         std::cout << " io step: " << getStepCounter() << std::endl;
         std::cout << " settings: N=" << N << "  precision=" << precision << "  uniform=" << uniform
                   << std::endl
@@ -158,8 +158,8 @@ public:
       platform->timer.toc("checkpointing");
     }
 
-    MPI_Barrier(platform->comm.mpiComm);
-    if (platform->comm.mpiRank == 0) {
+    MPI_Barrier(platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
       const auto elapsed = MPI_Wtime() - tStart;
       std::cout << " elapsed time: " << elapsed << "s";
       if (bytes) {
@@ -250,7 +250,7 @@ public:
     }
 
     auto p = (N > 0) ? N : mesh->N;
-    if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
       std::cout << " gernerating vis mesh with N=" << p << std::endl;
     }
 
