@@ -26,7 +26,7 @@ void parseMeshSection(const int rank, setupAide &options, inipp::Ini *ini)
       options.setArgs("MESH BOUNDARY ID MAP", boundaryIDs);
     }
 
-    if (ini->extract("mesh", "boundaryidmapV", boundaryIDs)) {
+    if (ini->extract("mesh", "boundaryidmapfluid", boundaryIDs)) {
       options.setArgs("MESHV BOUNDARY ID MAP", boundaryIDs);
     }
   }

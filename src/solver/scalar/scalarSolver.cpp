@@ -169,6 +169,12 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
       continue;
     }
 
+    nekrsCheck(options.compareArgs("SCALAR" + sid + " SOLVER", "BLOCK"),
+               platform->comm.mpiComm,
+               EXIT_FAILURE,
+               "%s\n",
+               "scalar does not support BLOCK solver!");
+
     if (platform->comm.mpiRank == 0) {
       std::cout << "S" << sid << ": " << name[is] << std::endl;
     }

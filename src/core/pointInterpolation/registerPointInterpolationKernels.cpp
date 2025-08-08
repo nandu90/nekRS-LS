@@ -12,6 +12,10 @@ unsigned nearestPowerOfTwo(unsigned int v)
 
 void registerKernels(int N)
 {
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    std::cout << "registerPointInterpolationKernels " << "N=" << N << std::endl;
+  }
+
   const dlong Nq = N + 1;
 
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR");

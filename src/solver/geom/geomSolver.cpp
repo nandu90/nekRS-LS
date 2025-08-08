@@ -146,10 +146,13 @@ void geomSolver_t::setupEllipticSolver()
               << "ELLIPTIC SETUP " + upperCase(name) << " ================" << std::endl;
   }
 
-  if (platform->options.compareArgs(upperCase(name) + " SOLVER", "BLOCK")) {
-    platform->options.setArgs(upperCase(name) + " NFIELDS", std::to_string(mesh->dim));
-  }
+  nekrsCheck(!platform->options.compareArgs(upperCase(name) + " SOLVER", "BLOCK"),
+             platform->comm.mpiComm,
+             EXIT_FAILURE,
+             "%s\n",
+             "geom requires block solver!");
 
+#if 0
   auto EToBx =
       mesh->createEToB([&](int bID) -> int { return platform->app->bc->typeElliptic(bID, name, "x"); });
 
@@ -163,10 +166,11 @@ void geomSolver_t::setupEllipticSolver()
   EToB.insert(std::end(EToB), std::begin(EToBx), std::end(EToBx));
   EToB.insert(std::end(EToB), std::begin(EToBy), std::end(EToBy));
   EToB.insert(std::end(EToB), std::begin(EToBz), std::end(EToBz));
+#endif
 
   auto o_lambda0 = o_prop;
 
-  ellipticSolver.push_back(new elliptic(name, mesh, fieldOffset, EToB, o_lambda0, o_NULL));
+  ellipticSolver.push_back(new elliptic(name, mesh, fieldOffset, o_lambda0, o_NULL));
 
   const auto unalignedBoundary = platform->app->bc->hasUnalignedMixed(name);
   if (unalignedBoundary) {

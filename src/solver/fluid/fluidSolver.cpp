@@ -414,8 +414,6 @@ void fluidSolver_t::setupEllipticSolver()
   const auto unalignedBoundary = platform->app->bc->hasUnalignedMixed(velocityName);
 
   if (platform->options.compareArgs(upperCase(velocityName) + " SOLVER", "BLOCK")) {
-    platform->options.setArgs(upperCase(velocityName) + " NFIELDS", std::to_string(mesh->dim));
-
     if (platform->options.compareArgs(upperCase(name) + " STRESSFORMULATION", "TRUE")) {
       platform->options.setArgs(upperCase(velocityName) + " STRESSFORMULATION", "TRUE");
     }

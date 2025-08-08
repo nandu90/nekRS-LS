@@ -55,17 +55,20 @@ void kernelRequestManager_t::add(kernelRequest_t request, bool checkUnique)
   // as inadvertently overwriting the existing entry could occur otherwise.
   if (!inserted) {
     auto exisitingProps = (requestMap.find(request.requestName)->second).props;
+
     nekrsCheck(request.props.hash() != exisitingProps.hash(),
-               platformRef.comm.mpiComm,
+               MPI_COMM_SELF,
                EXIT_FAILURE,
-               "detected different kernel hash for same request\n%s",
+               "request exists already but with a different hash %s\n%s",
+               exisitingProps.hash().getFullString().c_str(), 
                request.to_string().c_str());
 
     auto exisitingFileName = (requestMap.find(request.requestName)->second).fileName;
     nekrsCheck(request.fileName != exisitingFileName,
-               platformRef.comm.mpiComm,
+               MPI_COMM_SELF,
                EXIT_FAILURE,
-               "detected different kernel hash for same request\n%s",
+               "request exists already but points to a different filename %s\n%s",
+               exisitingFileName.c_str(),
                request.to_string().c_str());
 
     return;
@@ -179,7 +182,7 @@ void kernelRequestManager_t::compile()
       auto [iter, inserted] = map.insert({hash, req});
       const std::string txt =
           "request collision between <" + req.requestName + "> and <" + (iter->second).requestName + ">!";
-      nekrsCheck(!inserted, platform->comm.mpiComm, EXIT_FAILURE, "%s\n", txt.c_str());
+      nekrsCheck(!inserted, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", txt.c_str());
     }
   }
 
@@ -206,7 +209,7 @@ void kernelRequestManager_t::compile()
 
       if (platform->verbose() || platform->buildOnly) {
         const auto binaryFilename = fs::path(getenv("OCCA_CACHE_DIR")) / "cache" / hash / "binary";
-        std::cout << "hash: " << hash << " binary: " << binaryFilename << std::flush << std::endl;
+        std::cout << "hash: " << hash << " " << binaryFilename << std::flush << std::endl;
       }
 
     } catch (const std::exception &e) {

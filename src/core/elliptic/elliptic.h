@@ -42,7 +42,6 @@ class precon_t;
 
 struct elliptic_t {
   int elementType = 12; // number of edges (3=tri, 4=quad, 6=tet, 12=hex)
-  int blockSolver = 0;
   int Nfields = 1;
   int stressForm = 0;
   int poisson = 0;

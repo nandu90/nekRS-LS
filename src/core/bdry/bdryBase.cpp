@@ -43,8 +43,10 @@ computeAlignment(mesh_t *mesh, std::vector<dfloat> &sgeo, dlong element, dlong f
   return boundaryAlignment_t::UNALIGNED;
 }
 
-bool bdryBase::hasOutflow(const std::string &field) const
+bool bdryBase::hasOutflow(const std::string &fieldIn) const
 {
+  const auto field = lowerCase(fieldIn);
+
   auto retVal = false;
   for (int bID = 1; bID <= size(field); bID++) {
     auto bcType = platform->app->bc->typeId(bID, field);
@@ -80,8 +82,10 @@ void bdryBase::printBcTypeMapping(const std::string &field) const
   }
 }
 
-int bdryBase::typeElliptic(int bid, const std::string &field, std::string fieldComponent) const
+int bdryBase::typeElliptic(int bid, const std::string &fieldIn, std::string fieldComponent) const
 {
+  const auto field = lowerCase(fieldIn);
+
   if (bid < 1) {
     return ellipticBcType::NO_OP;
   }
@@ -391,8 +395,10 @@ void bdryBase::scalarFieldSetup(std::string field, std::vector<std::string> slis
   }
 }
 
-std::string bdryBase::typeText(int bid, const std::string &field) const
+std::string bdryBase::typeText(int bid, const std::string &fieldIn) const
 {
+  auto field = lowerCase(fieldIn);
+
   if (bid < 1) {
     return std::string();
   }

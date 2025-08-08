@@ -33,7 +33,7 @@ void ellipticZeroMean(elliptic_t *elliptic, occa::memory &o_q)
   auto mesh = elliptic->mesh;
   const auto Nglobal = mesh->NelementsGlobal * mesh->Np;
 
-  if (elliptic->blockSolver) {
+  if (elliptic->Nfields > 1) {
     nekrsAbort(platform->comm.mpiComm,
                EXIT_FAILURE,
                "%s\n",

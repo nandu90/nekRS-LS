@@ -66,7 +66,7 @@
   // for all elements
   for (dlong e = 0; e < Nelements; e++; @outer(0)) {
     // @shared storage for flux terms
-    @shared dfloat s_fluxDiv[2][p_Nq][p_Nq];
+    @shared dfloat s_fluxDiv[2][p_Nq][p_Nq + 1];
 
     @exclusive dfloat r_div[p_Nq];
 

@@ -202,7 +202,7 @@ regularization
 partitioner                 rbc, rsb, rbc+rsb [D]                      partitioning method
 
 boundaryIDMap               <int>, <int>, ...                          map ids to 1,2,3,... 
-boundaryIDMapV              <int>, <int>, ...                          required for cht case 
+boundaryIDMapFluid          <int>, <int>, ...                          required for cht case 
 
 connectivityTol             <float>
                             0.2 [D]
@@ -261,6 +261,12 @@ sharedRho                   true, false [D]                            use same 
 jtvRecycleProperties        true [D], false                            recycle property (freeze) evaluation for Jv
 dealiasing                  true, false
 ----------------------------------------------------------------------------------------------------------------------
+[ELLIPTIC FOO]
+vectorField                 true, false [D]
+poisson                     true, flase [D] 
+
+----------------------------------------------------------------------------------------------------------------------
+
 
 NOTES
 * section name and key/value pairs are treated as case insensitive

@@ -1951,6 +1951,10 @@ void nrs_t::evaluateDivergence(const double time)
 
 void nrs_t::registerKernels(occa::properties kernelInfoBC)
 {
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    std::cout << "registerNrsKernels" << std::endl;
+  }
+
   const bool serial = platform->serial;
   const std::string extension = serial ? ".c" : ".okl";
   const std::string suffix = "Hex3D";
@@ -2076,11 +2080,19 @@ void nrs_t::registerKernels(occa::properties kernelInfoBC)
     return false;
   };
 
-  auto ellipticFields = fieldsToSolve();
+  {
+    auto ellipticFieldsToRegister = fieldsToSolve();
 
-  for (auto &&entry : ellipticFields) {
-    registerEllipticKernels(entry, stressForm(entry));
-    registerEllipticPreconditionerKernels(entry);
+    auto list = serializeString(platform->options.getArgs("USER ELLIPTIC FIELDS"), ' ');
+    for (auto &&entry : list) {
+      if (!platform->options.compareArgs(std::string("ELLIPTIC ") + upperCase(entry) + " SOLVER", "NONE")) {
+          ellipticFieldsToRegister.push_back("elliptic " + lowerCase(entry));
+      }
+    }
+
+    for (auto &&entry : ellipticFieldsToRegister) {
+      registerEllipticKernels(entry, stressForm(entry));
+    }
   }
 }
 

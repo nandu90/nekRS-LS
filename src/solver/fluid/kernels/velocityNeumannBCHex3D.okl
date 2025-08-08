@@ -99,9 +99,9 @@
                                     @ restrict dfloat *rhsU)
 {
   for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
-    @shared dfloat s_ndU[p_Nq][p_Nq];
-    @shared dfloat s_ndV[p_Nq][p_Nq];
-    @shared dfloat s_ndW[p_Nq][p_Nq];
+    @shared dfloat s_ndU[p_Nq][p_Nq + 1];
+    @shared dfloat s_ndV[p_Nq][p_Nq + 1];
+    @shared dfloat s_ndW[p_Nq][p_Nq + 1];
     @exclusive dfloat r_rhsU[p_Nq], r_rhsV[p_Nq], r_rhsW[p_Nq];
 
     // for all face nodes of all elements

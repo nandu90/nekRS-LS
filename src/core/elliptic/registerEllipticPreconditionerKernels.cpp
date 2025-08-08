@@ -27,7 +27,6 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
   const bool serial = platform->serial;
   const std::string fileNameExtension = (serial) ? ".c" : ".okl";
   const std::string optionsPrefix = createOptionsPrefix(section);
-  const std::string poissonPrefix = poissonEquation ? "poisson-" : "";
 
   int nelgt, nelgv;
   const std::string meshFile = platform->options.getArgs("MESH FILE");
@@ -60,17 +59,22 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
                                 platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true,
                                 kernelSuffix);
 
-    const std::string suffix = "CoeffHex3D";
-
-    if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
-      kernelName = "ellipticPartialAxTrilinear" + suffix;
-    } else {
-      kernelName = "ellipticPartialAx" + suffix;
+    std::string kernelNamePrefix = (poissonEquation) ? "poisson-" : "";
+    kernelNamePrefix += "elliptic";
+    if (Nfields > 1) {
+      kernelNamePrefix += "Block";
     }
-
-    fileName = oklpath + kernelName + fileNameExtension;
-
-    platform->kernelRequests.add(poissonPrefix + kernelName + kernelSuffix, axKernel);
+    kernelName += "Ax";
+    if (coeffField) {
+      kernelName += "Var";
+    }
+    kernelName += "Coeff";
+    if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
+      kernelName += "Trilinear";
+    }
+    kernelName += "Hex3D" + kernelSuffix;
+ 
+    platform->kernelRequests.add(kernelNamePrefix + "Partial" + kernelName, axKernel);
   }
 }
 
@@ -368,6 +372,10 @@ void registerEllipticPreconditionerKernels(std::string section)
   int N;
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
   const std::string optionsPrefix = createOptionsPrefix(section);
+
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    std::cout << "registerEllipticPreconditionerKernels for " << section << std::endl; 
+  }
 
   const int poisson = platform->options.compareArgs(optionsPrefix + "HELMHOLTZ TYPE", "POISSON");
 

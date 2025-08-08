@@ -97,8 +97,8 @@
 {
   for (dlong scalarId = startScalar; scalarId < (startScalar + Nscalars); ++scalarId; @outer(1)) {
     for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
-      @shared dfloat s_ndU[p_Nq][p_Nq];
-      @shared dfloat s_lhsU[p_Nq][p_Nq];
+      @shared dfloat s_ndU[p_Nq][p_Nq + 1];
+      @shared dfloat s_lhsU[p_Nq][p_Nq + 1];
 
       @exclusive dfloat r_rhsU[p_Nq];
       @exclusive dfloat r_lhsU[p_Nq];

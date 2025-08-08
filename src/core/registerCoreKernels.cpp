@@ -4,6 +4,10 @@
 
 void registerCoreKernels(occa::properties kernelInfoBC)
 {
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    std::cout << "registerCoreKernels" << std::endl;
+  }
+
   oogs::registerKernels();
   registerLinAlgKernels();
   registerLinearSolverKernels();

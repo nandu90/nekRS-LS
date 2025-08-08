@@ -192,11 +192,10 @@ int udfMake(setupAide &options, const std::string &solverName, int rank)
 
   snprintf(cmd,
            cmdSize,
-           "rm -f %s/*.so && cmake %s -S %s -B %s "
+           "cmake %s -S %s -B %s "
            "-DNEKRS_USE_DFLOAT_FLOAT=%s "
            "-DNEKRS_INSTALL_DIR=\"%s\" -DCASE_DIR=\"%s\" -DCMAKE_CXX_COMPILER=\"$NEKRS_CXX\" "
            "-DCMAKE_CXX_FLAGS=\"$NEKRS_CXXFLAGS\" -DCMAKE_VERBOSE_MAKEFILE=%s >cmake.log 2>&1",
-           cmakeBuildDir.c_str(),
            cmakeFlags.c_str(),
            cmakeBuildDir.c_str(),
            cmakeBuildDir.c_str(),
@@ -204,6 +203,9 @@ int udfMake(setupAide &options, const std::string &solverName, int rank)
            installDir.c_str(),
            case_dir.c_str(),
            cmakeVerbose.c_str());
+
+  fs::remove(cmakeBuildDir + "/libudf.so");
+
   const int retVal = system(cmd);
   if (verbose && rank == 0) {
     printf("%s (cmake retVal: %d)\n", cmd, retVal);

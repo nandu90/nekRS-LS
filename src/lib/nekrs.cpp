@@ -361,7 +361,13 @@ void udfExecuteStep(double time, int tstep, int checkpointStep)
 
   platform->timer.tic("udfExecuteStep", 1);
   if (udf.executeStep) {
+    if (platform->comm.mpiRank == 0 && platform->verbose()) {
+      std::cout << "calling udfExecuteStep ..." << std::flush << std::endl;
+    } 
     udf.executeStep(time, tstep);
+    if (platform->comm.mpiRank == 0 && platform->verbose()) {
+      std::cout << "done" << std::endl;
+    } 
   }
   platform->timer.toc("udfExecuteStep");
 

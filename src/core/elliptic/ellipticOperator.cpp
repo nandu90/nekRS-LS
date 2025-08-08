@@ -54,14 +54,14 @@ void ellipticAx(elliptic_t *elliptic,
   bool valid = true;
   valid &= continuous;
   if (mixedPrecision) {
-    valid &= !elliptic->blockSolver;
+    valid &= !(elliptic->Nfields > 1);
     valid &= mapType == 0;
   }
 
   auto errTxt = [&]() {
     std::stringstream txt;
     txt << "Encountered invalid configuration inside ellipticAx!\n";
-    if (elliptic->blockSolver) {
+    if (elliptic->Nfields > 1) {
       txt << "Precision level (" << precision << ") does not support block solver\n";
     }
     if (mapType != 0) {

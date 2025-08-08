@@ -1719,7 +1719,7 @@ void lpm_t::writeToFile()
   static int out_step = 0;
   ++out_step;
 
-  MPI_Comm mpi_comm = platform->comm.mpiComm;
+  const auto mpi_comm = platform->comm.mpiComm;
 
   long long int globalNPartOutput = nPartOutput;
 

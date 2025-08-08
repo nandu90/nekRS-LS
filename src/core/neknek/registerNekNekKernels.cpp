@@ -4,6 +4,10 @@
 
 void registerNekNekKernels()
 {
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    std::cout << "registerNekNekKernels" << std::endl;
+  }
+
   dlong N;
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
 

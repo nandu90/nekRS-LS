@@ -161,11 +161,26 @@ static std::vector<std::string> commonKeys = {
     {"filterCutoffRatio"},
 };
 
+static std::vector<std::string> ellipticKeys = {
+    {"poisson"},
+    {"vectorfield"},
+    {"solver"},
+    {"residualTol"},
+    {"initialGuess"},
+    {"preconditioner"},
+    {"pMGSchedule"},
+    {"smootherType"},
+    {"coarseSolver"},
+    {"semfemSolver"},
+    {"coarseGridDiscretization"},
+    {"boundaryTypeMap"},
+};
+
 static std::vector<std::string> meshKeys = {
     {"partitioner"},
     {"file"},
     {"connectivitytol"},
-    {"boundaryidmapV"},
+    {"boundaryidmapfluid"},
     {"boundaryidmap"},
 };
 
@@ -280,6 +295,7 @@ void makeStringsLowerCase()
   pressureKeys = lowerCase(pressureKeys);
   occaKeys = lowerCase(occaKeys);
   cvodeKeys = lowerCase(cvodeKeys);
+  ellipticKeys = lowerCase(ellipticKeys);
   validSections = lowerCase(validSections);
 }
 
@@ -329,7 +345,6 @@ const std::vector<std::string> &getValidKeys(const std::string &section)
   if (section == "geom") {
     return geomKeys;
   }
-
   if (section == "fluid pressure") {
     return pressureKeys;
   }
@@ -348,6 +363,9 @@ const std::vector<std::string> &getValidKeys(const std::string &section)
   if (section == "occa") {
     return occaKeys;
   }
+  if (section == "elliptic") {
+    return ellipticKeys;
+  }
   if (section == "fluid velocity") {
     return velocityKeys;
   }
@@ -362,7 +380,6 @@ void validate(inipp::Ini *ini, const std::vector<std::string> &userSections)
 {
   auto sections = ini->sections;
 
-  int err = 0;
   bool generalExists = false;
   for (auto const &sec : sections) {
     if (sec.first.find("general") != std::string::npos) {
@@ -374,7 +391,6 @@ void validate(inipp::Ini *ini, const std::vector<std::string> &userSections)
     std::ostringstream error;
     error << "mandatory section [GENERAL] not found!\n";
     append_error(error.str());
-    err++;
   }
 
   bool defaultScalarExists = false;
@@ -396,14 +412,25 @@ void validate(inipp::Ini *ini, const std::vector<std::string> &userSections)
         std::ostringstream error;
         error << "invalid scalar section " << sec.first << "\n";
         append_error(error.str());
-        err++;
       }
 
       if (sec.first != "scalar" && scalarMap.find(secondWord) == scalarMap.end()) {
         std::ostringstream error;
         error << "scalar section defined for unknown scalar " << secondWord << "\n";
         append_error(error.str());
-        err++;
+      }
+    }
+
+    const auto isElliptic = sec.first.find("elliptic") != std::string::npos;
+    if (isElliptic) {
+      std::istringstream iss(sec.first);
+      std::string firstWord, secondWord;
+      iss >> firstWord >> secondWord;
+
+      if (firstWord != "elliptic" || secondWord.empty()) {
+        std::ostringstream error;
+        error << "invalid elliptic section\n";
+        append_error(error.str());
       }
     }
 
@@ -411,11 +438,10 @@ void validate(inipp::Ini *ini, const std::vector<std::string> &userSections)
 
     // check that section exists
     if (std::find(validSections.begin(), validSections.end(), sec.first) == validSections.end() &&
-        (!isScalar && !isBoomer)) {
+        (!isScalar && !isBoomer && !isElliptic)) {
       std::ostringstream error;
       error << "Invalid section name: " << sec.first << std::endl;
       append_error(error.str());
-      err++;
     } else {
       auto validKeys = getValidKeys(sec.first);
       if (isBoomer) validKeys = getValidKeys("boomeramg");
@@ -433,7 +459,6 @@ void validate(inipp::Ini *ini, const std::vector<std::string> &userSections)
             std::ostringstream error;
             error << "unknown key: " << sec.first << "::" << key << "\n";
             append_error(error.str());
-            err++;
           }
         }
       }
@@ -445,7 +470,6 @@ void validate(inipp::Ini *ini, const std::vector<std::string> &userSections)
     error << "specified " << scalarMap.size() << " scalars, while the maximum allowed is " << NSCALAR_MAX
           << "\n";
     append_error(error.str());
-    err++;
   }
 }
 
@@ -537,6 +561,7 @@ void parseCheckpointing(const int rank, setupAide &options, inipp::Ini *ini, std
 #include "parseProblemType.hpp"
 #include "parseNeknek.hpp"
 #include "parseFluid.hpp"
+#include "parseElliptic.hpp"
 
 #include "parseGeneral.hpp"
 
@@ -672,6 +697,20 @@ void Par::parse(setupAide &options)
   parseMeshSection(rank, options, ini);
 
   parseGeomSection(rank, options, ini);
+
+  for (auto &sec : ini->sections) {
+    if (sec.first.find("elliptic") == std::string::npos) continue;
+
+    std::istringstream iss(sec.first);
+    std::string firstWord, secondWord;
+    iss >> firstWord >> secondWord;
+
+    auto val = options.getArgs("USER ELLIPTIC FIELDS");
+    if (!val.empty()) val += " ";
+    val += secondWord;
+    options.setArgs("USER ELLIPTIC FIELDS", val);
+  } 
+  parseEllipticSection(rank, options, ini);
 
   if (ini->sections.count("fluid velocity")) {
     parsePressureSection(rank, options, ini);

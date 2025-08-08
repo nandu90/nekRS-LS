@@ -2,6 +2,10 @@
 
 void registerMeshKernels(occa::properties kernelInfoBC)
 {
+  if (platform->comm.mpiRank == 0 && platform->verbose()) {
+    std::cout << "registerMeshKernels" << std::endl;
+  }
+
   int p, pCub = 0;
   platform->options.getArgs("POLYNOMIAL DEGREE", p);
   platform->options.getArgs("CUBATURE POLYNOMIAL DEGREE", pCub);

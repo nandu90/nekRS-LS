@@ -3,6 +3,36 @@
 #include "elliptic.hpp"
 #include "ellipticPrecon.h"
 #include "maskedFaceIds.hpp"
+#include "app.hpp"
+
+static std::vector<int> generateEllipticEToB(const std::string &name, mesh_t *mesh)
+{
+  std::vector<int> EToB;
+  std::cout << "generateEllipticEToB" << std::endl; 
+
+  if (platform->options.compareArgs(upperCase(name) + " SOLVER", "BLOCK")) {
+    auto EToBx = mesh->createEToB([&](int bID) {
+      return platform->app->bc->typeElliptic(bID, name, "x");
+    });
+    auto EToBy = mesh->createEToB([&](int bID) {
+      return platform->app->bc->typeElliptic(bID, name, "y");
+    });
+    auto EToBz = mesh->createEToB([&](int bID) {
+      return platform->app->bc->typeElliptic(bID, name, "z");
+    });
+
+    EToB.insert(EToB.end(), EToBx.begin(), EToBx.end());
+    EToB.insert(EToB.end(), EToBy.begin(), EToBy.end());
+    EToB.insert(EToB.end(), EToBz.begin(), EToBz.end());
+  } else {
+    auto EToBx = mesh->createEToB([&](int bID) {
+      return platform->app->bc->typeElliptic(bID, name);
+    });
+    EToB.insert(EToB.end(), EToBx.begin(), EToBx.end());
+  }
+
+  return EToB;
+}
 
 elliptic::elliptic(const std::string &name,
                    mesh_t *mesh,
@@ -20,6 +50,15 @@ elliptic::elliptic(const std::string &name,
 
   solver->fieldOffset = (fieldOffset <= 0) ? alignStride<dfloat>(mesh->Nlocal) : fieldOffset;
   _setup(o_lambda0, o_lambda1);
+}
+
+elliptic::elliptic(const std::string &name,
+                   mesh_t *mesh,
+                   dlong fieldOffset,
+                   const occa::memory &o_lambda0,
+                   const occa::memory &o_lambda1)
+    : elliptic(name, mesh, fieldOffset, generateEllipticEToB(name, mesh), o_lambda0, o_lambda1)
+{
 }
 
 elliptic::~elliptic()
@@ -398,7 +437,7 @@ void checkConfig(elliptic_t *elliptic)
     err++;
   }
 
-  if (elliptic->blockSolver && options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
+  if (elliptic->Nfields > 1 && options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
     if (platform->comm.mpiRank == 0) {
       printf("Block solver does not support multigrid preconditioner\n");
     }
@@ -454,7 +493,7 @@ void checkConfig(elliptic_t *elliptic)
       }
     }
     MPI_Allreduce(MPI_IN_PLACE, &found, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm);
-    if (found && !elliptic->blockSolver) {
+    if (found && !(elliptic->Nfields > 1)) {
       if (platform->comm.mpiRank == 0) {
         printf("Unaligned BCs require block solver!\n");
       }
@@ -530,8 +569,12 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   }
 
   elliptic->Nfields = 1;
-  elliptic->options.getArgs("NFIELDS", elliptic->Nfields);
-  elliptic->blockSolver = elliptic->Nfields > 1;
+  if (elliptic->options.compareArgs("SOLVER", "BLOCK")) {
+    elliptic->Nfields = elliptic->mesh->dim;
+  }
+  if (platform->comm.mpiRank == 0) {
+    std::cout << "Nfields: " << elliptic->Nfields << std::endl;
+  }
 
   setupAide &options = elliptic->options;
   const int verbose = platform->verbose() ? 1 : 0;
@@ -570,7 +613,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   }
 
   { // setup masked gs handle
-    ogs_t *ogs = (elliptic->blockSolver) ? mesh->ogs : nullptr;
+    ogs_t *ogs = (elliptic->Nfields > 1) ? mesh->ogs : nullptr;
     const auto [Nmasked, o_maskIds, NmaskedLocal, o_maskIdsLocal, NmaskedGlobal, o_maskIdsGlobal] =
         maskedFaceIds(mesh,
                       elliptic->fieldOffset,
@@ -626,11 +669,17 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
 
     std::string kernelNamePrefix = poissonPrefix;
     kernelNamePrefix += "elliptic";
-    if (elliptic->blockSolver) {
+    if (elliptic->Nfields > 1) {
       kernelNamePrefix += (elliptic->stressForm) ? "Stress" : "Block";
     }
 
-    kernelName = "AxCoeff";
+    kernelName = "Ax";
+
+    if (options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE")) {
+      kernelName += "Var";
+    }
+    kernelName += "Coeff";
+
     if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
       kernelName += "Trilinear";
     }

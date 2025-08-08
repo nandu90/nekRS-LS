@@ -81,19 +81,4 @@ void registerScalarKernels(occa::properties kernelInfoBC)
   }
 
   registerCvodeKernels();
-
-#if 0
-  int Nscalar = 0;
-  platform->options.getArgs("NUMBER OF SCALARS", Nscalar);
-
-  for (int is = 0; is < Nscalar; is++) {
-    std::string sid = scalarDigitStr(is);
-    const std::string section = "scalar" + sid;
-
-    if (!platform->options.compareArgs("SCALAR" + sid + " SOLVER", "NONE")) {
-      registerEllipticKernels(section);
-      registerEllipticPreconditionerKernels(section);
-    }
-  }
-#endif
 }

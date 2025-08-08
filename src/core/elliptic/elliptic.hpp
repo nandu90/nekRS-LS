@@ -12,6 +12,9 @@ class elliptic
 public:
   elliptic(const std::string& name, mesh_t *mesh, dlong fieldOffset, const std::vector<int>& EToBIn, const occa::memory& o_lambda0, const occa::memory& o_lambda1);
 
+  elliptic(const std::string& name, mesh_t *mesh, dlong fieldOffset, const occa::memory& o_lambda0, const occa::memory& o_lambda1);
+
+
   ~elliptic();  
 
   void updatePreconditioner(); // to accomodate mesh or coeff changes
