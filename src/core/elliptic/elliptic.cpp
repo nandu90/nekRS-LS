@@ -8,7 +8,6 @@
 static std::vector<int> generateEllipticEToB(const std::string &name, mesh_t *mesh)
 {
   std::vector<int> EToB;
-  std::cout << "generateEllipticEToB" << std::endl;
 
   if (platform->options.compareArgs(upperCase(name) + " SOLVER", "BLOCK")) {
     auto EToBx = mesh->createEToB([&](int bID) { return platform->app->bc->typeElliptic(bID, name, "x"); });

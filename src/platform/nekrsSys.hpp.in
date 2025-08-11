@@ -161,6 +161,11 @@ do {                                                                            
   kernel(__VA_ARGS__);                                                                                       \
 } while (0)
 
+#define nekrsPrintf(...)                                                                                     \
+do {                                                                                                         \
+  if (platform->comm.mpiRank() == 0) printf(__VA_ARGS__)                                                     \
+} while (0)
+
 namespace
 {
 
