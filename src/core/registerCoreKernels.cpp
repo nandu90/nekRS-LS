@@ -66,6 +66,26 @@ void registerCoreKernels(occa::properties kernelInfoBC)
       platform->kernelRequests.add(section + "copyFloatToDfloat", fileName, prop);
     }
 
+    {
+      kernelName = "copyDfloatToPfloat";
+      fileName = oklpath + kernelName + extension;
+      auto prop = platform->kernelInfo;
+      prop["defines/dfloat"] = "float";
+      prop["defines/pfloat"] = "double";
+      prop["defines/dummy"] = 5; // just to make it different from copyDfloatToDouble to avoid collison
+      platform->kernelRequests.add(section + "copyFloatToDouble", fileName, prop);
+    }
+
+    {
+      kernelName = "copyDfloatToPfloat";
+      fileName = oklpath + kernelName + extension;
+      auto prop = platform->kernelInfo;
+      prop["defines/dfloat"] = "double";
+      prop["defines/pfloat"] = "float";
+      prop["defines/dummy"] = 6; // just to make it different from copyDfloatToDouble to avoid collison
+      platform->kernelRequests.add(section + "copyDoubleToFloat", fileName, prop);
+    }
+
     auto prop = platform->kernelInfo;
     kernelName = "copyDfloatToPfloat";
     fileName = oklpath + kernelName + extension;
@@ -93,6 +113,12 @@ void registerCoreKernels(occa::properties kernelInfoBC)
 
     kernelName = section + "copyFloatToDfloat";
     platform->copyFloatToDfloatKernel = platform->kernelRequests.load(kernelName);
+
+    kernelName = section + "copyFloatToDouble";
+    platform->copyFloatToDoubleKernel = platform->kernelRequests.load(kernelName);
+
+    kernelName = section + "copyDoubleToFloat";
+    platform->copyDoubleToFloatKernel = platform->kernelRequests.load(kernelName);
   }
 
   const auto meshProps = [&]() {

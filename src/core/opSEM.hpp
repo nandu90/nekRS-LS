@@ -6,7 +6,7 @@
 
 /*
   unless noted otherwise, operators are based on weak formulation
-  strong operators are weighted by Jw
+  strong operators are smoothed or weighted by Jw 
 */
 
 namespace opSEM 

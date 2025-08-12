@@ -24,16 +24,24 @@
 
  */
 
-@kernel void updatePGMRESSolution(const dlong N,
+@kernel void PGMRESSolution(const dlong N,
                                   const dlong offset,
-                                  @ restrict const dfloat *deltaX,
-                                  @ restrict double *x)
+                                  const dlong gmresSize,
+                                  @ restrict const dfloat *y,
+                                  @ restrict const dfloat *Z,
+                                  @ restrict dfloat *x)
 {
   for (dlong n = 0; n < N; ++n; @tile(p_blockSize, @outer, @inner)) {
     if (n < N) {
 #pragma unroll
       for (int fld = 0; fld < p_Nfields; fld++) {
-        x[n + fld * offset] += deltaX[n + fld * offset];
+        dfloat sum = 0.0;
+        for (int j = 0; j < gmresSize; ++j) {
+          const dfloat yj = y[j];
+          const dfloat Znj = Z[n + fld * offset + j * offset * p_Nfields];
+          sum += Znj * yj;
+        }
+        x[n + fld * offset] = sum;
       }
     }
   }

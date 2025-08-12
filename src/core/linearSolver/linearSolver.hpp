@@ -17,9 +17,12 @@ struct CombinedPCGId {
 class linearSolver
 {
 public:
+  virtual ~linearSolver() = default;
+
+  // solve Ax = r0  
+  // outputs x and r = r0 - Ax
   virtual int
   solve(const dfloat tol, const int maxIter, dfloat &rdotr, occa::memory &o_r, occa::memory &o_x) = 0;
-  virtual ~linearSolver() = default;
 
   occa::memory o_invDiagA;
 

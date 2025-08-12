@@ -38,12 +38,18 @@ linearSolverFactory<T>::create(const std::string &_solver,
         nRestartVectors = std::stoi(match[1]);
       }
 
+      auto iR = false;
+      if (solver.find("ir") != std::string::npos) {
+        iR = true;
+      }
+
       return std::make_unique<gmres<T>>(Nlocal,
                                         Nfields,
                                         fieldOffset,
                                         o_weight,
                                         nRestartVectors,
                                         flexible,
+                                        iR,
                                         Ax,
                                         Pc);
     } else {

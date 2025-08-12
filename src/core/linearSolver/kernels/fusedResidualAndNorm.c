@@ -32,13 +32,13 @@ extern "C" void FUNC(fusedResidualAndNorm)(const dlong &Nblocks,
                                            const dfloat *__restrict__ weights,
                                            const dfloat *__restrict__ b_vec,
                                            const dfloat *__restrict__ Ax,
-                                           dfloat *__restrict__ r,
-                                           dfloat *__restrict__ reduction)
+                                           double *__restrict__ r,
+                                           double *__restrict__ reduction)
 {
-  dfloat rdotr = 0.0;
+  double rdotr = 0.0;
   for (int fld = 0; fld < p_Nfields; ++fld) {
     for (int id = 0; id < N; ++id) {
-      const dfloat rnew = b_vec[id + fld * offset] - Ax[id + fld * offset];
+      const double rnew = b_vec[id + fld * offset] - Ax[id + fld * offset];
       r[id + fld * offset] = rnew;
       rdotr += rnew * rnew * weights[id];
     }
