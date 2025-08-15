@@ -189,7 +189,7 @@ void pointInterpolation_t::eval(dlong nFields,
   }
 
   auto nPoints_ = (nPointsIn > -1) ? nPointsIn : nPoints;
-  if (nPointsIn >= 0) {
+  if (nPointsIn > -1) {
     data_.updateCache = true; // enforce update as cache cannot be used
   }
 
