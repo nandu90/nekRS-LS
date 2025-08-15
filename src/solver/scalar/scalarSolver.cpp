@@ -110,7 +110,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   o_coeffEXT = cfg.o_coeffEXT;
 
   _fieldOffset = cfg.fieldOffset; // for now same for all scalars
-  vFieldOffset = cfg.vFieldOffset;
+  vFieldOffset = o_U.isInitialized() ? cfg.vFieldOffset : _fieldOffset;
   vCubatureOffset = cfg.vCubatureOffset;
 
   o_U = cfg.o_U;
