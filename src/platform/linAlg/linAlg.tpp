@@ -1,26 +1,26 @@
 template <typename T = dfloat> void mask(const dlong N, const occa::memory &o_maskIds, occa::memory &o_a)
 {
   if (N) {
-    launchKernel(getKnlPrefix<T>() + "mask", N, o_maskIds, o_a);
+    linAlgLaunchKernel(getKnlPrefix<T>() + "mask", N, o_maskIds, o_a);
   }
 }
 
 // o_a[n] = alpha
 template <typename T = dfloat> void fill(const dlong N, const double alpha, occa::memory &o_a)
 {
-  launchKernel(getKnlPrefix<T>() + "fill", N, static_cast<T>(alpha), o_a);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "fill", N, static_cast<T>(alpha), o_a);
 }
 
 // o_a[n] = abs(o_a[n])
 template <typename T = dfloat> void abs(const dlong N, occa::memory &o_a)
 {
-  launchKernel(getKnlPrefix<T>() + "vabs", N, o_a);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "vabs", N, o_a);
 }
 
 // o_a[n] += alpha
 template <typename T = dfloat> void add(const dlong N, const double alpha, occa::memory &o_a, const dlong offset = 0)
 {
-  launchKernel(getKnlPrefix<T>() + "add", N, offset, static_cast<T>(alpha), o_a);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "add", N, offset, static_cast<T>(alpha), o_a);
 }
 
 // o_a[n] *= alpha
@@ -37,7 +37,7 @@ void scaleMany(const dlong N,
                occa::memory &o_a,
                const dlong offset = 0)
 {
-  launchKernel(getKnlPrefix<T>() + "scaleMany", N, Nfields, fieldOffset, offset, static_cast<T>(alpha), o_a);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "scaleMany", N, Nfields, fieldOffset, offset, static_cast<T>(alpha), o_a);
 }
 
 // o_y[n] = beta*o_y[n] + alpha*o_x[n]
@@ -53,7 +53,7 @@ void axpby(const dlong N,
   const auto knlPrefix = getKnlPrefix<T>();
   const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
 
-  launchKernel(knlPrefix + "axpby", N, xOffset, yOffset, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y);
+  linAlgLaunchKernel(knlPrefix + "axpby", N, xOffset, yOffset, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y);
   platform->flopCounter->add("axpby", FPfactor + 3 * static_cast<double>(N));
 }
 
@@ -69,7 +69,7 @@ void axpbyMany(const dlong N,
   const auto knlPrefix = getKnlPrefix<T>();
   const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
 
-  launchKernel(knlPrefix + "axpbyMany", N, Nfields, offset, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y);
+  linAlgLaunchKernel(knlPrefix + "axpbyMany", N, Nfields, offset, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y);
   platform->flopCounter->add("axpbyMany", FPfactor * 3 * static_cast<double>(N) * Nfields);
 }
 
@@ -85,7 +85,7 @@ void axpbyz(const dlong N,
   const auto knlPrefix = getKnlPrefix<T>();
   const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
 
-  launchKernel(knlPrefix + "axpbyz", N, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y, o_z);
+  linAlgLaunchKernel(knlPrefix + "axpbyz", N, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y, o_z);
   platform->flopCounter->add("axpbyz", FPfactor * 3 * static_cast<double>(N));
 }
 
@@ -102,7 +102,7 @@ void axpbyzMany(const dlong N,
   const auto knlPrefix = getKnlPrefix<T>();
   const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
 
-  launchKernel(knlPrefix + "axpbyzMany", N, Nfields, fieldOffset, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y, o_z);
+  linAlgLaunchKernel(knlPrefix + "axpbyzMany", N, Nfields, fieldOffset, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y, o_z);
   platform->flopCounter->add("axpbyzMany", FPfactor * 3 * static_cast<double>(N) * Nfields);
 }
 
@@ -111,7 +111,7 @@ template <typename T = dfloat>
 void axmy(const dlong N, const double alpha, const occa::memory &o_x, occa::memory &o_y)
 {
   const auto knlPrefix = getKnlPrefix<T>();
-  launchKernel(knlPrefix + "axmy", N, static_cast<T>(alpha), o_x, o_y);
+  linAlgLaunchKernel(knlPrefix + "axmy", N, static_cast<T>(alpha), o_x, o_y);
 }
 
 // mode 1:
@@ -127,7 +127,7 @@ void axmyMany(const dlong N,
               const occa::memory &o_x,
               occa::memory &o_y)
 {
-  launchKernel(getKnlPrefix<T>() + "axmyMany", N, Nfields, offset, mode, static_cast<T>(alpha), o_x, o_y);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "axmyMany", N, Nfields, offset, mode, static_cast<T>(alpha), o_x, o_y);
 }
 
 template <typename T = dfloat>
@@ -138,7 +138,7 @@ void axmyVector(const dlong N,
                 const occa::memory &o_x,
                 occa::memory &o_y)
 {
-  launchKernel(getKnlPrefix<T>() + "axmyVector", N, offset, mode, static_cast<T>(alpha), o_x, o_y);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "axmyVector", N, offset, mode, static_cast<T>(alpha), o_x, o_y);
 }
 
 // o_z[n] = alpha*o_x[n]*o_y[n]
@@ -149,7 +149,7 @@ void axmyz(const dlong N,
            const occa::memory &o_y,
            occa::memory &o_z)
 {
-  launchKernel(getKnlPrefix<T>() + "axmyz", N, static_cast<T>(alpha), o_x, o_y, o_z);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "axmyz", N, static_cast<T>(alpha), o_x, o_y, o_z);
 }
 
 template <typename T = dfloat>
@@ -161,20 +161,20 @@ void axmyzMany(const dlong N,
                const occa::memory &o_y,
                occa::memory &o_z)
 {
-  launchKernel(getKnlPrefix<T>() + "axmyzMany", N, Nfields, offset, static_cast<T>(alpha), o_x, o_y, o_z);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "axmyzMany", N, Nfields, offset, static_cast<T>(alpha), o_x, o_y, o_z);
 }
 
 // o_y[n] = alpha*o_x[n]/o_y[n]
 template <typename T = dfloat>
 void axdy(const dlong N, const double alpha, const occa::memory &o_x, occa::memory &o_y)
 {
-  launchKernel(getKnlPrefix<T>() + "axdy", N, static_cast<T>(alpha), o_x, o_y);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "axdy", N, static_cast<T>(alpha), o_x, o_y);
 }
 
 template <typename T = dfloat>
 void aydx(const dlong N, const double alpha, const occa::memory &o_x, occa::memory &o_y)
 {
-  launchKernel(getKnlPrefix<T>() + "aydx", N, static_cast<T>(alpha), o_x, o_y);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "aydx", N, static_cast<T>(alpha), o_x, o_y);
 }
 
 template <typename T = dfloat>
@@ -186,33 +186,33 @@ void aydxMany(const dlong N,
               const occa::memory &o_x,
               occa::memory &o_y)
 {
-  launchKernel(getKnlPrefix<T>() + "aydxMany", N, Nfields, fieldOffset, mode, static_cast<T>(alpha), o_x, o_y);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "aydxMany", N, Nfields, fieldOffset, mode, static_cast<T>(alpha), o_x, o_y);
 }
 
 // o_y[n] = alpha/o_y[n]
 template <typename T = dfloat> void ady(const dlong N, const double alpha, occa::memory &o_y)
 {
-  launchKernel(getKnlPrefix<T>() + "ady", N, static_cast<T>(alpha), o_y);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "ady", N, static_cast<T>(alpha), o_y);
 }
 
 // o_z[n] = alpha/o_y[n]
 template <typename T = dfloat>
 void adyz(const dlong N, const double alpha, const occa::memory &o_y, occa::memory &o_z)
 {
-  launchKernel(getKnlPrefix<T>() + "adyz", N, static_cast<T>(alpha), o_y, o_z);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "adyz", N, static_cast<T>(alpha), o_y, o_z);
 }
 
 template <typename T = dfloat>
 void adyMany(const dlong N, const int Nfields, const dlong offset, const double alpha, occa::memory &o_y)
 {
-  launchKernel(getKnlPrefix<T>() + "adyMany", N, Nfields, offset, static_cast<T>(alpha), o_y);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "adyMany", N, Nfields, offset, static_cast<T>(alpha), o_y);
 }
 
 // o_z[n] = alpha*o_x[n]/o_y[n]
 template <typename T = dfloat>
 void axdyz(const dlong N, const double alpha, const occa::memory &o_x, const occa::memory &o_y, occa::memory &o_z)
 {
-  launchKernel(getKnlPrefix<T>() + "axdyz", N, static_cast<T>(alpha), o_x, o_y, o_z);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "axdyz", N, static_cast<T>(alpha), o_x, o_y, o_z);
 }
 
 // \sum o_a
@@ -228,7 +228,7 @@ T sum(const dlong N, const occa::memory &o_a, MPI_Comm _comm, const dlong offset
 
   
   if (N > 1) {
-    launchKernel(getKnlPrefix<T>() + "sum", Nblock, N, offset, o_a, o_scratch);
+    linAlgLaunchKernel(getKnlPrefix<T>() + "sum", Nblock, N, offset, o_a, o_scratch);
     o_scratch.copyTo(scratch);
   } else { 
     o_a.copyTo(scratch, N); 
@@ -257,7 +257,7 @@ T sumMany(const dlong N, const int Nfields, const dlong fieldOffset, const occa:
   auto scratch = h_scratch.template ptr<T>();
 
   if (N > 1 || Nfields > 1) {
-    launchKernel(getKnlPrefix<T>() + "sumMany", Nblock, N, Nfields, fieldOffset, o_a, o_scratch);
+    linAlgLaunchKernel(getKnlPrefix<T>() + "sumMany", Nblock, N, Nfields, fieldOffset, o_a, o_scratch);
     o_scratch.copyTo(scratch);
   } else {
     o_a.copyTo(scratch, N);
@@ -308,7 +308,7 @@ template <typename T = dfloat> T min(const dlong N, const occa::memory &o_a, MPI
   auto scratch = h_scratch.template ptr<T>();
 
   if (N > 1) {
-    launchKernel(getKnlPrefix<T>() + "min", Nblock, N, o_a, o_scratch);
+    linAlgLaunchKernel(getKnlPrefix<T>() + "min", Nblock, N, o_a, o_scratch);
     o_scratch.copyTo(scratch);
   } else {
     o_a.copyTo(scratch, N);
@@ -345,7 +345,7 @@ template <typename T = dfloat> T max(const dlong N, const occa::memory &o_a, MPI
   auto scratch = h_scratch.template ptr<T>();
 
   if (N > 1) {
-    launchKernel(getKnlPrefix<T>() + "max", Nblock, N, o_a, o_scratch);
+    linAlgLaunchKernel(getKnlPrefix<T>() + "max", Nblock, N, o_a, o_scratch);
     o_scratch.copyTo(scratch);
   } else {
     o_a.copyTo(scratch, N);
@@ -380,7 +380,7 @@ T amaxMany(const dlong N, const int Nfields, const dlong fieldOffset, const occa
   auto scratch = h_scratch.template ptr<T>();
 
   if (N > 1) {
-    launchKernel(getKnlPrefix<T>() + "amaxMany", Nblock, N, Nfields, fieldOffset, o_x, o_scratch);
+    linAlgLaunchKernel(getKnlPrefix<T>() + "amaxMany", Nblock, N, Nfields, fieldOffset, o_x, o_scratch);
     o_scratch.copyTo(scratch);
   } else {
     o_x.copyTo(scratch, N);
@@ -423,7 +423,7 @@ T norm2Many(const dlong N,
   auto scratch = h_scratch.template ptr<T>();
 
   dfloat norm = 0;
-  launchKernel(getKnlPrefix<T>() + "norm2Many", Nblock, N, Nfields, fieldOffset, o_x, o_scratch);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "norm2Many", Nblock, N, Nfields, fieldOffset, o_x, o_scratch);
   if (serial) {
     norm = *((T *)o_scratch.ptr());
   } else {
@@ -469,7 +469,7 @@ T norm1Many(const dlong N,
   auto scratch = h_scratch.template ptr<T>();
 
   dfloat norm = 0;
-  launchKernel(getKnlPrefix<T>() + "norm1Many", Nblock, N, Nfields, fieldOffset, o_x, o_scratch);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "norm1Many", Nblock, N, Nfields, fieldOffset, o_x, o_scratch);
 
   if (serial) {
     norm = *((T *)o_scratch.ptr());
@@ -512,7 +512,7 @@ T innerProd(const dlong N,
   auto scratch = h_scratch.template ptr<T>();
 
   dfloat dot = 0;
-  launchKernel(getKnlPrefix<T>() + "innerProd", Nblock, N, offset, o_x, o_y, o_scratch);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "innerProd", Nblock, N, offset, o_x, o_y, o_scratch);
 
   if (serial) {
     dot = *((T *)o_scratch.ptr());
@@ -572,11 +572,10 @@ void weightedInnerProdMulti(const dlong N,
   const int Nblock = (N + blocksize - 1) / blocksize;
 
   auto o_scratch = getScratch<T>(NVec * Nblock);
-
   auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
-  launchKernel(knlPrefix + "weightedInnerProdMulti",
+  linAlgLaunchKernel(knlPrefix + "weightedInnerProdMulti",
                Nblock,
                N,
                Nfields,
@@ -644,7 +643,7 @@ void weightedInnerProdMulti(const dlong N,
              "%s",
              "requires support of floating point atomics!\n");
 
-  launchKernel(knlPrefix + "weightedInnerProdMultiDevice",
+  linAlgLaunchKernel(knlPrefix + "weightedInnerProdMultiDevice",
                Nblock,
                N,
                Nfields,
@@ -708,7 +707,7 @@ T weightedInnerProdMany(const dlong N,
   auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
-  launchKernel(knlPrefix + "weightedInnerProdMany",
+  linAlgLaunchKernel(knlPrefix + "weightedInnerProdMany",
                Nblock,
                N,
                Nfields,
@@ -785,7 +784,7 @@ T weightedNorm1Many(const dlong N,
   auto scratch = h_scratch.template ptr<T>();
 
   dfloat norm = 0;
-  launchKernel(getKnlPrefix<T>() + "weightedNorm1Many", Nblock, N, Nfields, fieldOffset, o_w, o_a, o_scratch);
+  linAlgLaunchKernel(getKnlPrefix<T>() + "weightedNorm1Many", Nblock, N, Nfields, fieldOffset, o_w, o_a, o_scratch);
 
   if (serial) {
     norm = *((T *)o_scratch.ptr());
@@ -818,7 +817,7 @@ dfloat weightedSqrSum(const dlong N, const occa::memory &o_w, const occa::memory
 
   dfloat sum = 0;
   if (N > 1) {
-    launchKernel(getKnlPrefix<dfloat>() + "weightedSqrSum", Nblock, N, o_w, o_a, o_scratch);
+    linAlgLaunchKernel(getKnlPrefix<dfloat>() + "weightedSqrSum", Nblock, N, o_w, o_a, o_scratch);
 
     if (serial) {
       sum = *((dfloat *)o_scratch.ptr());

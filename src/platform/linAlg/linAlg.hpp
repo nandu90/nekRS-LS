@@ -29,6 +29,14 @@ SOFTWARE.
 
 #include "platform.hpp"
 
+
+#define linAlgLaunchKernel(name, ...)                                                                        \
+do {                                                                                                         \
+  static occa::kernel kernel;                                                                                \
+  if (!kernel.isInitialized()) kernel = platform->kernelRequests.load(name);                                 \
+  kernel(__VA_ARGS__);                                                                                       \
+} while (0)
+
 #define USE_WEIGHTED_INNER_PROD_MULTI_DEVICE 0
 
 class linAlg_t
@@ -49,30 +57,28 @@ private:
 
   template <typename T = dfloat> static std::string getKnlPrefix()
   {
-    std::string val;
-    if (std::is_same<T, pfloat>::value && sizeof(dfloat) != sizeof(pfloat)) {
-      val = std::string("p");
-    } else if (std::is_same<T, dfloat>::value) {
-      //
-    } else {
-      nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "%s", "unsupported data type on input!\n");
-    }
+    const auto supportedDataType = std::is_same<T, float>::value || std::is_same<T, double>::value;
+    nekrsCheck(!supportedDataType, MPI_COMM_SELF, EXIT_FAILURE, "%s", "unsupported data type on input!\n");  
 
-    return "linAlg::" + val;
+    return std::string("linAlg::") + ((std::is_same<T, float>::value) ? std::string("f_") : std::string("d_"));
   }
 
-  template <typename T = dfloat> static occa::memory getScratch(size_t n, bool host = false)
+  template <typename T = dfloat> occa::memory getScratch(const size_t n, bool host = false)
   {
-    if (std::is_same<T, pfloat>::value) {
-      if (host) {
-        return platform->memoryPool.reserve<pfloat>(n);
-      }
-      return platform->deviceMemoryPool.reserve<pfloat>(n);
+    if (host) {
+      static occa::memory o_mem;
+      if (o_mem.size() < n) {
+        if (o_mem.isInitialized()) o_mem.free();
+        o_mem = platform->device.mallocHost<T>(n);
+      } 
+      return o_mem.slice(0, n);
     } else {
-      if (host) {
-        return platform->memoryPool.reserve<dfloat>(n);
+      static occa::memory o_mem;
+      if (o_mem.size() < n) {
+        if (o_mem.isInitialized()) o_mem.free();
+        o_mem = platform->device.malloc<T>(n);
       }
-      return platform->deviceMemoryPool.reserve<dfloat>(n);
+      return o_mem.slice(0, n);
     }
   }
 

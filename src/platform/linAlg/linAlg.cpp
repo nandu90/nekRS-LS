@@ -177,12 +177,12 @@ void linAlg_t::crossProduct(const dlong N,
              "%s",
              "o_x too small to store a vector field!\n");
 
-  launchKernel(getKnlPrefix<dfloat>() + "crossProduct", N, fieldOffset, o_x, o_y, o_z);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "crossProduct", N, fieldOffset, o_x, o_y, o_z);
 }
 
 void linAlg_t::unitVector(const dlong N, const dlong fieldOffset, occa::memory &o_v)
 {
-  launchKernel(getKnlPrefix<dfloat>() + "unitVector", N, fieldOffset, o_v);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "unitVector", N, fieldOffset, o_v);
 }
 
 void linAlg_t::entrywiseMag(const dlong N,
@@ -191,7 +191,7 @@ void linAlg_t::entrywiseMag(const dlong N,
                             const occa::memory &o_a,
                             occa::memory &o_b)
 {
-  launchKernel(getKnlPrefix<dfloat>() + "entrywiseMag", N, Nfields, fieldOffset, o_a, o_b);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "entrywiseMag", N, Nfields, fieldOffset, o_a, o_b);
 }
 
 void linAlg_t::magSqrVector(const dlong N,
@@ -205,7 +205,7 @@ void linAlg_t::magSqrVector(const dlong N,
              "%s",
              "o_u too small to store a vector field!\n");
 
-  launchKernel(getKnlPrefix<dfloat>() + "magSqrVector", N, fieldOffset, o_u, o_mag);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "magSqrVector", N, fieldOffset, o_u, o_mag);
 }
 
 void linAlg_t::magSqrTensor(const dlong N,
@@ -219,7 +219,7 @@ void linAlg_t::magSqrTensor(const dlong N,
              "%s",
              "o_tensor too small to store a symmetric tensor field!\n");
 
-  launchKernel(getKnlPrefix<dfloat>() + "magSqrTensor", N, fieldOffset, o_tensor, o_mag);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "magSqrTensor", N, fieldOffset, o_tensor, o_mag);
 }
 
 void linAlg_t::magSqrSymTensor(const dlong N,
@@ -233,7 +233,7 @@ void linAlg_t::magSqrSymTensor(const dlong N,
              "%s",
              "o_tensor too small to store a symmetric tensor field!\n");
 
-  launchKernel(getKnlPrefix<dfloat>() + "magSqrSymTensor", N, fieldOffset, o_tensor, o_mag);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "magSqrSymTensor", N, fieldOffset, o_tensor, o_mag);
 }
 
 void linAlg_t::magSqrSymTensorDiag(const dlong N,
@@ -247,7 +247,7 @@ void linAlg_t::magSqrSymTensorDiag(const dlong N,
              "%s",
              "o_tensor too small to store a symmetric tensor field!\n");
 
-  launchKernel(getKnlPrefix<dfloat>() + "magSqrSymTensorDiag", N, fieldOffset, o_tensor, o_mag);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "magSqrSymTensorDiag", N, fieldOffset, o_tensor, o_mag);
 }
 
 void linAlg_t::linearCombination(const dlong N,
@@ -268,7 +268,7 @@ void linAlg_t::linearCombination(const dlong N,
              "o_x too small to store %d fields!\n",
              Nfields);
 
-  launchKernel(getKnlPrefix<dfloat>() + "linearCombination", N, Nfields, fieldOffset, o_coeff, o_x, o_y);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "linearCombination", N, Nfields, fieldOffset, o_coeff, o_x, o_y);
 }
 
 dfloat linAlg_t::maxRelativeError(const dlong N,
@@ -280,7 +280,7 @@ dfloat linAlg_t::maxRelativeError(const dlong N,
                                   MPI_Comm comm)
 {
   auto o_err = platform->deviceMemoryPool.reserve<dfloat>(std::max(Nfields * fieldOffset, N));
-  launchKernel(getKnlPrefix<dfloat>() + "relativeError", N, Nfields, fieldOffset, absTol, o_u, o_uRef, o_err);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "relativeError", N, Nfields, fieldOffset, absTol, o_u, o_uRef, o_err);
   return this->amaxMany(N, Nfields, fieldOffset, o_err, comm);
 }
 
@@ -293,6 +293,6 @@ dfloat linAlg_t::maxAbsoluteError(const dlong N,
                                   MPI_Comm comm)
 {
   auto o_err = platform->deviceMemoryPool.reserve<dfloat>(std::max(Nfields * fieldOffset, N));
-  launchKernel(getKnlPrefix<dfloat>() + "absoluteError", N, Nfields, fieldOffset, absTol, o_u, o_uRef, o_err);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "absoluteError", N, Nfields, fieldOffset, absTol, o_u, o_uRef, o_err);
   return this->amaxMany(N, Nfields, fieldOffset, o_err, comm);
 }
