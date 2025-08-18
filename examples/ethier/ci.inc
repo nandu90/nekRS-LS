@@ -264,7 +264,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("NUMBER TIMESTEPS", std::string("0"));
     options.setArgs("SCALAR00 SOLVER", "NONE");
     options.setArgs("SCALAR01 SOLVER", "NONE");
-    options.setArgs("FLUID", "NONE");
+    options.setArgs("FLUID", "FALSE");
   }
 
   // CVODE, both scalars
@@ -330,9 +330,9 @@ void ciSetup(MPI_Comm comm, setupAide &options)
 
 auto generatePoints(int nPoints, double R)
 {
-  auto pointsX = randomVector<dfloat>(nPoints);
-  auto pointsY = randomVector<dfloat>(nPoints);
-  auto pointsZ = randomVector<dfloat>(nPoints);
+  auto pointsX = randomVector<dfloat>(nPoints, 0, 1, true);
+  auto pointsY = randomVector<dfloat>(nPoints, 0, 1, true);
+  auto pointsZ = randomVector<dfloat>(nPoints, 0, 1, true);
 
   const auto third = 1.0 / 3.0;
 
@@ -353,7 +353,7 @@ auto generatePoints(int nPoints, double R)
     const auto sz = z * std::sqrt(1.0 - 0.5 * x * x - 0.5 * y * y + third * x * x * y * y);
 
     // rescale to desired radius
-    auto Rp = randomVector<dfloat>(1)[0] * R;
+    auto Rp = randomVector<dfloat>(1, 0, R)[0];
     const auto r = std::sqrt(sx * sx + sy * sy + sz * sz);
     const auto scale = Rp / r;
     pointsX[i] = sx * scale;
@@ -486,7 +486,7 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   const auto threshold = (sizeof(dfloat) == sizeof(double)) ? 3e-8 : 1e-5;
 
   const auto computeRelErrors = [&](dlong n, dlong offset, occa::memory o_Uexact, occa::memory o_Uinterp) {
-    const auto absTol = 1e-5;
+    const auto absTol = 1e-6;
 
     auto o_UexactX = o_Uexact.slice(0 * offset, n);
     auto o_UexactY = o_Uexact.slice(1 * offset, n);
@@ -537,11 +537,12 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   std::array<std::vector<dfloat>, nRandomInterp> pointsX;
   std::array<std::vector<dfloat>, nRandomInterp> pointsY;
   std::array<std::vector<dfloat>, nRandomInterp> pointsZ;
-  std::array<std::shared_ptr<pointInterpolation_t>, nRandomInterp> interpRand;
+  std::array<pointInterpolation_t*, nRandomInterp> interpRand;
 
   for (int n = 0; n < nRandomInterp; ++n) {
     std::tie(pointsX[n], pointsY[n], pointsZ[n]) = generatePoints(mesh->Nlocal, R);
-    interpRand[n] = std::make_shared<pointInterpolation_t>(mesh, platform->comm.mpiComm());
+
+    interpRand[n] = new pointInterpolation_t(mesh, platform->comm.mpiComm());
     interpRand[n]->setPoints(pointsX[n], pointsY[n], pointsZ[n]);
     interpRand[n]->find(verbosity);
   }
@@ -553,25 +554,27 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   }
 
   std::array<occa::memory, nRandomInterp> o_UeRand;
-  std::array<occa::memory, nRandomInterp> o_PeRand;
-  std::array<occa::memory, nRandomInterp> o_xRand;
-  std::array<occa::memory, nRandomInterp> o_yRand;
-  std::array<occa::memory, nRandomInterp> o_zRand;
   for (int n = 0; n < nRandomInterp; ++n) {
-    o_UeRand[n] = platform->device.malloc<dfloat>(nrs->meshV->dim * pointsX[n].size());
-    o_PeRand[n] = platform->device.malloc<dfloat>(pointsX[n].size());
+    const dlong nPoints = pointsX[0].size();
 
-    o_xRand[n] = platform->device.malloc<dfloat>(pointsX[n].size(), pointsX[n].data());
-    o_yRand[n] = platform->device.malloc<dfloat>(pointsX[n].size(), pointsY[n].data());
-    o_zRand[n] = platform->device.malloc<dfloat>(pointsX[n].size(), pointsZ[n].data());
+    o_UeRand[n] = platform->device.malloc<dfloat>(nrs->meshV->dim * nPoints);
 
-    const dlong nPoints = pointsX[n].size();
-    exactUVWPKernel(nPoints, time, o_xRand[n], o_yRand[n], o_zRand[n], nPoints, o_PeRand[n], o_UeRand[n]);
+    auto o_Pe = platform->device.malloc<dfloat>(nPoints);
+
+    auto o_x = platform->device.malloc<dfloat>(nPoints);
+    o_x.copyFrom(pointsX[n].data());
+    auto o_y = platform->device.malloc<dfloat>(nPoints);
+    o_y.copyFrom(pointsY[n].data());
+    auto o_z = platform->device.malloc<dfloat>(nPoints);
+    o_z.copyFrom(pointsZ[n].data());
+
+    exactUVWPKernel(nPoints, time, o_x, o_y, o_z, nPoints, o_Pe, o_UeRand[n]);
   }
 
   for (int n = 0; n < nRandomInterp; ++n) {
     auto [linfErrUxRand, linfErrUyRand, linfErrUzRand] =
       computeRelErrors(pointsX[n].size(), pointsX[n].size(), o_UeRand[n], o_UintRand[n]);
+
     CiEvalTest("point interp (random group" + std::to_string(n) + ") (RelLinfErr: " +
                to_string_f(linfErrUxRand) + ", " + to_string_f(linfErrUyRand) + ", " + to_string_f(linfErrUzRand) + ")",
                linfErrUxRand < threshold && linfErrUyRand < threshold && linfErrUzRand < threshold
@@ -937,7 +940,7 @@ void ciTestLinAlg(nrs_t *nrs, const int N)
   linAlg_t *linAlg = platform->linAlg;
   MPI_Comm comm = platform->comm.mpiComm();
   int rank = platform->comm.mpiRank();
-  auto x = randomVector<dfloat>(N);
+  auto x = randomVector<dfloat>(N, 0, 1, true);
   occa::memory o_x = platform->device.malloc<dfloat>(N, x.data());
 
   const dfloat testTol = 50. * std::numeric_limits<dfloat>::epsilon();
@@ -961,8 +964,8 @@ void ciTestLinAlg(nrs_t *nrs, const int N)
 
   constexpr int maxFields = 10;
   for (int Nfields = 1; Nfields <= maxFields; ++Nfields) {
-    auto x = randomVector<dfloat>(Nfields * fieldOffset);
-    auto wt = randomVector<dfloat>(N);
+    auto x = randomVector<dfloat>(Nfields * fieldOffset, 0, 1, true);
+    auto wt = randomVector<dfloat>(N, 0, 1, true);
     occa::memory o_x = platform->device.malloc<dfloat>(x.size(), x.data());
     occa::memory o_wt = platform->device.malloc<dfloat>(wt.size(), wt.data());
 

@@ -357,7 +357,7 @@ dfloat pMGLevel::maxEigSmoothAx()
     // v[j+1] = invD*(A*v[j])
     {
       platform->copyDfloatToPfloatKernel(M, o_V[j], o_VxPfloat);
-      ellipticOperator(elliptic, o_VxPfloat, o_AVxPfloat, pfloatString);
+      ellipticOperator(elliptic, o_VxPfloat, o_AVxPfloat);
       this->smoother(o_AVxPfloat, o_VxPfloat, true);
       platform->copyPfloatToDfloatKernel(M, o_VxPfloat, o_V[j + 1]);
     }

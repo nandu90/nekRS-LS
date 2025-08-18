@@ -19,12 +19,15 @@ class linearSolver
 public:
   virtual ~linearSolver() = default;
 
-  // solve Ax = r0  
-  // outputs x and r = r0 - Ax
-  virtual int
-  solve(const dfloat tol, const int maxIter, dfloat &rdotr, occa::memory &o_r, occa::memory &o_x) = 0;
+  // solve Ax = b (assumes zero initial guess, zeroing is done in solve) 
+  virtual void 
+  solve(const dfloat tol, const int maxIter, const occa::memory &o_b, occa::memory &o_x) = 0;
 
   occa::memory o_invDiagA;
+  
+  int nIter() const { return _nIter; }; 
+  dfloat initialResidualNorm() const { return r0Norm; };
+  dfloat finalResidualNorm() const { return rNorm; };
 
   void name(const std::string &val)
   {
@@ -39,6 +42,10 @@ protected:
   std::string knlPrefix;
   double FPfactor;
   dfloat tiny;
+
+  int _nIter;
+  dfloat r0Norm;
+  dfloat rNorm;
 };
 
 #endif

@@ -305,7 +305,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   // compute initial residual r = rhs - Ax0
   auto o_r = [&]() {
     auto &o_Ap = o_x;
-    ellipticAx(elliptic, mesh->Nelements, mesh->o_elementList, o_x0, o_Ap, dfloatString);
+    ellipticAx(elliptic, mesh->Nelements, mesh->o_elementList, o_x0, o_Ap);
 
     auto o_r = platform->deviceMemoryPool.reserve<dfloat>(o_x0.size());
     platform->linAlg
@@ -314,7 +314,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     if (elliptic->nullspace) {
       ellipticZeroMean(elliptic, o_r);
     }
-    ellipticApplyMask(elliptic, o_r, dfloatString);
+    ellipticApplyMask(elliptic, o_r);
     oogs::startFinish(o_r, elliptic->Nfields, elliptic->fieldOffset, ogsDfloat, ogsAdd, elliptic->oogs);
 
     return o_r;
@@ -337,6 +337,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
       options.compareArgs("INITIAL GUESS", "PROJECTION-ACONJ")) {
 
     platform->timer.tic(timerName + " proj pre", 1);
+
     elliptic->res00Norm = rdotr();
     nekrsCheck(std::isnan(elliptic->res00Norm),
                MPI_COMM_SELF,
@@ -349,14 +350,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     platform->timer.toc(timerName + " proj pre");
   }
 
-  elliptic->res0Norm = rdotr();
-  nekrsCheck(std::isnan(elliptic->res0Norm),
-             MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "%s unreasonable res00Norm!\n",
-             elliptic->name.c_str());
-
-  // linear solve
+  // solve A(x0 + dx) = b
   {
     // absolute tol
     dfloat tol = 1e-6;
@@ -373,11 +367,11 @@ void elliptic::_solve(const occa::memory &o_lambda0,
       }
     }
 
-    elliptic->resNorm = elliptic->res0Norm;
-    platform->linAlg->fill(o_x.size(), 0.0, o_x);
-
-    elliptic->Niter =
-        elliptic->KSP->solve(tol * std::sqrt(mesh->volume), maxIter, elliptic->resNorm, o_r, o_x);
+    // A(dx) = r = b - A(x0) 
+    elliptic->KSP->solve(tol * std::sqrt(mesh->volume), maxIter, o_r, o_x);
+    elliptic->Niter = elliptic->KSP->nIter();
+    elliptic->res0Norm = elliptic->KSP->initialResidualNorm();
+    elliptic->resNorm = elliptic->KSP->finalResidualNorm();
   }
 
   if (options.compareArgs("INITIAL GUESS", "PROJECTION") ||
@@ -389,6 +383,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     elliptic->res00Norm = elliptic->res0Norm;
   }
 
+  // x = x0 + dx
   platform->linAlg->axpbyMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_x0, 1.0, o_x);
 
   if (elliptic->nullspace) {
@@ -658,26 +653,6 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
 
     kernelName = "fusedCopyDfloatToPfloat";
     elliptic->fusedCopyDfloatToPfloatKernel = platform->kernelRequests.load(kernelName);
-
-    std::string kernelNamePrefix = poissonPrefix;
-    kernelNamePrefix += "elliptic";
-    if (elliptic->Nfields > 1) {
-      kernelNamePrefix += (elliptic->stressForm) ? "Stress" : "Block";
-    }
-
-    kernelName = "Ax";
-
-    if (options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE")) {
-      kernelName += "Var";
-    }
-    kernelName += "Coeff";
-
-    if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
-      kernelName += "Trilinear";
-    }
-    kernelName += suffix;
-
-    elliptic->AxKernel = platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
   }
 
   oogs_mode oogsMode = OOGS_AUTO;
@@ -692,14 +667,14 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
 
     auto timeEllipticOperator = [&]() {
       const int Nsamples = 10;
-      ellipticOperator(elliptic, o_p, o_Ap, dfloatString);
+      ellipticOperator(elliptic, o_p, o_Ap);
 
       platform->device.finish();
       MPI_Barrier(platform->comm.mpiComm());
       const double start = MPI_Wtime();
 
       for (int test = 0; test < Nsamples; ++test) {
-        ellipticOperator(elliptic, o_p, o_Ap, dfloatString);
+        ellipticOperator(elliptic, o_p, o_Ap);
       }
 
       platform->device.finish();
@@ -715,8 +690,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
                  mesh->NlocalGatherElements,
                  mesh->o_localGatherElementList,
                  o_p,
-                 o_Ap,
-                 dfloatString);
+                 o_Ap);
     };
     elliptic->oogsAx =
         oogs::setup(elliptic->ogs, elliptic->Nfields, elliptic->fieldOffset, ogsDfloat, callback, oogsMode);
@@ -742,7 +716,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     if (elliptic->userAx) {
       elliptic->userAx(o_p, o_Ap);
     } else {
-      ellipticOperator(elliptic, o_p, o_Ap, dfloatString);
+      ellipticOperator(elliptic, o_p, o_Ap);
     }
   };
 

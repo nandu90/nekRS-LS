@@ -51,8 +51,9 @@ elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf
   memcpy(elliptic, fineElliptic, sizeof(elliptic_t));
 
   elliptic->mgLevel = true;
+  elliptic->AxKernel = occa::kernel();
 
-  mesh_t *mesh = createMeshMG(fineElliptic->mesh, Nc);
+  auto mesh = createMeshMG(fineElliptic->mesh, Nc);
   elliptic->mesh = mesh;
 
   elliptic->fieldOffset = mesh->Nlocal; // assumes elliptic->Nfields == 1
@@ -111,30 +112,6 @@ elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf
   double tStartLoadKernel = MPI_Wtime();
 
   ellipticBuildMultigridLevelKernels(elliptic);
-
-  elliptic->AxKernel = [&]() {
-    if (Nc > 1 || (elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER") ||
-                   elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "CG") ||
-                   elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "GMRES"))) {
-      std::string kernelNamePrefix = (elliptic->poisson) ? "poisson-" : "";
-      kernelNamePrefix += "elliptic";
-      if (elliptic->Nfields > 1) {
-        kernelNamePrefix += "Block";
-      }
-      kernelName += "Ax";
-      if (elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
-        kernelName += "Var";
-      }
-      kernelName += "Coeff";
-      if (elliptic->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
-        kernelName += "Trilinear";
-      }
-      kernelName += "Hex3D" + gen_suffix(elliptic, pfloatString);
-
-      return platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
-    }
-    return occa::kernel();
-  }();
 
   elliptic->precon = new precon_t();
   precon_t *precon = elliptic->precon;

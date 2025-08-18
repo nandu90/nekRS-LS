@@ -259,10 +259,14 @@ SolutionProjection::SolutionProjection(elliptic_t &elliptic,
   }
 
   matvecOperator = [&](const occa::memory &o_x, occa::memory &o_Ax) {
-    ellipticOperator(&elliptic, o_x, o_Ax, dfloatString);
+    if (elliptic.userAx) {
+      elliptic.userAx(o_x, o_Ax);
+    } else {
+      ellipticOperator(&elliptic, o_x, o_Ax);
+    }
   };
 
-  maskOperator = [&](occa::memory &o_x) { ellipticApplyMask(&elliptic, o_x, dfloatString); };
+  maskOperator = [&](occa::memory &o_x) { ellipticApplyMask(&elliptic, o_x); };
 }
 
 void SolutionProjection::pre(occa::memory &o_r)

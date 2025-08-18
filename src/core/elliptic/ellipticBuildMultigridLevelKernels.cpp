@@ -49,8 +49,8 @@ void ellipticBuildMultigridLevelKernels(elliptic_t *elliptic)
   kernelName = "updateFourthKindChebyshev";
   elliptic->updateFourthKindChebyshevKernel = platform->kernelRequests.load(kernelName + orderSuffix);
 
-   kernelName = "ellipticBlockBuildDiagonalPfloatHex3D";
-   elliptic->ellipticBlockBuildDiagonalPfloatKernel =
+  kernelName = "ellipticBlockBuildDiagonalPfloatHex3D";
+  elliptic->ellipticBlockBuildDiagonalPfloatKernel =
      platform->kernelRequests.load(poissonPrefix + kernelName + orderSuffix);
-   elliptic->ellipticBlockBuildDiagonalKernel = nullptr; 
+  elliptic->ellipticBlockBuildDiagonalKernel = nullptr; 
 }

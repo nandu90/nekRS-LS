@@ -218,23 +218,17 @@ void MGSolver_t::runAdditiveVcycle()
     coarsenV(this);
   }
 
-  const int nThreads = this->overlapCrsGridSolve ? 2 : 1;
-  occa::memory o_rhs = levels[baseLevel]->o_rhs;
-  occa::memory o_x = levels[baseLevel]->o_x;
+  const auto nThreads = this->overlapCrsGridSolve ? 2 : 1;
 
-  auto xBuffer = this->coarseLevel->xBuffer;
-  auto ogs = this->coarseLevel->ogs;
-
-  auto Gx = this->coarseLevel->Gx;
-  auto Sx = this->coarseLevel->Sx;
-
-  // local E vector size
-  const auto Nlocal = ogs->N;
-
-  // local T vector size
-  const auto NlocalT = this->coarseLevel->N;
-
-  o_rhs.copyTo(Sx, Nlocal);
+  occa::memory o_x, o_rhs;
+  if (nThreads > 1) {
+    o_rhs = platform->memoryPool.reserve<pfloat>(levels[baseLevel]->o_rhs.size());
+    o_rhs.copyFrom(levels[baseLevel]->o_rhs);
+    o_x = platform->memoryPool.reserve<pfloat>(o_x.size());
+  } else {
+    o_rhs = levels[baseLevel]->o_rhs;
+    o_x = levels[baseLevel]->o_x;
+  }
 
   o_x.getDevice().finish();
 #pragma omp parallel proc_bind(close) num_threads(nThreads)
@@ -247,24 +241,14 @@ void MGSolver_t::runAdditiveVcycle()
       }
 #pragma omp task
       {
-        for (int i = 0; i < Nlocal; i++) {
-          Sx[i] *= this->coarseLevel->weight[i];
-        }
-        ogsGather(Gx, Sx, ogsPfloat, ogsAdd, ogs);
-
-        for (int i = 0; i < NlocalT; i++) {
-          xBuffer[i] = 0;
-        }
-
-        auto boomerAMG = (hypreWrapper::boomerAMG_t *)coarseLevel->boomerAMG;
-        boomerAMG->solve(Gx, xBuffer);
-
-        ogsScatter(Sx, xBuffer, ogsPfloat, ogsAdd, ogs);
+        coarseLevel->solvePtr(coarseLevel, o_rhs, o_x);
       }
     }
   }
 
-  o_x.copyFrom(Sx, Nlocal);
+  if (nThreads > 1) {
+    levels[baseLevel]->o_x.copyFrom(o_x);  
+  }
 
   {
     prolongateV(this);

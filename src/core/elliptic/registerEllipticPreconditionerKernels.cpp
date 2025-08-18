@@ -8,20 +8,19 @@ namespace
 
 void registerAxKernels(const std::string &section, int N, int poissonEquation)
 {
-  auto gen_suffix = [N](const char *floatString) {
-    const std::string precision = std::string(floatString);
-    if (precision.find(pfloatString) != std::string::npos) {
-      return std::string("_") + std::to_string(N) + std::string("pfloat");
-    } else {
-      return std::string("_") + std::to_string(N);
-    }
-  };
+  std::string dataType = "float";
+  if (std::is_same<pfloat, double>::value) {
+    dataType = "double"; 
+  }
+
+  // hardwired as MG currently does not support Nfields > 1
   constexpr int Nfields{1};
+  const auto stressForm = false; 
 
   auto kernelInfo = platform->kernelInfo + meshKernelProperties(N);
   kernelInfo["defines/p_Nfields"] = Nfields;
 
-  std::string fileName, kernelName;
+  std::string fileName;
 
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/elliptic/");
   const bool serial = platform->serial;
@@ -39,32 +38,28 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
     if (platform->options.compareArgs(optionsPrefix + "ELLIPTIC PRECO COEFF FIELD", "TRUE") != coeffField) {
       continue;
     }
-    const auto floatString = std::string(pfloatString);
-    const auto wordSize = sizeof(pfloat);
+    const auto verbosity = platform->verbose() ? 2 : 1;
 
-    bool verbose = platform->verbose();
-    const int verbosity = verbose ? 2 : 1;
-    const std::string kernelSuffix = gen_suffix(floatString.c_str());
     auto axKernel = benchmarkAx(NelemBenchmark,
                                 Nq,
                                 Nq - 1,
                                 !coeffField,
                                 poissonEquation,
                                 false,
-                                wordSize,
+                                (dataType == "float") ? sizeof(float) : sizeof(double),
                                 Nfields,
                                 false, // no stress formulation in preconditioner
                                 verbosity,
                                 targetTimeBenchmark,
-                                platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true,
-                                kernelSuffix);
+                                platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
+
 
     std::string kernelNamePrefix = (poissonEquation) ? "poisson-" : "";
     kernelNamePrefix += "elliptic";
     if (Nfields > 1) {
-      kernelNamePrefix += "Block";
+      kernelNamePrefix += (stressForm) ? "Stress" : "Block";
     }
-    kernelName += "Ax";
+    std::string kernelName = "Ax";
     if (coeffField) {
       kernelName += "Var";
     }
@@ -72,7 +67,8 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
     if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
       kernelName += "Trilinear";
     }
-    kernelName += "Hex3D" + kernelSuffix;
+  
+    kernelName += "Hex3D_" + std::to_string(N) + dataType;
 
     platform->kernelRequests.add(kernelNamePrefix + "Partial" + kernelName, axKernel);
   }
@@ -196,8 +192,8 @@ void registerSchwarzKernels(const std::string &section, int N)
     re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
     const int NelemBenchmark = nelgv / platform->comm.mpiCommSize();
 
-    bool verbose = platform->verbose();
-    const int verbosity = verbose ? 2 : 1;
+    const auto verbosity = platform->verbose() ? 2 : 1;
+
     auto fdmKernel = benchmarkFDM(NelemBenchmark,
                                   Nq_e,
                                   sizeof(pfloat),

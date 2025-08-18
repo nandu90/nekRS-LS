@@ -79,8 +79,13 @@ void MGSolver_t::coarseLevel_t::setupSolver(
     hlong *Ai,     //-- Local A matrix data (globally indexed, COO storage, row sorted)
     hlong *Aj,     //--
     dfloat *Avals, //--
+    const occa::memory& o_weight_,
+    ogs_t *ogs_,
     bool nullSpace)
 {
+  ogs = ogs_;
+  o_weight = o_weight_;
+
   int rank, size;
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &size);
@@ -105,7 +110,15 @@ void MGSolver_t::coarseLevel_t::setupSolver(
 
   o_xBuffer = platform->device.malloc<pfloat>(N);
   h_xBuffer = platform->device.mallocHost<pfloat>(N);
-  xBuffer = (pfloat *)h_xBuffer.ptr();
+
+  h_Gx = platform->device.mallocHost<pfloat>(ogs->Ngather);
+  o_Gx = platform->device.malloc<pfloat>(h_Gx.size());
+
+  h_Sx = platform->device.mallocHost<pfloat>(ogs->N);
+  o_Sx = platform->device.malloc<pfloat>(h_Sx.size());
+
+  h_weight = platform->device.mallocHost<pfloat>(o_Sx.size());
+  o_weight.copyTo(h_weight, h_weight.size());
 
   // convert dfloat to double
   std::vector<double> Av(nnz);
@@ -217,43 +230,53 @@ MGSolver_t::coarseLevel_t::~coarseLevel_t()
   if (AMGX) {
     delete AMGX;
   }
-
-  h_xBuffer.free();
-  o_xBuffer.free();
-  h_Sx.free();
-  h_Gx.free();
-  o_Sx.free();
-  o_Gx.free();
 }
 
 void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
 {
   platform->timer.tic(name + " coarseSolve", 1);
 
-  {
+  if (o_x.mode() == "Serial") {
+    // masked E->T
+    auto rhsPtr = o_rhs.ptr<pfloat>();
+    auto weightPtr = h_weight.ptr<pfloat>();
+    auto SxPtr = h_Sx.ptr<pfloat>();
+    for (int i = 0; i < ogs->N; i++) {
+      SxPtr[i] = rhsPtr[i] * weightPtr[i];
+    }
+
+    ogsGather(h_Gx.ptr<pfloat>(), h_Sx.ptr<pfloat>(), ogsPfloat, ogsAdd, ogs);
+
+    auto xBufferPtr = h_xBuffer.ptr<pfloat>();
+    for (int i = 0; i < N; i++) {
+      xBufferPtr[i] = 0;
+    }
+    auto boomerAMG = (hypreWrapper::boomerAMG_t *)this->boomerAMG;
+    boomerAMG->solve(h_Gx.ptr<pfloat>(), h_xBuffer.ptr<pfloat>());
+
+    // masked T->E
+    ogsScatter(o_x.ptr<pfloat>(), h_xBuffer.ptr<pfloat>(), ogsPfloat, ogsAdd, ogs);
+  } else {
     const bool useDevice = options.compareArgs("MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
 
-    const pfloat zero = 0.0;
-    platform->linAlg->fill<pfloat>(N, zero, o_xBuffer);
-    if (!useDevice) {
-      o_xBuffer.copyTo(xBuffer, N);
-    }
-
     // masked E->T
-    const pfloat one = 1.0;
-    vectorDotStarKernel(ogs->N, one, zero, o_weight, o_rhs, o_Sx);
+    vectorDotStarKernel(ogs->N, static_cast<pfloat>(1.0), static_cast<pfloat>(0.0), o_weight, o_rhs, o_Sx);
     ogsGather(o_Gx, o_Sx, ogsPfloat, ogsAdd, ogs);
     if (!useDevice) {
-      o_Gx.copyTo(Gx, N);
+      o_Gx.copyTo(h_Gx.ptr<pfloat>(), N);
     }
 
+    platform->linAlg->fill<pfloat>(N, 0.0, o_xBuffer);
+    if (!useDevice) {
+      o_xBuffer.copyTo(h_xBuffer, N);
+    }
     if (options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
       if (useDevice) {
         auto boomerAMG = (hypreWrapperDevice::boomerAMG_t *)this->boomerAMG;
         boomerAMG->solve(o_Gx, o_xBuffer);
       } else {
         auto boomerAMG = (hypreWrapper::boomerAMG_t *)this->boomerAMG;
-        boomerAMG->solve(Gx, xBuffer);
+        boomerAMG->solve(h_Gx.ptr<pfloat>(), h_xBuffer.ptr<pfloat>());
       }
     } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "AMGX")) {
       AMGX->solve(o_Gx.ptr(), o_xBuffer.ptr());
@@ -263,7 +286,7 @@ void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
     if (useDevice) {
       ogsScatter(o_x, o_xBuffer, ogsPfloat, ogsAdd, ogs);
     } else {
-      o_Gx.copyFrom(xBuffer, N);
+      o_Gx.copyFrom(h_xBuffer, N);
       ogsScatter(o_x, o_Gx, ogsPfloat, ogsAdd, ogs);
     }
   }

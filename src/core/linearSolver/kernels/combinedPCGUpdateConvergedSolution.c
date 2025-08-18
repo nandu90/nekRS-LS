@@ -1,8 +1,8 @@
 // converged solution update from Algorithm 5, https://arxiv.org/pdf/2205.08909.pdf
 extern "C" void
 FUNC(combinedPCGUpdateConvergedSolution)(const dlong &N,
-                                         const dlong &singleVectorUpdate,
-                                         const dlong &preco,
+                                         const int &singleVectorUpdate,
+                                         const int &preco,
                                          const dlong &fieldOffset,
                                          const dfloat &alphak,
                                          const dfloat &alphakm1,

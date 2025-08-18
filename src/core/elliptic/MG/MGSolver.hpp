@@ -78,17 +78,13 @@ public:
 
     occa::memory h_xBuffer;
     occa::memory o_xBuffer;
-    pfloat *xBuffer;
 
-    ogs_t *ogs;
-    pfloat *Gx, *Sx;
+    ogs_t *ogs = nullptr;
     occa::memory h_Sx, h_Gx;
     occa::memory o_Sx, o_Gx;
+    occa::memory o_weight, h_weight;
 
     std::string name;
-
-    pfloat *weight = NULL;
-    occa::memory o_weight;
 
     MPI_Comm comm;
     occa::device device;
@@ -98,7 +94,7 @@ public:
     coarseLevel_t(const std::string& name, setupAide options, MPI_Comm comm);
     ~coarseLevel_t();
 
-    void setupSolver(hlong *globalRowStarts, dlong nnz, hlong *Ai, hlong *Aj, dfloat *Avals, bool nullSpace);
+    void setupSolver(hlong *globalRowStarts, dlong nnz, hlong *Ai, hlong *Aj, dfloat *Avals, const occa::memory& o_weight, ogs_t *ogs, bool nullSpace);
     void updateMatrix(dlong nnz, hlong *Ai, hlong *Aj, dfloat *Avals);
 
     void solve(occa::memory &o_rhs, occa::memory &o_x);

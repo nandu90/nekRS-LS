@@ -32,12 +32,12 @@
 
 void pMGLevel::Ax(occa::memory o_x, occa::memory o_Ax)
 {
-  ellipticOperator(elliptic, o_x, o_Ax, pfloatString);
+  ellipticOperator(elliptic, o_x, o_Ax);
 }
 
 void pMGLevel::residual(occa::memory o_rhs, occa::memory o_x, occa::memory o_res)
 {
-  ellipticOperator(elliptic, o_x, o_res, pfloatString);
+  ellipticOperator(elliptic, o_x, o_res);
   platform->linAlg->axpbyMany<pfloat>(Nrows, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_rhs, -1.0, o_res);
 }
 
@@ -60,9 +60,7 @@ void pMGLevel::coarsen(occa::memory o_x, occa::memory o_Rx)
 
   if (options.compareArgs("DISCRETIZATION", "CONTINUOUS")) {
     oogs::startFinish(o_Rx, elliptic->Nfields, elliptic->fieldOffset, ogsPfloat, ogsAdd, elliptic->oogs);
-    ellipticApplyMask(elliptic,
-                      o_Rx,
-                      pfloatString); // apply mask again because coarsening does not preserve it
+    ellipticApplyMask(elliptic, o_Rx); // apply mask again because coarsening does not preserve it
   }
 
   const double factor =
@@ -219,7 +217,7 @@ void pMGLevel::smoothChebyshev(occa::memory &o_r, occa::memory &o_x, bool xIsZer
   // x_k+1 = x_k + d_k
   platform->linAlg->axpby<pfloat>(Nrows, one, o_d, one, o_x);
   flopCount += Nrows;
-  ellipticApplyMask(elliptic, o_x, pfloatString);
+  ellipticApplyMask(elliptic, o_x);
 
   const double factor =
       (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value) ? 0.5 : 1.0;
@@ -281,7 +279,7 @@ void pMGLevel::smoothFourthKindChebyshev(occa::memory &o_r, occa::memory &o_x, b
   // x_k+1 = x_k + \beta_k d_k
   platform->linAlg->axpby<pfloat>(Nrows, betas.back(), o_d, one, o_x);
   flopCount += 2 * Nrows;
-  ellipticApplyMask(elliptic, o_x, pfloatString);
+  ellipticApplyMask(elliptic, o_x);
 
   const double factor =
       (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value) ? 0.5 : 1.0;

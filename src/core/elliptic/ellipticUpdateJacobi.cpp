@@ -32,7 +32,6 @@
 void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
 {
   auto mesh = elliptic->mesh;
-  dfloat flopCount = 0.0;
 
   if (!o_invDiagA.isInitialized()) {
     if (elliptic->mgLevel) {
@@ -42,8 +41,9 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
     }
   }
 
-  auto kernel = (elliptic->mgLevel) ? elliptic->ellipticBlockBuildDiagonalPfloatKernel
-                                    : elliptic->ellipticBlockBuildDiagonalKernel;
+  auto kernel = (elliptic->mgLevel) ? 
+                elliptic->ellipticBlockBuildDiagonalPfloatKernel :
+                elliptic->ellipticBlockBuildDiagonalKernel;
 
   kernel(mesh->Nelements,
          elliptic->Nfields,
@@ -56,6 +56,7 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
          elliptic->o_lambda1,
          o_invDiagA);
 
+  dfloat flopCount = 0.0;
   flopCount += 12 * mesh->Nq + 12;
   flopCount += (elliptic->poisson) ? 0.0 : 2.0;
   flopCount *= static_cast<double>(mesh->Nlocal) * elliptic->Nfields;
@@ -64,11 +65,11 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
   oogs::startFinish(o_invDiagA,
                     elliptic->Nfields,
                     elliptic->fieldOffset,
-                    (elliptic->mgLevel) ? ogsPfloat : ogsDfloat,
+                    (o_invDiagA.dtype() == occa::dtype::get<float>()) ? ogsFloat : ogsDouble,
                     ogsAdd,
                     elliptic->oogs);
 
-  if (elliptic->mgLevel) {
+  if (o_invDiagA.dtype() == occa::dtype::get<pfloat>()) {
     platform->linAlg->adyMany<pfloat>(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_invDiagA);
   } else {
     platform->linAlg->adyMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_invDiagA);

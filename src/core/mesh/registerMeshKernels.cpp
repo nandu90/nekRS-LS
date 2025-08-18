@@ -164,6 +164,15 @@ void registerMeshKernels(occa::properties kernelInfoBC)
       fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, zeroNormalProps);
 
+      if (!std::is_same<dfloat, double>::value) {
+        auto props = zeroNormalProps;
+        props["defines/dfloat"] = "double";
+
+        kernelName = "applyZeroNormalMask";
+        fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
+        platform->kernelRequests.add(meshPrefix + kernelName + "Double", fileName, props);
+      }
+
       kernelName = "averageNormalBcType";
       fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, zeroNormalProps);

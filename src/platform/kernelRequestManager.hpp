@@ -76,7 +76,8 @@ private:
   std::set<kernelRequest_t> requests;
 
   // request name to request
-  std::map<std::string, kernelRequest_t> requestMap;
+  //std::map<std::string, kernelRequest_t> requestMap;
+  std::unordered_map<std::string, kernelRequest_t> requestMap;
 
   // request and kernel name to kernel
   std::map<std::tuple<kernelRequest_t, std::string>, occa::kernel> kernelMap;

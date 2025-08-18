@@ -50,6 +50,7 @@ elliptic_t *ellipticBuildMultigridLevelFine(elliptic_t *baseElliptic)
   memcpy(mesh, baseElliptic->mesh, sizeof(*baseElliptic->mesh));
   elliptic->mesh = mesh;
 
+  elliptic->AxKernel = occa::kernel();
   elliptic->mgLevel = true;
 
   ellipticBuildMultigridLevelKernels(elliptic);
@@ -87,21 +88,6 @@ elliptic_t *ellipticBuildMultigridLevelFine(elliptic_t *baseElliptic)
     platform->copyDfloatToPfloatKernel(mesh->Nq * mesh->Nq, baseElliptic->mesh->o_D, mesh->o_D);
     platform->copyDfloatToPfloatKernel(mesh->Nq * mesh->Nq, baseElliptic->mesh->o_DT, mesh->o_DT);
   }
-
-  std::string suffix = "CoeffHex3D";
-
-  std::string kernelName;
-
-  const std::string poissonPrefix = elliptic->poisson ? "poisson-" : "";
-
-  if (elliptic->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
-    kernelName = "ellipticPartialAxTrilinear" + suffix;
-  } else {
-    kernelName = "ellipticPartialAx" + suffix;
-  }
-
-  const std::string kernelSuffix = gen_suffix(elliptic, pfloatString);
-  elliptic->AxKernel = platform->kernelRequests.load(poissonPrefix + kernelName + kernelSuffix);
 
   return elliptic;
 }

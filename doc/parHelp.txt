@@ -133,7 +133,6 @@ coarseGridDiscretization    FEM [D]                                    linear fi
 
 coarseSolver/semfemSolver   smoother
                             jpcg                                       Jacobi preconditioned CG
-                              + combined
                               + residualTol=<float> 
                               + maxIter=<int> 
                             boomerAMG [D]                              HYPRE's AMG solver

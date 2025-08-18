@@ -150,15 +150,13 @@ void ellipticSolveSetup(elliptic_t *elliptic, const occa::memory &o_lambda0, con
 void ellipticOperator(elliptic_t *elliptic,
                       const occa::memory &o_q,
                       occa::memory &o_Aq,
-                      const char *precision,
                       bool masked = true);
 
 void ellipticAx(elliptic_t *elliptic,
                 dlong NelementsList,
                 const occa::memory &o_elementsList,
                 const occa::memory &o_q,
-                occa::memory &o_Aq,
-                const char *precision);
+                occa::memory &o_Aq);
 
 void ellipticUpdateJacobi(elliptic_t *ellipticBase, occa::memory &o_invDiagA);
 void ellipticUpdateAllJacobi(elliptic_t *elliptic);

@@ -107,12 +107,6 @@ void meshNekReaderHex3D(int N, mesh_t *mesh)
                EXIT_FAILURE,
                "\nboundary ID needs to be one-based index but min(ID) is %d!\n",
                minEToB);
-#if 0
-    MPI_Allreduce(MPI_IN_PLACE, &maxEToB, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
-    if (maxEToB - minEToB != mesh->Nbid  - 1) {
-      printf("\nboundary IDs are not contiguous!\n");
-    }
-#endif
   }
 
   // assign vertex coords

@@ -1,7 +1,7 @@
 // "pre" region from Algorithm 5, https://arxiv.org/pdf/2205.08909.pdf
 @kernel void combinedPCGPreMatVec(const dlong N,
-                                  const dlong updateX,
-                                  const dlong preco,
+                                  const int updateX,
+                                  const int preco,
                                   const dlong fieldOffset,
                                   const dfloat alphakm1,
                                   const dfloat alphakm2,

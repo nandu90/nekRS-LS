@@ -1,7 +1,7 @@
 #include <elliptic.h>
 #include <ellipticApplyMask.hpp>
 
-void ellipticApplyMask(elliptic_t *solver, occa::memory &o_x, std::string precision)
+void ellipticApplyMask(elliptic_t *solver, occa::memory &o_x)
 {
   auto mesh = solver->mesh;
   ellipticApplyMask(solver,
@@ -9,8 +9,7 @@ void ellipticApplyMask(elliptic_t *solver, occa::memory &o_x, std::string precis
                     solver->Nmasked,
                     mesh->o_elementList,
                     solver->o_maskIds,
-                    o_x,
-                    precision);
+                    o_x);
 }
 
 void ellipticApplyMask(elliptic_t *solver,
@@ -18,23 +17,17 @@ void ellipticApplyMask(elliptic_t *solver,
                        dlong Nmasked,
                        const occa::memory &o_elementList,
                        const occa::memory &o_maskIds,
-                       occa::memory &o_x,
-                       std::string precision)
+                       occa::memory &o_x)
 {
   auto mesh = solver->mesh;
 
   if (solver->applyZeroNormalMask) {
-    nekrsCheck(precision != dfloatString,
-               MPI_COMM_SELF,
-               EXIT_FAILURE,
-               "Precision level (%s) not supported in applyZeroNormalMask\n",
-               precision.c_str());
     solver->applyZeroNormalMask(Nelements, o_elementList, o_x);
   }
 
-  if (precision != dfloatString) {
-    platform->linAlg->mask<pfloat>(Nmasked, o_maskIds, o_x);
-  } else {
-    platform->linAlg->mask(Nmasked, o_maskIds, o_x);
+  if (o_x.dtype() == occa::dtype::get<double>()) {
+    platform->linAlg->mask<double>(Nmasked, o_maskIds, o_x);
+  } else if (o_x.dtype() == occa::dtype::get<float>()) {
+    platform->linAlg->mask<float>(Nmasked, o_maskIds, o_x);
   }
 }

@@ -85,6 +85,7 @@ using dlong = long long int;
 #include <sys/stat.h>
 #include <cfenv>
 #include <csignal>
+#include <type_traits>
 
 #ifdef CPPTRACE_ENABLED
 #include <cpptrace/cpptrace.hpp>

@@ -55,17 +55,41 @@ public:
 
     this->tiny = 10 * std::numeric_limits<T>::min();
     this->FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
-    auto type =
-        ((std::is_same<T, pfloat>::value && !std::is_same<dfloat, pfloat>::value) ? std::string("pfloat")
-                                                                                  : std::string(""));
-    this->knlPrefix = std::string("cg::") + type + std::to_string(this->Nfields) + "-";
+    this->knlPrefix = std::string("cg::") + ((std::is_same<T, double>::value) ? "double::" : "float::")
+                      + std::to_string(this->Nfields) + "::";
+
+    Nblock = (this->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
+
+    updateKernel = platform->kernelRequests.load(this->knlPrefix + "blockUpdatePCG");
+    combinedPreAxKernel = platform->kernelRequests.load(this->knlPrefix + "combinedPCGPreMatVec");
+    combinedPostAxKernel= platform->kernelRequests.load(this->knlPrefix + "combinedPCGPostMatVec"); 
+    combinedUpdateKernel = platform->kernelRequests.load(this->knlPrefix + "combinedPCGUpdateConvergedSolution");
   };
 
-  int solve(const dfloat tol, const int MAXIT, dfloat &rdotr, occa::memory &o_r, occa::memory &o_x) override
+  void solve(const dfloat tol, const int MAXIT, const occa::memory &o_rIn, occa::memory &o_x) override
   {
+    this->r0Norm = platform->linAlg->weightedNorm2Many<T>(this->Nlocal,
+                                                          this->Nfields,
+                                                          this->fieldOffset,
+                                                          this->o_weight,
+                                                          o_rIn,
+                                                          platform->comm.mpiComm());
+
+    nekrsCheck(std::isnan(this->r0Norm),
+               MPI_COMM_SELF,
+               EXIT_FAILURE,
+               "%s unreasonable initial residual norm!\n",
+               this->_name.c_str());
+
+    this->rNorm = this->r0Norm;
+
     {
-      const auto n =
-          (this->Nfields > 1) ? this->Nfields * static_cast<size_t>(this->fieldOffset) : this->Nlocal;
+      const auto n = (this->Nfields > 1) ? 
+                     this->Nfields * static_cast<size_t>(this->fieldOffset) :
+                     static_cast<size_t>(this->Nlocal);
+
+      o_r = platform->deviceMemoryPool.reserve<T>(n);
+      o_r.copyFrom(o_rIn);
 
       o_p = platform->deviceMemoryPool.reserve<T>(n);
       platform->linAlg->fill<T>(o_p.size(), 0.0, o_p);
@@ -77,14 +101,8 @@ public:
       }
     }
 
-    const auto Nblock = [&]() { return (this->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE; }();
-
     auto Nreductions = [&]() {
-      int n = 1;
-      if (combined) {
-        n = CombinedPCGId::nReduction;
-      }
-      return n;
+      return (combined) ? CombinedPCGId::nReduction : 1;
     }();
 
     h_tmpReductions = platform->memoryPool.reserve<T>(Nreductions * Nblock);
@@ -92,34 +110,33 @@ public:
 
     if (platform->comm.mpiRank() == 0 && platform->verbose()) {
       auto txt = (combined && this->o_invDiagA.isInitialized() || preco) ? std::string("P") : std::string("");
-      txt += (combined) ? std::string("CCG") : std::string("CG") + ((flexible) ? "-flex" : "");
-      printf("%s %s: initial res norm %.15e target %e \n", txt.c_str(), this->_name.c_str(), rdotr, tol);
+      txt += (combined) ? "CCG" : "CG";
+      txt += (flexible) ? "-flex" : "";
+      printf("%s %s: initial res norm %.15e target %e \n", txt.c_str(), this->_name.c_str(), this->rNorm, tol);
     }
 
-    const auto Niter = [&]() {
+    platform->linAlg->fill<T>(o_r.size(), 0.0, o_x);
+
+    _nIter = [&]() {
       if (combined) {
-        return runCombined(tol, MAXIT, rdotr, o_r, o_x);
+        return runCombined(tol, MAXIT, o_r, o_x);
       } else {
-        return runStandard(tol, MAXIT, rdotr, o_r, o_x);
+        return runStandard(tol, MAXIT, o_r, o_x);
       }
     }();
 
+    o_r.free();
     o_p.free();
-    if (o_z != o_r) {
-      o_z.free();
-    }
+    o_z.free();
     o_Ap.free();
-    if (combined) {
-      o_v.free();
-    }
+    o_v.free();
 
     o_tmpReductions.free();
     h_tmpReductions.free();
-
-    return Niter;
   };
 
 private:
+  occa::memory o_r;
   occa::memory o_p;
   occa::memory o_z;
   occa::memory o_Ap;
@@ -129,12 +146,19 @@ private:
 
   occa::memory o_weight;
 
+  dlong Nblock;
+
   bool flexible;
   bool combined;
 
   std::function<void(const occa::memory &o_q, occa::memory &o_Aq)> Ax;
   std::function<void(const occa::memory &o_r, occa::memory &o_z)> preco;
 
+  occa::kernel updateKernel;
+  occa::kernel combinedPreAxKernel;
+  occa::kernel combinedPostAxKernel;
+  occa::kernel combinedUpdateKernel;
+  
   dfloat update(const occa::memory &o_p,
                 const occa::memory &o_Ap,
                 const T alpha,
@@ -145,8 +169,7 @@ private:
 
     // r <= r - alpha*A*p
     // dot(r,r)
-    launchKernel(this->knlPrefix + "blockUpdatePCG",
-                 this->Nlocal,
+    updateKernel(this->Nlocal,
                  this->fieldOffset,
                  o_weight,
                  o_Ap,
@@ -155,9 +178,6 @@ private:
                  o_tmpReductions);
 
     dfloat rdotr1 = 0;
-#ifdef ELLIPTIC_ENABLE_TIMER
-    platform->timer.tic("dotp");
-#endif
     if (serial) {
       rdotr1 = *(o_tmpReductions.ptr<T>());
     } else {
@@ -178,9 +198,6 @@ private:
                                    o_x);
 
     MPI_Allreduce(MPI_IN_PLACE, &rdotr1, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
-#ifdef ELLIPTIC_ENABLE_TIMER
-    platform->timer.toc("dotp");
-#endif
 
     platform->flopCounter->add("UpdatePCG",
                                this->FPfactor * this->Nfields * static_cast<double>(this->Nlocal) * 6 +
@@ -189,33 +206,31 @@ private:
     return rdotr1;
   };
 
-  void combinedReductions(const occa::memory &o_Minv,
-                          const occa::memory &o_v,
+  void combinedReductions(const occa::memory &o_v,
                           const occa::memory &o_p,
                           const occa::memory &o_r,
                           std::array<T, CombinedPCGId::nReduction> &reductions)
   {
     const bool serial = platform->serial;
-    launchKernel(this->knlPrefix + "combinedPCGPostMatVec",
-                 this->Nlocal,
-                 this->fieldOffset,
-                 (this->o_invDiagA.isInitialized()) ? 1 : 0,
-                 o_weight,
-                 o_weight,
-                 o_Minv,
-                 o_v,
-                 o_p,
-                 o_r,
-                 o_tmpReductions);
+    combinedPostAxKernel(this->Nlocal,
+                         this->fieldOffset,
+                         static_cast<int>(this->o_invDiagA.isInitialized()),
+                         o_weight,
+                         o_weight,
+                         this->o_invDiagA,
+                         o_v,
+                         o_p,
+                         o_r,
+                         o_tmpReductions);
+
+    std::fill(reductions.begin(), reductions.end(), 0.0);
+
     if (serial) {
       auto ptr = o_tmpReductions.ptr<T>();
       std::copy(ptr, ptr + CombinedPCGId::nReduction, reductions.begin());
     } else {
       auto tmp = h_tmpReductions.ptr<T>();
       o_tmpReductions.copyTo(tmp);
-      std::fill(reductions.begin(), reductions.end(), 0.0);
-
-      const dlong Nblock = (this->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
       for (int red = 0; red < CombinedPCGId::nReduction; ++red) {
         for (int n = 0; n < Nblock; ++n) {
@@ -224,11 +239,10 @@ private:
       }
     }
 
-    const auto mpiType = (std::is_same<T, float>::value) ? MPI_FLOAT : MPI_DFLOAT;
     MPI_Allreduce(MPI_IN_PLACE,
                   reductions.data(),
                   CombinedPCGId::nReduction,
-                  MPI_DFLOAT,
+                  (std::is_same<T, float>::value) ? MPI_FLOAT : MPI_DOUBLE,
                   MPI_SUM,
                   platform->comm.mpiComm());
 
@@ -236,7 +250,7 @@ private:
                                this->FPfactor * this->Nfields * static_cast<double>(this->Nlocal) * 3 * 7);
   };
 
-  int runStandard(const dfloat tol, const int MAXIT, dfloat &rdotr, occa::memory &o_r, occa::memory &o_x)
+  int runStandard(const dfloat tol, const int MAXIT, occa::memory &o_r, occa::memory &o_x)
   {
     dfloat rdotz1;
     dfloat alpha;
@@ -256,7 +270,7 @@ private:
                                                             o_z,
                                                             platform->comm.mpiComm());
       } else {
-        rdotz1 = rdotr;
+        rdotz1 = this->rNorm;
       }
 
       if (platform->comm.mpiRank() == 0) {
@@ -298,7 +312,7 @@ private:
                                      this->fieldOffset,
                                      1.0,
                                      o_z,
-                                     static_cast<dfloat>(beta),
+                                     beta,
                                      o_p);
 
       Ax(o_p, o_Ap);
@@ -320,12 +334,12 @@ private:
       //  x <= x + alpha*p
       //  r <= r - alpha*A*p
       //  dot(r,r)
-      rdotr = std::sqrt(update(o_p, o_Ap, alpha, o_x, o_r));
+      this->rNorm = std::sqrt(update(o_p, o_Ap, alpha, o_x, o_r));
 #ifdef DEBUG
-      printf("rdotr: %.15e\n", rdotr);
+      printf("rdotr: %.15e\n", this->rNorm);
 #endif
       if (platform->comm.mpiRank() == 0) {
-        nekrsCheck(std::isnan(rdotr),
+        nekrsCheck(std::isnan(this->rNorm),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
                    "%s\n",
@@ -333,15 +347,15 @@ private:
       }
 
       if (platform->verbose() && (platform->comm.mpiRank() == 0)) {
-        printf("it %d r norm %.15e\n", iter, rdotr);
+        printf("it %d r norm %.15e\n", iter, this->rNorm);
       }
-    } while (rdotr > tol && iter < MAXIT);
+    } while (this->rNorm > tol && iter < MAXIT);
 
     return iter;
   };
 
   // Algo 5 from https://arxiv.org/pdf/2205.08909.pdf
-  int runCombined(const dfloat tol, const int MAXIT, dfloat &rdotr, occa::memory &o_r, occa::memory &o_x)
+  int runCombined(const dfloat tol, const int MAXIT, occa::memory &o_r, occa::memory &o_x)
   {
     T betakm1 = 0;
     T betakm2 = 0;
@@ -350,30 +364,27 @@ private:
     T alphakm2 = 0;
 
     std::array<T, CombinedPCGId::nReduction> reductions;
-
-    auto &o_Minv = (this->o_invDiagA.isInitialized()) ? this->o_invDiagA : o_NULL;
     platform->linAlg->fill<T>(o_v.size(), 0.0, o_v);
 
     int iter = 0;
     do {
       iter++;
-      const dlong updateX = iter > 1 && iter % 2 == 1;
+      const auto updateX = iter > 1 && iter % 2 == 1;
 
-      launchKernel(this->knlPrefix + "combinedPCGPreMatVec",
-                   this->Nlocal,
-                   updateX,
-                   (o_Minv.isInitialized()) ? 1 : 0,
-                   this->fieldOffset,
-                   alphakm1,
-                   alphakm2,
-                   betakm1,
-                   betakm2,
-                   (updateX) ? alphakm2 / betakm2 : static_cast<T>(0),
-                   o_Minv,
-                   o_v,
-                   o_p,
-                   o_x,
-                   o_r);
+      combinedPreAxKernel(this->Nlocal,
+                          static_cast<int>(updateX),
+                          static_cast<int>(this->o_invDiagA.isInitialized()),
+                          this->fieldOffset,
+                          alphakm1,
+                          alphakm2,
+                          betakm1,
+                          betakm2,
+                          (updateX) ? alphakm2 / betakm2 : static_cast<T>(0),
+                          this->o_invDiagA,
+                          o_v,
+                          o_p,
+                          o_x,
+                          o_r);
 
       platform->flopCounter->add("CombinedPCGPreMatVecKernel",
                                  this->FPfactor * this->Nfields * static_cast<double>(this->Nlocal) * 0.5 *
@@ -381,15 +392,15 @@ private:
 
       Ax(o_p, o_v);
 
-      combinedReductions(o_Minv, o_v, o_p, o_r, reductions);
+      combinedReductions(o_v, o_p, o_r, reductions);
 
-      const auto gammak = reductions[CombinedPCGId::gamma];
-      const auto ak = reductions[CombinedPCGId::a];
-      const auto bk = reductions[CombinedPCGId::b];
-      const auto ck = reductions[CombinedPCGId::c];
-      const auto dk = reductions[CombinedPCGId::d];
-      const auto ek = reductions[CombinedPCGId::e];
-      const auto fk = reductions[CombinedPCGId::f];
+      const auto& gammak = reductions[CombinedPCGId::gamma];
+      const auto& ak = reductions[CombinedPCGId::a];
+      const auto& bk = reductions[CombinedPCGId::b];
+      const auto& ck = reductions[CombinedPCGId::c];
+      const auto& dk = reductions[CombinedPCGId::d];
+      const auto& ek = reductions[CombinedPCGId::e];
+      const auto& fk = reductions[CombinedPCGId::f];
 
       alphak = dk / (ak + this->tiny);
 
@@ -408,25 +419,24 @@ private:
 #endif
 
       // r_{k+1}^T r_{k+1} = (r - alpha v)^T (r - alpha v)
-      rdotr = gammak + alphak * (-2. * bk + alphak * ck);
-      rdotr = std::sqrt(std::abs(rdotr));
+      this->rNorm = std::sqrt(std::abs(gammak + alphak * (-2. * bk + alphak * ck)));
 #ifdef DEBUG
-      printf("rdotr: %.15e\n", rdotr);
+      printf("rdotr: %.15e\n", this->rNorm);
 #endif
       if (platform->comm.mpiRank() == 0) {
-        nekrsCheck(std::isnan(rdotr),
+        nekrsCheck(std::isnan(this->rNorm),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
                    "%s\n",
                    "Detected invalid resiual norm while running linear solver!");
       }
       if (platform->verbose() && (platform->comm.mpiRank() == 0)) {
-        printf("it %d r norm %.15e\n", iter, rdotr);
+        printf("it %d r norm %.15e\n", iter, this->rNorm);
       }
 
       // converged, update solution prior to exit
-      if (rdotr <= tol) {
-        const dlong singleVectorUpdate = iter % 2 == 1;
+      if (this->rNorm <= tol) {
+        const auto singleVectorUpdate = iter % 2 == 1;
         if (platform->comm.mpiRank() == 0) {
           nekrsCheck(!singleVectorUpdate && betakm1 == 0,
                      MPI_COMM_SELF,
@@ -434,21 +444,19 @@ private:
                      "%s\n",
                      "Cannot update solution as beta == 0!");
         }
-        const T alphaInvBeta = (!singleVectorUpdate) ? alphakm1 / betakm1 : 0;
 
-        launchKernel(this->knlPrefix + "combinedPCGUpdateConvergedSolution",
-                     this->Nlocal,
-                     singleVectorUpdate,
-                     (o_Minv.isInitialized()) ? 1 : 0,
-                     this->fieldOffset,
-                     alphak,
-                     alphakm1,
-                     betakm1,
-                     alphaInvBeta,
-                     o_Minv,
-                     o_p,
-                     o_r,
-                     o_x);
+        combinedUpdateKernel(this->Nlocal,
+                             static_cast<int>(singleVectorUpdate),
+                             static_cast<int>(this->o_invDiagA.isInitialized()),
+                             this->fieldOffset,
+                             alphak,
+                             alphakm1,
+                             betakm1,
+                             (!singleVectorUpdate) ? alphakm1 / betakm1 : static_cast<T>(0),
+                             this->o_invDiagA,
+                             o_p,
+                             o_r,
+                             o_x);
       }
 
       betakm2 = betakm1;
@@ -461,7 +469,7 @@ private:
       alphakm2 = alphakm1;
       alphakm1 = alphak;
 
-    } while (rdotr > tol && iter < MAXIT);
+    } while (this->rNorm > tol && iter < MAXIT);
 
     return iter;
   };

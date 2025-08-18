@@ -79,32 +79,32 @@ void kernelRequestManager_t::add(kernelRequest_t request, bool checkUnique)
 
 occa::kernel kernelRequestManager_t::load(const std::string &requestName, const std::string &_kernelName)
 {
-  auto errTxt = [&]() {
-    const auto valid = processed() && (requestMap.find(requestName) != requestMap.end());
-
-    if (valid) {
-      return std::string();
-    }
-
-    std::stringstream txt;
-    txt << "\n";
-    txt << "Cannot find request " << "<" << requestName << ">" << "\n";
-    txt << "Available:\n";
-    for (auto &keyAndValue : requestMap) {
-      txt << "\t" << "<" << keyAndValue.second.requestName << ">" << "\n";
-    }
-
-    txt << "===========================================================\n";
-    auto retVal = txt.str();
-
-    return retVal;
-  }();
-
-  nekrsCheck(errTxt.size(), MPI_COMM_SELF, EXIT_FAILURE, "%s\n", errTxt.c_str());
-
   auto kernel = [&]() {
-    const auto &req = requestMap.find(requestName)->second;
+    const auto it = requestMap.find(requestName);
 
+    auto errTxt = [&]() {
+      const auto valid = processed() && (it != requestMap.end());
+      if (valid) {
+        return std::string();
+      }
+ 
+      std::stringstream txt;
+      txt << "\n";
+      txt << "Cannot find request " << "<" << requestName << ">" << "\n";
+      txt << "Available:\n";
+      for (auto &keyAndValue : requestMap) {
+        txt << "\t" << "<" << keyAndValue.second.requestName << ">" << "\n";
+      }
+ 
+      txt << "===========================================================\n";
+      auto retVal = txt.str();
+ 
+      return retVal;
+    }();
+ 
+    nekrsCheck(errTxt.size(), MPI_COMM_SELF, EXIT_FAILURE, "%s\n", errTxt.c_str());
+
+    const auto &req = it->second;
     auto reqKnl = req.kernel;
     if (reqKnl.isInitialized()) {
       return reqKnl; // request is mapped to a already loaded kernel

@@ -88,11 +88,20 @@ void ellipticCoarseFEMGridSetup(elliptic_t *elliptic, bool update)
   }
   free(coarseA);
 
+
+  auto& coarseLevel = precon->MGSolver->coarseLevel;
+
   if (update) {
-    precon->MGSolver->coarseLevel->updateMatrix(nnzCoarseA, Rows, Cols, Vals);
+    coarseLevel->updateMatrix(nnzCoarseA, Rows, Cols, Vals);
   } else {
-    precon->MGSolver->coarseLevel
-        ->setupSolver(coarseGlobalStarts, nnzCoarseA, Rows, Cols, Vals, ellipticCoarse->nullspace);
+    coarseLevel->setupSolver(coarseGlobalStarts, 
+                             nnzCoarseA, 
+                             Rows, 
+                             Cols, 
+                             Vals, 
+                             ellipticCoarse->o_invDegree,
+                             ellipticCoarse->ogs,
+                             ellipticCoarse->nullspace);
   }
 
   free(coarseGlobalStarts);
@@ -156,14 +165,14 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
 
     auto timeOperator = [&]() {
       const int Nsamples = 10;
-      ellipticOperator(elliptic, o_p, o_Ap, pfloatString);
+      ellipticOperator(elliptic, o_p, o_Ap);
 
       platform->device.finish();
       MPI_Barrier(platform->comm.mpiComm());
       const double start = MPI_Wtime();
 
       for (int test = 0; test < Nsamples; ++test) {
-        ellipticOperator(elliptic, o_p, o_Ap, pfloatString);
+        ellipticOperator(elliptic, o_p, o_Ap);
       }
 
       platform->device.finish();
@@ -180,8 +189,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
                    elliptic->mesh->NlocalGatherElements,
                    elliptic->mesh->o_localGatherElementList,
                    o_p,
-                   o_Ap,
-                   pfloatString);
+                   o_Ap);
       };
 
       elliptic->oogsAx = oogs::setup(elliptic->ogs, 1, 0, ogsPfloat, callback, oogsMode);
@@ -219,69 +227,73 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
 
   // build intermediate MGLevels
   for (int n = 1; n < numMGLevels - 1; n++) {
-    int Nc = levelDegree[n];
-    int Nf = levelDegree[n - 1];
-    elliptic_t *ellipticFine = ((pMGLevel *)levels[n - 1])->elliptic;
+    const auto Nc = levelDegree[n];
+    const auto Nf = levelDegree[n - 1];
+    auto fine = ((pMGLevel *)levels[n - 1])->elliptic;
     if (platform->comm.mpiRank() == 0) {
       printf("============= BUILDING pMG%d ==================\n", Nc);
     }
 
-    elliptic_t *ellipticC = ellipticBuildMultigridLevel(ellipticFine, Nc, Nf);
-
-    ellipticC->oogs = oogs::setup(ellipticC->ogs, 1, 0, ogsPfloat, NULL, oogsMode);
-    ellipticC->oogsAx = ellipticC->oogs;
+    auto lvl = ellipticBuildMultigridLevel(fine, Nc, Nf);
+    lvl->oogs = oogs::setup(lvl->ogs, 1, 0, ogsPfloat, NULL, oogsMode);
+    lvl->oogsAx = lvl->oogs;
 
     levels[n] = new pMGLevel(elliptic,
                              meshLevels.data(),
-                             ellipticFine,
-                             ellipticC,
+                             fine,
+                             lvl,
                              Nf,
                              Nc,
                              options,
                              platform->comm.mpiComm());
-    precon->MGSolver->numLevels++;
 
-    autoOverlap(ellipticC);
+    precon->MGSolver->numLevels++;
+    autoOverlap(lvl);
   }
 
   // set up coarse level numMGLevels - 1
-  elliptic_t *ellipticCoarse;
-  if (platform->comm.mpiRank() == 0) {
-    printf("============= BUILDING COARSE pMG%d ==================\n", Nmin);
-  }
-
-  if (Nmax > Nmin) {
-    int Nc = levelDegree[numMGLevels - 1];
-    int Nf = levelDegree[numMGLevels - 2];
-    elliptic_t *ellipticFine = ((pMGLevel *)levels[numMGLevels - 2])->elliptic;
-
-    ellipticCoarse = ellipticBuildMultigridLevel(ellipticFine, Nc, Nf);
-
-    ellipticCoarse->oogs = oogs::setup(ellipticCoarse->ogs, 1, 0, ogsPfloat, NULL, oogsMode);
-    ellipticCoarse->oogsAx = ellipticCoarse->oogs;
-
-    levels[numMGLevels - 1] = new pMGLevel(elliptic,
-                                           meshLevels.data(),
-                                           ellipticFine,
-                                           ellipticCoarse,
-                                           Nf,
-                                           Nc,
-                                           options,
-                                           platform->comm.mpiComm(),
-                                           true);
-
-    if (options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER") ||
-        options.compareArgs("MULTIGRID COARSE SOLVER", "CG") ||
-        options.compareArgs("MULTIGRID COARSE SOLVER", "GMRES") ||
-        options.compareArgs("PRECONDITIONER", "SEMFEM")) {
-      autoOverlap(ellipticCoarse);
+  auto ellipticCoarse = [&]() 
+  { 
+    if (platform->comm.mpiRank() == 0) {
+      printf("============= BUILDING COARSE pMG%d ==================\n", Nmin);
     }
-  } else {
-    ellipticCoarse = elliptic;
-    levels[numMGLevels - 1] = new pMGLevel(ellipticCoarse, Nmin, options, platform->comm.mpiComm(), true);
-  }
-  precon->MGSolver->baseLevel = precon->MGSolver->numLevels;
-  precon->MGSolver->numLevels++;
+
+    elliptic_t *crs; 
+    if (Nmax > Nmin) {
+      const auto Nc = levelDegree[numMGLevels - 1];
+      const auto Nf = levelDegree[numMGLevels - 2];
+      auto fine = ((pMGLevel *)levels[numMGLevels - 2])->elliptic;
+ 
+      crs = ellipticBuildMultigridLevel(fine, Nc, Nf);
+ 
+      crs->oogs = oogs::setup(crs->ogs, 1, 0, ogsPfloat, NULL, oogsMode);
+      crs->oogsAx = crs->oogs;
+ 
+      levels[numMGLevels - 1] = new pMGLevel(elliptic,
+                                             meshLevels.data(),
+                                             fine,
+                                             crs,
+                                             Nf,
+                                             Nc,
+                                             options,
+                                             platform->comm.mpiComm(),
+                                             true);
+ 
+      if (options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER") ||
+          options.compareArgs("MULTIGRID COARSE SOLVER", "CG") ||
+          options.compareArgs("MULTIGRID COARSE SOLVER", "GMRES") ||
+          options.compareArgs("PRECONDITIONER", "SEMFEM")) {
+        autoOverlap(crs);
+      }
+    } else {
+      crs = elliptic;
+      levels[numMGLevels - 1] = new pMGLevel(crs, Nmin, options, platform->comm.mpiComm(), true);
+    }
+    precon->MGSolver->baseLevel = precon->MGSolver->numLevels;
+    precon->MGSolver->numLevels++;
+
+    return crs;
+  }();
 
   if (options.compareArgs("PRECONDITIONER", "SEMFEM")) { // smoothed SEMFEM
     precon->SEMFEMSolver = new SEMFEMSolver_t(ellipticCoarse);
@@ -331,50 +343,22 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
         [maxNiter, tol, baseLevel](MGSolver_t::coarseLevel_t *coarseLevel,
                                    occa::memory &o_rhs,
                                    occa::memory &o_x) {
-          auto &o_r = baseLevel->o_res;
           auto &elliptic = baseLevel->elliptic;
-#if 0
-            baseLevel->residual(o_rhs, o_x, o_r);
-#else
-          o_r.copyFrom(o_rhs); // o_x is ZERO
-#endif
-
-          dfloat resNorm = platform->linAlg->weightedNorm2Many<pfloat>(elliptic->mesh->Nlocal,
-                                                                       elliptic->Nfields,
-                                                                       elliptic->fieldOffset,
-                                                                       elliptic->o_invDegree,
-                                                                       o_r,
-                                                                       platform->comm.mpiComm());
 
           if (elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
             ellipticUpdateJacobi(elliptic, elliptic->KSP->o_invDiagA);
           }
-          elliptic->KSP->solve(tol, maxNiter, resNorm, o_r, o_x);
+          auto& o_res = o_rhs;
+          elliptic->KSP->solve(tol, maxNiter, o_res, o_x);
         };
   } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
     ellipticCoarseFEMGridSetup(elliptic);
-
-    MGSolver_t::coarseLevel_t *coarseLevel = precon->MGSolver->coarseLevel;
-    coarseLevel->ogs = ellipticCoarse->ogs;
-
-    coarseLevel->o_weight = ellipticCoarse->o_invDegree;
-    coarseLevel->weight = (pfloat *)calloc(ellipticCoarse->mesh->Nlocal, sizeof(pfloat));
-    coarseLevel->o_weight.copyTo(coarseLevel->weight, ellipticCoarse->mesh->Nlocal);
-
-    coarseLevel->h_Gx = platform->device.mallocHost<pfloat>(coarseLevel->ogs->Ngather);
-    coarseLevel->Gx = (pfloat *)coarseLevel->h_Gx.ptr();
-    coarseLevel->o_Gx = platform->device.malloc<pfloat>(coarseLevel->ogs->Ngather);
-
-    coarseLevel->h_Sx = platform->device.mallocHost<pfloat>(ellipticCoarse->mesh->Nlocal);
-    coarseLevel->Sx = (pfloat *)coarseLevel->h_Sx.ptr();
-    coarseLevel->o_Sx = platform->device.malloc<pfloat>(ellipticCoarse->mesh->Nlocal);
-
     if (options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER")) {
       auto baseLevel = (pMGLevel *)levels[numMGLevels - 1];
 
       precon->MGSolver->coarseLevel->solvePtr =
           [baseLevel](MGSolver_t::coarseLevel_t *coarseLevel, occa::memory &o_rhs, occa::memory &o_x) {
-            occa::memory o_res = baseLevel->o_res;
+            auto& o_res = baseLevel->o_res;
             baseLevel->smooth(o_rhs, o_x, true);
             baseLevel->residual(o_rhs, o_x, o_res);
 

@@ -726,25 +726,25 @@ void nrs_t::printRunStat(int step)
   const int rank = platform->comm.mpiRank();
   auto comm_ = platform->comm.mpiComm();
 
-  platform->timer.set("velocity proj",
-                      platform->timer.query("velocity proj pre", "DEVICE:MAX") +
-                          platform->timer.query("velocity proj post", "DEVICE:MAX"),
-                      platform->timer.count("velocity proj pre"));
+  platform->timer.set("fluid velocity proj",
+                      platform->timer.query("fluid velocity proj pre", "DEVICE:MAX") +
+                          platform->timer.query("fluid velocity proj post", "DEVICE:MAX"),
+                      platform->timer.count("fluid velocity proj pre"));
 
-  platform->timer.set("pressure proj",
-                      platform->timer.query("pressure proj pre", "DEVICE:MAX") +
-                          platform->timer.query("pressure proj post", "DEVICE:MAX"),
-                      platform->timer.count("pressure proj pre"));
+  platform->timer.set("fluid pressure proj",
+                      platform->timer.query("fluid pressure proj pre", "DEVICE:MAX") +
+                          platform->timer.query("fluid pressure proj post", "DEVICE:MAX"),
+                      platform->timer.count("fluid pressure proj pre"));
 
   platform->timer.set("scalar proj",
                       platform->timer.query("scalar proj pre", "DEVICE:MAX") +
                           platform->timer.query("scalar proj post", "DEVICE:MAX"),
                       platform->timer.count("scalar proj pre"));
 
-  platform->timer.set("mesh proj",
-                      platform->timer.query("mesh proj pre", "DEVICE:MAX") +
-                          platform->timer.query("mesh proj post", "DEVICE:MAX"),
-                      platform->timer.count("mesh proj pre"));
+  platform->timer.set("geom proj",
+                      platform->timer.query("geom proj pre", "DEVICE:MAX") +
+                          platform->timer.query("geom proj post", "DEVICE:MAX"),
+                      platform->timer.count("geom proj pre"));
 
   double gsTime = ogsTime(/* reportHostTime */ true);
   MPI_Allreduce(MPI_IN_PLACE, &gsTime, 1, MPI_DOUBLE, MPI_MAX, comm_);
@@ -853,11 +853,10 @@ void nrs_t::printRunStat(int step)
                                  "DEVICE:MAX",
                                  tElapsedTimeSolve);
 
-  platform->timer.printStatEntry("    meshUpdate          ", "meshUpdate", "DEVICE:MAX", tElapsedTimeSolve);
-  const double tMesh = platform->timer.query("meshSolve", "DEVICE:MAX");
-  platform->timer.printStatEntry("    meshSolve           ", "meshSolve", "DEVICE:MAX", tElapsedTimeSolve);
-  platform->timer.printStatEntry("      preconditioner    ", "mesh preconditioner", "DEVICE:MAX", tMesh);
-  platform->timer.printStatEntry("      initial guess     ", "mesh proj", "DEVICE:MAX", tMesh);
+  const double tMesh = platform->timer.query("geomSolve", "DEVICE:MAX");
+  platform->timer.printStatEntry("    geomSolve           ", "geomSolve", "DEVICE:MAX", tElapsedTimeSolve);
+  platform->timer.printStatEntry("      preconditioner    ", "geom preconditioner", "DEVICE:MAX", tMesh);
+  platform->timer.printStatEntry("      initial guess     ", "geom proj", "DEVICE:MAX", tMesh);
 
   const double tNekNek = platform->timer.query("neknek update boundary", "DEVICE:MAX");
   platform->timer.printStatEntry("    neknek              ",
@@ -904,7 +903,7 @@ void nrs_t::printRunStat(int step)
 
   const double tPressurePreco = platform->timer.query("fluid pressure preconditioner", "DEVICE:MAX");
   platform->timer.printStatEntry("      preconditioner    ",
-                                 "pressure preconditioner",
+                                 "fluid pressure preconditioner",
                                  "DEVICE:MAX",
                                  tPressure);
 

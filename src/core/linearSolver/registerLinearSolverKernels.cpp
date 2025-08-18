@@ -4,17 +4,20 @@
 namespace
 {
 
+template <typename T>
 void registerGMRESKernels(int Nfields)
 {
-  const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/linearSolver/");
-  std::string fileName;
-  const bool serial = platform->serial;
-
-  const std::string fileNameExtension = (serial) ? ".c" : ".okl";
-  const std::string sectionIdentifier = std::string("gmres::") + std::to_string(Nfields) + "-";
+  const std::string fileNameExtension = (platform->serial) ? ".c" : ".okl";
+  const auto sectionIdentifier = std::string("gmres::") + ((std::is_same<T, double>::value) ? "double::" : "float::") 
+                                 + std::to_string(Nfields) + "::";
+  const auto oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/linearSolver/");
 
   occa::properties gmresKernelInfo = platform->kernelInfo;
+  gmresKernelInfo["defines/dfloat"] = (std::is_same<T, double>::value) ? "double" : "float";
+
   gmresKernelInfo["defines/p_Nfields"] = Nfields;
+
+  std::string fileName;
 
   std::string kernelName = "gramSchmidtOrthogonalization";
   fileName = oklpath + kernelName + fileNameExtension;
@@ -34,26 +37,22 @@ void registerGMRESKernels(int Nfields)
   platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
 }
 
-void registerCGKernels(int Nfields, bool usePfloat = false)
+template <typename T>
+void registerCGKernels(int Nfields, bool useFloat = false)
 {
-  const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/linearSolver/");
+  const auto oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/linearSolver/");
+  const std::string fileNameExtension = (platform->serial) ? ".c" : ".okl";
 
-  const bool serial = platform->serial;
+  const auto sectionIdentifier = std::string("cg::") + ((std::is_same<T, double>::value) ? "double::" : "float::") 
+                                 + std::to_string(Nfields) + "::";
 
-  const std::string fileNameExtension = (serial) ? ".c" : ".okl";
-
-  const auto sectionIdentifier = std::string("cg::") + (usePfloat ? std::string("pfloat") : std::string("")) +
-                                 std::to_string(Nfields) + "-";
-
-  std::string kernelName;
-  std::string fileName;
 
   occa::properties properties = platform->kernelInfo;
   properties["defines/p_Nfields"] = Nfields;
+  properties["defines/dfloat"] = (std::is_same<T, double>::value) ? "double" : "float"; 
 
-  if (usePfloat) {
-    properties["defines/dfloat"] = pfloatString;
-  }
+  std::string kernelName;
+  std::string fileName;
 
   kernelName = "blockUpdatePCG";
   fileName = oklpath + kernelName + fileNameExtension;
@@ -91,12 +90,12 @@ void registerLinearSolverKernels()
     std::cout << "registerLinearSolverKernels" << std::endl;
   }
 
-  registerGMRESKernels(1);
-  registerGMRESKernels(3);
-  registerCGKernels(1);
-  registerCGKernels(3);
+  registerGMRESKernels<dfloat>(1);
+  registerGMRESKernels<dfloat>(3);
+  registerCGKernels<dfloat>(1);
+  registerCGKernels<dfloat>(3);
 
   if (!std::is_same<pfloat, dfloat>::value) {
-    registerCGKernels(1, true); // Krylov based coarse solve
+    registerCGKernels<pfloat>(1); // Krylov based coarse solve
   }
 }

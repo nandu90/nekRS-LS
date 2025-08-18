@@ -119,7 +119,7 @@ void geomSolver_t::solve(double time, int iter)
     return;
   }
 
-  platform->timer.tic("meshSolve");
+  platform->timer.tic("geomSolve");
 
   auto o_rhs = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
   platform->linAlg->fill(o_rhs.size(), 0, o_rhs);
@@ -132,7 +132,7 @@ void geomSolver_t::solve(double time, int iter)
 
   ellipticSolver.at(0)->solve(o_lambda0, o_NULL, o_rhs, o_U.slice(0, fieldOffsetSum));
 
-  platform->timer.toc("meshSolve");
+  platform->timer.toc("geomSolve");
 }
 
 void geomSolver_t::setupEllipticSolver()

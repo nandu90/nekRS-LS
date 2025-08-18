@@ -1,7 +1,7 @@
 // "post" region from Algorithm 5, https://arxiv.org/pdf/2205.08909.pdf
 extern "C" void FUNC(combinedPCGPostMatVec)(const dlong &N,
                                             const dlong &fieldOffset,
-                                            const dlong &preco,
+                                            const int &preco,
                                             const dfloat *__restrict__ resWeight,
                                             const dfloat *__restrict__ weights,
                                             const dfloat *__restrict__ Minv,
