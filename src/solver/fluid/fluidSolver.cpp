@@ -3,6 +3,7 @@
 #include "lowPassFilter.hpp"
 #include "advectionSubCycling.hpp"
 #include "registerKernels.hpp"
+#include "nekInterfaceAdapter.hpp"
 
 fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<geomSolver_t> &_geom)
     : geom(_geom)
@@ -43,8 +44,7 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
   Nsubsteps = 0;
   platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
 
-  o_U = platform->device.malloc<dfloat>(mesh->dim * std::max(o_coeffBDF.size(), o_coeffEXT.size()) *
-                                        fieldOffset);
+  o_U = platform->device.malloc<dfloat>(fieldOffsetSum * std::max(o_coeffBDF.size(), o_coeffEXT.size()));
 
   if (!platform->options.compareArgs(upperCase(velocityName) + " EXTRAPOLATION", "FALSE")) {
     o_Ue = platform->device.malloc<dfloat>(fieldOffsetSum);
@@ -52,7 +52,17 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
     o_Ue = o_U.slice(0, fieldOffsetSum);
   }
 
-  o_P = platform->device.malloc<dfloat>(fieldOffset);
+  if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+    int nEXT = 2;
+    const auto key = upperCase(pressureName) + " EXT ORDER";
+    if (platform->options.getArgs(key).empty()) {
+      platform->options.setArgs(key, std::to_string(nEXT));
+    }
+    platform->options.getArgs(key, nEXT);
+    o_Pe = platform->device.malloc<dfloat>(fieldOffset);
+    o_coeffEXTP = platform->device.malloc<dfloat>(std::min(nEXT, static_cast<int>(o_coeffBDF.size()))); 
+  }
+  o_P = platform->device.malloc<dfloat>(fieldOffset * std::max(static_cast<int>(o_coeffEXTP.size()), 1));
 
   o_div = platform->device.malloc<dfloat>(fieldOffset);
 
@@ -125,10 +135,32 @@ void fluidSolver_t::solvePressure(double time, int stage)
   double flopCount = 0.0;
   platform->timer.tic(pressureName + " rhs");
 
-  const auto o_lambda0 = [&]() {
-    auto o_lambda0 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda0);
-    return o_lambda0;
+  auto o_lambda0 = [&](bool variable = true) {
+    auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !variable) {
+      platform->linAlg->fill(mesh->Nlocal, 1/rho0, o_lambda);
+    } else {
+      platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
+    }
+    return o_lambda;
+  };
+
+  const auto o_rhoSplitTerm = [&]() {
+    occa::memory o_del;
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+      // 1/rho - 1/rho0
+      auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
+      platform->linAlg->add(mesh->Nlocal, -1/rho0, o_lambda);
+
+      o_del = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+
+      const auto valSave = ellipticSolverP->options().getArgs("ELLIPTIC COEFF FIELD");
+      ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", "TRUE");
+      ellipticSolverP->Ax(o_lambda, o_NULL, o_Pe, o_del);
+      ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", valSave);
+    }
+    return o_del;
   }();
 
   const auto o_stressTerm = [&]() {
@@ -187,7 +219,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
                  mesh->Nlocal,
                  fieldOffset,
                  o_mue,
-                 o_lambda0,
+                 o_lambda0(),
                  o_JwF,
                  o_stressTerm,
                  o_gradDiv,
@@ -213,8 +245,8 @@ void fluidSolver_t::solvePressure(double time, int stage)
                  fieldOffset,
                  o_rhs,
                  o_pRhs);
-
     flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
+
     launchKernel("fluidSolver_t::pressureAddQtl", mesh->Nlocal, mesh->o_LMM, g0idt, o_div, o_pRhs);
     flopCount += 3 * mesh->Nlocal;
 
@@ -230,13 +262,17 @@ void fluidSolver_t::solvePressure(double time, int stage)
                  o_pRhs);
     flopCount += 25 * static_cast<double>(mesh->Nelements) * mesh->Nq * mesh->Nq;
 
+    if (o_rhoSplitTerm.isInitialized()) {
+      platform->linAlg->axpby(mesh->Nlocal, -1.0, o_rhoSplitTerm, 1.0, o_pRhs);
+    }
+
     return o_pRhs;
   }();
 
   platform->timer.toc(pressureName + " rhs");
   platform->flopCounter->add(pressureName + " rhs", flopCount);
 
-  ellipticSolverP->solve(o_lambda0, o_NULL, o_pRhs, o_P);
+  ellipticSolverP->solve(o_lambda0(false), o_NULL, o_pRhs, o_P.slice(0, mesh->Nlocal));
 
   if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
@@ -289,9 +325,49 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     return o_gradMueDiv;
   }();
 
+  const auto o_rhoSplitTerm = [&]() {
+    occa::memory o_del;
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+      o_del = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
+      auto o_delta = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+
+#if 1
+      platform->linAlg->axpbyz(mesh->Nlocal, 1.0, o_Pe, -1.0, o_P, o_delta);
+      launchKernel("core-wGradientVolumeHex3D",
+                   mesh->Nelements,
+                   mesh->o_vgeo,
+                   mesh->o_D,
+                   fieldOffset,
+                   o_delta,
+                   o_del);
+#else
+      platform->linAlg->axpbyz(mesh->Nlocal, 1.0, o_P, -1.0, o_Pe, o_delta);
+      launchKernel("core-gradientVolumeHex3D",
+                   mesh->Nelements,
+                   mesh->o_vgeo,
+                   mesh->o_D,
+                   fieldOffset,
+                   o_delta,
+                   o_del);
+#endif
+
+      flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
+
+      // o_del * rho / rho0
+      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1/rho0, o_rho, o_del);
+    }
+    return o_del;
+  }();
+
   const auto o_gradP = [&]() {
     occa::memory o_gradP = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
 
+    auto o_P = this->o_P;
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+      o_P = o_Pe; 
+    }
+
+#if 1
     launchKernel("core-wGradientVolumeHex3D",
                  mesh->Nelements,
                  mesh->o_vgeo,
@@ -299,6 +375,16 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                  fieldOffset,
                  o_P,
                  o_gradP);
+#else
+    launchKernel("core-gradientVolumeHex3D",
+                 mesh->Nelements,
+                 mesh->o_vgeo,
+                 mesh->o_D,
+                 fieldOffset,
+                 o_P,
+                 o_gradP);
+    platform->linAlg->scale(o_gradP.size(), -1.0, o_gradP);
+#endif
     flopCount += static_cast<double>(mesh->Nelements) * 18 * (mesh->Np * mesh->Nq + mesh->Np);
 
     return o_gradP;
@@ -307,6 +393,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
   const auto o_rhs = [&]() {
     auto o_rhs = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
 
+    // o_rho * o_JwF + o_gradP + o_gradMueDiv
     launchKernel("fluidSolver_t::velocityRhsHex3D",
                  mesh->Nlocal,
                  fieldOffset,
@@ -335,8 +422,11 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                  platform->app->o_usrwrk,
                  o_Ue,
                  o_rhs);
-
     flopCount += static_cast<double>(mesh->Nelements) * (3 * mesh->Np + 36 * mesh->Nq * mesh->Nq);
+
+    if (o_rhoSplitTerm.isInitialized()) {
+      platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, -1.0, o_rhoSplitTerm, 1.0, o_rhs);
+    }
 
     return o_rhs;
   }();
@@ -453,11 +543,20 @@ void fluidSolver_t::setupEllipticSolver()
                 << "ELLIPTIC SETUP " + upperCase(pressureName) << " ================" << std::endl;
     }
 
-    auto o_lambda0 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda0);
+    const auto o_lambda0 = [&]() {
+      auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+        rho0 = platform->linAlg->min(mesh->Nlocal, o_rho, platform->comm.mpiComm());
+        platform->linAlg->fill(mesh->Nlocal, 1/rho0, o_lambda);
+      } else {
+        platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
+      }
+      return o_lambda;
+    }();
 
+    // derive from velocity
     auto EToBP = mesh->createEToB([&](int bID) -> int {
-      auto bcType = platform->app->bc->typeId(bID, velocityName); // derive from velocity
+      auto bcType = platform->app->bc->typeId(bID, velocityName);
       if (bID < 1) {
         return ellipticBcType::NO_OP;
       }
@@ -751,13 +850,33 @@ void fluidSolver_t::extrapolateSolution()
                  o_U,
                  o_Ue);
   }
+
+  if (o_coeffEXTP.size()) {
+  launchKernel("core-extrapolate",
+               mesh->Nlocal,
+               1,
+               static_cast<int>(o_coeffEXTP.size()),
+               fieldOffset,
+               o_coeffEXTP,
+               o_P,
+               o_Pe);
+  }
 }
 
 void fluidSolver_t::lagSolution()
 {
-  const auto n = std::max(o_coeffEXT.size(), o_coeffBDF.size());
-  for (int s = n; s > 1; s--) {
-    o_U.copyFrom(o_U, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
+  {
+    const auto n = std::max(o_coeffEXT.size(), o_coeffBDF.size());
+    for (int s = n; s > 1; s--) {
+      o_U.copyFrom(o_U, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
+    }
+  }
+
+  {
+    const auto n = o_coeffEXTP.size();
+    for (int s = n; s > 1; s--) {
+      o_P.copyFrom(o_P, fieldOffset, (s - 1) * fieldOffset, (s - 2) * fieldOffset);
+    }
   }
 }
 
@@ -905,4 +1024,17 @@ void registerFluidSolverKernels(occa::properties kernelInfoBC)
   kernelName = "pressureAddQtl";
   fileName = oklpath + kernelName + ".okl";
   platform->kernelRequests.add(section + kernelName, fileName, meshProps);
+}
+
+void fluidSolver_t::setTimeIntegrationCoeffs(int tstep)
+{
+  if (o_coeffEXTP.size()) {
+    std::vector<dfloat> coeff(o_coeffEXTP.size());
+    const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXTP.size()));
+    nek::extCoeff(coeff.data(), dt, extOrder, extOrder);
+    for (int i = coeff.size(); i > extOrder; i--) {
+      coeff[i - 1] = 0;
+    }
+    o_coeffEXTP.copyFrom(coeff.data());
+  }
 }

@@ -1287,6 +1287,13 @@ void bdfCoeff(dfloat *g0, dfloat *coeff, dfloat *_dt, int order)
 
 void extCoeff(dfloat *coeff, dfloat *_dt, int nAB, int nBDF)
 {
+  nekrsCheck(nAB < nBDF,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "order for extrapolation cannot be smaller than for BDF");
+
+
   double dt[3] = {_dt[0], _dt[1], _dt[2]};
   double nekCoeff[3];
   (*nek_setabbd_ptr)(nekCoeff, dt, &nAB, &nBDF);

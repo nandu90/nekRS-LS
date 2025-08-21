@@ -117,7 +117,7 @@ struct elliptic_t {
       applyZeroNormalMask;
   std::function<void(const occa::memory &o_r, occa::memory &o_z)> userPreconditioner;
 
-  std::function<void(const occa::memory &o_x, occa::memory &o_Ax)> userAx;
+  std::function<void(elliptic_t *elliptic, dlong NelementsList, const occa::memory &o_elementsList, const occa::memory &o_x, occa::memory &o_Ax)> userAx;
 
   ~elliptic_t() = default;
 };

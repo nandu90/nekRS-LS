@@ -1,5 +1,6 @@
 #include "nrs.hpp"
 #include "registerKernels.hpp"
+#include "nekInterfaceAdapter.hpp"
 
 geomSolver_t::geomSolver_t(const geomSolverCfg_t &cfg)
 {
@@ -335,4 +336,21 @@ void registerGeomSolverKernels(occa::properties kernelInfoBC)
   kernelName = "meshDirichletBC" + suffix;
   fileName = oklpath + kernelName + ".okl";
   platform->kernelRequests.add(section + kernelName, fileName, kernelInfoBC);
+}
+
+void geomSolver_t::setTimeIntegrationCoeffs(int tstep)
+{
+  if (o_coeffAB.size()) {
+    const int meshOrder = std::min(tstep, static_cast<int>(o_coeffAB.size()));
+
+    std::vector<dfloat> coeff(o_coeffAB.size());
+    nek::coeffAB(coeff.data(), dt, meshOrder);
+    for (int i = 0; i < meshOrder; ++i) {
+      coeff[i] *= dt[0];
+    }
+    for (int i = o_coeffAB.size(); i > meshOrder; i--) {
+      coeff[i - 1] = 0.0;
+    }
+    o_coeffAB.copyFrom(coeff.data());
+  }
 }

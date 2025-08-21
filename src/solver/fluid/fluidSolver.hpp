@@ -33,6 +33,8 @@ private:
   occa::memory o_prop0;
   occa::memory o_EXT0;
 
+  occa::memory o_coeffEXTP;
+
 public:
   fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<geomSolver_t> &geom);
 
@@ -72,6 +74,8 @@ public:
   {
     return deviceMemory<dfloat>(o_rho);
   }
+
+  void setTimeIntegrationCoeffs(int tstep) override;
 
   void lagSolution() override;
   void extrapolateSolution() override;
@@ -122,7 +126,9 @@ public:
   occa::memory o_div;
 
   occa::memory o_P;
+  occa::memory o_Pe;
 
+  dfloat rho0 = NAN;
   occa::memory o_rho;
   occa::memory o_mue;
 

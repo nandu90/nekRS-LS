@@ -77,7 +77,6 @@ constexpr int Nvgeo = 12;
 
 /* offsets for second order geometric factors */
 constexpr int Nggeo = 7;
-#define NGGEO 7 
 #define G00ID 0
 #define G01ID 1
 #define G11ID 2
@@ -87,8 +86,7 @@ constexpr int Nggeo = 7;
 #define GWJID 6
 
 /* offsets for nx, ny, sJ, 1/J */
-constexpr int Nsgeo = 15;
-#define NSGEO 7 
+constexpr int Nsgeo = 19;
 #define NXID 0
 #define NYID 1
 #define NZID 2
@@ -107,6 +105,11 @@ constexpr int Nsgeo = 15;
 #define NDOTR 12
 #define NDOTS 13
 #define NDOTT 14
+
+#define NXAVGID 15
+#define NYAVGID 16
+#define NZAVGID 17
+
 
 // Mesh generation
 void NodesHex3D(int _N, dfloat* _r, dfloat* _s, dfloat* _t);

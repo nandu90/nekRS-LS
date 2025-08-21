@@ -29,17 +29,16 @@
   {                                                                                                          \
     struct bcData bc;                                                                                        \
     const dlong idM = vmapM[sk];                                                                             \
-                                                                                                             \
-    bc.nx = sgeo[sk * p_Nsgeo + p_NXID];                                                                     \
-    bc.ny = sgeo[sk * p_Nsgeo + p_NYID];                                                                     \
-    bc.nz = sgeo[sk * p_Nsgeo + p_NZID];                                                                     \
-    bc.uxFluid = U[idM + 0 * offset];                                                                        \
-    bc.uyFluid = U[idM + 1 * offset];                                                                        \
-    bc.uzFluid = U[idM + 2 * offset];                                                                        \
-    const dfloat WSJ = sgeo[sk * p_Nsgeo + p_WSJID];                                                         \
     const dlong bcType = EToB[face + p_Nfaces * e];                                                          \
     dfloat flux = 0;                                                                                         \
+    const dfloat WSJ = sgeo[sk * p_Nsgeo + p_WSJID];                                                         \
     if (bcType == p_bcType_udfDirichlet || bcType == p_bcType_interpolation) {                               \
+      bc.nx = sgeo[sk * p_Nsgeo + p_NXID];                                                                   \
+      bc.ny = sgeo[sk * p_Nsgeo + p_NYID];                                                                   \
+      bc.nz = sgeo[sk * p_Nsgeo + p_NZID];                                                                   \
+      bc.uxFluid = U[idM + 0 * offset];                                                                      \
+      bc.uyFluid = U[idM + 1 * offset];                                                                      \
+      bc.uzFluid = U[idM + 2 * offset];                                                                      \
       flux = coef * (bc.nx * bc.uxFluid + bc.ny * bc.uyFluid + bc.nz * bc.uzFluid);                          \
     } else if (bcType == p_bcType_zeroDirichletX_zeroNeumann ||                                              \
                bcType == p_bcType_zeroDirichletY_zeroNeumann ||                                              \
@@ -48,6 +47,9 @@
       const dfloat fx = F[idM + 0 * offset];                                                                 \
       const dfloat fy = F[idM + 1 * offset];                                                                 \
       const dfloat fz = F[idM + 2 * offset];                                                                 \
+      bc.nx = sgeo[sk * p_Nsgeo + p_NXAVGID];                                                                \
+      bc.ny = sgeo[sk * p_Nsgeo + p_NYAVGID];                                                                \
+      bc.nz = sgeo[sk * p_Nsgeo + p_NZAVGID];                                                                \
       flux = bc.nx * fx + bc.ny * fy + bc.nz * fz;                                                           \
     }                                                                                                        \
     s_fluxDiv[m][j][i] = -WSJ * flux;                                                                        \

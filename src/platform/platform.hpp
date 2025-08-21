@@ -9,7 +9,7 @@
 #include "par.hpp"
 #include "device.hpp"
 #include "device.tpp"
-#include "kernelRequestManager.hpp"
+#include "kernelManager.hpp"
 
 class app_t;
 
@@ -56,7 +56,7 @@ public:
   timer::timer_t timer;
   occa::memoryPool deviceMemoryPool;
   occa::memoryPool memoryPool;
-  kernelRequestManager_t kernelRequests;
+  kernelManager_t kernelRequests;
   Par *par;
   app_t *app;
   bool serial;

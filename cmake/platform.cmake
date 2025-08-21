@@ -40,7 +40,7 @@ set(PLATFORM_SOURCES
     src/platform/par/par.cpp
     src/platform/QQt.cpp
     src/platform/configReader.cpp
-    src/platform/kernelRequestManager.cpp
+    src/platform/kernelManager.cpp
     src/platform/utils/sha1.cpp
     src/platform/utils/inipp.cpp
     src/platform/utils/unifdef.c

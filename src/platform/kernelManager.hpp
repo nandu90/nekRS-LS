@@ -1,5 +1,5 @@
-#ifndef kernelRequestManager_hpp_
-#define kernelRequestManager_hpp_
+#ifndef kernelManager_hpp_
+#define kernelManager_hpp_
 
 #include <occa.hpp>
 #include <set>
@@ -10,10 +10,10 @@
 
 class platform_t;
 
-class kernelRequestManager_t
+class kernelManager_t
 {
 public:
-  kernelRequestManager_t(const platform_t& m_platform);
+  kernelManager_t(const platform_t& m_platform);
   void add(const std::string& m_requestName,
            const std::string& m_fileName,
            const occa::properties& m_props,

@@ -22,9 +22,9 @@
 
         if (bcType == p_ZERO_NORMAL) {
 
-          const dfloat nx = sgeo[sid * p_Nsgeo + p_NXID];
-          const dfloat ny = sgeo[sid * p_Nsgeo + p_NYID];
-          const dfloat nz = sgeo[sid * p_Nsgeo + p_NZID];
+          const dfloat nx = sgeo[sid * p_Nsgeo + p_NXAVGID];
+          const dfloat ny = sgeo[sid * p_Nsgeo + p_NYAVGID];
+          const dfloat nz = sgeo[sid * p_Nsgeo + p_NZAVGID];
 
           const dfloat t1x = sgeo[sid * p_Nsgeo + p_T1XID];
           const dfloat t1y = sgeo[sid * p_Nsgeo + p_T1YID];

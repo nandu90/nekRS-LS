@@ -1467,20 +1467,6 @@ void nrs_t::setTimeIntegrationCoeffs(int tstep)
     }
     o_coeffEXT.copyFrom(coeff.data());
   }
-
-  if (geom) {
-    const int meshOrder = std::min(tstep, static_cast<int>(geom->o_coeffAB.size()));
-
-    std::vector<dfloat> coeff(geom->o_coeffAB.size());
-    nek::coeffAB(coeff.data(), dt, meshOrder);
-    for (int i = 0; i < meshOrder; ++i) {
-      coeff[i] *= dt[0];
-    }
-    for (int i = geom->o_coeffAB.size(); i > meshOrder; i--) {
-      coeff[i - 1] = 0.0;
-    }
-    geom->o_coeffAB.copyFrom(coeff.data());
-  }
 }
 
 dfloat nrs_t::adjustDt(int tstep)
@@ -1629,10 +1615,12 @@ void nrs_t::initInnerStep(double time, dfloat _dt, int _tstep)
   setTimeIntegrationCoeffs(tstep);
 
   if (fluid) {
+    fluid->setTimeIntegrationCoeffs(tstep);
     fluid->extrapolateSolution();
   }
 
   if (geom) {
+    geom->setTimeIntegrationCoeffs(tstep);
     geom->extrapolateSolution();
   }
 
@@ -2073,7 +2061,12 @@ void nrs_t::registerKernels(occa::properties kernelInfoBC)
   }
 
   if (platform->options.compareArgs("LOWMACH", "TRUE")) { // // rho is varying
-    platform->options.setArgs("FLUID PRESSURE ELLIPTIC COEFF FIELD", "TRUE");
+    if (platform->options.compareArgs("FLUID PRESSURE RHO SPLITTING", "TRUE")) {
+      platform->options.setArgs("FLUID PRESSURE ELLIPTIC COEFF FIELD", "FALSE");
+      platform->options.setArgs("FLUID PRESSURE ELLIPTIC PRECO COEFF FIELD", "FALSE");
+    } else {
+      platform->options.setArgs("FLUID PRESSURE ELLIPTIC COEFF FIELD", "TRUE");
+    }
   }
 
   const auto stressForm = [&](const std::string &field) {

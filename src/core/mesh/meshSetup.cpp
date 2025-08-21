@@ -115,6 +115,13 @@ occa::properties meshKernelProperties(int N)
                  "p_T2ZID"] = T2ZID;
 
   meshProperties["defines/"
+                 "p_NXAVGID"] = NXAVGID;
+  meshProperties["defines/"
+                 "p_NYAVGID"] = NYAVGID;
+  meshProperties["defines/"
+                 "p_NZAVGID"] = NZAVGID;
+
+  meshProperties["defines/"
                  "p_NDOTRID"] = NDOTR;
   meshProperties["defines/"
                  "p_NDOTSID"] = NDOTS;

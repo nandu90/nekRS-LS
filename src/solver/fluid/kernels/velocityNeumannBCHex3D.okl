@@ -66,6 +66,9 @@
     }                                                                                                        \
     if (bcType == p_bcType_zeroDirichletN_udfNeumann) {                                                      \
       _strcpy(bc.fieldName, velocityName);                                                                   \
+      bc.nx = sgeo[sk * p_Nsgeo + p_NXAVGID];                                                                \
+      bc.ny = sgeo[sk * p_Nsgeo + p_NYAVGID];                                                                \
+      bc.nz = sgeo[sk * p_Nsgeo + p_NZAVGID];                                                                \
       bc.tr1 = 0.0;                                                                                          \
       bc.tr2 = 0.0;                                                                                          \
       udfNeumann(&bc);                                                                                       \

@@ -39,6 +39,8 @@ public:
   void restoreSolutionState() override;
   void lagSolution() override;
 
+  void setTimeIntegrationCoeffs(int tstep) override {};
+
   void extrapolateSolution() override;
 
   void applyDirichlet(double time) override;

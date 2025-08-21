@@ -24,6 +24,8 @@ public:
   void applyDirichlet(double time) override;
   void setupEllipticSolver() override;
 
+  void setTimeIntegrationCoeffs(int tstep) override;
+
   void solve(double time, int iter) override;
 
   void finalize() override

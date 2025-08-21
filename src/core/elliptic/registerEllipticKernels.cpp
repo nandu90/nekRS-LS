@@ -73,7 +73,8 @@ void registerEllipticKernels(std::string section, bool stressForm)
   const int verbosity = verbose ? 2 : 1;
 
   for (auto &&coeffField : {true, false}) {
-    if (platform->options.compareArgs(optionsPrefix + "ELLIPTIC COEFF FIELD", "TRUE") != coeffField) {
+    if (!platform->options.compareArgs(optionsPrefix + "RHO SPLITTING", "TRUE") && 
+        platform->options.compareArgs(optionsPrefix + "ELLIPTIC COEFF FIELD", "TRUE") != coeffField) {
       continue;
     }
 

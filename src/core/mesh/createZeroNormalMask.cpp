@@ -33,8 +33,6 @@ static std::vector<int> createEToBV(const mesh_t* mesh, const std::vector<int>& 
 occa::memory mesh_t::createZeroNormalMask(dlong fieldOffset,
                                           const occa::memory &o_EToB)
 {
-  auto o_mask = platform->device.malloc<dfloat>(fieldOffset * dim);
-
   auto o_EToBV = [&]()
   {
     std::vector<int> EToB(o_EToB.size());
@@ -46,25 +44,20 @@ occa::memory mesh_t::createZeroNormalMask(dlong fieldOffset,
     return o_EToBV;
   }();
 
-  static occa::kernel initializeZeroNormalMaskKernel;
-  if(!initializeZeroNormalMaskKernel.isInitialized()) 
-    initializeZeroNormalMaskKernel = platform->kernelRequests.load("mesh-initializeZeroNormalMask");   
-
+  // init with local mask (0,1,1) on ZERO_NORMAL points
+  auto o_mask = platform->device.malloc<dfloat>(fieldOffset * dim);
+  auto initializeZeroNormalMaskKernel = platform->kernelRequests.load("mesh-initializeZeroNormalMask");   
   initializeZeroNormalMaskKernel(Nlocal, fieldOffset, o_EToBV, o_mask);
+  oogs::startFinish(o_mask, dim, fieldOffset, ogsDfloat, ogsMin, oogs);
 
   // normal xyz + count
   occa::memory o_avgNormal =
       platform->deviceMemoryPool.reserve<dfloat>((dim + 1) * fieldOffset);
 
-  const int bcType = ellipticBcType::ZERO_NORMAL;
-
-  static occa::kernel averageNormalBcTypeKernel;
-  if(!averageNormalBcTypeKernel.isInitialized()) 
-    averageNormalBcTypeKernel = platform->kernelRequests.load("mesh-averageNormalBcType");   
-
+  auto averageNormalBcTypeKernel = platform->kernelRequests.load("mesh-averageNormalBcType");   
   averageNormalBcTypeKernel(Nelements,
                             fieldOffset,
-                            bcType,
+                            static_cast<int>(ellipticBcType::ZERO_NORMAL),
                             o_sgeo,
                             o_vmapM,
                             o_EToB,
@@ -72,20 +65,14 @@ occa::memory mesh_t::createZeroNormalMask(dlong fieldOffset,
 
   oogs::startFinish(o_avgNormal, dim + 1, fieldOffset, ogsDfloat, ogsAdd, oogs);
 
-  static occa::kernel fixZeroNormalMaskKernel;
-  if(!fixZeroNormalMaskKernel.isInitialized()) 
-    fixZeroNormalMaskKernel = platform->kernelRequests.load("mesh-fixZeroNormalMask");   
-
-  fixZeroNormalMaskKernel(Nelements,
-                          fieldOffset,
-                          o_sgeo,
-                          o_vmapM,
-                          o_EToB,
-                          o_avgNormal,
-                          o_mask);
-
-  oogs::startFinish(o_mask, dim, fieldOffset, ogsDfloat, ogsMin, oogs);
+  // overwrite normal and tangential for ZERO_NORMAL points
+  auto setAvgNormalKernel = platform->kernelRequests.load("mesh-setAvgNormal");
+  setAvgNormalKernel(Nelements,
+                    fieldOffset,
+                    o_vmapM,
+                    o_EToB,
+                    o_avgNormal,
+                    o_sgeo);
 
   return o_mask;
 }
-

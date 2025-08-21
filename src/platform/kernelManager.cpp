@@ -1,5 +1,5 @@
 #include "nekrsSys.hpp"
-#include "kernelRequestManager.hpp"
+#include "kernelManager.hpp"
 #include "platform.hpp"
 #include "fileUtils.hpp"
 #include "fileBcast.hpp"
@@ -8,13 +8,13 @@
 #include "sha1.hpp"
 #include "threadPool.hpp"
 
-kernelRequestManager_t::kernelRequestManager_t(const platform_t &m_platform)
+kernelManager_t::kernelManager_t(const platform_t &m_platform)
     : kernelsProcessed(false), platformRef(m_platform)
 {
 }
 
 // add (autotuned) kernel for subsequent load
-void kernelRequestManager_t::add(const std::string &requestName, occa::kernel kernel)
+void kernelManager_t::add(const std::string &requestName, occa::kernel kernel)
 {
   if (!kernel.isInitialized()) {
     return;
@@ -25,7 +25,7 @@ void kernelRequestManager_t::add(const std::string &requestName, occa::kernel ke
   this->add(req, false);
 }
 
-void kernelRequestManager_t::add(const std::string &m_requestName,
+void kernelManager_t::add(const std::string &m_requestName,
                                  const std::string &m_fileName,
                                  const occa::properties &m_props,
                                  std::string m_suffix,
@@ -34,7 +34,7 @@ void kernelRequestManager_t::add(const std::string &m_requestName,
   this->add(kernelRequest_t{m_requestName, m_fileName, m_props, m_suffix}, checkUnique);
 }
 
-void kernelRequestManager_t::add(kernelRequest_t request, bool checkUnique)
+void kernelManager_t::add(kernelRequest_t request, bool checkUnique)
 {
   auto [iter, inserted] = requests.insert(request);
 
@@ -77,7 +77,7 @@ void kernelRequestManager_t::add(kernelRequest_t request, bool checkUnique)
   requestMap.insert({request.requestName, request});
 }
 
-occa::kernel kernelRequestManager_t::load(const std::string &requestName, const std::string &_kernelName)
+occa::kernel kernelManager_t::load(const std::string &requestName, const std::string &_kernelName)
 {
   auto kernel = [&]() {
     const auto it = requestMap.find(requestName);
@@ -146,7 +146,7 @@ occa::kernel kernelRequestManager_t::load(const std::string &requestName, const 
   return kernel;
 }
 
-void kernelRequestManager_t::compile()
+void kernelManager_t::compile()
 {
   if (kernelsProcessed) {
     return;

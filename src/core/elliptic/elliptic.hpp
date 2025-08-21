@@ -45,9 +45,12 @@ public:
 
   int Nfields() const; 
 
+  void op(const occa::memory &o_q, occa::memory &o_Aq, bool masked = true); 
+  void Ax(const occa::memory &o_lambda0In, const occa::memory &o_lambda1In, const occa::memory &o_q, occa::memory &o_Aq); 
+
   void applyZeroNormalMask(const std::function<void(dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x)>& f);
   void userPreconditioner(const std::function<void(const occa::memory &o_r, occa::memory &o_z)>& f);
-  void userAx(const std::function<void(const occa::memory &o_x, occa::memory &o_Ax)>& f);
+  void userAx(const std::function<void(elliptic_t *elliptic, dlong NelementsList, const occa::memory &o_elementsList, const occa::memory &o_x, occa::memory &o_Ax)>& f);
 
   std::tuple<int, int> projectionCounters() const; 
 

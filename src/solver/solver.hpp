@@ -31,6 +31,7 @@ public:
   virtual void applyDirichlet(double time) = 0;
   virtual void setupEllipticSolver() = 0;
   virtual void finalize() = 0;
+  virtual void setTimeIntegrationCoeffs(int tstep) = 0;
 
   virtual deviceMemory<dfloat> o_solution(std::string key = "") = 0;
   virtual deviceMemory<dfloat> o_explicitTerms(std::string key = "") = 0;

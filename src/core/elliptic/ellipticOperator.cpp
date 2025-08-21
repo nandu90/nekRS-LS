@@ -36,6 +36,11 @@ void ellipticAx(elliptic_t *elliptic,
     return;
   }
 
+  if (elliptic->userAx) {
+    elliptic->userAx(elliptic, NelementsList, o_elementsList, o_q, o_Aq);
+    return;
+  }
+
   auto& mesh = elliptic->mesh;
 
   auto& o_geom_factors = elliptic->stressForm ? mesh->o_vgeo : mesh->o_ggeo;
@@ -51,8 +56,14 @@ void ellipticAx(elliptic_t *elliptic,
       kernelNamePrefix += (elliptic->stressForm) ? "Stress" : "Block";
     }
     std::string kernelName = "Ax";
-    if (elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
-      kernelName += "Var";
+    if (elliptic->mgLevel) {
+      if (elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
+        kernelName += "Var";
+      }
+    } else {
+       if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE")) {
+         kernelName += "Var";
+       }
     }
     kernelName += "Coeff";
     if (elliptic->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
@@ -90,7 +101,13 @@ void ellipticAx(elliptic_t *elliptic,
                      o_Aq);
 
   double flopCount = mesh->Np * 12 * mesh->Nq + 15 * mesh->Np;
- 
+
+#if 0
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+    std::cout << "AxKernel: " << elliptic->AxKernel.binaryFilename() << std::endl;
+  }
+#endif
+
   if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE")) {
     flopCount += 3 * mesh->Np;
   } else {

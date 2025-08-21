@@ -208,7 +208,7 @@ void elliptic::userPreconditioner(const std::function<void(const occa::memory &o
   solver->userPreconditioner = f;
 };
 
-void elliptic::userAx(const std::function<void(const occa::memory &o_x, occa::memory &o_Ax)> &f)
+void elliptic::userAx(const std::function<void(elliptic_t *elliptic, dlong NelementsList, const occa::memory &o_elementsList, const occa::memory &o_x, occa::memory &o_Ax)>& f)
 {
   solver->userAx = f;
 };
@@ -512,12 +512,20 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
                                                      platform->comm.mpiComm()) /
                          elliptic->mesh->volume;
 
+  if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+    std::cout << "lambda0Avg: " << elliptic->lambda0Avg << std::endl;  
+  }
+
   if (elliptic->o_lambda1.isInitialized()) {
     elliptic->lambda1Avg = platform->linAlg->innerProd(elliptic->mesh->Nlocal,
                                                        elliptic->mesh->o_LMM,
                                                        elliptic->o_lambda1,
                                                        platform->comm.mpiComm()) /
                            elliptic->mesh->volume;
+
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+      std::cout << "lambda1Avg: " << elliptic->lambda1Avg << std::endl;  
+    }
   }
 
   nekrsCheck(!std::isnormal(elliptic->lambda0Avg) || elliptic->lambda0Avg == 0,
@@ -713,11 +721,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   ellipticPreconditionerSetup(elliptic, elliptic->ogs);
 
   auto Ax = [elliptic](const occa::memory &o_p, occa::memory &o_Ap) {
-    if (elliptic->userAx) {
-      elliptic->userAx(o_p, o_Ap);
-    } else {
-      ellipticOperator(elliptic, o_p, o_Ap);
-    }
+    ellipticOperator(elliptic, o_p, o_Ap);
   };
 
   auto Pc = [elliptic](const occa::memory &o_r, occa::memory &o_z) {
@@ -778,3 +782,22 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   }
   fflush(stdout);
 }
+
+void elliptic::op(const occa::memory &o_q, occa::memory &o_Aq, bool masked)
+{
+  ellipticOperator(solver, o_q, o_Aq, masked);
+};
+
+void elliptic::Ax(const occa::memory &o_lambda0In, const occa::memory &o_lambda1In, const occa::memory &o_q, occa::memory &o_Aq)
+{
+  auto o_lambda0Save = solver->o_lambda0;
+  solver->o_lambda0 = o_lambda0In;
+
+  auto o_lambda1Save = solver->o_lambda1;
+  solver->o_lambda1 = o_lambda1In;
+
+  ellipticAx(solver, solver->mesh->Nelements, solver->mesh->o_elementList, o_q, o_Aq);
+
+  solver->o_lambda0 = o_lambda0Save;
+  solver->o_lambda1 = o_lambda1Save;
+};
