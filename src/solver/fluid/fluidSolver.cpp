@@ -331,16 +331,6 @@ void fluidSolver_t::solveVelocity(double time, int stage)
       o_del = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
       auto o_delta = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
-#if 1
-      platform->linAlg->axpbyz(mesh->Nlocal, 1.0, o_Pe, -1.0, o_P, o_delta);
-      launchKernel("core-wGradientVolumeHex3D",
-                   mesh->Nelements,
-                   mesh->o_vgeo,
-                   mesh->o_D,
-                   fieldOffset,
-                   o_delta,
-                   o_del);
-#else
       platform->linAlg->axpbyz(mesh->Nlocal, 1.0, o_P, -1.0, o_Pe, o_delta);
       launchKernel("core-gradientVolumeHex3D",
                    mesh->Nelements,
@@ -349,7 +339,6 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                    fieldOffset,
                    o_delta,
                    o_del);
-#endif
 
       flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
 
@@ -368,6 +357,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     }
 
 #if 1
+    // use weak formulation to allow for non-zero Dirichlet pressure BC when using stressFormulation 
     launchKernel("core-wGradientVolumeHex3D",
                  mesh->Nelements,
                  mesh->o_vgeo,
@@ -419,7 +409,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                  mesh->o_z,
                  o_rho,
                  o_mue,
-                 platform->app->o_usrwrk,
+                 platform->app->bc->o_usrwrk,
                  o_Ue,
                  o_rhs);
     flopCount += static_cast<double>(mesh->Nelements) * (3 * mesh->Np + 36 * mesh->Nq * mesh->Nq);
@@ -616,7 +606,7 @@ void fluidSolver_t::applyDirichlet(double time)
                  o_EToB,
                  o_rho,
                  o_mue,
-                 platform->app->o_usrwrk,
+                 platform->app->bc->o_usrwrk,
                  o_Ue,
                  o_tmp);
 
@@ -637,7 +627,7 @@ void fluidSolver_t::applyDirichlet(double time)
                  neknek ? neknek->intValOffset() : 0,
                  neknek ? neknek->o_pointMap() : o_NULL,
                  neknek ? neknek->getField(velocityName).o_intVal : o_NULL,
-                 platform->app->o_usrwrk,
+                 platform->app->bc->o_usrwrk,
                  o_U,
                  o_tmp.slice(fieldOffset));
 
