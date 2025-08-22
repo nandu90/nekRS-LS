@@ -800,7 +800,7 @@ void cvode_t::applyDirichlet(double time)
                    o_NULL,
                    o_NULL,
                    o_NULL,
-                   platform->app->o_usrwrk,
+                   platform->app->bc->o_usrwrk,
                    o_Si);
       if (sweep == 0) {
         oogs::startFinish(o_Si, 1, 0, ogsDfloat, ogsMax, mesh->oogs);
@@ -1166,7 +1166,7 @@ void cvode_t::makeq(double time)
                  scalar->o_EToB,
                  scalar->o_diff,
                  scalar->o_rho,
-                 platform->app->o_usrwrk,
+                 platform->app->bc->o_usrwrk,
                  scalar->o_EXT);
 
     if (detailedTimersEnabled) {

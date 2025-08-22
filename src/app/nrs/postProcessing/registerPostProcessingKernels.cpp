@@ -22,4 +22,8 @@ void registerPostProcessingKernels()
   kernelName = "Qcriterion";
   fileName = oklpath + "/app/nrs/postProcessing/" + kernelName + ".okl";
   platform->kernelRequests.add(section + kernelName, fileName, kernelInfo);
+
+  kernelName = "viscousShearStress";
+  fileName = oklpath + "/app/nrs/postProcessing/" + kernelName + ".okl";
+  platform->kernelRequests.add(section + kernelName, fileName, kernelInfo);
 }

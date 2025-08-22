@@ -144,7 +144,9 @@ public:
   void evaluateProperties(const double time);
   void evaluateDivergence(const double time);
 
-  AeroForce *aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_ = o_NULL);
+  AeroForce *aeroForces(const occa::memory &o_bID, const occa::memory &o_Sij = o_NULL);
+
+  occa::memory viscousShearStress(const occa::memory o_bID, occa::memory o_Sij_= o_NULL);
 
   // output in row-major order
   occa::memory strainRotationRate(dlong offset, const occa::memory &o_U, bool smooth = true);

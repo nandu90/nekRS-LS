@@ -1,9 +1,9 @@
 #define p_vecBlockSize 5 
 
-#define reduce(nBlock, blockSize, nVec, vecBlockSize, blockIdx, vecBlockIdx, s_in, out) \
+#define reduce(nBlock, nVec, vecBlockSize, blockIdx, vecBlockIdx, s_in, out) \
 {                                                                                       \
     for(int s = p_blockSize/2; s > 1; s >>= 1) {                                        \
-      for (int t = 0; t < blockSize; ++t; @inner(0)) {                                  \
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {                                \
         if (t < s) {                                                                    \
           for(int v = 0; v < vecBlockSize; v++) {                                       \
             const dlong vecId = v + vecBlockIdx*vecBlockSize;                           \
@@ -13,7 +13,7 @@
       }                                                                                 \
       @barrier();                                                                       \
     }                                                                                   \
-    for (int t = 0; t < blockSize; ++t; @inner(0)) {                                    \
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {                                  \
       if (t < 1) {                                                                      \
         for(int v = 0; v < vecBlockSize; v++) {                                         \
           const dlong vecId = v + vecBlockIdx*vecBlockSize;                             \
@@ -57,7 +57,7 @@
       }
       @barrier();
 
-      reduce(Nblock, p_blockSize, NVec, p_vecBlockSize, b, bVec, s_sum, dotp);
+      reduce(Nblock, NVec, p_vecBlockSize, b, bVec, s_sum, dotp);
     }
   }
 }

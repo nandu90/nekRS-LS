@@ -190,11 +190,9 @@ void lowMach::qThermalSingleComponent(double time)
 
     double p0thHelperFlops = 4 * mesh->Nlocal;
 
-    const auto flux = mesh->surfaceAreaNormalMultiplyIntegrate(nrs->fluid->fieldOffset,
-                                                               o_bID.length(),
-                                                               o_bID,
-                                                               nrs->fluid->o_Ue);
-    const auto termV = std::accumulate(flux.begin(), flux.end(), 0.0);
+    const auto termV = mesh->surfaceAreaNormalMultiplyVectorIntegrate(nrs->fluid->fieldOffset,
+                                                                      o_bID,
+                                                                      nrs->fluid->o_Ue);
 
     double surfaceFluxFlops = 13 * mesh->Nq * mesh->Nq;
     surfaceFluxFlops *= static_cast<double>(mesh->Nelements);

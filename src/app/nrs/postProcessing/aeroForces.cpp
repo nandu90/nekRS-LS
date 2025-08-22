@@ -1,59 +1,27 @@
 #include "nrs.hpp"
 #include "aeroForce.hpp"
 
-AeroForce *nrs_t::aeroForces(int nbID, const occa::memory &o_bID, const occa::memory &o_Sij_)
+AeroForce *nrs_t::aeroForces(const occa::memory &o_bID, const occa::memory &o_Sij_)
 {
+  auto mesh = meshV;
+  auto af = new AeroForce();
+
   occa::memory o_Sij = o_Sij_;
   if (!o_Sij.isInitialized()) {
     o_Sij = this->strainRate();
   }
+  auto o_tauT = viscousShearStress(o_bID, o_Sij);
+  auto fT = mesh->surfaceAreaMultiplyIntegrate(mesh->dim, o_tauT.size() / mesh->dim, o_bID, o_tauT); 
+  af->tangential({fT[0], fT[1], fT[2]});
 
-  auto af = new AeroForce();
-
-  auto o_rho = af->rho();
-  if (!o_rho.isInitialized()) {
-    o_rho = this->fluid->o_rho;
-  }
-
-  auto mesh = meshV;
-  const dlong offsetSij = o_Sij.size() / (2 * mesh->dim);
-
-  auto o_forces = platform->deviceMemoryPool.reserve<dfloat>(2 * mesh->dim * mesh->Nelements);
-  launchKernel("nrs-aeroForces",
-               mesh->Nelements,
-               offsetSij,
-               nbID,
-               o_bID,
-               mesh->o_sgeo,
-               mesh->o_vmapM,
-               mesh->o_EToB,
-               o_rho,
-               this->fluid->o_mue,
-               this->fluid->o_P,
-               o_Sij,
-               o_forces);
-
-  static std::vector<dfloat> tmp;
-  if (tmp.size() < o_forces.size()) {
-    tmp.resize(o_forces.size());
-  }
-  o_forces.copyTo(tmp.data());
-
-  std::vector<dfloat> sum{0, 0, 0, 0, 0, 0};
-  for (dlong i = 0; i < mesh->Nelements; i++) {
-    sum[0] += tmp[i + 0 * mesh->Nelements];
-    sum[1] += tmp[i + 1 * mesh->Nelements];
-    sum[2] += tmp[i + 2 * mesh->Nelements];
-
-    sum[3] += tmp[i + 3 * mesh->Nelements];
-    sum[4] += tmp[i + 4 * mesh->Nelements];
-    sum[5] += tmp[i + 5 * mesh->Nelements];
-  }
-
-  MPI_Allreduce(MPI_IN_PLACE, sum.data(), sum.size(), MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
-
-  af->forceViscous({sum[0], sum[1], sum[2]});
-  af->forcePressure({sum[3], sum[4], sum[5]});
+  auto o_rhoP = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+  platform->linAlg->axmyz(o_rhoP.size(), 
+                          1.0, 
+                          af->rho().isInitialized() ? af->rho() : this->fluid->o_rho, 
+                          af->p().isInitialized() ? af->p() : this->fluid->o_P, 
+                          o_rhoP);
+  auto fN = mesh->surfaceAreaNormalMultiplyIntegrate(o_bID, o_rhoP);
+  af->normal({fN[0], fN[1], fN[2]});
 
   return af;
 }

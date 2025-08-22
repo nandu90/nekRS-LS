@@ -341,7 +341,7 @@ void UDF_Setup()
 
   o_divTau.resize(3 * nrs->fieldOffset);
 
-  platform->app->o_usrwrk.resize(5);
+  platform->app->bc->o_usrwrk.resize(5);
 
   nrs->userSource = &userSource;
 
@@ -447,15 +447,13 @@ void UDF_ExecuteStep(double time, int tstep)
     if (surArea < 0) {
       poolDeviceMemory<dfloat> o_one(mesh->Nlocal);
       platform->linAlg->fill(o_one.size(), 1.0, o_one);
-      auto area = mesh->surfaceAreaMultiplyIntegrate(o_bid.size(), o_bid, o_one);
-      surArea = std::accumulate(area.begin(), area.end(), 0.0);
+      surArea = mesh->surfaceAreaMultiplyIntegrate(o_bid, o_one);
     }
    
     std::vector<dfloat> avgUWallValues(mesh->dim);
     for (int i = 0; i < mesh->dim; i++) {
       auto o_u = o_avg.slice(i * nrs->fieldOffset, mesh->Nlocal);
-      auto avg = mesh->surfaceAreaMultiplyIntegrate(o_bid.size(), o_bid, o_u);
-      avgUWallValues[i] = std::accumulate(avg.begin(), avg.end(), 0.0) / surArea;
+      avgUWallValues[i] = mesh->surfaceAreaMultiplyIntegrate(o_bid, o_u) / surArea;
     }
 
     return avgUWallValues;
@@ -464,7 +462,7 @@ void UDF_ExecuteStep(double time, int tstep)
   enum wall { thts = 0, magU = 1, temp = 2, uTau = 3, thetaTau =4 };
   auto wallData = [&]()
   {
-    std::vector<dfloat> wallData(nrs->o_usrwrk.size());
+    std::vector<dfloat> wallData(platform->app->bc->o_usrwrk.size());
  
     wallData.at(wall::thts) = T0S + SCOOLRATE * time;
     wallData[wall::magU] = std::sqrt(avgUWallValues[0] * avgUWallValues[0] + avgUWallValues[1] * avgUWallValues[1]); 
@@ -475,7 +473,7 @@ void UDF_ExecuteStep(double time, int tstep)
 
     return wallData;
   }();
-  nrs->o_usrwrk.copyFrom(wallData);
+  platform->app->bc->o_usrwrk.copyFrom(wallData);
 
   const auto rLength = [&]() 
   {

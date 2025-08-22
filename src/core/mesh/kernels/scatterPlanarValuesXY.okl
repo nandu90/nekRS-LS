@@ -1,5 +1,5 @@
 @kernel void scatterPlanarValuesXY(const dlong Nelements,
-                                   const dlong Nfields,
+                                   const int Nfields,
                                    const dlong fieldOffset,
                                    const dlong nelx,
                                    const dlong nely,

@@ -58,16 +58,16 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
 
   auto o_Sij = nrs->strainRate();
 
-  auto forces = nrs->aeroForces(bidWall.size(), o_bidWall, o_Sij);
+  auto forces = nrs->aeroForces(o_bidWall, o_Sij);
   o_Sij.free();
 
   auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
   platform->linAlg->fill(mesh->Nlocal, 1.0, o_tmp);
-  const auto areaWall = mesh->surfaceAreaMultiplyIntegrate(bidWall.size(), o_bidWall, o_tmp);
+  const auto areaWall = mesh->surfaceAreaMultiplyIntegrate(o_bidWall, o_tmp);
 
   // https://turbulence.oden.utexas.edu/channel2015/data/LM_Channel_2000_mean_prof.dat
   const auto utauRef = 4.58794e-02;
-  const auto utau = sqrt(std::abs(forces->forceViscous()[0]) / areaWall.at(0));
+  const auto utau = sqrt(std::abs(forces->tangential()[0]) / areaWall);
   const auto utauErr = std::abs((utau - utauRef) / utauRef);
 
   CiEvalTest("tau (LinfErr:" + to_string_f(utauErr) + ")", fabs(utauErr) < EPS);

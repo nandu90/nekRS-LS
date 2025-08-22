@@ -82,22 +82,27 @@ struct mesh_t {
 
   void computeInvLMM();
 
-  std::vector<dfloat> surfaceAreaMultiplyIntegrate(int nbID, 
-                                                   const occa::memory &o_bID, 
-                                                   const occa::memory &o_fld);
-
+  // \int o_fld dS
   std::vector<dfloat> surfaceAreaMultiplyIntegrate(int Nfields,
                                                    dlong fieldOffset,
-                                                   int nbID,
                                                    const occa::memory &o_bID,
                                                    const occa::memory &o_fld);
 
-  std::vector<dfloat> surfaceAreaNormalMultiplyIntegrate(dlong fieldOffset,
-                                                         int nbID,
-                                                         const occa::memory &o_bID,
+  dfloat surfaceAreaMultiplyIntegrate(const occa::memory &o_bID,
+                                      const occa::memory &o_fld);
+
+
+  // \int o_fld \dot n dS
+  dfloat surfaceAreaNormalMultiplyVectorIntegrate(dlong fieldOffset,
+                                                  const occa::memory &o_bID,
+                                                  const occa::memory &o_fld);
+
+  // \int o_fld n dS
+  std::vector<dfloat> surfaceAreaNormalMultiplyIntegrate(const occa::memory &o_bID,
                                                          const occa::memory &o_fld);
 
-  occa::memory surfaceAreaMultiply(int nbID, const occa::memory &o_bID, const occa::memory &o_fld);
+  // outputs volume field (zero in interior)
+  occa::memory surfaceAreaMultiply(const occa::memory &o_bID, const occa::memory &o_fld);
 
   std::tuple<std::vector<dfloat>, std::vector<dfloat>, std::vector<dfloat>> xyzHost() const 
   {

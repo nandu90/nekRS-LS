@@ -67,7 +67,7 @@ This list provides an overview of the most significant changes in this release, 
 * some member names of `bcData` changed (see include/app/nrs/bdry/bcData.h)
 * `velocityDirichletConditions` -> `udfDirichlet` (same for all fields)
 * `velocityNeumannConditions` -> `udfNeumann` (same for all fields)
-* `nrs->o_usrwrk`-> `platform->solver->o_usrwrk`
+* `nrs->o_usrwrk`-> `platform->app->bc->o_usrwrk`
 * `nrs->_mesh` -> `nrs->meshT`
 * `nek::ocopyToNek` -> `nrs->copyToNek`
 * `nek::ocopyFromNek` -> `nrs->copyFromNek`

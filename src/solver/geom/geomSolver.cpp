@@ -225,7 +225,7 @@ void geomSolver_t::applyDirichlet(double time)
                  mesh->o_EToB,
                  o_EToB,
                  o_prop,
-                 platform->app->o_usrwrk,
+                 platform->app->bc->o_usrwrk,
                  o_Ufluid,
                  o_UDirichlet);
 

@@ -13,22 +13,27 @@ public:
     forceP = std::get<1>(f); 
   };
 
-  std::array<dfloat, 3> forceViscous() const { return forceV; };
-  void forceViscous(std::array<dfloat, 3> f) { forceV = f; }
+  std::array<dfloat, 3> tangential() const { return forceV; };
+  void tangential(std::array<dfloat, 3> f) { forceV = f; }
 
-  std::array<dfloat, 3> forcePressure() const { return forceP; };
-  void forcePressure(std::array<dfloat, 3> f) { forceP = f; }
+  // neglecting normal viscous forces
+  std::array<dfloat, 3> normal() const { return forceP; };
+  void normal(std::array<dfloat, 3> f) { forceP = f; }
 
   std::array<dfloat, 3> forceEff() const 
   { 
      return {forceV[0] + forceP[0], forceV[1] + forceP[1], forceV[2] + forceP[2]}; 
   };
 
-  void rho(const occa::memory& o_rhoIn) { o_rho = o_rhoIn; }
-  occa::memory rho() const { return o_rho; }
+  void rho(const occa::memory& o_in) { o_rho = o_in; }
+  occa::memory rho() { return o_rho; }
+
+  void p(const occa::memory& o_in) { o_P = o_in; }
+  occa::memory p() { return o_P; }
 
 private:
   occa::memory o_rho;
+  occa::memory o_P;
 
   std::array<dfloat, 3> forceV;
   std::array<dfloat, 3> forceP;

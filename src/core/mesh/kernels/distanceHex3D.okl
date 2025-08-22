@@ -19,7 +19,7 @@ dlong dlongMin(dlong i, dlong j)
 }
 
 @kernel void distanceHex3D(const dlong Nelements,
-                           const dlong Nfields,
+                           const int Nfields,
                            const dlong fieldOffset,
                            @ restrict const dfloat *xpt,
                            @ restrict const dfloat *ypt,

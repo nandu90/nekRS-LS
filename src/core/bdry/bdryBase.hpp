@@ -209,6 +209,8 @@ public:
   bool isOutflow(int bcType) const;
   void printBcTypeMapping(const std::string &field) const;
 
+  deviceMemory<dfloat> o_usrwrk;
+
 protected:
   static std::map<std::string, bool>  fields;
   static std::map<std::pair<std::string, int>, int> bToBc;

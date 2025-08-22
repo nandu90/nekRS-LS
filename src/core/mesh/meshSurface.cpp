@@ -12,8 +12,7 @@ occa::memory h_sumFace;
 std::vector<dfloat> integral(mesh_t *mesh,
                              int Nfields,
                              int fieldOffset,
-                             bool ndot,
-                             int nbID,
+                             int mode,
                              const occa::memory o_bID,
                              const occa::memory &o_fld)
 {
@@ -34,37 +33,29 @@ std::vector<dfloat> integral(mesh_t *mesh,
     sum = (dfloat *)calloc(Nfields * mesh->Nelements, sizeof(dfloat));
   }
 
-  if (ndot) {
-    static occa::kernel kernel;
-    if (!kernel.isInitialized()) {
-      kernel = platform->kernelRequests.load("mesh-surfaceAreaNormalMultiplyIntegrateHex3D-ndot");
+  auto kernel = [&]() {
+    if (mode == 0) {
+      return platform->kernelRequests.load("mesh-surfaceAreaMultiplyIntegrateHex3D");
+    } else if (mode == 1) {
+      return platform->kernelRequests.load("mesh-surfaceAreaNormalMultiplyVectorIntegrateHex3D");
+    } else if (mode == 2) {
+      nekrsCheck(Nfields != mesh->dim, MPI_COMM_SELF, EXIT_FAILURE, "%s", "invalid Nfields for mode2\n");
+      return platform->kernelRequests.load("mesh-surfaceAreaNormalMultiplyIntegrateHex3D");
+    } else {
+      return occa::kernel();
     }
-    kernel(mesh->Nelements,
-           Nfields,
-           fieldOffset,
-           nbID,
-           o_bID,
-           mesh->o_sgeo,
-           mesh->o_vmapM,
-           mesh->o_EToB,
-           o_fld,
-           o_sumFace);
-  } else {
-    static occa::kernel kernel;
-    if (!kernel.isInitialized()) {
-      kernel = platform->kernelRequests.load("mesh-surfaceAreaNormalMultiplyIntegrateHex3D");
-    }
-    kernel(mesh->Nelements,
-           Nfields,
-           fieldOffset,
-           nbID,
-           o_bID,
-           mesh->o_sgeo,
-           mesh->o_vmapM,
-           mesh->o_EToB,
-           o_fld,
-           o_sumFace);
-  }
+  }();
+
+  kernel(mesh->Nelements,
+         Nfields,
+         fieldOffset,
+         static_cast<int>(o_bID.size()),
+         o_bID,
+         mesh->o_sgeo,
+         mesh->o_vmapM,
+         mesh->o_EToB,
+         o_fld,
+         o_sumFace);
 
   o_sumFace.copyTo(sumFace, Nfields * mesh->Nelements);
 
@@ -88,36 +79,41 @@ std::vector<dfloat> integral(mesh_t *mesh,
 
 std::vector<dfloat> mesh_t::surfaceAreaMultiplyIntegrate(int Nfields,
                                                          dlong fieldOffset,
-                                                         int nbID,
                                                          const occa::memory &o_bID,
                                                          const occa::memory &o_fld)
 {
-  return integral(this, Nfields, fieldOffset, false, nbID, o_bID, o_fld);
+  nekrsCheck(o_fld.size() != (Nfields * ((Nfields > 1) ? fieldOffset : Nlocal)), 
+             MPI_COMM_SELF, EXIT_FAILURE, "%s", "invalid input field size\n");
+  return integral(this, Nfields, fieldOffset, 0, o_bID, o_fld);
 }
 
-std::vector<dfloat>
-mesh_t::surfaceAreaMultiplyIntegrate(int nbID, const occa::memory &o_bID, const occa::memory &o_fld)
+dfloat mesh_t::surfaceAreaMultiplyIntegrate(const occa::memory &o_bID, const occa::memory &o_fld)
 {
-  return surfaceAreaMultiplyIntegrate(1, 0, nbID, o_bID, o_fld);
+  return surfaceAreaMultiplyIntegrate(1, 0, o_bID, o_fld).at(0);
 }
 
-std::vector<dfloat> mesh_t::surfaceAreaNormalMultiplyIntegrate(dlong fieldOffset,
-                                                               int nbID,
-                                                               const occa::memory &o_bID,
+dfloat mesh_t::surfaceAreaNormalMultiplyVectorIntegrate(dlong fieldOffset,
+                                                        const occa::memory &o_bID,
+                                                        const occa::memory &o_fld)
+{
+  nekrsCheck(o_fld.size() != (dim * fieldOffset), MPI_COMM_SELF, EXIT_FAILURE, "%s", "invalid input field size\n");
+  return integral(this, 1, fieldOffset, 1, o_bID, o_fld).at(0);
+}
+
+std::vector<dfloat> mesh_t::surfaceAreaNormalMultiplyIntegrate(const occa::memory &o_bID,
                                                                const occa::memory &o_fld)
 {
-  return integral(this, 1, fieldOffset, true, nbID, o_bID, o_fld);
+  nekrsCheck(o_fld.size() != Nlocal, MPI_COMM_SELF, EXIT_FAILURE, "%s", "invalid input field size\n");
+  return integral(this, dim, fieldOffset, 2, o_bID, o_fld);
 }
 
-occa::memory mesh_t::surfaceAreaMultiply(int nbID, const occa::memory &o_bID, const occa::memory &o_fld)
+occa::memory mesh_t::surfaceAreaMultiply(const occa::memory &o_bID, const occa::memory &o_fld)
 {
   auto o_out = platform->deviceMemoryPool.reserve<dfloat>(this->Nlocal);
 
-  static occa::kernel kernel;
-  if (!kernel.isInitialized()) {
-    kernel = platform->kernelRequests.load("mesh-surfaceAreaMultiplyHex3D");
-  }
-  kernel(this->Nelements, nbID, o_bID, this->o_sgeo, this->o_vmapM, this->o_EToB, o_fld, o_out);
+  auto kernel = platform->kernelRequests.load("mesh-surfaceAreaMultiplyHex3D");
+  nekrsCheck(o_fld.size() != Nlocal, MPI_COMM_SELF, EXIT_FAILURE, "%s", "invalid input field size\n");
+  kernel(this->Nelements, static_cast<int>(o_bID.size()), o_bID, this->o_sgeo, this->o_vmapM, this->o_EToB, o_fld, o_out);
 
   return o_out;
 }

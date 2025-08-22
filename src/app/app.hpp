@@ -54,9 +54,6 @@ class app_t {
 
     userProperties_t userProperties = nullptr;
 
-    std::vector<dfloat> usrwrk;
-    deviceMemory<dfloat> o_usrwrk;
-
     userSource_t userSource = nullptr;
  
     std::unique_ptr<neknek_t> neknek = nullptr;

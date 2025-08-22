@@ -118,14 +118,18 @@ void registerMeshKernels(occa::properties kernelInfoBC)
       }
 
       auto prop = kernelInfo;
-      prop["defines/p_ndot"] = 0;
-      kernelName = "surfaceAreaNormalMultiplyIntegrateHex3D";
+      prop["defines/p_mode"] = 0;
+      kernelName = "surfaceAreaMultiplyIntegrateHex3D";
       fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
       platform->kernelRequests.add(meshPrefix + kernelName, fileName, prop);
 
-      prop["defines/p_ndot"] = 1;
-      kernelName = "surfaceAreaNormalMultiplyIntegrateHex3D-ndot";
-      platform->kernelRequests.add(meshPrefix + kernelName, fileName, prop);
+      prop["defines/p_mode"] = 1;
+      kernelName = "surfaceAreaMultiplyIntegrateHex3D";
+      platform->kernelRequests.add(meshPrefix + "surfaceAreaNormalMultiplyVectorIntegrateHex3D", fileName, prop);
+
+      prop["defines/p_mode"] = 2;
+      kernelName = "surfaceAreaMultiplyIntegrateHex3D";
+      platform->kernelRequests.add(meshPrefix + "surfaceAreaNormalMultiplyIntegrateHex3D", fileName, prop);
 
       kernelName = "surfaceAreaMultiplyHex3D";
       fileName = oklpath + "/core/mesh/" + kernelName + ".okl";

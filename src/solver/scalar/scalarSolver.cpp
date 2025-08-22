@@ -621,7 +621,7 @@ void scalar_t::applyDirichlet(double time)
                    o_intValU,
                    o_intVal,
                    intValIdx,
-                   platform->app->o_usrwrk,
+                   platform->app->bc->o_usrwrk,
                    o_SiDirichlet);
 
       oogs::startFinish(o_SiDirichlet,
@@ -775,7 +775,7 @@ void scalar_t::solve(double time, int stage)
                  o_EToB,
                  o_diff,
                  o_rho,
-                 platform->app->o_usrwrk,
+                 platform->app->bc->o_usrwrk,
                  o_lhs,
                  o_rhs);
 
