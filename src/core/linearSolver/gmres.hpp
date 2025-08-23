@@ -72,8 +72,7 @@ public:
     s.resize(nRestartVectors + 1);
 
     o_y = platform->deviceMemoryPool.reserve<T>(nRestartVectors);
-    auto h_y = platform->memoryPool.reserve<T>(o_y.size());
-    y = h_y.template ptr<T>();
+    h_y = platform->memoryPool.reserve<T>(o_y.size());
 
     o_scratch = platform->deviceMemoryPool.reserve<T>(nRestartVectors * Nblock);
     h_scratch = platform->memoryPool.reserve<T>(o_scratch.size());
@@ -155,7 +154,7 @@ public:
     o_xCorr.free();
 
     o_y.free();
-    y = nullptr;
+    h_y.free();
 
     o_scratch.free();
     h_scratch.free();
@@ -190,7 +189,7 @@ private:
   occa::memory h_scratch;
 
   occa::memory o_y;
-  T *y;
+  occa::memory h_y;
 
   std::vector<dfloat> H;
   std::vector<dfloat> sn;
@@ -248,6 +247,8 @@ private:
   void updateSolution(const int gmresUpdateSize, bool runPreco = true) 
   {
     for (int k = gmresUpdateSize - 1; k >= 0; --k) {
+      auto y = h_y.template ptr<T>();
+
       y[k] = s[k];
 
       for (int m = k + 1; m < gmresUpdateSize; ++m) {
@@ -257,7 +258,7 @@ private:
       y[k] /= (H[k + k * (nRestartVectors + 1)] + this->tiny);
     }
 
-    o_y.copyFrom(y, gmresUpdateSize);
+    o_y.copyFrom(h_y.template ptr<T>(), gmresUpdateSize);
 
     correctionKernel(this->Nlocal,
                      this->fieldOffset,
@@ -322,7 +323,7 @@ private:
                                                     o_w,
                                                     platform->comm.mpiComm(),
                                                     o_y);
-        o_y.copyTo(y, (i + 1));
+        o_y.copyTo(h_y.template ptr<T>(), (i + 1));
 #else
         platform->linAlg->weightedInnerProdMulti<T>(this->Nlocal,
                                                     (i + 1),
@@ -332,8 +333,8 @@ private:
                                                     o_V,
                                                     o_w,
                                                     platform->comm.mpiComm(),
-                                                    y);
-        o_y.copyFrom(y, (i + 1));
+                                                    h_y.template ptr<T>());
+        o_y.copyFrom(h_y.template ptr<T>(), (i + 1));
 #endif
 
         gsOrthoKernel(Nblock,
@@ -382,7 +383,7 @@ private:
 
       // apply Givens rotation
       for (int k = 0; k <= i; ++k) {
-        H[k + i * (nRestartVectors + 1)] = y[k];
+        H[k + i * (nRestartVectors + 1)] = h_y.template ptr<T>()[k];
       }
 
       for (int k = 0; k < i; ++k) {
