@@ -529,21 +529,27 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
       mesh_vis->o_z.copyFrom(o_work.at(2));
 
       interp = std::make_unique<pointInterpolation_t>(mesh_vis, platform->comm.mpiComm());
-      interp->setPoints(mesh->o_x, mesh->o_y, mesh->o_z);
-      const auto verbosity = pointInterpolation_t::VerbosityLevel::Detailed;
-      interp->find(verbosity);
     } else {
       for (int dim = 0; dim < o_work.size(); dim++) {
-        auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(interp->numPoints());
 
-        dlong pointOffset = 0;
-        const int pointBlockSize = alignStride<dlong>(128 * mesh->Np);
-
-        int nPointsBlocks = (interp->numPoints() + pointBlockSize - 1) / pointBlockSize;
+        const dlong pointBlockSize = alignStride<dlong>(128 * mesh->Np);
+        int nPointsBlocks = (mesh->o_x.size() + pointBlockSize - 1) / pointBlockSize;
         MPI_Allreduce(MPI_IN_PLACE, &nPointsBlocks, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
 
+        auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(mesh->o_x.size());
+
+        dlong pointOffset = 0;
         for (int block = 0; block < nPointsBlocks; block++) {
-          const auto nPoints = std::max(std::min(interp->numPoints() - pointOffset, pointBlockSize), 0);
+          const auto nPoints =
+              std::max(std::min(static_cast<dlong>(mesh->o_x.size()) - pointOffset, pointBlockSize), 0);
+
+          interp->setPoints(mesh->o_x.slice(pointOffset, nPoints),
+                            mesh->o_y.slice(pointOffset, nPoints),
+                            mesh->o_z.slice(pointOffset, nPoints));
+
+          interp->find(platform->verbose() ? pointInterpolation_t::VerbosityLevel::Detailed
+                                           : pointInterpolation_t::VerbosityLevel::None);
+
           auto o_tmpBlock = (nPoints) ? o_tmp.slice(pointOffset, nPoints) : o_NULL;
           interp->eval(1, 0, o_work.at(dim), 0, o_tmpBlock, nPoints, pointOffset);
           pointOffset += pointBlockSize;
