@@ -530,7 +530,7 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
 
       interp = std::make_unique<pointInterpolation_t>(mesh_vis, platform->comm.mpiComm());
     } else {
-      const dlong pointBlockSize = alignStride<dlong>(512 * mesh->Np);
+      const dlong pointBlockSize = alignStride<dfloat>(512 * mesh->Np);
       int nBlocks = (mesh->o_x.size() + pointBlockSize - 1) / pointBlockSize;
       MPI_Allreduce(MPI_IN_PLACE, &nBlocks, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
 
