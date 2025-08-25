@@ -507,7 +507,7 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
     return o_work;
   };
 
-  auto convertFromDfloat = [&](const occa::memory &o_tmp, occa::memory &o_buf) {
+  auto convertFromDfloat = [&](const occa::memory &o_tmp, occa::memory o_buf) {
     if (o_buf.dtype() == occa::dtype::get<double>()) {
       platform->copyDfloatToDoubleKernel(o_buf.size(), o_tmp, o_buf);
     } else {
@@ -530,32 +530,33 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
 
       interp = std::make_unique<pointInterpolation_t>(mesh_vis, platform->comm.mpiComm());
     } else {
-      for (int dim = 0; dim < o_work.size(); dim++) {
+      const dlong pointBlockSize = alignStride<dlong>(512 * mesh->Np);
+      int nBlocks = (mesh->o_x.size() + pointBlockSize - 1) / pointBlockSize;
+      MPI_Allreduce(MPI_IN_PLACE, &nBlocks, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
 
-        const dlong pointBlockSize = alignStride<dlong>(128 * mesh->Np);
-        int nPointsBlocks = (mesh->o_x.size() + pointBlockSize - 1) / pointBlockSize;
-        MPI_Allreduce(MPI_IN_PLACE, &nPointsBlocks, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
+      dlong pointOffset = 0;
+      for (int block = 0; block < nBlocks; block++) {
+        const auto nPoints =
+          std::max(std::min(static_cast<dlong>(mesh->o_x.size()) - pointOffset, pointBlockSize), 0);
 
-        auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(mesh->o_x.size());
+        interp->setPoints(mesh->o_x.slice(pointOffset, nPoints),
+                          mesh->o_y.slice(pointOffset, nPoints),
+                          mesh->o_z.slice(pointOffset, nPoints));
 
-        dlong pointOffset = 0;
-        for (int block = 0; block < nPointsBlocks; block++) {
-          const auto nPoints =
-              std::max(std::min(static_cast<dlong>(mesh->o_x.size()) - pointOffset, pointBlockSize), 0);
+        interp->find(platform->verbose() ? pointInterpolation_t::VerbosityLevel::Detailed
+                                         : pointInterpolation_t::VerbosityLevel::None);
 
-          interp->setPoints(mesh->o_x.slice(pointOffset, nPoints),
-                            mesh->o_y.slice(pointOffset, nPoints),
-                            mesh->o_z.slice(pointOffset, nPoints));
-
-          interp->find(platform->verbose() ? pointInterpolation_t::VerbosityLevel::Detailed
-                                           : pointInterpolation_t::VerbosityLevel::None);
-
-          auto o_tmpBlock = (nPoints) ? o_tmp.slice(pointOffset, nPoints) : o_NULL;
-          interp->eval(1, 0, o_work.at(dim), 0, o_tmpBlock, nPoints, pointOffset);
-          pointOffset += pointBlockSize;
+        auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(nPoints);
+        for (int dim = 0; dim < o_work.size(); dim++) {
+          interp->eval(1, 
+                       0, 
+                       o_work.at(dim).slice(pointOffset, nPoints), 
+                       0, 
+                       o_tmp); 
+          convertFromDfloat(o_tmp, o_userBuf.at(dim).slice(pointOffset, nPoints));
         }
 
-        convertFromDfloat(o_tmp, o_userBuf.at(dim));
+        pointOffset += pointBlockSize;
       }
     }
   } else if (mesh_vis->N != mesh->N) {
