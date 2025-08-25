@@ -1,27 +1,29 @@
 #define p_fieldBlockSize 3
 
-#define reduce()                                                                        \
-{                                                                                       \
-    @barrier();                                                                         \
-    for(int s = p_blockSize/2; s > 1; s >>= 1) {                                        \
-      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {                                \
-        if (t < s) {                                                                    \
-          for (int fld = 0; fld < p_fieldBlockSize; fld++) {                            \
-            s_sum[fld][t] += s_sum[fld][t + s];                                           \
-          }                                                                             \
-        }                                                                               \
-      }                                                                                 \
-      @barrier();                                                                       \
-    }                                                                                   \
-    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {                                  \
-      if (t < 1) {                                                                      \
-        for (int fld = 0; fld < p_fieldBlockSize; fld++) {                              \
-          out[e + (fldStart + fld) * Nelements] += s_sum[fld][0] + s_sum[fld][1];         \
-        }                                                                               \
-      }                                                                                 \
-    }                                                                                   \
-    @barrier();                                                                         \
-}
+#define reduce()                                                                                             \
+  {                                                                                                          \
+    @barrier();                                                                                              \
+    for (int s = p_blockSize / 2; s > 1; s >>= 1) {                                                          \
+      for (int t = 0; t < p_blockSize; ++t; @inner(0)) {                                                     \
+        if (t < s) {                                                                                         \
+          for (int fld = 0; fld < p_fieldBlockSize; fld++) {                                                 \
+            s_sum[fld][t] += s_sum[fld][t + s];                                                              \
+          }                                                                                                  \
+        }                                                                                                    \
+      }                                                                                                      \
+      @barrier();                                                                                            \
+    }                                                                                                        \
+    for (int t = 0; t < p_blockSize; ++t; @inner(0)) {                                                       \
+      if (t < 1) {                                                                                           \
+        for (int fld = 0; fld < p_fieldBlockSize; fld++) {                                                   \
+          if (fldStart + fld < Nfields) {                                                                    \
+            out[e + (fldStart + fld) * Nelements] += s_sum[fld][0] + s_sum[fld][1];                          \
+          }                                                                                                  \
+        }                                                                                                    \
+      }                                                                                                      \
+    }                                                                                                        \
+    @barrier();                                                                                              \
+  }
 
 @kernel void surfaceAreaMultiplyIntegrateHex3D(const dlong Nelements,
                                                const int Nfields,
@@ -64,7 +66,7 @@
 
 #pragma unroll p_fieldBlockSize
                   for (int fld = 0; fld < p_fieldBlockSize; fld++) {
-                    if (fldStart + fld < Nfields) { 
+                    if (fldStart + fld < Nfields) {
                       s_sum[fld][t] += U[idM + (fldStart + fld) * fieldOffset] * sWJ;
                     }
                   }
@@ -73,15 +75,14 @@
 
 #if p_mode == 1
                   if (fldStart < 1) {
-                    const dfloat _U = U[idM + 0 * fieldOffset] * nx + 
-                                      U[idM + 1 * fieldOffset] * ny +
+                    const dfloat _U = U[idM + 0 * fieldOffset] * nx + U[idM + 1 * fieldOffset] * ny +
                                       U[idM + 2 * fieldOffset] * nz;
                     s_sum[0][t] += _U * sWJ;
                   }
 #else
                   if (fldStart < 1) {
-                    s_sum[0][t] += U[idM] * sWJ * nx; 
-                    s_sum[1][t] += U[idM] * sWJ * ny; 
+                    s_sum[0][t] += U[idM] * sWJ * nx;
+                    s_sum[1][t] += U[idM] * sWJ * ny;
                     s_sum[2][t] += U[idM] * sWJ * nz;
                   }
 #endif

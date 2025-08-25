@@ -46,6 +46,7 @@ std::vector<dfloat> integral(mesh_t *mesh,
     }
   }();
 
+  platform->linAlg->fill(o_sumFace.size(), 0.0, o_sumFace);
   kernel(mesh->Nelements,
          Nfields,
          fieldOffset,
