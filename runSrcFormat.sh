@@ -13,6 +13,7 @@ if [ -d $1 ]; then
   find $1 -regex '.*\.\(h\)' -exec clang-format -style=file -i {} \;
   find $1 -regex '.*\.\(okl\)' -exec clang-format -style=file -i {} \;
   find $1 -regex '.*\.\(tpp\)' -exec clang-format -style=file -i {} \;
+  find $1 -regex '.*\.\(ci\)' -exec clang-format -style=file -i {} \;
 
 fi
 

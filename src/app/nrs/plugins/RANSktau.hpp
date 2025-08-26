@@ -8,8 +8,7 @@ namespace RANSktau
 {
 void buildKernel(occa::properties kernelInfo);
 void updateSourceTerms();
-void setup(int startFieldIndex);
-void setup(int startFieldIndex, std::string &modelIn);
+void setup(int startFieldIndex, std::string model = "KTAU");
 void updateProperties();
 const deviceMemory<dfloat> o_mue_t();
 }

@@ -10,10 +10,11 @@ namespace
 nrs_t *nrs;
 
 int kFieldIndex;
-std::string model = "KTAU"; //default model
 
 dfloat rho;
 dfloat mueLam;
+
+std::string model;
 
 occa::memory o_mut;
 
@@ -62,8 +63,8 @@ dfloat coeff[] = {
     0.52,      // alp_inf
     1e-8,      // TINY
     0,         // Pope correction
-               
-    //Additional SST parameters
+
+    // Additional SST parameters
     0.85,      // sigma_k_SST
     0.075,     // beta0_SST
     5.0 / 9.0, // alp_inf_SST
@@ -72,16 +73,16 @@ dfloat coeff[] = {
     1.0,       // sigk2
     0.856,     // sigom2
     0.44,      // gamma2
-    //Free-stream limiter
-    0.0,       // edd_free //0.01 for external flows
-    0.0,       // ywlim    //0.5 for external flows
+    // Free-stream limiter
+    0.0, // edd_free //0.01 for external flows
+    0.0, // ywlim    //0.5 for external flows
 
-    //DES parameters
-    0.78,      // cdes1
-    0.61,      // cdes2
-    20.0,      // c_d1
-    3.0,       // c_d2
-    0.41       // vkappa
+    // DES parameters
+    0.78, // cdes1
+    0.61, // cdes2
+    20.0, // c_d1
+    3.0,  // c_d2
+    0.41  // vkappa
 };
 
 occa::memory implicitK(double time, int scalarIdx)
@@ -248,11 +249,18 @@ void RANSktau::updateProperties()
   auto o_SijOij = nrs->strainRotationRate();
 
   bool ifktau = 1;
-  if(model != "KTAU") ifktau = 0;
+  if (model != "KTAU") {
+    ifktau = 0;
+  }
 
-  SijMag2OiOjSkKernel(mesh->Nlocal, nrs->fluid->fieldOffset, static_cast<int>(ifktau), o_SijOij, o_OiOjSk, o_SijMag2);
+  SijMag2OiOjSkKernel(mesh->Nlocal,
+                      nrs->fluid->fieldOffset,
+                      static_cast<int>(ifktau),
+                      o_SijOij,
+                      o_OiOjSk,
+                      o_SijMag2);
 
-  if(model == "KTAUSST+DDES" || model == "KTAUSST+IDDES"){
+  if (model == "KTAUSST+DDES" || model == "KTAUSST+IDDES") {
     auto o_Oij = o_SijOij.slice(6 * nrs->fluid->fieldOffset);
     platform->linAlg->magSqrVector(mesh->Nlocal, nrs->fluid->fieldOffset, o_Oij, o_OijMag2);
   }
@@ -267,9 +275,11 @@ void RANSktau::updateProperties()
                     o_xt,
                     o_xtq);
 
-  if(movingMesh && !ifktau) o_ywd = mesh->minDistance(o_wbID.size(), o_wbID, "cheap_dist");
+  if (movingMesh && !ifktau) {
+    o_ywd = mesh->minDistance(o_wbID.size(), o_wbID, "cheap_dist");
+  }
 
-  mueKernel(mesh->Nlocal, 
+  mueKernel(mesh->Nlocal,
             nrs->fluid->fieldOffset,
             rho,
             mueLam,
@@ -305,19 +315,21 @@ void RANSktau::updateSourceTerms()
   platform->options.getArgs("FLUID DENSITY", rho);
 
   bool ifktau = 1;
-  if(model != "KTAU") ifktau = 0;
+  if (model != "KTAU") {
+    ifktau = 0;
+  }
 
-  int ifdes = 0; //DES model type
-  if(model == "KTAUSST+DDES") ifdes = 1;
-  if(model == "KTAUSST+IDDES") ifdes = 2;
+  int ifdes = 0; // DES model type
+  if (model == "KTAUSST+DDES") {
+    ifdes = 1;
+  }
+  if (model == "KTAUSST+IDDES") {
+    ifdes = 2;
+  }
 
-  if(ifdes && movingMesh)
-    DESLenScaleKernel(mesh->Nelements,
-                      nrs->fluid->fieldOffset,
-                      mesh->o_x,
-                      mesh->o_y,
-                      mesh->o_z,
-                      o_dgrd);
+  if (ifdes && movingMesh) {
+    DESLenScaleKernel(mesh->Nelements, nrs->fluid->fieldOffset, mesh->o_x, mesh->o_y, mesh->o_z, o_dgrd);
+  }
 
   computeKernel(mesh->Nlocal,
                 nrs->fluid->fieldOffset,
@@ -339,7 +351,7 @@ void RANSktau::updateSourceTerms()
                 scalar->o_EXT + scalar->fieldOffsetScan[kFieldIndex]);
 }
 
-void RANSktau::setup(int ifld)
+void RANSktau::setup(int ifld, std::string modelIn)
 {
   static bool isInitialized = false;
   if (isInitialized) {
@@ -347,16 +359,18 @@ void RANSktau::setup(int ifld)
   }
   isInitialized = true;
 
-  if(platform->comm.mpiRank() == 0) printf("RANS Model: %s\n",model.c_str());
+  model = upperCase(modelIn);
 
-  nekrsCheck(model != "KTAU" &&
-             model != "KTAUSST" &&
-	         model != "KTAUSST+DDES" &&
-	         model != "KTAUSST+IDDES",
-	         platform->comm.mpiComm(),
-	         EXIT_FAILURE,
-	         "%s\n",
-	         "Specified RANS model not supported!\nAvailable RANS models are:\nKTAU\nKTAUSST\nKTAUSST+DDES\nKTAUSST+IDDES");
+  if (platform->comm.mpiRank() == 0) {
+    printf("RANS model: %s\n", model.c_str());
+  }
+
+  nekrsCheck(model != "KTAU" && model != "KTAUSST" && model != "KTAUSST+DDES" && model != "KTAUSST+IDDES",
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "%s\n",
+             "Specified RANS model not supported!\nAvailable RANS models "
+             "are:\nKTAU\nKTAUSST\nKTAUSST+DDES\nKTAUSST+IDDES");
 
   nrs = dynamic_cast<nrs_t *>(platform->app);
   kFieldIndex = ifld; // tauFieldIndex is assumed to be kFieldIndex+1
@@ -402,39 +416,30 @@ void RANSktau::setup(int ifld)
 
   auto mesh = nrs->fluid->mesh;
 
-  if(model != "KTAU") {
+  if (model != "KTAU") {
     std::vector<int> wbID;
     for (auto &[key, bcID] : platform->app->bc->bIdToTypeId()) {
       const auto field = key.first;
       if (field == "fluid velocity") {
-          if (bcID == bdryBase::bcType_zeroDirichlet) {
-              wbID.push_back(key.second + 1);
-          }
+        if (bcID == bdryBase::bcType_zeroDirichlet) {
+          wbID.push_back(key.second + 1);
+        }
       }
     }
     o_wbID = platform->device.malloc<int>(wbID.size(), wbID.data());
 
-    if(!movingMesh) 
+    if (!movingMesh) {
       o_ywd = mesh->minDistance(o_wbID.size(), o_wbID, "cheap_dist");
+    }
   }
 
-  if(model == "KTAUSST+DDES" || model == "KTAUSST+IDDES"){
+  if (model == "KTAUSST+DDES" || model == "KTAUSST+IDDES") {
     o_dgrd = platform->device.malloc<dfloat>(mesh->Nelements);
     o_OijMag2 = platform->device.malloc<dfloat>(nrs->fluid->fieldOffset);
 
-    if(!movingMesh)
-      DESLenScaleKernel(mesh->Nelements,
-                        nrs->fluid->fieldOffset,
-                        mesh->o_x,
-                        mesh->o_y,
-                        mesh->o_z,
-                        o_dgrd);
+    if (!movingMesh) {
+      DESLenScaleKernel(mesh->Nelements, nrs->fluid->fieldOffset, mesh->o_x, mesh->o_y, mesh->o_z, o_dgrd);
+    }
   }
   setupCalled = true;
-}
-
-void RANSktau::setup(int ifld, std::string &modelIn)
-{
-  model = upperCase(modelIn);
-  RANSktau::setup(ifld);
 }
