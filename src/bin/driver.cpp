@@ -239,10 +239,6 @@ int main(int argc, char** argv)
     double tSolveStepMin = std::numeric_limits<double>::max();
     double tSolveStepMax = std::numeric_limits<double>::min();
 
-    if (cmdOpt->debug && std::fetestexcept(FE_INVALID)) {
-      throw std::runtime_error("floating-point exception occured!");
-    }
- 
     if (nekrs::endTime() > nekrs::startTime()) {
       if (rank == 0) std::cout << "\ntimestepping to time " << nekrs::endTime() << " ...\n";
     } else if (nekrs::numSteps() > tStep) {
