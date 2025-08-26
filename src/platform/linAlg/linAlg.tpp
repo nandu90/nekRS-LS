@@ -51,7 +51,7 @@ void axpby(const dlong N,
            const dlong yOffset = 0)
 {
   const auto knlPrefix = getKnlPrefix<T>();
-  const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
+  const auto FPfactor = (std::is_same<T, dfloat>::value) ? 1.0 : 0.5;
 
   linAlgLaunchKernel(knlPrefix + "axpby", N, xOffset, yOffset, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y);
   platform->flopCounter->add("axpby", FPfactor + 3 * static_cast<double>(N));
@@ -67,7 +67,7 @@ void axpbyMany(const dlong N,
                occa::memory &o_y)
 {
   const auto knlPrefix = getKnlPrefix<T>();
-  const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
+  const auto FPfactor = (std::is_same<T, dfloat>::value) ? 1.0 : 0.5;
 
   linAlgLaunchKernel(knlPrefix + "axpbyMany", N, Nfields, offset, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y);
   platform->flopCounter->add("axpbyMany", FPfactor * 3 * static_cast<double>(N) * Nfields);
@@ -83,7 +83,7 @@ void axpbyz(const dlong N,
             occa::memory &o_z)
 {
   const auto knlPrefix = getKnlPrefix<T>();
-  const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
+  const auto FPfactor = (std::is_same<T, dfloat>::value) ? 1.0 : 0.5;
 
   linAlgLaunchKernel(knlPrefix + "axpbyz", N, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y, o_z);
   platform->flopCounter->add("axpbyz", FPfactor * 3 * static_cast<double>(N));
@@ -100,7 +100,7 @@ void axpbyzMany(const dlong N,
                 occa::memory &o_z)
 {
   const auto knlPrefix = getKnlPrefix<T>();
-  const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
+  const auto FPfactor = (std::is_same<T, dfloat>::value) ? 1.0 : 0.5;
 
   linAlgLaunchKernel(knlPrefix + "axpbyzMany", N, Nfields, fieldOffset, static_cast<T>(alpha), o_x, static_cast<T>(beta), o_y, o_z);
   platform->flopCounter->add("axpbyzMany", FPfactor * 3 * static_cast<double>(N) * Nfields);
@@ -234,13 +234,13 @@ T sum(const dlong N, const occa::memory &o_a, MPI_Comm _comm, const dlong offset
     o_a.copyTo(scratch, N); 
   } 
     
-  dfloat sum = 0;
+  double sum = 0;
   for (dlong n = 0; n < Nblock; ++n) {
     sum += scratch[n];
   } 
     
   if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DFLOAT, MPI_SUM, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, _comm);
   } 
       
   return sum;
@@ -263,13 +263,13 @@ T sumMany(const dlong N, const int Nfields, const dlong fieldOffset, const occa:
     o_a.copyTo(scratch, N);
   }
 
-  dfloat sum = 0;
+  double sum = 0;
   for (dlong n = 0; n < Nblock; ++n) {
     sum += scratch[n];
   }
 
   if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DFLOAT, MPI_SUM, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, _comm);
   }
 
   return sum;
@@ -314,12 +314,12 @@ template <typename T = dfloat> T min(const dlong N, const occa::memory &o_a, MPI
     o_a.copyTo(scratch, N);
   }
 
-  dfloat val = scratch[0];
+  double val = scratch[0];
   for (dlong n = 1; n < Nblock; ++n) {
     val = (scratch[n] < val) ? static_cast<dfloat>(scratch[n]) : val;
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, &val, 1, MPI_DFLOAT, MPI_MIN, _comm);
+  MPI_Allreduce(MPI_IN_PLACE, &val, 1, MPI_DOUBLE, MPI_MIN, _comm);
 
   return val;
 }
@@ -351,13 +351,13 @@ template <typename T = dfloat> T max(const dlong N, const occa::memory &o_a, MPI
     o_a.copyTo(scratch, N);
   }
 
-  dfloat val = scratch[0];
+  double val = scratch[0];
   for (dlong n = 1; n < Nblock; ++n) {
     val = (scratch[n] > val) ? static_cast<dfloat>(scratch[n]) : val;
   }
 
   if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &val, 1, MPI_DFLOAT, MPI_MAX, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &val, 1, MPI_DOUBLE, MPI_MAX, _comm);
   }
 
   return val;
@@ -386,13 +386,13 @@ T amaxMany(const dlong N, const int Nfields, const dlong fieldOffset, const occa
     o_x.copyTo(scratch, N);
   }
 
-  dfloat val = scratch[0];
+  double val = scratch[0];
   for (dlong n = 1; n < Nblock; ++n) {
-    val = std::max(val, static_cast<dfloat>(scratch[n]));
+    val = std::max(val, static_cast<double>(scratch[n]));
   }
 
   if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &val, 1, MPI_DFLOAT, MPI_MAX, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &val, 1, MPI_DOUBLE, MPI_MAX, _comm);
   }
 
   return val;
@@ -422,7 +422,7 @@ T norm2Many(const dlong N,
   auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
-  dfloat norm = 0;
+  double norm = 0;
   linAlgLaunchKernel(getKnlPrefix<T>() + "norm2Many", Nblock, N, Nfields, fieldOffset, o_x, o_scratch);
   if (serial) {
     norm = *((T *)o_scratch.ptr());
@@ -434,7 +434,7 @@ T norm2Many(const dlong N,
   }
 
   if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, _comm);
   }
 
   if (timer) {
@@ -468,9 +468,9 @@ T norm1Many(const dlong N,
   auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
-  dfloat norm = 0;
   linAlgLaunchKernel(getKnlPrefix<T>() + "norm1Many", Nblock, N, Nfields, fieldOffset, o_x, o_scratch);
 
+  double norm = 0;
   if (serial) {
     norm = *((T *)o_scratch.ptr());
   } else {
@@ -481,7 +481,7 @@ T norm1Many(const dlong N,
   }
 
   if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, _comm);
   }
 
   if (timer) {
@@ -511,9 +511,9 @@ T innerProd(const dlong N,
   auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
-  dfloat dot = 0;
   linAlgLaunchKernel(getKnlPrefix<T>() + "innerProd", Nblock, N, offset, o_x, o_y, o_scratch);
 
+  double dot = 0;
   if (serial) {
     dot = *((T *)o_scratch.ptr());
   } else {
@@ -525,7 +525,7 @@ T innerProd(const dlong N,
   }
 
   if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &dot, 1, MPI_DFLOAT, MPI_SUM, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &dot, 1, MPI_DOUBLE, MPI_SUM, _comm);
   }
 
   if (timer) {
@@ -567,7 +567,7 @@ void weightedInnerProdMulti(const dlong N,
   }
 
   const auto knlPrefix = getKnlPrefix<T>();
-  const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
+  const auto FPfactor = (std::is_same<T, dfloat>::value) ? 1.0 : 0.5;
 
   const int Nblock = (N + blocksize - 1) / blocksize;
 
@@ -602,7 +602,7 @@ void weightedInnerProdMulti(const dlong N,
     MPI_Allreduce(MPI_IN_PLACE,
                   result,
                   NVec,
-                  (std::is_same<T, pfloat>::value) ? MPI_PFLOAT : MPI_DFLOAT,
+                  (std::is_same<T, double>::value) ? MPI_DOUBLE : MPI_FLOAT,
                   MPI_SUM,
                   _comm);
   }
@@ -635,7 +635,7 @@ void weightedInnerProdMulti(const dlong N,
   const auto Nblock = (N + blocksize - 1) / blocksize;
 
   const auto knlPrefix = getKnlPrefix<T>();
-  const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
+  const auto FPfactor = (std::is_same<T, dfloat>::value) ? 1.0 : 0.5;
 
   nekrsCheck(!platform->device.deviceAtomic,
              MPI_COMM_SELF,
@@ -661,7 +661,7 @@ void weightedInnerProdMulti(const dlong N,
     MPI_Allreduce(MPI_IN_PLACE,
                   (void *)o_result.ptr(),
                   NVec,
-                  (std::is_same<T, pfloat>::value) ? MPI_PFLOAT : MPI_DFLOAT,
+                  (std::is_same<T, double>::value) ? MPI_DOUBLE : MPI_FLOAT,
                   MPI_SUM,
                   _comm);
   }
@@ -698,7 +698,7 @@ T weightedInnerProdMany(const dlong N,
   }
 
   const auto knlPrefix = getKnlPrefix<T>();
-  const auto FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
+  const auto FPfactor = (std::is_same<T, dfloat>::value) ? 1.0 : 0.5;
 
   const auto Nblock = (N + blocksize - 1) / blocksize;
 
@@ -717,7 +717,7 @@ T weightedInnerProdMany(const dlong N,
                o_y,
                o_scratch);
 
-  dfloat dot = 0;
+  double dot = 0;
   if (serial) {
     dot = *((T *)o_scratch.ptr());
   } else {
@@ -728,7 +728,7 @@ T weightedInnerProdMany(const dlong N,
   }
 
   if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &dot, 1, MPI_DFLOAT, MPI_SUM, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &dot, 1, MPI_DOUBLE, MPI_SUM, _comm);
   }
 
   if (timer) {
@@ -783,9 +783,9 @@ T weightedNorm1Many(const dlong N,
   auto h_scratch = getScratch<T>(o_scratch.size(), true);
   auto scratch = h_scratch.template ptr<T>();
 
-  dfloat norm = 0;
   linAlgLaunchKernel(getKnlPrefix<T>() + "weightedNorm1Many", Nblock, N, Nfields, fieldOffset, o_w, o_a, o_scratch);
 
+  double norm = 0;
   if (serial) {
     norm = *((T *)o_scratch.ptr());
   } else {
@@ -796,7 +796,7 @@ T weightedNorm1Many(const dlong N,
   }
 
   if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, _comm);
   }
 
   if (timer) {
@@ -815,7 +815,7 @@ dfloat weightedSqrSum(const dlong N, const occa::memory &o_w, const occa::memory
   auto h_scratch = getScratch<dfloat>(o_scratch.size(), true);
   auto scratch = h_scratch.ptr<dfloat>();
 
-  dfloat sum = 0;
+  double sum = 0;
   if (N > 1) {
     linAlgLaunchKernel(getKnlPrefix<dfloat>() + "weightedSqrSum", Nblock, N, o_w, o_a, o_scratch);
 
@@ -835,7 +835,7 @@ dfloat weightedSqrSum(const dlong N, const occa::memory &o_w, const occa::memory
   }
 
   if (_comm != MPI_COMM_SELF) {
-    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DFLOAT, MPI_SUM, _comm);
+    MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, _comm);
   }
 
   return sum;
@@ -843,11 +843,11 @@ dfloat weightedSqrSum(const dlong N, const occa::memory &o_w, const occa::memory
 
 template <typename T = dfloat> void rescale(const double newMin, const double newMax, occa::memory &o_a, MPI_Comm _comm)
 {
-  auto mn = this->min<T>(o_a.size(), o_a, _comm);
-  auto mx = this->max<T>(o_a.size(), o_a, _comm);
+  double mn = this->min<T>(o_a.size(), o_a, _comm);
+  double mx = this->max<T>(o_a.size(), o_a, _comm);
 
-  MPI_Allreduce(MPI_IN_PLACE, &mn, 1, MPI_DFLOAT, MPI_MIN, _comm);
-  MPI_Allreduce(MPI_IN_PLACE, &mx, 1, MPI_DFLOAT, MPI_MAX, _comm);
+  MPI_Allreduce(MPI_IN_PLACE, &mn, 1, MPI_DOUBLE, MPI_MIN, _comm);
+  MPI_Allreduce(MPI_IN_PLACE, &mx, 1, MPI_DOUBLE, MPI_MAX, _comm);
   const auto fac = (newMax - newMin)/(mx - mn);
 
   this->add<T>(o_a.size(), (newMin - fac*mn)/fac, o_a);

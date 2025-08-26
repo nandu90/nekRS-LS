@@ -34,7 +34,6 @@ int main(int argc, char **argv)
   int Ndim = 1;
   int okl = 1;
   int BKmode = 0;
-  int Ntests = -1;
   size_t wordSize = 8;
   int computeGeom = 0;
   bool stressForm = false;
@@ -50,7 +49,6 @@ int main(int argc, char **argv)
                                            {"bk-mode", no_argument, 0, 'm'},
                                            {"fp32", no_argument, 0, 'f'},
                                            {"help", required_argument, 0, 'h'},
-                                           {"iterations", required_argument, 0, 'i'},
                                            {"stress", no_argument, 0, 's'},
                                            {0, 0, 0, 0}};
     int option_index = 0;
@@ -92,9 +90,6 @@ int main(int argc, char **argv)
       wordSize = 4;
       ;
       break;
-    case 'i':
-      Ntests = atoi(optarg);
-      break;
     case 'h':
       err = 1;
       break;
@@ -108,7 +103,7 @@ int main(int argc, char **argv)
       printf("Usage: ./nekrs-axhelm  --p-order <n> --elements <n> --backend <CPU|CUDA|HIP|DPCPP|OPENCL>\n"
              "                    [--block-dim <n>]\n"
              "                    [--g-order <n>] [--computeGeom]\n"
-             "                    [--bk-mode] [--fp32] [--stress] [--iterations <n>]\n");
+             "                    [--bk-mode] [--fp32] [--stress]\n");
     }
     exit(1);
   }
@@ -140,33 +135,27 @@ int main(int argc, char **argv)
   platform->device.compileWhenLoad();
 
   const int verbosity = 2;
-  if (Ntests != -1) {
-    benchmarkAx(Nelements,
-                Nq,
-                Ng,
-                poisson,
-                constCoeff,
-                computeGeom,
-                wordSize,
-                Ndim,
-                stressForm,
-                verbosity,
-                Ntests,
-                true);
+
+  auto runBenchmark = [&](auto T, auto Tgeo) {
+      benchmarkAx<decltype(T), decltype(Tgeo)>(Nelements,
+                                               Nq,
+                                               Ng,
+                                               poisson,
+                                               constCoeff,
+                                               computeGeom,
+                                               Ndim,
+                                               stressForm,
+                                               verbosity,
+                                               targetTimeBenchmark,
+                                               true);
+  };
+
+  if (wordSize == sizeof(double)) {
+    runBenchmark(double{}, double{});
   } else {
-    benchmarkAx(Nelements,
-                Nq,
-                Ng,
-                poisson,
-                constCoeff,
-                computeGeom,
-                wordSize,
-                Ndim,
-                stressForm,
-                verbosity,
-                targetTimeBenchmark,
-                true);
+    runBenchmark(float{}, float{});
   }
+
   MPI_Finalize();
   exit(0);
 }

@@ -108,6 +108,7 @@ solver                      none                                       linear so
                               +flexible [D for PRESSURE]
                               +maxiter=<int>
                               +nVector=<int>                           dimension of Krylov space
+                              +iR                                      iterative refinement 
 
 residualTol                 <float>                                    absolute linear solver residual tolerance 
                             1e-4 [D] 

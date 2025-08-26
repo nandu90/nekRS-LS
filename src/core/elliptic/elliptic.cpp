@@ -721,7 +721,42 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   ellipticPreconditionerSetup(elliptic, elliptic->ogs);
 
   auto Ax = [elliptic](const occa::memory &o_p, occa::memory &o_Ap) {
+
+    const auto enforceDouble = elliptic->options.compareArgs("SOLVER", "IR") && 
+                               o_Ap.dtype() == occa::dtype::get<double>() &&
+                               std::is_same<dfloat, float>::value &&
+                               !elliptic->mgLevel;
+
+    occa::memory o_lambda0;
+    if (enforceDouble) {
+      o_lambda0 = platform->deviceMemoryPool.reserve<double>(elliptic->o_lambda0.size()); 
+    }
+
+    occa::memory o_DSave, o_DTSave, o_lambda0Save;
+    occa::kernel AxKernelSave;
+    if (enforceDouble) {
+      o_DSave = elliptic->mesh->o_D;  
+      elliptic->mesh->o_D = elliptic->mesh->o_Ddouble; 
+
+      o_DTSave = elliptic->mesh->o_DT;
+      elliptic->mesh->o_DT = elliptic->mesh->o_DTdouble;
+
+      platform->copyFloatToDoubleKernel(elliptic->o_lambda0.size(), elliptic->o_lambda0, o_lambda0);
+      o_lambda0Save = elliptic->o_lambda0; 
+      elliptic->o_lambda0 = o_lambda0;
+
+      AxKernelSave = elliptic->AxKernel;
+      elliptic->AxKernel = occa::kernel(); // triggers lookup
+    }
+
     ellipticOperator(elliptic, o_p, o_Ap);
+
+    if (enforceDouble) {
+      elliptic->mesh->o_D = o_DSave; 
+      elliptic->mesh->o_DT = o_DTSave; 
+      elliptic->o_lambda0 = o_lambda0Save;
+      elliptic->AxKernel = AxKernelSave;
+    }
   };
 
   auto Pc = [elliptic](const occa::memory &o_r, occa::memory &o_z) {

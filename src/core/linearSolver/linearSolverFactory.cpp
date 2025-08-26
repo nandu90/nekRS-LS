@@ -18,6 +18,7 @@ linearSolverFactory<T>::create(const std::string &_solver,
 
   auto KSP = [&]() -> std::unique_ptr<linearSolver> {
     const auto solver = lowerCase(_solver);
+
     auto flexible = false;
     if (solver.find("flexible") != std::string::npos) {
       flexible = true;
@@ -31,16 +32,16 @@ linearSolverFactory<T>::create(const std::string &_solver,
 
       return std::make_unique<cg<T>>(Nlocal, Nfields, fieldOffset, o_weight, flexible, combined, Ax, Pc);
     } else if (solver.find("gmres") != std::string::npos) {
-      int nRestartVectors = 15;
-      std::regex pattern("nvector=([0-9]+)");
-      std::smatch match;
-      if (std::regex_search(solver, match, pattern)) {
-        nRestartVectors = std::stoi(match[1]);
-      }
-
       auto iR = false;
       if (solver.find("ir") != std::string::npos) {
         iR = true;
+      }
+
+      std::regex pattern("nvector=([0-9]+)");
+      std::smatch match;
+      auto nRestartVectors = 15;
+      if (std::regex_search(solver, match, pattern)) {
+        nRestartVectors = std::stoi(match[1]);
       }
 
       return std::make_unique<gmres<T>>(Nlocal,

@@ -84,10 +84,15 @@ void ellipticAx(elliptic_t *elliptic,
 
     kernelName += "Hex3D" + gen_suffix(elliptic->mesh->N);
 
+#if 0
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+      std::cout << kernelNamePrefix + "Partial" + kernelName << std::endl;
+    }
+#endif 
     return platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
   };
 
-  if (!elliptic->AxKernel.isInitialized()) elliptic->AxKernel = loadKernel(); 
+  if (!elliptic->AxKernel.isInitialized()) elliptic->AxKernel = loadKernel();
   elliptic->AxKernel(NelementsList,
                      elliptic->fieldOffset,
                      elliptic->loffset,

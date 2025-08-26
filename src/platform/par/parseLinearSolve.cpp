@@ -69,6 +69,7 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
 
     if (parScope == "fluid pressure") {
       options.setArgs(parSectionName + "SOLVER", "GMRES+FLEXIBLE+NVECTOR=15");
+      if (std::is_same<dfloat, float>::value) options.setArgs(parSectionName + "SOLVER", "GMRES+IR+FLEXIBLE+NVECTOR=5");
     }
     if (parScope == "fluid mesh") {
       options.setArgs(parSectionName + "SOLVER", "NONE");
@@ -96,6 +97,7 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
       {"pcg"},
       {"combined"},
       {"block"},
+      {"ir"},
       {"maxiter"},
   };
   std::vector<std::string> list = serializeString(p_solver, '+');
@@ -105,7 +107,11 @@ void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
   if (p_solver.find("gmres") != std::string::npos) {
     //
   } else if (p_solver.find("cg") != std::string::npos) {
-    if (p_solver.find("flexible") != std::string::npos) {
+    if (p_solver.find("ir") != std::string::npos) {
+        std::ostringstream ss;
+        ss << "CG solver not support iterative refinement!\n";
+        append_value_error(ss.str());
+    } else if (p_solver.find("flexible") != std::string::npos) {
       if (p_solver.find("combined") != std::string::npos) {
         std::ostringstream ss;
         ss << "combined CG solver not support flexible!\n";

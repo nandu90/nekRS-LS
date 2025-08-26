@@ -73,13 +73,12 @@ void registerEllipticKernels(std::string section, bool stressForm)
   const int verbosity = verbose ? 2 : 1;
 
   for (auto &&coeffField : {true, false}) {
-    if (!platform->options.compareArgs(optionsPrefix + "RHO SPLITTING", "TRUE") && 
+    if (!platform->options.compareArgs(optionsPrefix + "RHO SPLITTING", "TRUE") &&
         platform->options.compareArgs(optionsPrefix + "ELLIPTIC COEFF FIELD", "TRUE") != coeffField) {
       continue;
     }
 
-    auto addRequest = [&](std::string dataType, const occa::kernel& kernel)
-    {
+    auto addRequest = [&](const std::string &dataType, occa::kernel &kernel) {
       std::string kernelNamePrefix = (poisson) ? "poisson-" : "";
       kernelNamePrefix += "elliptic";
       if (blockSolver) {
@@ -93,44 +92,40 @@ void registerEllipticKernels(std::string section, bool stressForm)
       if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
         kernelName += "Trilinear";
       }
- 
+
       kernelName += "Hex3D_" + std::to_string(N) + dataType;
- 
+
       platform->kernelRequests.add(kernelNamePrefix + "Partial" + kernelName, kernel);
     };
 
-    auto axKernel = [&](std::string dataType)
-    {  
-      return benchmarkAx(NelemBenchmark,
-                         N + 1,
-                         N,
-                         !coeffField,
-                         poisson,
-                         false,
-                         (dataType == "float") ? sizeof(float) : sizeof(double),
-                         Nfields,
-                         stressForm,
-                         verbosity,
-                         targetTimeBenchmark,
-                         platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
+    auto axKernel = [&](auto typeTag, auto geoTypeTag) {
+      return benchmarkAx<decltype(typeTag), decltype(geoTypeTag)>(
+          NelemBenchmark,
+          N + 1,
+          N,
+          !coeffField,
+          poisson,
+          false,
+          Nfields,
+          stressForm,
+          verbosity,
+          targetTimeBenchmark,
+          platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
     };
 
     {
-      auto kernel = axKernel(dfloatString); 
+      auto kernel = axKernel(dfloat{}, dfloat{});
       if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
         addRequest(dfloatString, kernel);
       }
     }
 
-#if 0
-    if (!std::is_same<dfloat, double>::value) {
-    {
-      auto kernel = axKernel("double"); // always required from GMRES-IR
+    if (std::is_same<dfloat, float>::value && platform->options.compareArgs(optionsPrefix + "SOLVER", "IR")) {
+      auto kernel = axKernel(double{}, float{}); // required from GMRES-IR
       if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
         addRequest("double", kernel);
       }
     }
-#endif
   }
 
   registerEllipticPreconditionerKernels(section);

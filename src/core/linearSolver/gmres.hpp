@@ -23,17 +23,12 @@ public:
     flexible = _flexible;
     Ax = _Ax;
     preco = _preco;
-
-#if 0 // disabled for now as it's not yet supported
     iR = _iR;
-#else
-    iR = false;
-#endif
 
     Nblock = (this->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
     this->tiny = 10 * std::numeric_limits<T>::min();
-    this->FPfactor = (std::is_same<T, pfloat>::value) ? 0.5 : 1.0;
+    this->FPfactor = (std::is_same<T, dfloat>::value) ? 1.0 : 0.5;
     this->knlPrefix = std::string("gmres::") + ((std::is_same<T, double>::value) ? "double::" : "float::")
                       + std::to_string(this->Nfields) + "::";
 
@@ -48,12 +43,14 @@ public:
              const occa::memory &o_rIn,
              occa::memory &o_xIn) override
   {
-    this->r0Norm = platform->linAlg->weightedNorm2Many<T>(this->Nlocal,
-                                                          this->Nfields, 
-                                                          this->fieldOffset,
-                                                          this->o_weight,
-                                                          o_rIn,
-                                                          platform->comm.mpiComm());
+    o_r0 = o_rIn;
+    this->r0Norm = this->rNorm = 
+      platform->linAlg->weightedNorm2Many<T>(this->Nlocal,
+                                             this->Nfields, 
+                                             this->fieldOffset,
+                                             this->o_weight,
+                                             o_r0,
+                                             platform->comm.mpiComm());
     
     nekrsCheck(std::isnan(this->r0Norm),
                MPI_COMM_SELF,
@@ -61,8 +58,6 @@ public:
                "%s unreasonable initial residual norm!\n",
                this->_name.c_str());
     
-    this->rNorm = this->r0Norm;
-
     maxIter = _maxIter;
     nRestartVectors = std::min(nRestartVectors, maxIter);
 
@@ -74,47 +69,45 @@ public:
     o_y = platform->deviceMemoryPool.reserve<T>(nRestartVectors);
     h_y = platform->memoryPool.reserve<T>(o_y.size());
 
-    o_scratch = platform->deviceMemoryPool.reserve<T>(nRestartVectors * Nblock);
+    o_scratch = platform->deviceMemoryPool.reserve<T>(Nblock);
     h_scratch = platform->memoryPool.reserve<T>(o_scratch.size());
 
     {
       const auto n = (this->Nfields > 1 ) ? this->Nfields * static_cast<size_t>(this->fieldOffset) : this->Nlocal;
  
+      o_V = platform->deviceMemoryPool.reserve<T>(alignStride<T>(n) * nRestartVectors);
+      o_Z = platform->deviceMemoryPool.reserve<T>(alignStride<T>(n) * ((flexible) ? nRestartVectors : 1));
+
       o_tmp = platform->deviceMemoryPool.reserve<T>(n);
       o_w = platform->deviceMemoryPool.reserve<T>(n);
 
-      o_xCorr = platform->deviceMemoryPool.reserve<T>(n);
-
-      o_r0 = o_rIn;
       o_r = platform->deviceMemoryPool.reserve<double>(n);
-      
       if (std::is_same<T, float>::value) {
         platform->copyFloatToDoubleKernel(o_r.size(), o_r0, o_r);
       } else {
         o_r.copyFrom(o_r0);
       }
 
-      platform->linAlg->fill<T>(n, 0.0, o_xIn);
+      o_xCorr = platform->deviceMemoryPool.reserve<T>(n);
       if (std::is_same<T, float>::value) {
         o_x = platform->deviceMemoryPool.reserve<double>(n);
-        platform->copyFloatToDoubleKernel(o_x.size(), o_xIn, o_x);
       } else {
         o_x = o_xIn.slice(0, n); 
       }
-
-      o_V = platform->deviceMemoryPool.reserve<T>(alignStride<T>(n) * nRestartVectors);
-      o_Z = platform->deviceMemoryPool.reserve<T>(alignStride<T>(n) * ((flexible) ? nRestartVectors : 1));
+      platform->linAlg->fill<double>(o_x.size(), 0.0, o_x);
     }
 
     if (platform->comm.mpiRank() == 0 && platform->verbose()) {
       auto txt = (preco) ? std::string("P") : std::string("");
-      txt += std::string("GMRES") + ((flexible) ? "-flex" : "");
+      txt += std::string("GMRES");
+      if (flexible) txt += "-flex";
+      if (iR) txt += "-iR";
       printf("%s %s: initial res norm %.15e target %e \n", txt.c_str(), this->_name.c_str(), this->rNorm, tol);
     }
 
     int Niter = 0;
     do {
-      auto NiterInner = runInner(tol, Niter, this->rNorm);
+      auto NiterInner = runInner(tol, Niter);
       Niter += NiterInner;
 
       if (iR) {
@@ -206,42 +199,55 @@ private:
 
   double updateResidual()
   {
-    auto o_wrk = platform->deviceMemoryPool.reserve<double>(Nblock);
+    const auto o_Ax = [&]() {
+      auto o_AxDouble = platform->deviceMemoryPool.reserve<double>(o_x.size());
+      if (iR) {
+        Ax(o_x, o_AxDouble);
+      } else {
+        auto o_xT = o_x;
+        if (std::is_same<T, float>::value) {
+          platform->copyDoubleToFloatKernel(o_x.size(), o_x, o_w);
+          o_xT = o_w;
+        }
+ 
+        Ax(o_xT, o_tmp);
 
-    occa::memory o_xT = o_w;
-    if (std::is_same<T, float>::value) {
-      platform->copyDoubleToFloatKernel(o_x.size(), o_x, o_xT);
-    } else {
-      o_xT = o_x;
-    }
-  
-    // r = r0 - Ax
+        if (std::is_same<T, float>::value) {
+          platform->copyDfloatToDoubleKernel(o_x.size(), o_tmp, o_AxDouble);
+        } 
+      }
+      return o_AxDouble;
+    }();
+ 
+    // r += r0 - Ax
+    auto o_wrk = platform->deviceMemoryPool.reserve<double>(Nblock);
     residualKernel(Nblock,
                    this->Nlocal,
                    this->fieldOffset,
                    o_weight,
                    o_r0,
-                   [&](){ Ax(o_xT, o_tmp); return o_tmp; }(),
+                   o_Ax,
                    o_r,
                    o_wrk);
 
     auto flopCount = this->FPfactor * 4 * this->Nfields * static_cast<double>(this->Nlocal);
     platform->flopCounter->add("gmres evaluate residual and norm", flopCount);
 
-    double nr = 0.0;
+    double norm = 0;
     if (platform->serial) {
-      nr = *(o_wrk.ptr<double>());
+      norm = o_wrk.ptr<double>()[0];
     } else {
       auto h_wrk = platform->memoryPool.reserve<double>(o_wrk.size());
+      o_wrk.copyTo(h_wrk);
+
       auto wrk = h_wrk.template ptr<double>();
-      o_wrk.copyTo(wrk);
       for (dlong n = 0; n < h_wrk.size(); ++n) {
-        nr += wrk[n];
+        norm += wrk[n];
       }
     }
-    MPI_Allreduce(MPI_IN_PLACE, &nr, 1, MPI_DOUBLE, MPI_SUM, platform->comm.mpiComm());
+    MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, platform->comm.mpiComm());
 
-    return std::sqrt(nr);
+    return std::sqrt(norm);
   };
 
   void updateSolution(const int gmresUpdateSize, bool runPreco = true) 
@@ -258,7 +264,7 @@ private:
       y[k] /= (H[k + k * (nRestartVectors + 1)] + this->tiny);
     }
 
-    o_y.copyFrom(h_y.template ptr<T>(), gmresUpdateSize);
+    o_y.copyFrom(h_y, gmresUpdateSize);
 
     correctionKernel(this->Nlocal,
                      this->fieldOffset,
@@ -275,6 +281,7 @@ private:
       }
     }
 
+    // x += xCorr
     updateSolutionKernel(this->Nlocal,
                          this->fieldOffset,
                          o_xCorr,
@@ -284,11 +291,11 @@ private:
     platform->flopCounter->add("gmresUpdate", flopCount);
   };
 
-  int runInner(const dfloat tol, const int iter0, dfloat &rdotr)
+  int runInner(const dfloat tol, const int iter0)
   {
     const auto offset = o_V.size() / nRestartVectors;
 
-    dfloat nr = s[0] = rdotr;
+    dfloat nr = s[0] = this->rNorm;
 
     // init o_V0
     auto o_rT = [&]() {
@@ -300,6 +307,7 @@ private:
         return o_r;
       }
     }();
+
     platform->linAlg
        ->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, 1. / (nr + this->tiny), o_rT, 0.0, o_V);
 
@@ -323,7 +331,7 @@ private:
                                                     o_w,
                                                     platform->comm.mpiComm(),
                                                     o_y);
-        o_y.copyTo(h_y.template ptr<T>(), (i + 1));
+        o_y.copyTo(h_y, (i + 1));
 #else
         platform->linAlg->weightedInnerProdMulti<T>(this->Nlocal,
                                                     (i + 1),
@@ -334,7 +342,7 @@ private:
                                                     o_w,
                                                     platform->comm.mpiComm(),
                                                     h_y.template ptr<T>());
-        o_y.copyFrom(h_y.template ptr<T>(), (i + 1));
+        o_y.copyFrom(h_y, (i + 1));
 #endif
 
         gsOrthoKernel(Nblock,
@@ -353,19 +361,20 @@ private:
 
       // normalize
       auto nw = [&]() {
-        dfloat norm = 0.0;
+        dfloat norm = 0;
         if (platform->serial) {
-          norm = *(o_scratch.ptr<T>());
+          norm = o_scratch.ptr<T>()[0];
         } else {
+          o_scratch.copyTo(h_scratch);
           auto scratch = h_scratch.template ptr<T>();
-          o_scratch.copyTo(scratch);
-          for (int k = 0; k < o_scratch.size(); ++k) {
+          for (int k = 0; k < h_scratch.size(); ++k) {
             norm += scratch[k];
           }
         }
         MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
         return std::sqrt(norm);
       }();
+
       if (i < nRestartVectors - 1) {
         auto o_Vi = o_V + (i + 1) * offset;
         platform->linAlg->axpbyMany<T>(this->Nlocal,
@@ -377,11 +386,8 @@ private:
                                        o_Vi);
       }
 
-      // apply Givens rotations to new column
-      //  H(i+1,i) = ||w||_2
-      H[i + 1 + i * (nRestartVectors + 1)] = nw;
-
       // apply Givens rotation
+      H[i + 1 + i * (nRestartVectors + 1)] = nw;
       for (int k = 0; k <= i; ++k) {
         H[k + i * (nRestartVectors + 1)] = h_y.template ptr<T>()[k];
       }
@@ -408,23 +414,23 @@ private:
       s[i + 1] = -sn[i] * s[i];
       s[i] = cs[i] * s[i];
 
-      rdotr = std::abs(s[i + 1]);
-
-      if (platform->comm.mpiRank() == 0) {
-        nekrsCheck(std::isnan(rdotr),
-                   MPI_COMM_SELF,
-                   EXIT_FAILURE,
-                   "%s\n",
-                   "Detected invalid resiual norm while running linear solver!");
-      }
-
       if (!iR) {
-        const auto iter = iter0 + i + 1;
-        if (platform->verbose() && platform->comm.mpiRank() == 0) {
-          printf("it %d r norm %.15e\n", iter, rdotr);
+        this->rNorm = std::abs(s[i + 1]);
+ 
+        if (platform->comm.mpiRank() == 0) {
+          nekrsCheck(std::isnan(this->rNorm),
+                     MPI_COMM_SELF,
+                     EXIT_FAILURE,
+                     "%s\n",
+                     "Detected invalid resiual norm while running linear solver!");
         }
 
-        if (rdotr < tol || iter == maxIter) {
+        const auto iter = iter0 + i + 1;
+        if (platform->verbose() && platform->comm.mpiRank() == 0) {
+          printf("it %d r norm %.15e\n", iter, this->rNorm);
+        }
+
+        if (this->rNorm < tol || iter == maxIter) {
           return i+1;
         }
       }

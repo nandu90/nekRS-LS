@@ -31,7 +31,7 @@ extern "C" void FUNC(fusedResidualAndNorm)(const dlong &Nblocks,
                                            const dlong &offset,
                                            const dfloat *__restrict__ weights,
                                            const dfloat *__restrict__ b_vec,
-                                           const dfloat *__restrict__ Ax,
+                                           const double *__restrict__ Ax,
                                            double *__restrict__ r,
                                            double *__restrict__ reduction)
 {

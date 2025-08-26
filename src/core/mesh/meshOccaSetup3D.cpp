@@ -79,6 +79,11 @@ void meshOccaPopulateDeviceHex3D(mesh_t *mesh, setupAide &newOptions, occa::prop
   }
 
   mesh->o_D = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq, mesh->D);
+  mesh->o_Ddouble = mesh->o_D;
+  if (std::is_same<dfloat, float>::value) {
+    mesh->o_Ddouble = platform->device.malloc<double>(mesh->o_D.size());
+    platform->copyFloatToDoubleKernel(mesh->o_D.size(), mesh->o_D, mesh->o_Ddouble);
+  } 
   mesh->o_DW = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq, mesh->DW);
   dfloat* DT = (dfloat*) calloc(mesh->Nq * mesh->Nq, sizeof(dfloat));
   for(int j = 0; j < mesh->Nq; ++j)
@@ -87,6 +92,12 @@ void meshOccaPopulateDeviceHex3D(mesh_t *mesh, setupAide &newOptions, occa::prop
   mesh->o_DT = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq);
   mesh->o_DT.copyFrom(DT);
   free(DT);
+
+  mesh->o_DTdouble = mesh->o_DT;
+  if (std::is_same<dfloat, float>::value) {
+    mesh->o_DTdouble = platform->device.malloc<double>(mesh->o_DT.size());
+    platform->copyFloatToDoubleKernel(mesh->o_DT.size(), mesh->o_DT, mesh->o_DTdouble);
+  } 
 
   mesh->o_gllw =
     platform->device.malloc<dfloat>(mesh->Nq, mesh->gllw);

@@ -22,6 +22,7 @@ struct CallParameters {
   bool poisson;
   bool computeGeom;
   size_t wordSize;
+  size_t wordSizeGeo;
   int Ndim;
   bool stressForm;
   std::string suffix;
@@ -41,6 +42,7 @@ template <> struct less<CallParameters> {
                       v.poisson,
                       v.computeGeom,
                       v.wordSize,
+                      v.wordSizeGeo,
                       v.Ndim,
                       v.stressForm,
                       v.suffix);
@@ -55,21 +57,23 @@ namespace
 std::map<CallParameters, occa::kernel> cachedResults;
 }
 
-template <typename T>
+template <typename T, typename TGeo>
 occa::kernel benchmarkAx(int Nelements,
                          int Nq,
                          int Ng,
                          bool constCoeff,
                          bool poisson,
                          bool computeGeom,
-                         size_t wordSize,
                          int Ndim,
                          bool stressForm,
                          int verbosity,
-                         T NtestsOrTargetTime,
+                         double targetTime,
                          bool runAutotuner,
                          std::string suffix)
 {
+  const auto wordSize = sizeof(T);
+  const auto wordSizeGeo = sizeof(TGeo);
+
   const std::string oklpath(getenv("NEKRS_KERNEL_DIR"));
   const std::string ext = platform->serial ? ".c" : ".okl";
 
@@ -78,7 +82,7 @@ occa::kernel benchmarkAx(int Nelements,
   }
 
   CallParameters
-      params{Nelements, Nq, Ng, constCoeff, poisson, computeGeom, wordSize, Ndim, stressForm, suffix};
+      params{Nelements, Nq, Ng, constCoeff, poisson, computeGeom, wordSize, wordSizeGeo, Ndim, stressForm, suffix};
 
   if (cachedResults.count(params) > 0) {
     return cachedResults.at(params);
@@ -97,10 +101,10 @@ occa::kernel benchmarkAx(int Nelements,
   props["includes"].asArray();
   props["includes"] += diffDataFile.c_str();
 
-  if (wordSize == 4) {
-    props["defines/dfloat"] = "float";
-    props["defines/FP32"] = 1;
-  }
+  props["defines/dfloat"] = (wordSize == sizeof(double)) ? "double" : "float";
+  props["defines/FP32"]   = (wordSize == sizeof(double)) ? 0 : 1;
+  props["defines/gfloat"] = (wordSizeGeo == sizeof(double)) ? "double" : "float";
+
   if (Ng != N) {
     props["defines/p_Nq_g"] = Nq_g;
     props["defines/p_Np_g"] = Np_g;
@@ -138,9 +142,7 @@ occa::kernel benchmarkAx(int Nelements,
   kernelName += "Hex3D";
   const std::string fileName = oklpath + "/core/elliptic/" + kernelName;
 
-  auto benchmarkAxWithPrecision = [&](auto sampleWord) {
-    using FPType = decltype(sampleWord);
-    const auto wordSize = sizeof(FPType);
+  auto runBenchmark = [&]() {
     constexpr int p_Nggeo{7}, p_Nvgeo{12};
 
     std::vector<int> kernelVariants;
@@ -266,14 +268,14 @@ occa::kernel benchmarkAx(int Nelements,
     };
     auto readConstDMatrixKernel = buildConstMatrixReader("/core/readCubDMatrix.okl");
 
-    auto ggeo = randomVector<FPType>(Np_g * Nelements * p_Nggeo, 0, 1, true);
-    auto vgeo = randomVector<FPType>(Np * Nelements * p_Nvgeo, 0, 1, true);
-    auto q = randomVector<FPType>((Ndim * Np) * Nelements, 0, 1, true);
-    auto Aq = randomVector<FPType>((Ndim * Np) * Nelements, 0, 1, true);
-    auto exyz = randomVector<FPType>((3 * Np_g) * Nelements, 0, 1, true);
-    auto gllwz = randomVector<FPType>(2 * Nq_g, 0, 1, true);
-    auto lambda0 = randomVector<FPType>(Np * Nelements, 0.01, 0.02, true);
-    auto lambda1 = randomVector<FPType>(Np * Nelements, 0.2, 0.3, true);
+    auto ggeo = randomVector<TGeo>(Np_g * Nelements * p_Nggeo, 0, 1, true);
+    auto vgeo = randomVector<TGeo>(Np * Nelements * p_Nvgeo, 0, 1, true);
+    auto q = randomVector<T>((Ndim * Np) * Nelements, 0, 1, true);
+    auto Aq = randomVector<T>((Ndim * Np) * Nelements, 0, 1, true);
+    auto exyz = randomVector<T>((3 * Np_g) * Nelements, 0, 1, true);
+    auto gllwz = randomVector<T>(2 * Nq_g, 0, 1, true);
+    auto lambda0 = randomVector<T>(Np * Nelements, 0.01, 0.02, true);
+    auto lambda1 = randomVector<T>(Np * Nelements, 0.2, 0.3, true);
 
     // elementList[e] = e
     std::vector<dlong> elementList(Nelements);
@@ -286,8 +288,8 @@ occa::kernel benchmarkAx(int Nelements,
     }
 
     auto o_S = o_D;
-    auto o_ggeo = platform->device.malloc(Np_g * Nelements * p_Nggeo * wordSize, ggeo.data());
-    auto o_vgeo = platform->device.malloc(Np * Nelements * p_Nvgeo * wordSize, vgeo.data());
+    auto o_ggeo = platform->device.malloc(Np_g * Nelements * p_Nggeo * wordSizeGeo, ggeo.data());
+    auto o_vgeo = platform->device.malloc(Np * Nelements * p_Nvgeo * wordSizeGeo, vgeo.data());
     auto o_q = platform->device.malloc((Ndim * Np) * Nelements * wordSize, q.data());
     auto o_exyz = platform->device.malloc((3 * Np_g) * Nelements * wordSize, exyz.data());
     auto o_gllwz = platform->device.malloc(2 * Nq_g * wordSize, gllwz.data());
@@ -349,8 +351,8 @@ occa::kernel benchmarkAx(int Nelements,
         return occa::kernel();
       }
 
-      std::vector<FPType> refResults((Ndim * Np) * Nelements);
-      std::vector<FPType> results((Ndim * Np) * Nelements);
+      std::vector<T> refResults((Ndim * Np) * Nelements);
+      std::vector<T> results((Ndim * Np) * Nelements);
 
       // Reset o_Aq for each kernel variant to avoid buggy/no-op kernels
       // from falsely passing verification.
@@ -363,10 +365,10 @@ occa::kernel benchmarkAx(int Nelements,
       o_Aq.copyTo(results.data());
 
       const auto absTol = 1e-2;
-      const auto err = maxRelErr<FPType>(refResults, results, platform->comm.mpiComm(), absTol);
-      const auto scale = 10 * range<FPType>(refResults, absTol);
+      const auto err = maxRelErr<T>(refResults, results, platform->comm.mpiComm(), absTol);
+      const auto scale = 10 * range<T>(refResults, absTol);
 
-      if (err > scale * std::numeric_limits<FPType>::epsilon() || std::isnan(err)) {
+      if (err > scale * std::numeric_limits<T>::epsilon() || std::isnan(err)) {
         if (platform->comm.mpiRank() == 0 && verbosity > 1) {
           std::cout << "Ax: Ignore version " << kernelVariant << " as correctness check failed with " << err
                     << std::endl;
@@ -447,8 +449,13 @@ occa::kernel benchmarkAx(int Nelements,
           if (verbosity > 1)
             std::cout << " elapsed time=" << elapsed;
 
-          std::cout << " wordSize=" << 8 * wordSize << " GDOF/s=" << GDOFPerSecond << " GB/s=" << bw
-                    << " GFLOPS/s=" << gflops << " constCoeff=" << constCoeff << " poisson=" << poisson
+          std::cout << " wordSize=" << 8 * wordSize 
+                    << " wordSizeGeo=" << 8 * wordSizeGeo
+                    << " GDOF/s=" << GDOFPerSecond 
+                    << " GB/s=" << bw
+                    << " GFLOPS/s=" << gflops 
+                    << " constCoeff=" << constCoeff 
+                    << " poisson=" << poisson
                     << " kernelVer=" << kernelVariant << "\n";
         }
       }
@@ -459,7 +466,7 @@ occa::kernel benchmarkAx(int Nelements,
     };
 
     auto kernelAndTime =
-        benchmarkKernel(axKernelBuilder, kernelRunner, printCallBack, kernelVariants, NtestsOrTargetTime);
+        benchmarkKernel(axKernelBuilder, kernelRunner, printCallBack, kernelVariants, targetTime);
 
     if (kernelAndTime.first.properties().has("defines/p_knl") &&
         !platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
@@ -488,42 +495,47 @@ occa::kernel benchmarkAx(int Nelements,
 
   occa::kernel kernel;
 
-  if (wordSize == sizeof(float)) {
-    float p = 0.0;
-    auto kernelAndTime = benchmarkAxWithPrecision(p);
-    kernel = kernelAndTime.first;
-  } else {
-    double p = 0.0;
-    auto kernelAndTime = benchmarkAxWithPrecision(p);
-    kernel = kernelAndTime.first;
-  }
+  auto kernelAndTime = runBenchmark();
+  kernel = kernelAndTime.first;
 
   cachedResults[params] = kernel;
 
   return kernel;
 }
 
-template occa::kernel benchmarkAx<int>(int Nelements,
-                                       int Nq,
-                                       int Ng,
-                                       bool constCoeff,
-                                       bool poisson,
-                                       bool computeGeom,
-                                       size_t wordSize,
-                                       int Ndim,
-                                       bool stressForm,
-                                       int verbosity,
-                                       int Ntests,
-                                       bool runAutotuner,
-                                       std::string suffix);
+template occa::kernel benchmarkAx<float, float>(int Nelements,
+                                         int Nq,
+                                         int Ng,
+                                         bool constCoeff,
+                                         bool poisson,
+                                         bool computeGeom,
+                                         int Ndim,
+                                         bool stressForm,
+                                         int verbosity,
+                                         double targetTime,
+                                         bool runAutotuner,
+                                         std::string suffix);
 
-template occa::kernel benchmarkAx<double>(int Nelements,
+template occa::kernel benchmarkAx<double, double>(int Nelements,
+                                         int Nq,
+                                         int Ng,
+                                         bool constCoeff,
+                                         bool poisson,
+                                         bool computeGeom,
+                                         int Ndim,
+                                         bool stressForm,
+                                         int verbosity,
+                                         double targetTime,
+                                         bool runAutotuner,
+                                         std::string suffix);
+
+
+template occa::kernel benchmarkAx<double, float>(int Nelements,
                                           int Nq,
                                           int Ng,
                                           bool constCoeff,
                                           bool poisson,
                                           bool computeGeom,
-                                          size_t wordSize,
                                           int Ndim,
                                           bool stressForm,
                                           int verbosity,

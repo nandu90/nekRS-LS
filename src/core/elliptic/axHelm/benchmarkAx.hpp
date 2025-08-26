@@ -1,16 +1,15 @@
 #include "occa.hpp"
 
-template <typename T>
+template <typename T, typename TGeo>
 occa::kernel benchmarkAx(int Nelements,
                          int Nq,
                          int Ng,
                          bool constCoeff,
                          bool poisson,
                          bool computeGeom,
-                         size_t wordSize,
                          int Ndim,
                          bool stressForm,
                          int verbosity,
-                         T NtestsOrTargetTime,
+                         double targetTime,
                          bool requiresBenchmark,
                          std::string suffix = "");

@@ -236,9 +236,11 @@ struct mesh_t {
   occa::memory o_invAJwTimesInvDegree;
 
   occa::memory o_D;
+  occa::memory o_Ddouble;
 
   occa::memory o_DW;
   occa::memory o_DT;
+  occa::memory o_DTdouble;
 
   occa::memory o_vgeo, o_sgeo;
   occa::memory o_vmapM, o_vmapP, o_mapP;

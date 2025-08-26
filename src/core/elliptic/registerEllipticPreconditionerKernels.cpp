@@ -8,14 +8,9 @@ namespace
 
 void registerAxKernels(const std::string &section, int N, int poissonEquation)
 {
-  std::string dataType = "float";
-  if (std::is_same<pfloat, double>::value) {
-    dataType = "double"; 
-  }
-
   // hardwired as MG currently does not support Nfields > 1
   constexpr int Nfields{1};
-  const auto stressForm = false; 
+  const auto stressForm = false;
 
   auto kernelInfo = platform->kernelInfo + meshKernelProperties(N);
   kernelInfo["defines/p_Nfields"] = Nfields;
@@ -40,19 +35,18 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
     }
     const auto verbosity = platform->verbose() ? 2 : 1;
 
-    auto axKernel = benchmarkAx(NelemBenchmark,
-                                Nq,
-                                Nq - 1,
-                                !coeffField,
-                                poissonEquation,
-                                false,
-                                (dataType == "float") ? sizeof(float) : sizeof(double),
-                                Nfields,
-                                false, // no stress formulation in preconditioner
-                                verbosity,
-                                targetTimeBenchmark,
-                                platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
-
+    auto axKernel = benchmarkAx<pfloat, pfloat>(
+        NelemBenchmark,
+        Nq,
+        Nq - 1,
+        !coeffField,
+        poissonEquation,
+        false,
+        Nfields,
+        false, // no stress formulation in preconditioner
+        verbosity,
+        targetTimeBenchmark,
+        platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
 
     std::string kernelNamePrefix = (poissonEquation) ? "poisson-" : "";
     kernelNamePrefix += "elliptic";
@@ -67,7 +61,8 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
     if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
       kernelName += "Trilinear";
     }
-  
+
+    const auto dataType = (std::is_same<pfloat, double>::value) ? "double" : "float";
     kernelName += "Hex3D_" + std::to_string(N) + dataType;
 
     platform->kernelRequests.add(kernelNamePrefix + "Partial" + kernelName, axKernel);
