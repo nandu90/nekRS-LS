@@ -136,7 +136,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("BDF ORDER", "3");
   options.setArgs("FLUID VELOCITY SOLVER TOLERANCE", std::string("1e-12"));
   const auto pTol = (sizeof(dfloat) == sizeof(double)) 
-                    ? std::string("1e-10") : std::string("1e-05"); 
+                    ? std::string("1e-10") : std::string("1e-06"); 
   options.setArgs("FLUID PRESSURE SOLVER TOLERANCE", pTol);
   options.setArgs("SCALAR00 SOLVER TOLERANCE", std::string("1e-12"));
   options.setArgs("SCALAR01 SOLVER TOLERANCE", std::string("1e-12"));
@@ -151,7 +151,6 @@ void ciSetup(MPI_Comm comm, setupAide &options)
       options.setArgs("SCALAR00 SOLVER TOLERANCE", std::string("1e-10"));
       options.setArgs("SCALAR01 SOLVER TOLERANCE", std::string("1e-10"));
 
-      options.setArgs("FLUID PRESSURE SOLVER TOLERANCE", std::string("5e-04"));
       nekrsCheck(sizeof(dfloat) != sizeof(float),
                  platform->comm.mpiComm(),
                  EXIT_FAILURE,
@@ -1044,7 +1043,7 @@ void ciTestErrors(nrs_t *nrs,
     }
 
     if (ciMode == 22) {
-      expectedNiterP = 1;
+      expectedNiterP = 5;
     }
 
     if (nrs->timeStepConverged) {
@@ -1402,7 +1401,7 @@ void ciTestErrors(nrs_t *nrs,
     velIterTest = abs(NiterU - 8) < 2;
     s1Test = err[2] < 2e-6;
     s2Test = err[3] < 2e-6;
-    pIterTest = abs(NiterP - 1) < 2;
+    pIterTest = abs(NiterP - 5) < 2;
     vxTest = err[0] < 8e-5;
     prTest = err[1] < 8e-4;
     break;
