@@ -108,6 +108,8 @@ public:
 
   void magSqrVector(const dlong N, const dlong fieldOffset, const occa::memory &o_u, occa::memory &o_mag);
 
+  void magVector(const dlong N, const dlong fieldOffset, const occa::memory &o_u, occa::memory &o_mag);
+
   void
   magSqrSymTensor(const dlong N, const dlong fieldOffset, const occa::memory &o_tensor, occa::memory &o_mag);
 

@@ -96,7 +96,7 @@ void uservp(double time)
 
   dfloat conductivity;
   platform->options.getArgs("SCALAR00 DIFFUSIVITY", conductivity);
-  const dfloat Pr_t = 0.7;
+  const dfloat Pr_t = 0.85;
   scalarScaledAdd(mesh->Nlocal, conductivity, 1 / Pr_t, RANSktau::o_mue_t(), scalar->o_diffusionCoeff("temperature"));
 
 #if 0

@@ -10,6 +10,7 @@ namespace
 nrs_t *nrs;
 
 int kFieldIndex;
+std::string model = "KTAU"; //default model
 
 dfloat rho;
 dfloat mueLam;
@@ -21,14 +22,29 @@ occa::memory o_tau;
 
 occa::memory o_implicitKtau;
 
+occa::memory o_wbID;
+occa::memory o_ywd;
+
+occa::memory o_SijMag2;
+occa::memory o_OiOjSk;
+occa::memory o_xk;
+occa::memory o_xt;
+occa::memory o_xtq;
+
+occa::memory o_dgrd;
+occa::memory o_OijMag2;
+
 occa::kernel computeKernel;
 occa::kernel mueKernel;
 occa::kernel limitKernel;
+occa::kernel computeGradKernel;
+occa::kernel DESLenScaleKernel;
 
 occa::kernel SijMag2OiOjSkKernel;
 
 bool buildKernelCalled = false;
 bool setupCalled = false;
+bool movingMesh = false;
 
 dfloat coeff[] = {
     0.6,       // sigma_k
@@ -45,7 +61,27 @@ dfloat coeff[] = {
     100.0,     // fb_c2
     0.52,      // alp_inf
     1e-8,      // TINY
-    0          // Pope correction
+    0,         // Pope correction
+               
+    //Additional SST parameters
+    0.85,      // sigma_k_SST
+    0.075,     // beta0_SST
+    5.0 / 9.0, // alp_inf_SST
+    0.31,      // alp1
+    0.0828,    // beta2
+    1.0,       // sigk2
+    0.856,     // sigom2
+    0.44,      // gamma2
+    //Free-stream limiter
+    0.0,       // edd_free //0.01 for external flows
+    0.0,       // ywlim    //0.5 for external flows
+
+    //DES parameters
+    0.78,      // cdes1
+    0.61,      // cdes2
+    20.0,      // c_d1
+    3.0,       // c_d2
+    0.41       // vkappa
 };
 
 occa::memory implicitK(double time, int scalarIdx)
@@ -114,6 +150,51 @@ void RANSktau::buildKernel(occa::properties _kernelInfo)
   if (!kernelInfo.get<std::string>("defines/p_pope").size()) {
     kernelInfo["defines/p_pope"] = coeff[14];
   }
+  if (!kernelInfo.get<std::string>("defines/p_sigmak_SST").size()) {
+    kernelInfo["defines/p_sigmak_SST"] = coeff[15];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_beta0_SST").size()) {
+    kernelInfo["defines/p_beta0_SST"] = coeff[16];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_alpinf_SST").size()) {
+    kernelInfo["defines/p_alpinf_SST"] = coeff[17];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_alp1").size()) {
+    kernelInfo["defines/p_alp1"] = coeff[18];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_beta2").size()) {
+    kernelInfo["defines/p_beta2"] = coeff[19];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_sigk2").size()) {
+    kernelInfo["defines/p_sigk2"] = coeff[20];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_sigom2").size()) {
+    kernelInfo["defines/p_sigom2"] = coeff[21];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_gamma2").size()) {
+    kernelInfo["defines/p_gamma2"] = coeff[22];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_edd_free").size()) {
+    kernelInfo["defines/p_edd_free"] = coeff[23];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_ywlim").size()) {
+    kernelInfo["defines/p_ywlim"] = coeff[24];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_cdes1").size()) {
+    kernelInfo["defines/p_cdes1"] = coeff[25];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_cdes2").size()) {
+    kernelInfo["defines/p_cdes2"] = coeff[26];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_cd1").size()) {
+    kernelInfo["defines/p_cd1"] = coeff[27];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_cd2").size()) {
+    kernelInfo["defines/p_cd2"] = coeff[28];
+  }
+  if (!kernelInfo.get<std::string>("defines/p_vkappa").size()) {
+    kernelInfo["defines/p_vkappa"] = coeff[29];
+  }
 
   if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "\nRANSktau settings\n";
@@ -135,10 +216,12 @@ void RANSktau::buildKernel(occa::properties _kernelInfo)
     }
   };
 
-  computeKernel = buildKernel("RANSktauComputeHex3D");
+  computeKernel = buildKernel("RANSktauCompute");
   mueKernel = buildKernel("mue");
   limitKernel = buildKernel("limit");
   SijMag2OiOjSkKernel = buildKernel("SijMag2OiOjSk");
+  computeGradKernel = buildKernel("RANSGradHex3D");
+  DESLenScaleKernel = buildKernel("DESLenScale");
 
   int Nscalar;
   platform->options.getArgs("NUMBER OF SCALARS", Nscalar);
@@ -158,13 +241,44 @@ void RANSktau::updateProperties()
   platform->options.getArgs("FLUID VISCOSITY", mueLam);
   platform->options.getArgs("FLUID DENSITY", rho);
 
-  limitKernel(nrs->fluid->mesh->Nlocal, o_k, o_tau);
-  mueKernel(nrs->fluid->mesh->Nlocal,
+  auto mesh = nrs->fluid->mesh;
+
+  limitKernel(mesh->Nlocal, o_k, o_tau);
+
+  auto o_SijOij = nrs->strainRotationRate();
+
+  bool ifktau = 1;
+  if(model != "KTAU") ifktau = 0;
+
+  SijMag2OiOjSkKernel(mesh->Nlocal, nrs->fluid->fieldOffset, static_cast<int>(ifktau), o_SijOij, o_OiOjSk, o_SijMag2);
+
+  if(model == "KTAUSST+DDES" || model == "KTAUSST+IDDES"){
+    auto o_Oij = o_SijOij.slice(6 * nrs->fluid->fieldOffset);
+    platform->linAlg->magSqrVector(mesh->Nlocal, nrs->fluid->fieldOffset, o_Oij, o_OijMag2);
+  }
+
+  computeGradKernel(mesh->Nelements,
+                    nrs->scalar->fieldOffset(),
+                    mesh->o_vgeo,
+                    mesh->o_D,
+                    o_k,
+                    o_tau,
+                    o_xk,
+                    o_xt,
+                    o_xtq);
+
+  if(movingMesh && !ifktau) o_ywd = mesh->minDistance(o_wbID.size(), o_wbID, "cheap_dist");
+
+  mueKernel(mesh->Nlocal, 
             nrs->fluid->fieldOffset,
             rho,
             mueLam,
+            static_cast<int>(ifktau),
             o_k,
             o_tau,
+            o_SijMag2,
+            o_xk,
+            o_ywd,
             o_mut,
             nrs->fluid->o_mue,
             nrs->scalar->o_diff + nrs->scalar->fieldOffsetScan[kFieldIndex]);
@@ -187,26 +301,40 @@ void RANSktau::updateSourceTerms()
   auto mesh = nrs->fluid->mesh;
   auto &scalar = nrs->scalar;
 
-  occa::memory o_OiOjSk = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-  occa::memory o_SijMag2 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-
-  auto o_SijOij = nrs->strainRotationRate();
-
-  SijMag2OiOjSkKernel(mesh->Nlocal, nrs->fluid->fieldOffset, 1, o_SijOij, o_OiOjSk, o_SijMag2);
-
   platform->options.getArgs("FLUID VISCOSITY", mueLam);
   platform->options.getArgs("FLUID DENSITY", rho);
 
-  computeKernel(mesh->Nelements,
-                nrs->fluid->fieldOffset, // assumes offset is always the same
+  bool ifktau = 1;
+  if(model != "KTAU") ifktau = 0;
+
+  int ifdes = 0; //DES model type
+  if(model == "KTAUSST+DDES") ifdes = 1;
+  if(model == "KTAUSST+IDDES") ifdes = 2;
+
+  if(ifdes && movingMesh)
+    DESLenScaleKernel(mesh->Nelements,
+                      nrs->fluid->fieldOffset,
+                      mesh->o_x,
+                      mesh->o_y,
+                      mesh->o_z,
+                      o_dgrd);
+
+  computeKernel(mesh->Nlocal,
+                nrs->fluid->fieldOffset,
+                static_cast<int>(ifktau),
+                ifdes,
                 rho,
                 mueLam,
-                mesh->o_vgeo,
-                mesh->o_D,
                 o_k,
                 o_tau,
                 o_SijMag2,
                 o_OiOjSk,
+                o_xk,
+                o_xt,
+                o_xtq,
+                o_dgrd,
+                o_ywd,
+                o_OijMag2,
                 o_implicitKtau,
                 scalar->o_EXT + scalar->fieldOffsetScan[kFieldIndex]);
 }
@@ -218,6 +346,17 @@ void RANSktau::setup(int ifld)
     return;
   }
   isInitialized = true;
+
+  if(platform->comm.mpiRank() == 0) printf("RANS Model: %s\n",model.c_str());
+
+  nekrsCheck(model != "KTAU" &&
+             model != "KTAUSST" &&
+	         model != "KTAUSST+DDES" &&
+	         model != "KTAUSST+IDDES",
+	         platform->comm.mpiComm(),
+	         EXIT_FAILURE,
+	         "%s\n",
+	         "Specified RANS model not supported!\nAvailable RANS models are:\nKTAU\nKTAUSST\nKTAUSST+DDES\nKTAUSST+IDDES");
 
   nrs = dynamic_cast<nrs_t *>(platform->app);
   kFieldIndex = ifld; // tauFieldIndex is assumed to be kFieldIndex+1
@@ -253,5 +392,49 @@ void RANSktau::setup(int ifld)
 
   scalar->userImplicitLinearTerm = implicitK;
 
+  o_OiOjSk = platform->device.malloc<dfloat>(nrs->fluid->fieldOffset);
+  o_SijMag2 = platform->device.malloc<dfloat>(nrs->fluid->fieldOffset);
+  o_xk = platform->device.malloc<dfloat>(scalar->fieldOffset());
+  o_xt = platform->device.malloc<dfloat>(scalar->fieldOffset());
+  o_xtq = platform->device.malloc<dfloat>(scalar->fieldOffset());
+
+  movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
+
+  auto mesh = nrs->fluid->mesh;
+
+  if(model != "KTAU") {
+    std::vector<int> wbID;
+    for (auto &[key, bcID] : platform->app->bc->bIdToTypeId()) {
+      const auto field = key.first;
+      if (field == "fluid velocity") {
+          if (bcID == bdryBase::bcType_zeroDirichlet) {
+              wbID.push_back(key.second + 1);
+          }
+      }
+    }
+    o_wbID = platform->device.malloc<int>(wbID.size(), wbID.data());
+
+    if(!movingMesh) 
+      o_ywd = mesh->minDistance(o_wbID.size(), o_wbID, "cheap_dist");
+  }
+
+  if(model == "KTAUSST+DDES" || model == "KTAUSST+IDDES"){
+    o_dgrd = platform->device.malloc<dfloat>(mesh->Nelements);
+    o_OijMag2 = platform->device.malloc<dfloat>(nrs->fluid->fieldOffset);
+
+    if(!movingMesh)
+      DESLenScaleKernel(mesh->Nelements,
+                        nrs->fluid->fieldOffset,
+                        mesh->o_x,
+                        mesh->o_y,
+                        mesh->o_z,
+                        o_dgrd);
+  }
   setupCalled = true;
+}
+
+void RANSktau::setup(int ifld, std::string &modelIn)
+{
+  model = upperCase(modelIn);
+  RANSktau::setup(ifld);
 }

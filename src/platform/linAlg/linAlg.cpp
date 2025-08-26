@@ -208,6 +208,20 @@ void linAlg_t::magSqrVector(const dlong N,
   linAlgLaunchKernel(getKnlPrefix<dfloat>() + "magSqrVector", N, fieldOffset, o_u, o_mag);
 }
 
+void linAlg_t::magVector(const dlong N,
+                         const dlong fieldOffset,
+                         const occa::memory &o_u,
+                         occa::memory &o_mag)
+{
+  nekrsCheck(o_u.length() < (3 * fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_u too small to store a vector field!\n");
+
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "magVector", N, fieldOffset, o_u, o_mag);
+}
+
 void linAlg_t::magSqrTensor(const dlong N,
                             const dlong fieldOffset,
                             const occa::memory &o_tensor,

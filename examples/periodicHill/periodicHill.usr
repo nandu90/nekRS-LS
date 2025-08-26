@@ -1,30 +1,14 @@
 c-----------------------------------------------------------------------
-      subroutine usrdat()   ! This routine to modify element vertices
-      include 'SIZE'
-      include 'TOTAL'
-
-      pi = atan(4.0)
-      n = nelt * 2**ndim
-
-      ymin = glmin(yc,n)
-      ymax = glmax(yc,n)
-      yscale = 1./(ymax-ymin)
-
-      do i=1,n
-         y = yscale*yc(i,1)
-         yc(i,1) = 0.5*(1.0 - cos(y*pi))
-      enddo
-
-      return
-      end
-c-----------------------------------------------------------------------
-      subroutine usrdat2()  ! This routine to modify mesh coordinates
+      subroutine usrdat2()
       include 'SIZE'
       include 'TOTAL'
 
       do e=1,nelt
       do f=1,2*ndim
         if (cbc(f,e,1) .eq. 'W  ') boundaryID(f,e) = 1
+        if (cbc(f,e,1) .eq. 'W  ') cbc(f,e,2) = 't  '
+        if (cbc(f,e,1) .eq. 'W  ') cbc(f,e,3) = 't  '
+        if (cbc(f,e,1) .eq. 'W  ') boundaryIDt(f,e) = 1
       enddo
       enddo
 
