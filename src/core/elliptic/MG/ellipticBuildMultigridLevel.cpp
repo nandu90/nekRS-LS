@@ -46,9 +46,7 @@ std::string gen_suffix(const elliptic_t *elliptic, const char *floatString)
 
 elliptic_t *ellipticBuildMultigridLevel(elliptic_t *fineElliptic, int Nc, int Nf)
 {
-
-  elliptic_t *elliptic = new elliptic_t();
-  memcpy(elliptic, fineElliptic, sizeof(elliptic_t));
+  auto elliptic = new elliptic_t(*fineElliptic);
 
   elliptic->mgLevel = true;
   elliptic->AxKernel = occa::kernel();

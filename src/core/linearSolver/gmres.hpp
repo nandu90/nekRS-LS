@@ -112,7 +112,7 @@ public:
 
       if (iR) {
         updateSolution(NiterInner);
-        this->rNorm = updateResidual();
+        updateResidual();
         if (platform->comm.mpiRank() == 0 && platform->verbose()) {
           std::cout << "r-norm: " << this->rNorm << std::endl;
         }
@@ -128,7 +128,7 @@ public:
 
       if (!iR) {
         updateSolution(nRestartVectors);
-        this->rNorm = updateResidual();
+        updateResidual();
         if (platform->comm.mpiRank() == 0 && platform->verbose()) {
          std::cout << "restarting r-norm: " << this->rNorm << std::endl;
         }
@@ -197,7 +197,7 @@ private:
   occa::kernel updateSolutionKernel;
   occa::kernel gsOrthoKernel;
 
-  double updateResidual()
+  void updateResidual()
   {
     const auto o_Ax = [&]() {
       auto o_AxDouble = platform->deviceMemoryPool.reserve<double>(o_x.size());
@@ -247,7 +247,7 @@ private:
     }
     MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DOUBLE, MPI_SUM, platform->comm.mpiComm());
 
-    return std::sqrt(norm);
+    this->rNorm = std::sqrt(norm);
   };
 
   void updateSolution(const int gmresUpdateSize, bool runPreco = true) 

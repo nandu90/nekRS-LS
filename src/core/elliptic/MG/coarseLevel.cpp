@@ -234,7 +234,7 @@ MGSolver_t::coarseLevel_t::~coarseLevel_t()
 
 void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
 {
-  platform->timer.tic(name + " coarseSolve", 1);
+  platform->timer.tic(name + " coarseSolve");
 
   if (o_x.mode() == "Serial") {
     // masked E->T

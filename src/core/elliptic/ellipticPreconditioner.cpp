@@ -37,11 +37,9 @@ void ellipticPreconditioner(elliptic_t *elliptic, const occa::memory &o_r, occa:
   auto &options = elliptic->options;
 
   if (options.compareArgs("PRECONDITIONER", "JACOBI")) {
-    const dlong Nlocal = mesh->Np * mesh->Nelements;
-
     platform->linAlg
-        ->axmyzMany(Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_r, precon->o_invDiagA, o_z);
-    platform->flopCounter->add("jacobiPrecon", static_cast<double>(Nlocal) * elliptic->Nfields);
+        ->axmyzMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_r, precon->o_invDiagA, o_z);
+    platform->flopCounter->add("jacobiPrecon", static_cast<double>(mesh->Nlocal) * elliptic->Nfields);
   } else if (options.compareArgs("PRECONDITIONER", "MULTIGRID")) {
     platform->linAlg->fill<pfloat>(elliptic->fieldOffset * elliptic->Nfields, 0.0, elliptic->o_zPfloat);
     platform->copyDfloatToPfloatKernel(elliptic->fieldOffset * elliptic->Nfields, o_r, elliptic->o_rPfloat);

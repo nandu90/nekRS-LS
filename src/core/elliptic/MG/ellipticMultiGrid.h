@@ -55,8 +55,8 @@ class pMGLevel : public MGSolver_t::multigridLevel
 public:
   static constexpr hlong Narnoldi {10};
 
-  elliptic_t* elliptic;
-  mesh_t* mesh;
+  elliptic_t* elliptic = nullptr;
+  mesh_t* mesh = nullptr;
 
   int degree;
 
@@ -96,11 +96,11 @@ public:
 
   //local patch data
   occa::memory o_invAP, o_patchesIndex, o_invDegreeAP;
-  void* ogs;
-  void* ogsOverlap;
+  void* ogs = nullptr;
+  void* ogsOverlap = nullptr;
 
-  void* ogsExt;
-  void* ogsExtOverlap;
+  void* ogsExt = nullptr;
+  void* ogsExtOverlap = nullptr;
 
   void setupSmootherSchwarz(elliptic_t* pSolver);
   void updateSmootherSchwarz(elliptic_t *pSolver);

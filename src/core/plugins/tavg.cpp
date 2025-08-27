@@ -184,11 +184,6 @@ void tavg::writeToFile(mesh_t *mesh, bool reset)
   outfldCounter++;
 }
 
-deviceMemory<double> tavg::o_data()
-{
-  return deviceMemory<double>(o_AVG);
-}
-
 tavg::~tavg()
 {
   userFieldList.clear();

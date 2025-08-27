@@ -669,11 +669,6 @@ void scalar_t::setupEllipticSolver()
       continue;
     }
 
-    const auto solverName = cvodeSolve[is] ? "CVODE" : "ELLIPTIC";
-    if (platform->comm.mpiRank() == 0) {
-      std::cout << "================= " << solverName << " SETUP SCALAR" << sid << " ===============\n";
-    }
-
     if (cvodeSolve[is]) {
       continue;
     }
@@ -737,7 +732,7 @@ void scalar_t::makeForcing()
 
 void scalar_t::solve(double time, int stage)
 {
-  platform->timer.tic("scalarSolve", 1);
+  platform->timer.tic("scalarSolve");
 
   for (int is = 0; is < NSfields; is++) {
     if (!compute[is] || cvodeSolve[is]) {
@@ -747,7 +742,7 @@ void scalar_t::solve(double time, int stage)
     const std::string sid = scalarDigitStr(is);
     auto mesh = this->_mesh[is];
 
-    platform->timer.tic("scalar rhs", 1);
+    platform->timer.tic("scalar rhs");
 
     auto o_rhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
     o_rhs.copyFrom(o_JwF, mesh->Nlocal, 0, fieldOffsetScan[is]);

@@ -87,12 +87,12 @@ void ellipticUpdateAllJacobi(elliptic_t *ellipticBase)
     precon_t *precon = ellipticBase->precon;
     MGSolver_t::multigridLevel **levels = precon->MGSolver->levels;
 
-    for (int levelIndex = 0; levelIndex < ellipticBase->nLevels; levelIndex++) {
+    for (int levelIndex = 0; levelIndex < ellipticBase->levels.size(); levelIndex++) {
       auto mgLevel = dynamic_cast<pMGLevel *>(levels[levelIndex]);
       auto elliptic = mgLevel->elliptic;
       auto mesh = elliptic->mesh;
 
-      const bool coarsestLevel = (levelIndex == ellipticBase->nLevels - 1);
+      const bool coarsestLevel = (levelIndex == ellipticBase->levels.size() - 1);
       if (coarsestLevel && !elliptic->options.compareArgs("MULTIGRID COARSER SOLVER", "SMOOTHER")) {
         continue; // skip
       }

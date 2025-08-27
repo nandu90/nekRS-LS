@@ -179,11 +179,11 @@ private:
 
     dfloat rdotr1 = 0;
     if (serial) {
-      rdotr1 = *(o_tmpReductions.ptr<T>());
+      rdotr1 = o_tmpReductions.ptr<T>()[0];
     } else {
+      o_tmpReductions.copyTo(h_tmpReductions);
       auto tmp = h_tmpReductions.ptr<T>();
-      o_tmpReductions.copyTo(tmp);
-      for (int n = 0; n < o_tmpReductions.size(); ++n) {
+      for (int n = 0; n < h_tmpReductions.size(); ++n) {
         rdotr1 += tmp[n];
       }
     }
@@ -224,14 +224,12 @@ private:
                          o_tmpReductions);
 
     std::fill(reductions.begin(), reductions.end(), 0.0);
-
     if (serial) {
       auto ptr = o_tmpReductions.ptr<T>();
       std::copy(ptr, ptr + CombinedPCGId::nReduction, reductions.begin());
     } else {
+      o_tmpReductions.copyTo(h_tmpReductions);
       auto tmp = h_tmpReductions.ptr<T>();
-      o_tmpReductions.copyTo(tmp);
-
       for (int red = 0; red < CombinedPCGId::nReduction; ++red) {
         for (int n = 0; n < Nblock; ++n) {
           reductions[red] += tmp[n + Nblock * red];

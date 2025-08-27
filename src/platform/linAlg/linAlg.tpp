@@ -412,7 +412,7 @@ T norm2Many(const dlong N,
             MPI_Comm _comm)
 {
   if (timer) {
-    platform->timer.tic("dotp", 1);
+    platform->timer.tic("dotp");
   }
 
   int Nblock = (N + blocksize - 1) / blocksize;
@@ -458,7 +458,7 @@ T norm1Many(const dlong N,
             MPI_Comm _comm)
 {
   if (timer) {
-    platform->timer.tic("dotp", 1);
+    platform->timer.tic("dotp");
   }
 
   const int Nblock = (N + blocksize - 1) / blocksize;
@@ -501,7 +501,7 @@ T innerProd(const dlong N,
 {
 
   if (timer) {
-    platform->timer.tic("dotp", 1);
+    platform->timer.tic("dotp");
   }
 
   const int Nblock = (N + blocksize - 1) / blocksize;
@@ -563,7 +563,7 @@ void weightedInnerProdMulti(const dlong N,
                             const int weight = 1)
 {
   if (timer) {
-    platform->timer.tic("dotpMulti", 1);
+    platform->timer.tic("dotpMulti");
   }
 
   const auto knlPrefix = getKnlPrefix<T>();
@@ -629,7 +629,7 @@ void weightedInnerProdMulti(const dlong N,
                             const int weight = 1)
 {
   if (timer) {
-    platform->timer.tic("dotpMulti", 1);
+    platform->timer.tic("dotpMulti");
   }
 
   const auto Nblock = (N + blocksize - 1) / blocksize;
@@ -694,7 +694,7 @@ T weightedInnerProdMany(const dlong N,
                         MPI_Comm _comm)
 {
   if (timer) {
-    platform->timer.tic("dotp", 1);
+    platform->timer.tic("dotp");
   }
 
   const auto knlPrefix = getKnlPrefix<T>();
@@ -774,7 +774,7 @@ T weightedNorm1Many(const dlong N,
                     MPI_Comm _comm)
 {
   if (timer) {
-    platform->timer.tic("dotp", 1);
+    platform->timer.tic("dotp");
   }
   const int Nblock = (N + blocksize - 1) / blocksize;
 

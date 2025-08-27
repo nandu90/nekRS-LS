@@ -724,7 +724,7 @@ void cvode_t::setupDirichletMask()
 
   { // setup masked gs handle
     const auto [Nmasked_, o_maskIds_, NmaskedLocal, o_maskIdsLocal, NmaskedGlobal, o_maskIdsGlobal] =
-        maskedFaceIds(mesh, mesh->Nlocal, Nscalar, fieldOffset, EToB.data(), ellipticBcType::DIRICHLET);
+        maskedFaceIds(mesh, mesh->Nlocal, Nscalar, fieldOffset, EToB, ellipticBcType::DIRICHLET);
 
     this->Nmasked = Nmasked_;
     this->o_maskIds = o_maskIds_;

@@ -146,6 +146,7 @@ public:
     return slice(offset);
   };
 
+#if 0
   template <class A> void copyFrom(const deviceMemory<T, A> &src)
   {
     occa_memory_.copyFrom(src.occa_memory_);
@@ -159,32 +160,57 @@ public:
   {
     occa_memory_.copyFrom(src.occa_memory_, count, dest_offset, src_offset);
   }
-
-  void copyFrom(const std::vector<T> &src)
-  {
-    occa_memory_.copyFrom(src.data());
-  }
+#endif
 
   void copyFrom(const void *src, size_type count, size_type dest_offset = 0)
   {
     occa_memory_.copyFrom(src, count, dest_offset);
   }
 
-  void copyFrom(const std::vector<T> &src, size_type count, size_type dest_offset = 0)
+  void copyFrom(const std::vector<T> &src, size_type count, size_type dest_offset = 0, size_type src_offset = 0)
   {
-    occa_memory_.copyFrom(src.data(), count, dest_offset);
+    occa_memory_.copyFrom(src.data() + src_offset, count, dest_offset);
+  }
+
+  void copyFrom(const std::vector<T> &src)
+  {
+    copyFrom(src, occa_memory_.size(), 0, 0);
+  }
+
+  void copyFrom(const occa::memory &src, size_type count, size_type dest_offset = 0, size_type src_offset = 0)
+  {
+    const auto srcType  = src.dtype();
+    const auto destType = occa_memory_.dtype();
+ 
+    // Handle special float <-> double conversions
+    if (srcType == occa::dtype::get<double>() && destType == occa::dtype::get<float>()) {
+      platform->copyDoubleToFloatKernel(
+        static_cast<dlong>(count),
+        src.slice(src_offset),
+        occa_memory_.slice(dest_offset)
+      );
+      return;
+    }
+ 
+    if (srcType == occa::dtype::get<float>() && destType == occa::dtype::get<double>()) {
+      platform->copyFloatToDoubleKernel(
+        static_cast<dlong>(count),
+        src.slice(src_offset),
+        occa_memory_.slice(dest_offset)
+      );
+      return;
+    }
+ 
+    // Default case: direct copy
+    occa_memory_.copyFrom(src.slice(src_offset), count, dest_offset);
   }
 
   void copyFrom(const occa::memory &src)
   {
-    occa_memory_.copyFrom(src);
+    copyFrom(src, occa_memory_.size(), 0, 0);
   }
 
-  void copyFrom(const occa::memory &src, size_type count, size_type dest_offset = 0)
-  {
-    occa_memory_.copyFrom(src, count, dest_offset);
-  }
-
+#if 0
   template <class A> void copyTo(deviceMemory<T, A> &dest) const
   {
     occa_memory_.copyTo(dest.occa_memory_);
@@ -196,25 +222,49 @@ public:
   {
     occa_memory_.copyTo(dest.occa_memory_, count, dest_offset, src_offset);
   }
+#endif
+
+  void copyTo(std::vector<T> &dest, size_type count, size_type src_offset = 0, size_type dest_offset = 0) const
+  {
+    occa_memory_.copyTo(dest.data() + dest_offset, count, src_offset);
+  }
 
   void copyTo(std::vector<T> &dest) const
   {
-    occa_memory_.copyTo(dest.data());
+    copyTo(dest, occa_memory_.size(), 0, 0);
   }
 
-  void copyTo(std::vector<T> &dest, size_type count, size_type src_offset = 0) const
+  void copyTo(occa::memory &dest, size_type count, size_type src_offset = 0, size_type dest_offset = 0) const
   {
-    occa_memory_.copyTo(dest.data(), count, src_offset);
+    const auto srcType  = occa_memory_.dtype();
+    const auto destType = dest.dtype();
+ 
+    // Handle special float <-> double cases
+    if (srcType == occa::dtype::get<double>() && destType == occa::dtype::get<float>()) {
+      platform->copyDoubleToFloatKernel(
+        static_cast<dlong>(count),
+        occa_memory_.slice(src_offset),
+        dest.slice(dest_offset)
+      );
+      return;
+    }
+ 
+    if (srcType == occa::dtype::get<float>() && destType == occa::dtype::get<double>()) {
+      platform->copyFloatToDoubleKernel(
+        static_cast<dlong>(count),
+        occa_memory_.slice(src_offset),
+        dest.slice(dest_offset)
+      );
+      return;
+    }
+ 
+    // Default case: straight copy
+    occa_memory_.copyTo(dest.slice(dest_offset), count, src_offset);
   }
 
   void copyTo(occa::memory &dest) const
   {
-    occa_memory_.copyTo(dest);
-  }
-
-  void copyTo(occa::memory &dest, size_type count, size_type src_offset = 0) const
-  {
-    occa_memory_.copyTo(dest, count, src_offset);
+    copyTo(dest, occa_memory_.size(), 0, 0);
   }
 
 private:

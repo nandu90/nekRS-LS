@@ -473,11 +473,6 @@ void fluidSolver_t::setupEllipticSolver()
     return;
   }
 
-  if (platform->comm.mpiRank() == 0) {
-    std::cout << "================ "
-              << "ELLIPTIC SETUP " + upperCase(velocityName) << " ================" << std::endl;
-  }
-
   auto o_lambda0 = o_mue;
   auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
   platform->linAlg->axpby(mesh->Nlocal, *g0 / dt[0], o_rho, 0.0, o_lambda1);
@@ -528,11 +523,6 @@ void fluidSolver_t::setupEllipticSolver()
   }
 
   {
-    if (platform->comm.mpiRank() == 0) {
-      std::cout << "================ "
-                << "ELLIPTIC SETUP " + upperCase(pressureName) << " ================" << std::endl;
-    }
-
     const auto o_lambda0 = [&]() {
       auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {

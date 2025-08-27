@@ -14,7 +14,7 @@ void neknek_t::exchangeTimes(dfloat* dt, double time)
   }
 
   if (this->globalMovingMesh) {
-    platform->timer.tic("neknek updateInterpPoints", 1);
+    platform->timer.tic("neknek updateInterpPoints");
     this->updateInterpPoints();
     platform->timer.toc("neknek updateInterpPoints");
 

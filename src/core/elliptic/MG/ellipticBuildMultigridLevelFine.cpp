@@ -42,9 +42,7 @@ std::string gen_suffix(const elliptic_t *elliptic, const char *floatString)
 
 elliptic_t *ellipticBuildMultigridLevelFine(elliptic_t *baseElliptic)
 {
-
-  auto elliptic = new elliptic_t();
-  memcpy(elliptic, baseElliptic, sizeof(*baseElliptic));
+  auto elliptic = new elliptic_t(*baseElliptic);
 
   auto mesh = new mesh_t();
   memcpy(mesh, baseElliptic->mesh, sizeof(*baseElliptic->mesh));
