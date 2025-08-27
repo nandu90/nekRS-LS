@@ -2,9 +2,9 @@
 
 static int ciMode = 0;
 
-#define EPS_SST 4.13e-2
-#define EPS_DDES 9.92e-2
-#define EPS_IDDES 1.39e-1
+#define EPS_SST 4.21e-2
+#define EPS_DDES 1.02e-1
+#define EPS_IDDES 1.55e-1
 
 dfloat hill_step(dfloat x, dfloat w, dfloat h);
 dfloat hill_height(dfloat x, dfloat Lx, dfloat w, dfloat h);
@@ -28,8 +28,9 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("END TIME", std::string("1.0"));
   options.setArgs("ADVECTION TYPE", "CUBATURE+CONVECTIVE");
   options.setArgs("DT", std::string("1e-3"));
+  options.setArgs("TARGET CFL", std::string("2.0"));
   options.setArgs("VARIABLE DT", std::string("TRUE"));
-  options.setArgs("TARGET CFL", std::string("0.5"));
+  options.setArgs("SUBCYCLING STEPS", std::string("1"));
 
   options.setArgs("FLUID PRESSURE SOLVER TOLERANCE", std::string("1e-4"));
 
@@ -40,7 +41,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("SCALAR01 SOLVER TOLERANCE", std::string("1e-6"));
 }
 
-void ciTestErrors(nrs_t *nrs, double time, int tstep, occa::memory o_avgU)
+void ciTestErrors(nrs_t *nrs, double time, int tstep, const occa::memory& o_avgU)
 {
   if (!nrs->lastStep) {
     return;
@@ -97,8 +98,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep, occa::memory o_avgU)
     }
     file.close();
 
-    static deviceMemory<dfloat> o_err(lesData.size());
-    o_err.copyFrom(lesData);
+    deviceMemory<dfloat> o_err(lesData);
     platform->linAlg->axpby(lesData.size(), 2.0, o_tauwpx, -1.0, o_err);
     const auto errNorm = platform->linAlg->norm2(lesData.size(), o_err, MPI_COMM_SELF);
 
