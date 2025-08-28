@@ -13,7 +13,7 @@ class app_t {
 
     virtual std::string id() const { return ""; };
 
-    virtual std::vector<std::string> fieldsToSolve() const = 0;
+    virtual const std::vector<std::string>& fieldsToSolve() const = 0; 
     virtual void printRunStat(int step) = 0;
 
     virtual void init() = 0;

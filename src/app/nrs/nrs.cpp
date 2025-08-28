@@ -1754,8 +1754,10 @@ bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter, bo
 
   if (fluid) {
     fluid->applyDirichlet(timeNew);
-    if (neknek && !platform->app->bc->hasOutflow("fluid velocity")) {
-      neknek->fixCoupledSurfaceFlux(fluid->o_EToB, fluid->fieldOffset, fluid->o_U);
+    if (neknek && fieldsToSolveContains("fluid velocity")) {
+      if (!platform->app->bc->hasOutflow("fluid velocity")) {
+        neknek->fixCoupledSurfaceFlux(fluid->o_EToB, fluid->fieldOffset, fluid->o_U);
+      }
     }
   }
 

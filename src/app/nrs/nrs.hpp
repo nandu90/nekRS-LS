@@ -62,11 +62,12 @@ public:
 
   void finalize() override;
 
-  std::vector<std::string> fieldsToSolve() const override
+  const std::vector<std::string>& fieldsToSolve() const override
   {
-    auto options = platform->options;
+    auto& options = platform->options;
 
-    std::vector<std::string> fields;
+    static std::vector<std::string> fields;
+    fields.clear();
 
     if (options.compareArgs("MOVING MESH", "TRUE") && !options.compareArgs("GEOM SOLVER", "NONE")) {
       fields.push_back("geom");
@@ -86,6 +87,10 @@ public:
       }
     }
     return fields;
+  };
+
+  bool fieldsToSolveContains(const std::string& value) {
+    return std::find(fieldsToSolve().begin(), fieldsToSolve().end(), value) != fieldsToSolve().end();
   };
 
   void saveSolutionState();

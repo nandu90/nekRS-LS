@@ -16,7 +16,7 @@ void neknek_t::fixCoupledSurfaceFlux(const occa::memory &o_EToB, dlong fieldOffs
                o_U,
                o_reduction);
 
-  std::vector<dfloat> reduction(nReduction * mesh->Nelements);
+  std::vector<dfloat> reduction(o_reduction.size());
   o_reduction.copyTo(reduction.data());
 
   std::array<dfloat, nReduction> res;
@@ -27,7 +27,7 @@ void neknek_t::fixCoupledSurfaceFlux(const occa::memory &o_EToB, dlong fieldOffs
     }
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, res.data(), nReduction, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, res.data(), res.size(), MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
 
   auto [flux, area] = res;
 
