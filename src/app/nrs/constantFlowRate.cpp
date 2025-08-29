@@ -64,7 +64,7 @@ void nrs_t::computeHomogenousStokesSolution(double time)
   platform->linAlg->adyz(mesh->Nlocal, 1.0, fluid->o_rho, o_lambda0);
 
   auto o_Prhs = [&]() {
-    platform->timer.tic("pressure rhs");
+    platform->timer.tic(fluid->pressureName + " rhs");
 
     auto o_gradPCoeff = platform->deviceMemoryPool.reserve<dfloat>(mesh->dim * fieldOffset);
     launchKernel("core-wGradientVolumeHex3D",
@@ -90,18 +90,18 @@ void nrs_t::computeHomogenousStokesSolution(double time)
                  o_rhs);
 
     flops += 5 * mesh->Nlocal;
-    platform->timer.toc("pressure rhs");
+    platform->timer.toc(fluid->pressureName + " rhs");
     return o_rhs;
   }();
 
-  platform->timer.tic("pressureSolve");
+  platform->timer.tic(fluid->pressureName + "Solve");
   fluid->ellipticSolverP->solve(o_lambda0, o_NULL, o_Prhs, o_Pc);
-  platform->timer.toc("pressureSolve");
+  platform->timer.toc(fluid->pressureName + "Solve");
   o_Prhs.free();
   o_lambda0.free();
 
   auto o_RhsVel = [&]() {
-    platform->timer.tic("velocity rhs");
+    platform->timer.tic(fluid->velocityName + " rhs");
 
     occa::memory o_rhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->dim * fieldOffset);
 
@@ -129,11 +129,11 @@ void nrs_t::computeHomogenousStokesSolution(double time)
       const dfloat n_dim = flowDirection[dim];
       platform->linAlg->axpby(mesh->Nlocal, n_dim, o_JwF, 1.0, o_rhs, offset, offset);
     }
-    platform->timer.toc("velocity rhs");
+    platform->timer.toc(fluid->velocityName + " rhs");
     return o_rhs;
   }();
 
-  platform->timer.tic("velocitySolve");
+  platform->timer.tic(fluid->velocityName + "Solve");
 
   o_lambda0 = fluid->o_mue;
   auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
@@ -149,7 +149,7 @@ void nrs_t::computeHomogenousStokesSolution(double time)
     fluid->ellipticSolver[1]->solve(o_lambda0, o_lambda1, o_RhsVel.slice(1 * fieldOffset), o_Ucy);
     fluid->ellipticSolver[2]->solve(o_lambda0, o_lambda1, o_RhsVel.slice(2 * fieldOffset), o_Ucz);
   }
-  platform->timer.toc("velocitySolve");
+  platform->timer.toc(fluid->velocityName + "Solve");
 
   platform->flopCounter->add("ConstantFlowRate::compute", flops);
 }

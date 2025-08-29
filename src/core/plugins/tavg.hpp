@@ -28,7 +28,7 @@ void reset();
 void free();
 const double& time() const { return atime; }
 dlong fieldOffset() const { return fieldOffset_; };
-deviceMemory<double> o_data();
+const deviceMemory<double> o_data() const { return deviceMemory<double>(o_AVG); };
 
 
 private:

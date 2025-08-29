@@ -16,7 +16,7 @@ void neknek_t::fixCoupledSurfaceFlux(const occa::memory &o_EToB, dlong fieldOffs
                o_U,
                o_reduction);
 
-  std::vector<dfloat> reduction(nReduction * mesh->Nelements);
+  std::vector<dfloat> reduction(o_reduction.size());
   o_reduction.copyTo(reduction.data());
 
   std::array<dfloat, nReduction> res;
@@ -26,15 +26,13 @@ void neknek_t::fixCoupledSurfaceFlux(const occa::memory &o_EToB, dlong fieldOffs
       res[fld] += reduction[e + fld * mesh->Nelements];
     }
   }
-
-  MPI_Allreduce(MPI_IN_PLACE, res.data(), nReduction, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, res.data(), res.size(), MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
 
   auto [flux, area] = res;
+  nekrsCheck(isnan(area) || area <= 0, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "Invalid area!");
+  nekrsCheck(isnan(flux), MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "Invalid flux!");
 
-  dfloat gamma = 0.0;
-  if (area > 0.0) {
-    gamma = -1.0 * flux / area;
-  }
+  const auto gamma = -flux / area;
 
   if (platform->verbose() && platform->comm.mpiRank() == 0) {
     printf("neknek::fixCoupledSurfaceFlux flux = %11.4e, area = %11.4e, gamma = %11.4e\n", flux, area, gamma);

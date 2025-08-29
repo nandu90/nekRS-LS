@@ -448,7 +448,7 @@ void lpm_t::interpolate()
 void lpm_t::interpolate(const std::string &interpFieldName)
 {
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "integrate::userRHS::interpolate", 1);
+    platform->timer.tic(timerName + "integrate::userRHS::interpolate");
   }
   auto o_fld = extrapolatedInterpFields.at(interpFieldName);
   auto o_interpFld = getInterpField(interpFieldName);
@@ -478,7 +478,7 @@ void lpm_t::integrate(double tf)
              "cannot call integrate without setting a userRHS!");
 
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "integrate", 1);
+    platform->timer.tic(timerName + "integrate");
   }
 
   // past integration time, exit without integrating
@@ -583,7 +583,7 @@ void lpm_t::find(const occa::memory &o_yNew)
     o_zCoord = o_yNew.slice(2 * fieldOffset_, nParticles_);
   }
   interp->setPoints(o_xCoord, o_yCoord, o_zCoord);
-  platform->timer.tic(timerName + "integrate::find", 1);
+  platform->timer.tic(timerName + "integrate::find");
   interp->setTimerName(timerName + "integrate::find::");
   interp->find(verbosityLevel);
   platform->timer.toc(timerName + "integrate::find");
@@ -633,7 +633,7 @@ void lpm_t::integrateAB()
       o_ydot.copyFrom(o_k, nDOFs_ * fieldOffset_); // for later lagging
     }
   } else {
-    platform->timer.tic(timerName + "integrate::userRHS", 1);
+    platform->timer.tic(timerName + "integrate::userRHS");
     deviceMemory<dfloat> o_ydot_(o_ydot);
     deviceMemory<dfloat> o_y_(o_y);
     userRHS_(this, time, o_y_, userdata_, o_ydot_);
@@ -676,7 +676,7 @@ void lpm_t::integrateRK()
 
 void lpm_t::integrateRK1()
 {
-  platform->timer.tic(timerName + "integrate::userRHS", 1);
+  platform->timer.tic(timerName + "integrate::userRHS");
   deviceMemory<dfloat> o_k_(o_k);
   deviceMemory<dfloat> o_y_(o_y);
   userRHS_(this, time, o_y_, userdata_, o_k_);
@@ -701,7 +701,7 @@ void lpm_t::integrateRK2()
   deviceMemory<dfloat> o_k2_(o_k2);
   deviceMemory<dfloat> o_y_(o_y);
 
-  platform->timer.tic(timerName + "integrate::userRHS", 1);
+  platform->timer.tic(timerName + "integrate::userRHS");
 
   userRHS_(this, time, o_y_, userdata_, o_k1_);
   platform->timer.toc(timerName + "integrate::userRHS");
@@ -716,7 +716,7 @@ void lpm_t::integrateRK2()
   // extrapolate to t^{n+1} using t^{n}, t^{n-1}, ...
   extrapolateFluidState(time + dt[0]);
 
-  platform->timer.tic(timerName + "integrate::userRHS", 1);
+  platform->timer.tic(timerName + "integrate::userRHS");
   deviceMemory<dfloat> o_ytmp_(o_ytmp);
   userRHS_(this, time + dt[0], o_ytmp_, userdata_, o_k2_);
   platform->timer.toc(timerName + "integrate::userRHS");
@@ -743,7 +743,7 @@ void lpm_t::integrateRK3()
   deviceMemory<dfloat> o_k3_(o_k3);
   deviceMemory<dfloat> o_y_(o_y);
 
-  platform->timer.tic(timerName + "integrate::userRHS", 1);
+  platform->timer.tic(timerName + "integrate::userRHS");
   userRHS_(this, time, o_y_, userdata_, o_k1_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
@@ -757,7 +757,7 @@ void lpm_t::integrateRK3()
   // extrapolate to t^{n+1/2} using t^{n}, t^{n-1}, ...
   extrapolateFluidState(time + 0.5 * dt[0]);
 
-  platform->timer.tic(timerName + "integrate::userRHS", 1);
+  platform->timer.tic(timerName + "integrate::userRHS");
   userRHS_(this, time + 0.5 * dt[0], o_y_, userdata_, o_k2_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
@@ -772,7 +772,7 @@ void lpm_t::integrateRK3()
   // extrapolate to t^{n+1} using t^{n}, t^{n-1}, ...
   extrapolateFluidState(time + dt[0]);
 
-  platform->timer.tic(timerName + "integrate::userRHS", 1);
+  platform->timer.tic(timerName + "integrate::userRHS");
   deviceMemory<dfloat> o_ytmp_(o_ytmp);
   userRHS_(this, time + dt[0], o_ytmp_, userdata_, o_k3_);
   platform->timer.toc(timerName + "integrate::userRHS");
@@ -801,7 +801,7 @@ void lpm_t::integrateRK4()
   deviceMemory<dfloat> o_k4_(o_k4);
   deviceMemory<dfloat> o_y_(o_y);
 
-  platform->timer.tic(timerName + "integrate::userRHS", 1);
+  platform->timer.tic(timerName + "integrate::userRHS");
   userRHS_(this, time, o_y_, userdata_, o_k1_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
@@ -815,7 +815,7 @@ void lpm_t::integrateRK4()
   // extrapolate to t^{n+1/2} using t^{n}, t^{n-1}, ...
   extrapolateFluidState(time + 0.5 * dt[0]);
 
-  platform->timer.tic(timerName + "integrate::userRHS", 1);
+  platform->timer.tic(timerName + "integrate::userRHS");
   userRHS_(this, time + 0.5 * dt[0], o_y_, userdata_, o_k2_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
@@ -826,7 +826,7 @@ void lpm_t::integrateRK4()
 
   this->find(o_ytmp);
 
-  platform->timer.tic(timerName + "integrate::userRHS", 1);
+  platform->timer.tic(timerName + "integrate::userRHS");
   userRHS_(this, time + 0.5 * dt[0], o_y_, userdata_, o_k3_);
   platform->timer.toc(timerName + "integrate::userRHS");
 
@@ -840,7 +840,7 @@ void lpm_t::integrateRK4()
   // extrapolate to t^{n+1} using t^{n}, t^{n-1}, ...
   extrapolateFluidState(time + dt[0]);
 
-  platform->timer.tic(timerName + "integrate::userRHS", 1);
+  platform->timer.tic(timerName + "integrate::userRHS");
   deviceMemory<dfloat> o_ytmp_(o_ytmp);
   userRHS_(this, time + dt[0], o_ytmp_, userdata_, o_k4_);
   platform->timer.toc(timerName + "integrate::userRHS");
@@ -991,7 +991,7 @@ lpm_t::sendReceiveData(const std::vector<dfloat> &sendData,
 {
 
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "migrate::sendReceiveData", 1);
+    platform->timer.tic(timerName + "migrate::sendReceiveData");
   }
 
   std::vector<dfloat> recvData;
@@ -1032,11 +1032,11 @@ void lpm_t::migrate()
              lpm_t::maxEntriesPerParticleMigration);
 
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "migrate", 1);
+    platform->timer.tic(timerName + "migrate");
   }
 
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "migrate::find", 1);
+    platform->timer.tic(timerName + "migrate::find");
   }
 
   {
@@ -1074,7 +1074,7 @@ void lpm_t::migrate()
 
   // Pack data to send to other ranks
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "migrate::packSending", 1);
+    platform->timer.tic(timerName + "migrate::packSending");
   }
   if (nNonLocal) {
     // pack buffers for sending to other procs
@@ -1168,7 +1168,7 @@ void lpm_t::migrate()
       sendReceiveData(sendingData, r, proc, code, elem, entriesPerParticle);
 
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "migrate::unpackReceiving", 1);
+    platform->timer.tic(timerName + "migrate::unpackReceiving");
   }
 
   // copy data into host arrays, converting from packing as AoS to SoA structure
@@ -1320,7 +1320,7 @@ void lpm_t::migrate()
 
   // do an additional findpts call
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "migrate::find", 1);
+    platform->timer.tic(timerName + "migrate::find");
   }
 
   {
@@ -1406,7 +1406,7 @@ void lpm_t::addParticles(int newNParticles,
                          const occa::memory &o_ydotNewPart)
 {
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "addParticles", 1);
+    platform->timer.tic(timerName + "addParticles");
   }
 
   std::array<dlong, 2> counts = {newNParticles, this->numParticles()};
@@ -1549,7 +1549,7 @@ void lpm_t::addParticles(int newNParticles,
     interp->setPoints(o_xcoord, o_ycoord, o_zcoord);
 
     if (timerLevel != TimerLevel::None) {
-      platform->timer.tic(timerName + "addParticles::find", 1);
+      platform->timer.tic(timerName + "addParticles::find");
     }
 
     // disable findpts kernel timer for this call
@@ -1571,7 +1571,7 @@ void lpm_t::deleteParticles()
 {
   // apply tic here to get correct number of deletion events in timer output
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "deleteParticles", 1);
+    platform->timer.tic(timerName + "deleteParticles");
   }
 
   int nDelete = numUnfoundParticles();
@@ -1668,7 +1668,7 @@ void lpm_t::deleteParticles()
     interp->setPoints(o_xcoord, o_ycoord, o_zcoord);
 
     if (timerLevel != TimerLevel::None) {
-      platform->timer.tic(timerName + "deleteParticles::find", 1);
+      platform->timer.tic(timerName + "deleteParticles::find");
     }
 
     // disable findpts kernel timer for this call
@@ -1698,7 +1698,7 @@ std::string lpm_vtu_data(const std::string &fieldName, long long int nComponent,
 void lpm_t::writeToFile()
 {
   if (timerLevel != TimerLevel::None) {
-    platform->timer.tic(timerName + "write", 1);
+    platform->timer.tic(timerName + "write");
   }
 
   // Required to determine if points are outside of the domain

@@ -142,11 +142,6 @@ void geomSolver_t::setupEllipticSolver()
     return;
   }
 
-  if (platform->comm.mpiRank() == 0) {
-    std::cout << "================ "
-              << "ELLIPTIC SETUP " + upperCase(name) << " ================" << std::endl;
-  }
-
   nekrsCheck(!platform->options.compareArgs(upperCase(name) + " SOLVER", "BLOCK"),
              platform->comm.mpiComm(),
              EXIT_FAILURE,

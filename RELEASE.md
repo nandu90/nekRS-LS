@@ -21,6 +21,7 @@
 * Linear implicit velocity source term
 * T-mesh support for all scalars
 * Robin boundary conditions
+* Add RANS ktau variants SST, DDES, IDDES
 * Various bug fixes
 
 ## Good to know

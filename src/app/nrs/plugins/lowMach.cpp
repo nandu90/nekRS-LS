@@ -130,7 +130,7 @@ void lowMach::qThermalSingleComponent(double time)
   auto o_src = platform->deviceMemoryPool.reserve<dfloat>(nrs->fluid->fieldOffset);
   platform->linAlg->fill(mesh->Nlocal, 0.0, o_src);
   if (nrs->userSource) {
-    platform->timer.tic(scope + "udfSEqnSource", 1);
+    platform->timer.tic(scope + "udfSEqnSource");
     auto o_saveEXT = scalar->o_EXT;
     scalar->o_EXT = o_src;
     platform->callerScope = "qThermal";

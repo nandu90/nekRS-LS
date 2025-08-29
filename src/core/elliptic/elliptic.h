@@ -51,6 +51,7 @@ struct elliptic_t {
   bool mgLevel = false;
 
   std::string name = "unknown";
+  std::string timerName;
 
   int Niter;
   dfloat res00Norm, res0Norm, resNorm;
@@ -61,15 +62,15 @@ struct elliptic_t {
 
   precon_t *precon = nullptr;
 
-  ogs_t *ogs;
-  oogs_t *oogs;
-  oogs_t *oogsAx;
+  ogs_t *ogs = nullptr;
+  oogs_t *oogs = nullptr;
+  oogs_t *oogsAx = nullptr;
 
   setupAide options;
 
   bool nullspace = 0;
 
-  int *EToB = nullptr;
+  std::vector<int> EToB;
 
   // C0-FEM mask data
   dlong Nmasked;
@@ -106,12 +107,11 @@ struct elliptic_t {
   occa::memory o_lambda1;
   dfloat lambda1Avg = NAN;
 
-  int nLevels = 0;
-  int *levels = nullptr;
+  std::vector<int> levels;
 
   SolutionProjection *solutionProjection = nullptr;
 
-  std::unique_ptr<linearSolver> KSP;  
+  linearSolver *KSP = nullptr;  
 
   std::function<void(dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x)>
       applyZeroNormalMask;

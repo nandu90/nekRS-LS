@@ -39,7 +39,7 @@ public:
   void exchange(bool allTimeStates = false, bool lag = false);
 
   // multi-rate specific functions
-  void exchangeTimes(dfloat* dt, double time);
+  void exchangeTimes(const std::vector<dfloat>& dt, double time);
   void setCorrectorTime(double time);
 
   void extrapolateBoundary(int tstep, double time, bool predictor);

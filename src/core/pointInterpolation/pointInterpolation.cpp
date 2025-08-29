@@ -38,9 +38,9 @@ pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
   newton_tol =
       (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(1e-6, newton_tol_);
 
-  auto x = platform->memoryPool.reserve<dfloat>(mesh->Nlocal);
-  auto y = platform->memoryPool.reserve<dfloat>(mesh->Nlocal);
-  auto z = platform->memoryPool.reserve<dfloat>(mesh->Nlocal);
+  auto x = platform->device.mallocHost<dfloat>(mesh->Nlocal);
+  auto y = platform->device.mallocHost<dfloat>(mesh->Nlocal);
+  auto z = platform->device.mallocHost<dfloat>(mesh->Nlocal);
 
   if (mySession) {
     mesh->o_x.copyTo(x, mesh->Nlocal);
@@ -63,14 +63,10 @@ pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
   int sessionID = 0;
   platform->options.getArgs("NEKNEK SESSION ID", sessionID);
 
-  auto xPtr = x.ptr<dfloat>();
-  auto yPtr = y.ptr<dfloat>();
-  auto zPtr = z.ptr<dfloat>();
-
   findpts_ = std::make_unique<findpts::findpts_t>(comm,
-                                                  mySession ? xPtr : nullptr,
-                                                  mySession ? yPtr : nullptr,
-                                                  mySession ? zPtr : nullptr,
+                                                  mySession ? x.ptr<dfloat>() : nullptr,
+                                                  mySession ? y.ptr<dfloat>() : nullptr,
+                                                  mySession ? z.ptr<dfloat>() : nullptr,
                                                   mesh->Nq,
                                                   mySession ? mesh->Nelements : 0,
                                                   2 * mesh->Nq,

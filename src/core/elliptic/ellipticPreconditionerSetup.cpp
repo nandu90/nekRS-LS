@@ -45,9 +45,8 @@ void ellipticPreconditionerSetup(elliptic_t *elliptic, ogs_t *ogs)
     }
 
     const std::vector<int> levels = determineMGLevels(elliptic->name);
-    elliptic->nLevels = levels.size();
-    elliptic->levels = (int *)calloc(elliptic->nLevels, sizeof(int));
-    for (int i = 0; i < elliptic->nLevels; ++i) {
+    elliptic->levels.resize(levels.size());
+    for (int i = 0; i < elliptic->levels.size(); ++i) {
       elliptic->levels[i] = levels.at(i);
     }
 

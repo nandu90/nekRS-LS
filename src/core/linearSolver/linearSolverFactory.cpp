@@ -4,7 +4,7 @@
 #include "gmres.hpp"
 
 template <typename T>
-std::unique_ptr<linearSolver>
+linearSolver*
 linearSolverFactory<T>::create(const std::string &_solver,
                                const std::string &varName,
                                dlong Nlocal,
@@ -16,7 +16,7 @@ linearSolverFactory<T>::create(const std::string &_solver,
 {
   nekrsCheck(!Ax, MPI_COMM_SELF, EXIT_FAILURE, "Ax undefined for %s!\n", varName.c_str());
 
-  auto KSP = [&]() -> std::unique_ptr<linearSolver> {
+  auto KSP = [&]() -> linearSolver* {
     const auto solver = lowerCase(_solver);
 
     auto flexible = false;
@@ -30,7 +30,7 @@ linearSolverFactory<T>::create(const std::string &_solver,
         combined = true;
       }
 
-      return std::make_unique<cg<T>>(Nlocal, Nfields, fieldOffset, o_weight, flexible, combined, Ax, Pc);
+      return new cg<T>(Nlocal, Nfields, fieldOffset, o_weight, flexible, combined, Ax, Pc);
     } else if (solver.find("gmres") != std::string::npos) {
       auto iR = false;
       if (solver.find("ir") != std::string::npos) {
@@ -44,15 +44,15 @@ linearSolverFactory<T>::create(const std::string &_solver,
         nRestartVectors = std::stoi(match[1]);
       }
 
-      return std::make_unique<gmres<T>>(Nlocal,
-                                        Nfields,
-                                        fieldOffset,
-                                        o_weight,
-                                        nRestartVectors,
-                                        flexible,
-                                        iR,
-                                        Ax,
-                                        Pc);
+      return new gmres<T>(Nlocal,
+                          Nfields,
+                          fieldOffset,
+                          o_weight,
+                          nRestartVectors,
+                          flexible,
+                          iR,
+                          Ax,
+                          Pc);
     } else {
       nekrsAbort(platform->comm.mpiComm(), EXIT_FAILURE, "Unknown linear solver %s!\n", solver.c_str());
       return nullptr;

@@ -7,7 +7,7 @@
 template <typename T = dfloat> class linearSolverFactory
 {
 public:
-  static std::unique_ptr<linearSolver>
+  static linearSolver*
   create(const std::string &_solver,
          const std::string &varName,
          dlong Nlocal,

@@ -27,6 +27,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("FLUID DENSITY", std::string("1.0"));
   options.setArgs("END TIME", std::string("0.5"));
   options.setArgs("ADVECTION TYPE", "CUBATURE+CONVECTIVE");
+
   options.setArgs("DT", std::string("5e-3"));
   options.setArgs("VARIABLE DT", std::string("TRUE"));
   options.setArgs("TARGET CFL", std::string("1.5"));
@@ -41,7 +42,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("SCALAR01 SOLVER TOLERANCE", std::string("1e-6"));
 }
 
-void ciTestErrors(nrs_t *nrs, double time, int tstep, occa::memory o_avgU)
+void ciTestErrors(nrs_t *nrs, double time, int tstep, const occa::memory& o_avgU)
 {
   if (!nrs->lastStep) {
     return;
@@ -98,12 +99,11 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep, occa::memory o_avgU)
     }
     file.close();
 
-    static deviceMemory<dfloat> o_err(lesData.size());
-    o_err.copyFrom(lesData);
+    deviceMemory<dfloat> o_err(lesData);
     platform->linAlg->axpby(lesData.size(), 2.0, o_tauwpx, -1.0, o_err);
     const auto errNorm = platform->linAlg->norm2(lesData.size(), o_err, MPI_COMM_SELF);
 
-#if 1
+#if 0
     std::vector<dfloat> tauwpx(np);
     o_tauwpx.copyTo(tauwpx);
 

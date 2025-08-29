@@ -101,7 +101,7 @@ void nrs_t::printSolutionMinMax()
 
   if (Nscalar) {
     if (platform->comm.mpiRank() == 0) {
-      printf("%-15s min/max:", "SCALAR s");
+      printf("%-15s min/max:", "SCALAR S");
     }
 
     int cnt = 0;
@@ -726,26 +726,6 @@ void nrs_t::printRunStat(int step)
   const int rank = platform->comm.mpiRank();
   auto comm_ = platform->comm.mpiComm();
 
-  platform->timer.set("fluid velocity proj",
-                      platform->timer.query("fluid velocity proj pre", "DEVICE:MAX") +
-                          platform->timer.query("fluid velocity proj post", "DEVICE:MAX"),
-                      platform->timer.count("fluid velocity proj pre"));
-
-  platform->timer.set("fluid pressure proj",
-                      platform->timer.query("fluid pressure proj pre", "DEVICE:MAX") +
-                          platform->timer.query("fluid pressure proj post", "DEVICE:MAX"),
-                      platform->timer.count("fluid pressure proj pre"));
-
-  platform->timer.set("scalar proj",
-                      platform->timer.query("scalar proj pre", "DEVICE:MAX") +
-                          platform->timer.query("scalar proj post", "DEVICE:MAX"),
-                      platform->timer.count("scalar proj pre"));
-
-  platform->timer.set("geom proj",
-                      platform->timer.query("geom proj pre", "DEVICE:MAX") +
-                          platform->timer.query("geom proj post", "DEVICE:MAX"),
-                      platform->timer.count("geom proj pre"));
-
   double gsTime = ogsTime(/* reportHostTime */ true);
   MPI_Allreduce(MPI_IN_PLACE, &gsTime, 1, MPI_DOUBLE, MPI_MAX, comm_);
 
@@ -856,6 +836,11 @@ void nrs_t::printRunStat(int step)
   const double tMesh = platform->timer.query("geomSolve", "DEVICE:MAX");
   platform->timer.printStatEntry("    geomSolve           ", "geomSolve", "DEVICE:MAX", tElapsedTimeSolve);
   platform->timer.printStatEntry("      preconditioner    ", "geom preconditioner", "DEVICE:MAX", tMesh);
+
+  platform->timer.set("geom proj",
+                      platform->timer.query("geom proj pre", "DEVICE:MAX") +
+                          platform->timer.query("geom proj post", "DEVICE:MAX"),
+                      platform->timer.count("geom proj pre"));
   platform->timer.printStatEntry("      initial guess     ", "geom proj", "DEVICE:MAX", tMesh);
 
   const double tNekNek = platform->timer.query("neknek update boundary", "DEVICE:MAX");
@@ -892,6 +877,11 @@ void nrs_t::printRunStat(int step)
                                  "fluid velocity preconditioner",
                                  "DEVICE:MAX",
                                  tVelocity);
+
+  platform->timer.set("fluid velocity proj",
+                      platform->timer.query("fluid velocity proj pre", "DEVICE:MAX") +
+                          platform->timer.query("fluid velocity proj post", "DEVICE:MAX"),
+                      platform->timer.count("fluid velocity proj pre"));
   platform->timer.printStatEntry("      initial guess     ", "fluid velocity proj", "DEVICE:MAX", tVelocity);
 
   const double tPressure = platform->timer.query("fluid pressureSolve", "DEVICE:MAX");
@@ -920,6 +910,11 @@ void nrs_t::printRunStat(int step)
                                  "fluid pressure coarseSolve",
                                  "DEVICE:MAX",
                                  tPressurePreco);
+
+  platform->timer.set("fluid pressure proj",
+                      platform->timer.query("fluid pressure proj pre", "DEVICE:MAX") +
+                          platform->timer.query("fluid pressure proj post", "DEVICE:MAX"),
+                      platform->timer.count("fluid pressure proj pre"));
   platform->timer.printStatEntry("      initial guess     ", "fluid pressure proj", "DEVICE:MAX", tPressure);
 
   int nScalar = 0;
@@ -972,16 +967,23 @@ void nrs_t::printRunStat(int step)
   platform->timer.printStatEntry("      udfProperties     ", tPropCvode, nPropCvode, tScalarCvode);
 
   auto precoTimeScalars = 0.0;
-  auto precoCallsScalars = 0.0;
+  auto precoCallsScalars = 0;
+  auto projTimeScalars = 0.0;
+  auto projCallsScalars = 0;
   for (int is = 0; is < nScalar; is++) {
     std::string sid = scalarDigitStr(is);
     precoTimeScalars += platform->timer.query("scalar" + sid + " preconditioner", "DEVICE:MAX");
     precoCallsScalars += platform->timer.count("scalar" + sid + " preconditioner");
+    projTimeScalars += platform->timer.query("scalar" + sid + " proj pre", "DEVICE:MAX") +
+                       platform->timer.query("scalar" + sid + " proj post", "DEVICE:MAX");
+    projCallsScalars += platform->timer.count("scalar" + sid + " proj pre");
   }
   platform->timer.set("scalar preconditioner", precoTimeScalars, precoCallsScalars);
+  platform->timer.set("scalar proj", projTimeScalars, projCallsScalars);
 
   platform->timer.printStatEntry("      preconditioner    ", "scalar preconditioner", "DEVICE:MAX", tScalar);
   platform->timer.printStatEntry("      initial guess     ", "scalar proj", "DEVICE:MAX", tScalar);
+
 
   platform->timer.printStatEntry("    gsMPI               ", gsTime, tElapsedTimeSolve);
 
@@ -1068,6 +1070,14 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solve
 
   if (platform->comm.mpiRank() == 0) {
     if (solverInfo) {
+      if (neknek) {
+        printf("step=%-8d %-20s: sync %.2e  exchange %.2e\n",
+               tstep,
+               "neknek",
+               neknek->tSync(),
+               neknek->tExch());
+      }
+
       bool cvodePrinted = false;
       for (int is = 0; is < Nscalar; is++) {
         if (scalar->compute[is] && !scalar->cvodeSolve[is]) {
@@ -1077,14 +1087,6 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solve
           scalar->cvode->printInfo(true);
           cvodePrinted = true;
         }
-      }
-
-      if (neknek) {
-        printf("step=%-8d %-20s: sync %.2e  exchange %.2e\n",
-               tstep,
-               "neknek",
-               neknek->tSync(),
-               neknek->tExch());
       }
 
       if (!platform->options.compareArgs("FLUID VELOCITY SOLVER", "NONE")) {
@@ -1752,8 +1754,10 @@ bool nrs_t::runInnerStep(std::function<bool(int)> convergenceCheck, int iter, bo
 
   if (fluid) {
     fluid->applyDirichlet(timeNew);
-    if (neknek && !platform->app->bc->hasOutflow("fluid velocity")) {
-      neknek->fixCoupledSurfaceFlux(fluid->o_EToB, fluid->fieldOffset, fluid->o_U);
+    if (neknek && fieldsToSolveContains("fluid velocity")) {
+      if (!platform->app->bc->hasOutflow("fluid velocity")) {
+        neknek->fixCoupledSurfaceFlux(fluid->o_EToB, fluid->fieldOffset, fluid->o_U);
+      }
     }
   }
 
@@ -2104,7 +2108,7 @@ void nrs_t::initOuterStep(double time, dfloat _dt, int tstep)
     neknek->exchange(exchangeAllTimes, lagState);
   }
 
-  neknek->exchangeTimes(this->dt, time);
+  neknek->exchangeTimes(std::vector<dfloat>(this->dt, this->dt + sizeof(this->dt)/sizeof(dfloat)), time);
 }
 
 void nrs_t::finishOuterStep() {}

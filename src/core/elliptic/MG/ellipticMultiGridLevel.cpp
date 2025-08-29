@@ -87,7 +87,7 @@ void pMGLevel::prolongate(occa::memory o_x, occa::memory o_Px)
 // compute residual and smooths it
 void pMGLevel::smooth(occa::memory o_rhs, occa::memory o_x, bool x_is_zero)
 {
-  platform->timer.tic(elliptic->name + " preconditioner smoother N=" + std::to_string(mesh->N), 1);
+  platform->timer.tic(elliptic->timerName + " preconditioner smoother N=" + std::to_string(mesh->N));
 
   if (!x_is_zero && smootherType == SmootherType::ASM) {
     return;
@@ -107,7 +107,7 @@ void pMGLevel::smooth(occa::memory o_rhs, occa::memory o_x, bool x_is_zero)
     this->smoothJacobi(o_rhs, o_x, x_is_zero);
   }
 
-  platform->timer.toc(elliptic->name + " preconditioner smoother N=" + std::to_string(mesh->N));
+  platform->timer.toc(elliptic->timerName + " preconditioner smoother N=" + std::to_string(mesh->N));
 }
 
 // just run smoother itself

@@ -75,7 +75,7 @@ public:
                                                           o_rIn,
                                                           platform->comm.mpiComm());
 
-    nekrsCheck(std::isnan(this->r0Norm),
+    nekrsCheck(!std::isfinite(this->r0Norm),
                MPI_COMM_SELF,
                EXIT_FAILURE,
                "%s unreasonable initial residual norm!\n",
@@ -179,11 +179,11 @@ private:
 
     dfloat rdotr1 = 0;
     if (serial) {
-      rdotr1 = *(o_tmpReductions.ptr<T>());
+      rdotr1 = o_tmpReductions.ptr<T>()[0];
     } else {
+      o_tmpReductions.copyTo(h_tmpReductions);
       auto tmp = h_tmpReductions.ptr<T>();
-      o_tmpReductions.copyTo(tmp);
-      for (int n = 0; n < o_tmpReductions.size(); ++n) {
+      for (int n = 0; n < h_tmpReductions.size(); ++n) {
         rdotr1 += tmp[n];
       }
     }
@@ -224,14 +224,12 @@ private:
                          o_tmpReductions);
 
     std::fill(reductions.begin(), reductions.end(), 0.0);
-
     if (serial) {
       auto ptr = o_tmpReductions.ptr<T>();
       std::copy(ptr, ptr + CombinedPCGId::nReduction, reductions.begin());
     } else {
+      o_tmpReductions.copyTo(h_tmpReductions);
       auto tmp = h_tmpReductions.ptr<T>();
-      o_tmpReductions.copyTo(tmp);
-
       for (int red = 0; red < CombinedPCGId::nReduction; ++red) {
         for (int n = 0; n < Nblock; ++n) {
           reductions[red] += tmp[n + Nblock * red];
@@ -274,11 +272,11 @@ private:
       }
 
       if (platform->comm.mpiRank() == 0) {
-        nekrsCheck(std::isnan(rdotz1),
+        nekrsCheck(!std::isfinite(rdotz1),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
-                   "%s\n",
-                   "Detected invalid rdotz norm while running linear solver!");
+                   "%s invalid rdotz norm while running linear solver!\n",
+                   this->_name.c_str());
       }
 
 #ifdef DEBUG
@@ -339,11 +337,11 @@ private:
       printf("rdotr: %.15e\n", this->rNorm);
 #endif
       if (platform->comm.mpiRank() == 0) {
-        nekrsCheck(std::isnan(this->rNorm),
+        nekrsCheck(!std::isfinite(this->rNorm),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
-                   "%s\n",
-                   "Detected invalid resiual norm while running linear solver!");
+                   "%s invalid resiual norm while running linear solver!", 
+                   this->_name.c_str());
       }
 
       if (platform->verbose() && (platform->comm.mpiRank() == 0)) {
@@ -405,12 +403,13 @@ private:
       alphak = dk / (ak + this->tiny);
 
       if (platform->comm.mpiRank() == 0) {
-        nekrsCheck(std::isnan(dk),
+        nekrsCheck(!std::isfinite(dk),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
-                   "%s\n",
-                   "Detected invalid rdotz norm while running linear solver!");
-      }
+                   "%s invalid rdotz norm while running linear solver!",
+                   this->_name.c_str());
+
+       }
 
 #ifdef DEBUG
       printf("alpha: %.15e\n", alphak);
@@ -424,11 +423,11 @@ private:
       printf("rdotr: %.15e\n", this->rNorm);
 #endif
       if (platform->comm.mpiRank() == 0) {
-        nekrsCheck(std::isnan(this->rNorm),
+        nekrsCheck(!std::isfinite(this->rNorm),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
-                   "%s\n",
-                   "Detected invalid resiual norm while running linear solver!");
+                   "%s invalid resiual norm while running linear solver!",
+                   this->_name.c_str());
       }
       if (platform->verbose() && (platform->comm.mpiRank() == 0)) {
         printf("it %d r norm %.15e\n", iter, this->rNorm);
@@ -441,8 +440,9 @@ private:
           nekrsCheck(!singleVectorUpdate && betakm1 == 0,
                      MPI_COMM_SELF,
                      EXIT_FAILURE,
-                     "%s\n",
-                     "Cannot update solution as beta == 0!");
+                     "%s cannot update solution as beta == 0!",
+                     this->_name.c_str());
+
         }
 
         combinedUpdateKernel(this->Nlocal,

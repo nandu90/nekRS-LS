@@ -34,10 +34,11 @@ elliptic::elliptic(const std::string &name,
 {
   solver = new elliptic_t();
   solver->name = name;
+  solver->timerName = name;
   solver->mesh = mesh;
 
   _EToB = EToBIn;
-  solver->EToB = _EToB.data();
+  solver->EToB = _EToB;
 
   solver->fieldOffset = (fieldOffset <= 0) ? alignStride<dfloat>(mesh->Nlocal) : fieldOffset;
   _setup(o_lambda0, o_lambda1);
@@ -54,10 +55,14 @@ elliptic::elliptic(const std::string &name,
 
 elliptic::~elliptic()
 {
-  if (solver->precon) {
-    delete solver->precon;
-  }
-  solver->o_EToB.free();
+  if (solver->precon) delete solver->precon; 
+  if (solver->solutionProjection) delete solver->solutionProjection;
+  if (solver->KSP) delete solver->KSP;
+#if 0
+  if (solver->ogs) delete solver->ogs;
+  if (solver->oogs) delete solver->oogs;
+  if (solver->oogsAx) delete solver->oogsAx;
+#endif
 }
 
 void elliptic::updatePreconditioner()
@@ -79,14 +84,14 @@ void elliptic::updatePreconditioner()
       ellipticMultiGridUpdateLambda(solver);
     } else if (solver->options.compareArgs("MULTIGRID SMOOTHER", "ASM") ||
                solver->options.compareArgs("MULTIGRID SMOOTHER", "RAS")) {
-      for (int n = 0; n < elliptic->nLevels - 1; n++) {
+      for (int n = 0; n < elliptic->levels.size() - 1; n++) {
         auto level = dynamic_cast<pMGLevel *>(levels[n]);
         level->updateSmootherSchwarz(solver);
       }
     }
 
     if (solver->options.compareArgs("MULTIGRID SMOOTHER", "CHEBYSHEV")) {
-      for (int n = 0; n < elliptic->nLevels - 1; n++) {
+      for (int n = 0; n < elliptic->levels.size() - 1; n++) {
         auto level = dynamic_cast<pMGLevel *>(levels[n]);
         level->updateSetupSmootherChebyshev();
       }
@@ -208,7 +213,11 @@ void elliptic::userPreconditioner(const std::function<void(const occa::memory &o
   solver->userPreconditioner = f;
 };
 
-void elliptic::userAx(const std::function<void(elliptic_t *elliptic, dlong NelementsList, const occa::memory &o_elementsList, const occa::memory &o_x, occa::memory &o_Ax)>& f)
+void elliptic::userAx(const std::function<void(elliptic_t *elliptic,
+                                               dlong NelementsList,
+                                               const occa::memory &o_elementsList,
+                                               const occa::memory &o_x,
+                                               occa::memory &o_Ax)> &f)
 {
   solver->userAx = f;
 };
@@ -232,9 +241,9 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   elliptic->o_lambda0 = o_lambda0;
   elliptic->o_lambda1 = o_lambda1;
 
-  auto &options = elliptic->options;
-  auto &precon = elliptic->precon;
-  auto &mesh = elliptic->mesh;
+  auto& options = elliptic->options;
+  auto& precon = elliptic->precon;
+  auto& mesh = elliptic->mesh;
 
   const auto maxIter = [&]() {
     auto val = 500;
@@ -265,7 +274,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     if (platform->comm.mpiRank() == 0) {
       printf("%s %s norm: %.15e\n", elliptic->name.c_str(), txt.c_str(), norm);
     }
-    nekrsCheck(std::isnan(norm),
+    nekrsCheck(!std::isfinite(norm),
                MPI_COMM_SELF,
                EXIT_FAILURE,
                "%s unreasonable %s!\n",
@@ -277,11 +286,6 @@ void elliptic::_solve(const occa::memory &o_lambda0,
       (elliptic->Nfields > 1) ? elliptic->Nfields * elliptic->fieldOffset : mesh->Nlocal);
   nekrsCheck(o_x.size() < o_x0.size(), MPI_COMM_SELF, EXIT_FAILURE, "%s!\n", "unreasonable size of o_x");
   nekrsCheck(o_rhs.size() < o_x.size(), MPI_COMM_SELF, EXIT_FAILURE, "%s!\n", "unreasonable size of o_rhs");
-
-  std::string timerName = elliptic->name;
-  if (timerName.find("scalar") != std::string::npos) {
-    timerName = "scalar";
-  }
 
   ellipticAllocateWorkspace(elliptic);
 
@@ -297,6 +301,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   }
 
   o_x0.copyFrom(o_x);
+
   if (platform->verbose()) {
     printNorm(o_x0, "o_x0");
     printNorm(o_rhs, "o_rhs");
@@ -336,10 +341,10 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   if (options.compareArgs("INITIAL GUESS", "PROJECTION") ||
       options.compareArgs("INITIAL GUESS", "PROJECTION-ACONJ")) {
 
-    platform->timer.tic(timerName + " proj pre", 1);
+    platform->timer.tic(elliptic->timerName + " proj pre");
 
-    elliptic->res00Norm = rdotr();
-    nekrsCheck(std::isnan(elliptic->res00Norm),
+    elliptic->res00Norm = rdotr(); // just needed for monitoring
+    nekrsCheck(!std::isfinite(elliptic->res00Norm),
                MPI_COMM_SELF,
                EXIT_FAILURE,
                "%s unreasonable res00Norm!\n",
@@ -347,7 +352,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
 
     elliptic->solutionProjection->pre(o_r);
 
-    platform->timer.toc(timerName + " proj pre");
+    platform->timer.toc(elliptic->timerName + " proj pre");
   }
 
   // solve A(x0 + dx) = b
@@ -367,7 +372,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
       }
     }
 
-    // A(dx) = r = b - A(x0) 
+    // A(dx) = r = b - A(x0)
     elliptic->KSP->solve(tol * std::sqrt(mesh->volume), maxIter, o_r, o_x);
     elliptic->Niter = elliptic->KSP->nIter();
     elliptic->res0Norm = elliptic->KSP->initialResidualNorm();
@@ -376,9 +381,9 @@ void elliptic::_solve(const occa::memory &o_lambda0,
 
   if (options.compareArgs("INITIAL GUESS", "PROJECTION") ||
       options.compareArgs("INITIAL GUESS", "PROJECTION-ACONJ")) {
-    platform->timer.tic(timerName + " proj post", 1);
+    platform->timer.tic(elliptic->timerName + " proj post");
     elliptic->solutionProjection->post(o_x);
-    platform->timer.toc(timerName + " proj post");
+    platform->timer.toc(elliptic->timerName + " proj post");
   } else {
     elliptic->res00Norm = elliptic->res0Norm;
   }
@@ -459,11 +464,11 @@ void checkConfig(elliptic_t *elliptic)
     err++;
   }
 
-  nekrsCheck(elliptic->EToB == nullptr,
+  nekrsCheck(elliptic->EToB.empty(),
              platform->comm.mpiComm(),
              EXIT_FAILURE,
              "%s",
-             "elliptic->EToB not allocated!\n");
+             "elliptic->EToB is emtpy!\n");
 
   {
     int found = 0;
@@ -494,6 +499,11 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
 {
   auto &elliptic = solver;
 
+  if (platform->comm.mpiRank() == 0) {
+    std::cout << "================= " << "ELLIPTIC SETUP " << upperCase(elliptic->name)
+              << " =================" << std::endl;
+  }
+
   MPI_Barrier(platform->comm.mpiComm());
   const double tStart = MPI_Wtime();
 
@@ -513,7 +523,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
                          elliptic->mesh->volume;
 
   if (platform->comm.mpiRank() == 0 && platform->verbose()) {
-    std::cout << "lambda0Avg: " << elliptic->lambda0Avg << std::endl;  
+    std::cout << "lambda0Avg: " << elliptic->lambda0Avg << std::endl;
   }
 
   if (elliptic->o_lambda1.isInitialized()) {
@@ -524,7 +534,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
                            elliptic->mesh->volume;
 
     if (platform->comm.mpiRank() == 0 && platform->verbose()) {
-      std::cout << "lambda1Avg: " << elliptic->lambda1Avg << std::endl;  
+      std::cout << "lambda1Avg: " << elliptic->lambda1Avg << std::endl;
     }
   }
 
@@ -580,7 +590,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   const dlong Nblocks = (Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
   elliptic->o_EToB =
-      platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * elliptic->Nfields, elliptic->EToB);
+      platform->device.malloc<int>(mesh->Nelements * mesh->Nfaces * elliptic->Nfields, elliptic->EToB.data());
 
   checkConfig(elliptic);
 
@@ -694,11 +704,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
 
     auto nonOverlappedTime = timeEllipticOperator();
     auto callback = [&]() {
-      ellipticAx(elliptic,
-                 mesh->NlocalGatherElements,
-                 mesh->o_localGatherElementList,
-                 o_p,
-                 o_Ap);
+      ellipticAx(elliptic, mesh->NlocalGatherElements, mesh->o_localGatherElementList, o_p, o_Ap);
     };
     elliptic->oogsAx =
         oogs::setup(elliptic->ogs, elliptic->Nfields, elliptic->fieldOffset, ogsDfloat, callback, oogsMode);
@@ -721,28 +727,26 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   ellipticPreconditionerSetup(elliptic, elliptic->ogs);
 
   auto Ax = [elliptic](const occa::memory &o_p, occa::memory &o_Ap) {
-
-    const auto enforceDouble = elliptic->options.compareArgs("SOLVER", "IR") && 
+    const auto enforceDouble = elliptic->options.compareArgs("SOLVER", "IR") &&
                                o_Ap.dtype() == occa::dtype::get<double>() &&
-                               std::is_same<dfloat, float>::value &&
-                               !elliptic->mgLevel;
+                               std::is_same<dfloat, float>::value && !elliptic->mgLevel;
 
     occa::memory o_lambda0;
     if (enforceDouble) {
-      o_lambda0 = platform->deviceMemoryPool.reserve<double>(elliptic->o_lambda0.size()); 
+      o_lambda0 = platform->deviceMemoryPool.reserve<double>(elliptic->o_lambda0.size());
     }
 
     occa::memory o_DSave, o_DTSave, o_lambda0Save;
     occa::kernel AxKernelSave;
     if (enforceDouble) {
-      o_DSave = elliptic->mesh->o_D;  
-      elliptic->mesh->o_D = elliptic->mesh->o_Ddouble; 
+      o_DSave = elliptic->mesh->o_D;
+      elliptic->mesh->o_D = elliptic->mesh->o_Ddouble;
 
       o_DTSave = elliptic->mesh->o_DT;
       elliptic->mesh->o_DT = elliptic->mesh->o_DTdouble;
 
       platform->copyFloatToDoubleKernel(elliptic->o_lambda0.size(), elliptic->o_lambda0, o_lambda0);
-      o_lambda0Save = elliptic->o_lambda0; 
+      o_lambda0Save = elliptic->o_lambda0;
       elliptic->o_lambda0 = o_lambda0;
 
       AxKernelSave = elliptic->AxKernel;
@@ -752,15 +756,15 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     ellipticOperator(elliptic, o_p, o_Ap);
 
     if (enforceDouble) {
-      elliptic->mesh->o_D = o_DSave; 
-      elliptic->mesh->o_DT = o_DTSave; 
+      elliptic->mesh->o_D = o_DSave;
+      elliptic->mesh->o_DT = o_DTSave;
       elliptic->o_lambda0 = o_lambda0Save;
       elliptic->AxKernel = AxKernelSave;
     }
   };
 
   auto Pc = [elliptic](const occa::memory &o_r, occa::memory &o_z) {
-    platform->timer.tic(elliptic->name + " preconditioner");
+    platform->timer.tic(elliptic->timerName + " preconditioner");
 
     if (elliptic->userPreconditioner) {
       elliptic->userPreconditioner(o_r, o_z);
@@ -768,7 +772,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
       ellipticPreconditioner(elliptic, o_r, o_z);
     }
 
-    platform->timer.toc(elliptic->name + " preconditioner");
+    platform->timer.toc(elliptic->timerName + " preconditioner");
 
     if (elliptic->nullspace) {
       ellipticZeroMean(elliptic, o_z);
@@ -823,7 +827,10 @@ void elliptic::op(const occa::memory &o_q, occa::memory &o_Aq, bool masked)
   ellipticOperator(solver, o_q, o_Aq, masked);
 };
 
-void elliptic::Ax(const occa::memory &o_lambda0In, const occa::memory &o_lambda1In, const occa::memory &o_q, occa::memory &o_Aq)
+void elliptic::Ax(const occa::memory &o_lambda0In,
+                  const occa::memory &o_lambda1In,
+                  const occa::memory &o_q,
+                  occa::memory &o_Aq)
 {
   auto o_lambda0Save = solver->o_lambda0;
   solver->o_lambda0 = o_lambda0In;
