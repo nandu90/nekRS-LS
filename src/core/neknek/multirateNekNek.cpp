@@ -1,13 +1,13 @@
 #include "platform.hpp"
 #include "neknek.hpp"
 
-void neknek_t::exchangeTimes(dfloat* dt, double time)
+void neknek_t::exchangeTimes(const std::vector<dfloat>& dt, double time)
 {
   if (!this->multirate()) {
     return;
   }
 
-  const int maxOrd = sizeof(dt) / sizeof(dfloat);
+  const auto maxOrd = dt.size();
  
   if (!o_time_.isInitialized()) {
     o_time_ = platform->device.malloc<dfloat>(intValOffset_ * (maxOrd + 1));
@@ -56,19 +56,18 @@ void neknek_t::extrapolateBoundary(int tstep, double time, bool predictor)
 
   if (npt_ == 0) return; 
 
-  dlong predictorStep = predictor ? 1 : 0;
+  const int predictorStep = predictor ? 1 : 0;
   for(auto&& field : fields_) {
-      const int fieldDim = field.offsetSum / field.offset;
       launchKernel("neknek::extrapolateBoundary",
                    npt_,
                    intValOffset_,
-                   fieldDim,
+                   static_cast<int>(field.o_filter.size()),
                    order,
                    predictorStep,
                    time,
                    o_time_,
-                   field.o_intVal + intValOffset_ * fieldDim,
-                   field.o_intVal);
+                   field.o_intVal.slice(intValOffset_ * field.o_filter.size()),
+                   field.o_intVal.slice(0, npt_));
   }
 }
 

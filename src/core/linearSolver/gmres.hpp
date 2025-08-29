@@ -48,7 +48,7 @@ public:
                                                                         o_r0,
                                                                         platform->comm.mpiComm());
 
-    nekrsCheck(std::isnan(this->r0Norm),
+    nekrsCheck(!std::isfinite(this->r0Norm),
                MPI_COMM_SELF,
                EXIT_FAILURE,
                "%s unreasonable initial residual norm!\n",
@@ -406,7 +406,7 @@ private:
       const auto h1 = H[i + i * (nRestartVectors + 1)];
       const auto h2 = H[i + 1 + i * (nRestartVectors + 1)];
 #if 1
-      const auto r = hypot(h1, h2);
+      const auto r = std::hypot(h1, h2);
       cs[i] = (r == 0) ? 1 : h1 / r;
       sn[i] = (r == 0) ? 0 : h2 / r;
       H[i + i * (nRestartVectors + 1)] = r;
@@ -427,11 +427,11 @@ private:
         this->rNorm = std::abs(s[i + 1]);
 
         if (platform->comm.mpiRank() == 0) {
-          nekrsCheck(std::isnan(this->rNorm),
+          nekrsCheck(!std::isfinite(this->rNorm),
                      MPI_COMM_SELF,
                      EXIT_FAILURE,
-                     "%s\n",
-                     "Detected invalid resiual norm while running linear solver!");
+                     "%s invalid resiual norm while running linear solver!\n",
+                     this->_name.c_str());
         }
 
         const auto iter = iter0 + i + 1;

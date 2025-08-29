@@ -241,9 +241,9 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   elliptic->o_lambda0 = o_lambda0;
   elliptic->o_lambda1 = o_lambda1;
 
-  auto &options = elliptic->options;
-  auto &precon = elliptic->precon;
-  auto &mesh = elliptic->mesh;
+  auto& options = elliptic->options;
+  auto& precon = elliptic->precon;
+  auto& mesh = elliptic->mesh;
 
   const auto maxIter = [&]() {
     auto val = 500;
@@ -274,7 +274,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     if (platform->comm.mpiRank() == 0) {
       printf("%s %s norm: %.15e\n", elliptic->name.c_str(), txt.c_str(), norm);
     }
-    nekrsCheck(std::isnan(norm),
+    nekrsCheck(!std::isfinite(norm),
                MPI_COMM_SELF,
                EXIT_FAILURE,
                "%s unreasonable %s!\n",
@@ -301,6 +301,7 @@ void elliptic::_solve(const occa::memory &o_lambda0,
   }
 
   o_x0.copyFrom(o_x);
+
   if (platform->verbose()) {
     printNorm(o_x0, "o_x0");
     printNorm(o_rhs, "o_rhs");
@@ -342,8 +343,8 @@ void elliptic::_solve(const occa::memory &o_lambda0,
 
     platform->timer.tic(elliptic->timerName + " proj pre");
 
-    elliptic->res00Norm = rdotr();
-    nekrsCheck(std::isnan(elliptic->res00Norm),
+    elliptic->res00Norm = rdotr(); // just needed for monitoring
+    nekrsCheck(!std::isfinite(elliptic->res00Norm),
                MPI_COMM_SELF,
                EXIT_FAILURE,
                "%s unreasonable res00Norm!\n",
@@ -500,7 +501,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
 
   if (platform->comm.mpiRank() == 0) {
     std::cout << "================= " << "ELLIPTIC SETUP " << upperCase(elliptic->name)
-              << "================= " << std::endl;
+              << " =================" << std::endl;
   }
 
   MPI_Barrier(platform->comm.mpiComm());

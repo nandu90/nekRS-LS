@@ -1070,6 +1070,14 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solve
 
   if (platform->comm.mpiRank() == 0) {
     if (solverInfo) {
+      if (neknek) {
+        printf("step=%-8d %-20s: sync %.2e  exchange %.2e\n",
+               tstep,
+               "neknek",
+               neknek->tSync(),
+               neknek->tExch());
+      }
+
       bool cvodePrinted = false;
       for (int is = 0; is < Nscalar; is++) {
         if (scalar->compute[is] && !scalar->cvodeSolve[is]) {
@@ -1079,14 +1087,6 @@ void nrs_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solve
           scalar->cvode->printInfo(true);
           cvodePrinted = true;
         }
-      }
-
-      if (neknek) {
-        printf("step=%-8d %-20s: sync %.2e  exchange %.2e\n",
-               tstep,
-               "neknek",
-               neknek->tSync(),
-               neknek->tExch());
       }
 
       if (!platform->options.compareArgs("FLUID VELOCITY SOLVER", "NONE")) {
@@ -2108,7 +2108,7 @@ void nrs_t::initOuterStep(double time, dfloat _dt, int tstep)
     neknek->exchange(exchangeAllTimes, lagState);
   }
 
-  neknek->exchangeTimes(this->dt, time);
+  neknek->exchangeTimes(std::vector<dfloat>(this->dt, this->dt + sizeof(this->dt)/sizeof(dfloat)), time);
 }
 
 void nrs_t::finishOuterStep() {}
