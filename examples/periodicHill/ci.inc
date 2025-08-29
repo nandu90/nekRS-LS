@@ -2,9 +2,9 @@
 
 static int ciMode = 0;
 
-#define EPS_SST 4.13e-2
-#define EPS_DDES 9.93e-2
-#define EPS_IDDES 1.39e-1
+#define EPS_SST 8.52e-2
+#define EPS_DDES 1.57e-1
+#define EPS_IDDES 2.04e-1
 
 dfloat hill_step(dfloat x, dfloat w, dfloat h);
 dfloat hill_height(dfloat x, dfloat Lx, dfloat w, dfloat h);
@@ -29,7 +29,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   options.setArgs("ADVECTION TYPE", "CUBATURE+CONVECTIVE");
   options.setArgs("DT", std::string("5e-3"));
   options.setArgs("VARIABLE DT", std::string("TRUE"));
-  options.setArgs("TARGET CFL", std::string("2.0"));
+  options.setArgs("TARGET CFL", std::string("1.5"));
   options.setArgs("SUBCYCLING STEPS", std::string("1"));
 
   options.setArgs("FLUID PRESSURE SOLVER TOLERANCE", std::string("1e-4"));

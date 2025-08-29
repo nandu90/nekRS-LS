@@ -1,5 +1,5 @@
 [GENERAL]
-polynomialOrder = 7
+polynomialOrder = 5
 
 #startFrom = sst.fld+time=0
 
