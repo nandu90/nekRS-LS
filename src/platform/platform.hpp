@@ -84,6 +84,19 @@ public:
     return options.compareArgs("VERBOSE", "TRUE");
   }
 };
+
+template <typename T = dfloat>
+static bool o_isfinite(const occa::memory& o_u) 
+{
+  auto h_tmp = platform->memoryPool.template reserve<T>(o_u.size());
+  h_tmp.copyFrom(o_u);
+  auto tmp = h_tmp.template ptr<T>();
+  for (int i = 0; i < h_tmp.size(); i++) {
+    if (std::isfinite(tmp[i])) return true;
+  }
+  return false;
+};
+
 #endif
 
 #include "occaWrapper.hpp"
