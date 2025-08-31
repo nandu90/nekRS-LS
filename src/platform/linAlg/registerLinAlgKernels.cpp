@@ -6,7 +6,7 @@ void registerLinAlgKernels()
   occa::properties kernelInfo = platform->kernelInfo;
 
   const std::string oklDir = getenv("NEKRS_KERNEL_DIR") + std::string("/platform/linAlg/");
-  const bool serial = platform->serial;
+  const bool serial = platform->serial();
 
   const std::string extension = serial ? ".c" : ".okl";
   const std::vector<std::pair<std::string, bool>> allKernels{
@@ -71,8 +71,8 @@ void registerLinAlgKernels()
   for (bool useFloat : {true, false}) {
     for (auto &&nameAndSerialImpl : allKernels) {
       std::tie(kernelName, nativeSerialImplementation) = nameAndSerialImpl;
-  
-      fileName = kernelName; 
+
+      fileName = kernelName;
       occa::properties props = kernelInfo;
       if (useFloat) {
         kernelName = "f_" + kernelName;
@@ -81,9 +81,9 @@ void registerLinAlgKernels()
         kernelName = "d_" + kernelName;
         props["defines/dfloat"] = "double";
       }
- 
+
       const std::string extension = (serial && nativeSerialImplementation) ? ".c" : ".okl";
-      
+
       platform->kernelRequests.add(prefix + kernelName, oklDir + fileName + extension, props);
     }
   }

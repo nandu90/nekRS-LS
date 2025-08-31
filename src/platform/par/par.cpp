@@ -594,7 +594,7 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *ini)
                                               "ELLIPTIC COEFF FIELD",
                                               "REGULARIZATION",
                                               "BOUNDARY TYPE MAP",
-                                              "LINEAR SOLVER MAXIMUM ITERATIONS",
+                                              "SOLVER MAXIMUM ITERATIONS",
                                               "BLOCK SOLVER",
                                               "PRECONDITIONER",
                                               "ELLIPTIC",

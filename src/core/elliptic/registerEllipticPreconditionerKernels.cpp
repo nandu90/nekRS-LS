@@ -18,7 +18,7 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
   std::string fileName;
 
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/elliptic/");
-  const bool serial = platform->serial;
+  const bool serial = platform->serial();
   const std::string fileNameExtension = (serial) ? ".c" : ".okl";
   const std::string optionsPrefix = createOptionsPrefix(section);
 
@@ -73,7 +73,7 @@ void registerJacobiKernels(const std::string &section, int N, int poissonEquatio
 {
   const std::string suffix = "Hex3D";
   const std::string poissonPrefix = poissonEquation ? "poisson-" : "";
-  const bool serial = platform->serial;
+  const bool serial = platform->serial();
   const std::string extension = serial ? ".c" : ".okl";
   const std::string optionsPrefix = createOptionsPrefix(section);
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/elliptic/");
@@ -104,7 +104,7 @@ void registerCommonMGPreconditionerKernels(int N, occa::properties kernelInfo, i
 
   const std::string orderSuffix = std::string("_") + std::to_string(N);
 
-  const bool serial = platform->serial;
+  const bool serial = platform->serial();
   const std::string extension = serial ? ".c" : ".okl";
 
   int p;
@@ -162,7 +162,7 @@ void registerSchwarzKernels(const std::string &section, int N)
   const int Np = Nq * Nq * Nq;
   const int Np_e = Nq_e * Nq_e * Nq_e;
 
-  const bool serial = platform->serial;
+  const bool serial = platform->serial();
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/elliptic/");
 
   std::string fileName, kernelName;
@@ -241,7 +241,7 @@ void registerMultigridLevelKernels(const std::string &section,
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/elliptic/");
   registerCommonMGPreconditionerKernels(N, kernelInfo, poissonEquation);
 
-  const bool serial = platform->serial;
+  const bool serial = platform->serial();
   const std::string fileNameExtension = (serial) ? ".c" : ".okl";
 
   {

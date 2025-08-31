@@ -84,6 +84,7 @@ struct elliptic_t {
   occa::memory o_EToB;
 
   occa::memory o_invDegree;
+  dfloat invDegreeSum;
   occa::memory o_interp;
 
   occa::memory o_rPfloat;
@@ -160,8 +161,6 @@ void ellipticAx(elliptic_t *elliptic,
 
 void ellipticUpdateJacobi(elliptic_t *ellipticBase, occa::memory &o_invDiagA);
 void ellipticUpdateAllJacobi(elliptic_t *elliptic);
-
-void ellipticZeroMean(elliptic_t *elliptic, occa::memory &o_q);
 
 void ellipticOgs(mesh_t *mesh,
                  dlong mNlocal,

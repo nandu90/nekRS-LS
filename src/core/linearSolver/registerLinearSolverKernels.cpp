@@ -4,12 +4,12 @@
 namespace
 {
 
-template <typename T>
-void registerGMRESKernels(int Nfields)
+template <typename T> void registerGMRESKernels(int Nfields)
 {
-  const std::string fileNameExtension = (platform->serial) ? ".c" : ".okl";
-  const auto sectionIdentifier = std::string("gmres::") + ((std::is_same<T, double>::value) ? "double::" : "float::") 
-                                 + std::to_string(Nfields) + "::";
+  const std::string fileNameExtension = (platform->serial()) ? ".c" : ".okl";
+  const auto sectionIdentifier = std::string("gmres::") +
+                                 ((std::is_same<T, double>::value) ? "double::" : "float::") +
+                                 std::to_string(Nfields) + "::";
   const auto oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/linearSolver/");
 
   occa::properties gmresKernelInfo = platform->kernelInfo;
@@ -31,25 +31,23 @@ void registerGMRESKernels(int Nfields)
   fileName = oklpath + kernelName + fileNameExtension;
   platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
 
-
   kernelName = "fusedResidualAndNorm";
   fileName = oklpath + kernelName + fileNameExtension;
   platform->kernelRequests.add(sectionIdentifier + kernelName, fileName, gmresKernelInfo);
 }
 
-template <typename T>
-void registerCGKernels(int Nfields, bool useFloat = false)
+template <typename T> void registerCGKernels(int Nfields, bool useFloat = false)
 {
   const auto oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/linearSolver/");
-  const std::string fileNameExtension = (platform->serial) ? ".c" : ".okl";
+  const std::string fileNameExtension = (platform->serial()) ? ".c" : ".okl";
 
-  const auto sectionIdentifier = std::string("cg::") + ((std::is_same<T, double>::value) ? "double::" : "float::") 
-                                 + std::to_string(Nfields) + "::";
-
+  const auto sectionIdentifier = std::string("cg::") +
+                                 ((std::is_same<T, double>::value) ? "double::" : "float::") +
+                                 std::to_string(Nfields) + "::";
 
   occa::properties properties = platform->kernelInfo;
   properties["defines/p_Nfields"] = Nfields;
-  properties["defines/dfloat"] = (std::is_same<T, double>::value) ? "double" : "float"; 
+  properties["defines/dfloat"] = (std::is_same<T, double>::value) ? "double" : "float";
 
   std::string kernelName;
   std::string fileName;

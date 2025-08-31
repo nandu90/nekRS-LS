@@ -34,7 +34,7 @@ void registerEllipticKernels(std::string section, bool stressForm)
   }();
   const int Nfields = (blockSolver) ? 3 : 1;
 
-  const bool serial = platform->serial;
+  const bool serial = platform->serial();
   const std::string fileNameExtension = (serial) ? ".c" : ".okl";
   const std::string sectionIdentifier = std::to_string(Nfields) + "-";
 

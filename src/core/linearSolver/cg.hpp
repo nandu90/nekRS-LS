@@ -41,6 +41,7 @@ public:
      const occa::memory &_o_weight,
      bool _flexible,
      bool _combined,
+     bool _removeMean,
      std::function<void(const occa::memory &o_q, occa::memory &o_Aq)> _Ax,
      std::function<void(const occa::memory &o_r, occa::memory &o_z)> _preco)
   {
@@ -52,18 +53,22 @@ public:
     combined = _combined;
     Ax = _Ax;
     preco = _preco;
+    removeMean = _removeMean;
+
+    weightSum = platform->linAlg->sum(this->Nlocal, o_weight, platform->comm.mpiComm());
 
     this->tiny = 10 * std::numeric_limits<T>::min();
     this->FPfactor = (std::is_same<T, dfloat>::value) ? 1.0 : 0.5;
-    this->knlPrefix = std::string("cg::") + ((std::is_same<T, double>::value) ? "double::" : "float::")
-                      + std::to_string(this->Nfields) + "::";
+    this->knlPrefix = std::string("cg::") + ((std::is_same<T, double>::value) ? "double::" : "float::") +
+                      std::to_string(this->Nfields) + "::";
 
     Nblock = (this->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
     updateKernel = platform->kernelRequests.load(this->knlPrefix + "blockUpdatePCG");
     combinedPreAxKernel = platform->kernelRequests.load(this->knlPrefix + "combinedPCGPreMatVec");
-    combinedPostAxKernel= platform->kernelRequests.load(this->knlPrefix + "combinedPCGPostMatVec"); 
-    combinedUpdateKernel = platform->kernelRequests.load(this->knlPrefix + "combinedPCGUpdateConvergedSolution");
+    combinedPostAxKernel = platform->kernelRequests.load(this->knlPrefix + "combinedPCGPostMatVec");
+    combinedUpdateKernel =
+        platform->kernelRequests.load(this->knlPrefix + "combinedPCGUpdateConvergedSolution");
   };
 
   void solve(const dfloat tol, const int MAXIT, const occa::memory &o_rIn, occa::memory &o_x) override
@@ -84,9 +89,8 @@ public:
     this->rNorm = this->r0Norm;
 
     {
-      const auto n = (this->Nfields > 1) ? 
-                     this->Nfields * static_cast<size_t>(this->fieldOffset) :
-                     static_cast<size_t>(this->Nlocal);
+      const auto n = (this->Nfields > 1) ? this->Nfields * static_cast<size_t>(this->fieldOffset)
+                                         : static_cast<size_t>(this->Nlocal);
 
       o_r = platform->deviceMemoryPool.reserve<T>(n);
       o_r.copyFrom(o_rIn);
@@ -101,9 +105,7 @@ public:
       }
     }
 
-    auto Nreductions = [&]() {
-      return (combined) ? CombinedPCGId::nReduction : 1;
-    }();
+    auto Nreductions = [&]() { return (combined) ? CombinedPCGId::nReduction : 1; }();
 
     h_tmpReductions = platform->memoryPool.reserve<T>(Nreductions * Nblock);
     o_tmpReductions = platform->deviceMemoryPool.reserve<T>(h_tmpReductions.size());
@@ -112,7 +114,11 @@ public:
       auto txt = (combined && this->o_invDiagA.isInitialized() || preco) ? std::string("P") : std::string("");
       txt += (combined) ? "CCG" : "CG";
       txt += (flexible) ? "-flex" : "";
-      printf("%s %s: initial res norm %.15e target %e \n", txt.c_str(), this->_name.c_str(), this->rNorm, tol);
+      printf("%s %s: initial res norm %.15e target %e \n",
+             txt.c_str(),
+             this->_name.c_str(),
+             this->rNorm,
+             tol);
     }
 
     platform->linAlg->fill<T>(o_r.size(), 0.0, o_x);
@@ -147,9 +153,11 @@ private:
   occa::memory o_weight;
 
   dlong Nblock;
+  dfloat weightSum;
 
   bool flexible;
   bool combined;
+  bool removeMean;
 
   std::function<void(const occa::memory &o_q, occa::memory &o_Aq)> Ax;
   std::function<void(const occa::memory &o_r, occa::memory &o_z)> preco;
@@ -158,24 +166,18 @@ private:
   occa::kernel combinedPreAxKernel;
   occa::kernel combinedPostAxKernel;
   occa::kernel combinedUpdateKernel;
-  
+
   dfloat update(const occa::memory &o_p,
                 const occa::memory &o_Ap,
                 const T alpha,
                 occa::memory &o_x,
                 occa::memory &o_r)
   {
-    const bool serial = platform->serial;
+    const bool serial = platform->serial();
 
     // r <= r - alpha*A*p
     // dot(r,r)
-    updateKernel(this->Nlocal,
-                 this->fieldOffset,
-                 o_weight,
-                 o_Ap,
-                 alpha,
-                 o_r,
-                 o_tmpReductions);
+    updateKernel(this->Nlocal, this->fieldOffset, o_weight, o_Ap, alpha, o_r, o_tmpReductions);
 
     dfloat rdotr1 = 0;
     if (serial) {
@@ -211,7 +213,7 @@ private:
                           const occa::memory &o_r,
                           std::array<T, CombinedPCGId::nReduction> &reductions)
   {
-    const bool serial = platform->serial;
+    const bool serial = platform->serial();
     combinedPostAxKernel(this->Nlocal,
                          this->fieldOffset,
                          static_cast<int>(this->o_invDiagA.isInitialized()),
@@ -260,6 +262,15 @@ private:
       if (preco) {
         preco(o_r, o_z);
 
+        if (removeMean) {
+          const auto dotp = platform->linAlg->innerProd(this->Nlocal,
+                                                        o_weight,
+                                                        o_z,
+                                                        platform->comm.mpiComm());
+ 
+          platform->linAlg->add(o_z.size(), -dotp / weightSum, o_z);
+        }
+
         rdotz1 = platform->linAlg->weightedInnerProdMany<T>(this->Nlocal,
                                                             this->Nfields,
                                                             this->fieldOffset,
@@ -305,13 +316,7 @@ private:
       printf("beta: %.15e\n", beta);
 #endif
 
-      platform->linAlg->axpbyMany<T>(this->Nlocal,
-                                     this->Nfields,
-                                     this->fieldOffset,
-                                     1.0,
-                                     o_z,
-                                     beta,
-                                     o_p);
+      platform->linAlg->axpbyMany<T>(this->Nlocal, this->Nfields, this->fieldOffset, 1.0, o_z, beta, o_p);
 
       Ax(o_p, o_Ap);
 
@@ -340,7 +345,7 @@ private:
         nekrsCheck(!std::isfinite(this->rNorm),
                    MPI_COMM_SELF,
                    EXIT_FAILURE,
-                   "%s invalid resiual norm while running linear solver!", 
+                   "%s invalid resiual norm while running linear solver!",
                    this->_name.c_str());
       }
 
@@ -388,17 +393,26 @@ private:
                                  this->FPfactor * this->Nfields * static_cast<double>(this->Nlocal) * 0.5 *
                                      (11 + 5));
 
+      if (removeMean) {
+        const auto dotp = platform->linAlg->innerProd(this->Nlocal,
+                                                      o_weight,
+                                                      o_v,
+                                                      platform->comm.mpiComm());
+                                                                
+        platform->linAlg->add(o_v.size(), -dotp / weightSum, o_v);
+      }
+
       Ax(o_p, o_v);
 
       combinedReductions(o_v, o_p, o_r, reductions);
 
-      const auto& gammak = reductions[CombinedPCGId::gamma];
-      const auto& ak = reductions[CombinedPCGId::a];
-      const auto& bk = reductions[CombinedPCGId::b];
-      const auto& ck = reductions[CombinedPCGId::c];
-      const auto& dk = reductions[CombinedPCGId::d];
-      const auto& ek = reductions[CombinedPCGId::e];
-      const auto& fk = reductions[CombinedPCGId::f];
+      const auto &gammak = reductions[CombinedPCGId::gamma];
+      const auto &ak = reductions[CombinedPCGId::a];
+      const auto &bk = reductions[CombinedPCGId::b];
+      const auto &ck = reductions[CombinedPCGId::c];
+      const auto &dk = reductions[CombinedPCGId::d];
+      const auto &ek = reductions[CombinedPCGId::e];
+      const auto &fk = reductions[CombinedPCGId::f];
 
       alphak = dk / (ak + this->tiny);
 
@@ -408,8 +422,7 @@ private:
                    EXIT_FAILURE,
                    "%s invalid rdotz norm while running linear solver!",
                    this->_name.c_str());
-
-       }
+      }
 
 #ifdef DEBUG
       printf("alpha: %.15e\n", alphak);
@@ -442,7 +455,6 @@ private:
                      EXIT_FAILURE,
                      "%s cannot update solution as beta == 0!",
                      this->_name.c_str());
-
         }
 
         combinedUpdateKernel(this->Nlocal,

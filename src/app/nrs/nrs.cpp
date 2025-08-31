@@ -984,7 +984,6 @@ void nrs_t::printRunStat(int step)
   platform->timer.printStatEntry("      preconditioner    ", "scalar preconditioner", "DEVICE:MAX", tScalar);
   platform->timer.printStatEntry("      initial guess     ", "scalar proj", "DEVICE:MAX", tScalar);
 
-
   platform->timer.printStatEntry("    gsMPI               ", gsTime, tElapsedTimeSolve);
 
   platform->timer.printStatEntry("    dotp                ", "dotp", "DEVICE:MAX", tElapsedTimeSolve);
@@ -1950,7 +1949,7 @@ void nrs_t::registerKernels(occa::properties kernelInfoBC)
     std::cout << "registerNrsKernels" << std::endl;
   }
 
-  const bool serial = platform->serial;
+  const bool serial = platform->serial();
   const std::string extension = serial ? ".c" : ".okl";
   const std::string suffix = "Hex3D";
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/app/nrs/");
@@ -2108,7 +2107,7 @@ void nrs_t::initOuterStep(double time, dfloat _dt, int tstep)
     neknek->exchange(exchangeAllTimes, lagState);
   }
 
-  neknek->exchangeTimes(std::vector<dfloat>(this->dt, this->dt + sizeof(this->dt)/sizeof(dfloat)), time);
+  neknek->exchangeTimes(std::vector<dfloat>(this->dt, this->dt + sizeof(this->dt) / sizeof(dfloat)), time);
 }
 
 void nrs_t::finishOuterStep() {}

@@ -92,5 +92,5 @@ void meshGlobalFaceIds(mesh_t *mesh)
   }
 
   free(meshExt->globalIds);
-  free(meshExt);
+  delete meshExt;
 }

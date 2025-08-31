@@ -314,6 +314,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
                                                                    baseLevel->elliptic->Nfields,
                                                                    baseLevel->elliptic->fieldOffset,
                                                                    baseLevel->elliptic->o_invDegree,
+                                                                   elliptic->nullspace,
                                                                    Ax);
 
     if (baseLevel->elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "COMBINED")) {

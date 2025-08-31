@@ -12,6 +12,7 @@ public:
         int _nRestartVectors,
         bool _flexible,
         bool _iR,
+        bool _removeMean,
         std::function<void(const occa::memory &o_q, occa::memory &o_Aq)> _Ax,
         std::function<void(const occa::memory &o_r, occa::memory &o_z)> _preco)
   {
@@ -24,6 +25,9 @@ public:
     Ax = _Ax;
     preco = _preco;
     iR = _iR;
+    removeMean = _removeMean;
+
+    weightSum = platform->linAlg->sum(this->Nlocal, o_weight, platform->comm.mpiComm());
 
     Nblock = (this->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
@@ -168,10 +172,13 @@ private:
   occa::memory o_weight;
   bool flexible;
   bool iR;
+  bool removeMean;
 
   int maxIter;
   int nRestartVectors;
   int Nblock;
+
+  dfloat weightSum;
 
   occa::memory o_V;
   occa::memory o_Z;
@@ -237,7 +244,7 @@ private:
     platform->flopCounter->add("gmres evaluate residual and norm", flopCount);
 
     double norm = 0;
-    if (platform->serial) {
+    if (platform->serial()) {
       norm = o_wrk.ptr<double>()[0];
     } else {
       auto h_wrk = platform->memoryPool.reserve<double>(o_wrk.size());
@@ -278,7 +285,7 @@ private:
                      (flexible) ? o_xCorr : o_w);
 
     if (!flexible) {
-      if (runPreco) {
+      if (preco && runPreco) {
         preco(o_w, o_xCorr);
       } else {
         o_xCorr.copyFrom(o_w);
@@ -297,7 +304,7 @@ private:
   {
     const auto offset = o_V.size() / nRestartVectors;
 
-    dfloat nr = s[0] = this->rNorm;
+    s[0] = this->rNorm;
 
     // init o_V0
     auto o_rT = [&]() {
@@ -313,23 +320,38 @@ private:
     platform->linAlg->axpbyMany<T>(this->Nlocal,
                                    this->Nfields,
                                    this->fieldOffset,
-                                   1. / (nr + this->tiny),
+                                   1. / (s[0] + this->tiny),
                                    o_rT,
                                    0.0,
                                    o_V);
 
     int i;
     for (i = 0; i < nRestartVectors; ++i) {
+      // right preconditioning: z_k = M^{-1} v_k
+      auto o_zk = [&]() {
+        const auto n = o_w.size();
+        const auto o_vk = o_V.slice(i * offset, n);
+        if (preco) {
+          auto o_zk = flexible ? o_Z.slice(i * offset, n) : o_Z.slice(0, n);
+          preco(o_vk, o_zk);
+          return o_zk;
+        } else {
+          return o_vk;
+        }
+      }();
 
-      // right preconditioning
-      // z_k = M^{-1} v_k
-      auto o_Mv = flexible ? o_Z + i * offset : o_Z;
-      preco(o_V + i * offset, o_Mv);
+      if (removeMean) {
+        const auto dotp = platform->linAlg->innerProd(this->Nlocal,
+                                                      o_weight,
+                                                      o_zk,
+                                                      platform->comm.mpiComm());
 
-      // w = A * z_k
-      Ax(static_cast<const occa::memory>(o_Mv), o_w);
+        platform->linAlg->add(o_zk.size(), -dotp / weightSum, o_zk);
+      }
 
-      // 1 pass classical Gram-Schmidt (project o_w onto o_V)
+      Ax(o_zk, o_w);
+
+      // 1 pass classical Gram-Schmidt (project new solution vector o_w onto o_V)
       {
 #if USE_WEIGHTED_INNER_PROD_MULTI_DEVICE
         platform->linAlg->weightedInnerProdMulti<T>(this->Nlocal,
@@ -355,16 +377,17 @@ private:
         o_y.copyFrom(h_y, (i + 1));
 #endif
 
+        // orthogonalize o_w against previous o_V
         gsOrthoKernel(Nblock, this->Nlocal, this->fieldOffset, (i + 1), o_weight, o_y, o_V, o_w, o_scratch);
 
         double flopCount = FPfactor * 5 * (i + 1) * this->Nfields * static_cast<double>(this->Nlocal);
         platform->flopCounter->add("gramSchmidt", flopCount);
       }
 
-      // normalize
+      // normalize  
       auto nw = [&]() {
         dfloat norm = 0;
-        if (platform->serial) {
+        if (platform->serial()) {
           norm = o_scratch.ptr<T>()[0];
         } else {
           o_scratch.copyTo(h_scratch);
@@ -378,7 +401,7 @@ private:
       }();
 
       if (i < nRestartVectors - 1) {
-        auto o_Vi = o_V + (i + 1) * offset;
+        auto o_Vi = o_V.slice((i + 1) * offset);
         platform->linAlg->axpbyMany<T>(this->Nlocal,
                                        this->Nfields,
                                        this->fieldOffset,

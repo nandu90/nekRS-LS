@@ -122,7 +122,7 @@ linAlg_t *linAlg_t::getInstance()
 linAlg_t::linAlg_t()
 {
   blocksize = BLOCKSIZE;
-  serial = platform->serial;
+  serial = platform->serial();
   comm = platform->comm.mpiComm();
   timer = 0;
 
@@ -208,10 +208,7 @@ void linAlg_t::magSqrVector(const dlong N,
   linAlgLaunchKernel(getKnlPrefix<dfloat>() + "magSqrVector", N, fieldOffset, o_u, o_mag);
 }
 
-void linAlg_t::magVector(const dlong N,
-                         const dlong fieldOffset,
-                         const occa::memory &o_u,
-                         occa::memory &o_mag)
+void linAlg_t::magVector(const dlong N, const dlong fieldOffset, const occa::memory &o_u, occa::memory &o_mag)
 {
   nekrsCheck(o_u.length() < (3 * fieldOffset),
              MPI_COMM_SELF,
@@ -282,7 +279,13 @@ void linAlg_t::linearCombination(const dlong N,
              "o_x too small to store %d fields!\n",
              Nfields);
 
-  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "linearCombination", N, Nfields, fieldOffset, o_coeff, o_x, o_y);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "linearCombination",
+                     N,
+                     Nfields,
+                     fieldOffset,
+                     o_coeff,
+                     o_x,
+                     o_y);
 }
 
 dfloat linAlg_t::maxRelativeError(const dlong N,
@@ -294,7 +297,14 @@ dfloat linAlg_t::maxRelativeError(const dlong N,
                                   MPI_Comm comm)
 {
   auto o_err = platform->deviceMemoryPool.reserve<dfloat>(std::max(Nfields * fieldOffset, N));
-  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "relativeError", N, Nfields, fieldOffset, absTol, o_u, o_uRef, o_err);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "relativeError",
+                     N,
+                     Nfields,
+                     fieldOffset,
+                     absTol,
+                     o_u,
+                     o_uRef,
+                     o_err);
   return this->amaxMany(N, Nfields, fieldOffset, o_err, comm);
 }
 
@@ -307,6 +317,13 @@ dfloat linAlg_t::maxAbsoluteError(const dlong N,
                                   MPI_Comm comm)
 {
   auto o_err = platform->deviceMemoryPool.reserve<dfloat>(std::max(Nfields * fieldOffset, N));
-  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "absoluteError", N, Nfields, fieldOffset, absTol, o_u, o_uRef, o_err);
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "absoluteError",
+                     N,
+                     Nfields,
+                     fieldOffset,
+                     absTol,
+                     o_u,
+                     o_uRef,
+                     o_err);
   return this->amaxMany(N, Nfields, fieldOffset, o_err, comm);
 }

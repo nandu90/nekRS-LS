@@ -75,14 +75,23 @@ occa::kernel benchmarkAx(int Nelements,
   const auto wordSizeGeo = sizeof(TGeo);
 
   const std::string oklpath(getenv("NEKRS_KERNEL_DIR"));
-  const std::string ext = platform->serial ? ".c" : ".okl";
+  const std::string ext = platform->serial() ? ".c" : ".okl";
 
   if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
     Nelements = 1;
   }
 
-  CallParameters
-      params{Nelements, Nq, Ng, constCoeff, poisson, computeGeom, wordSize, wordSizeGeo, Ndim, stressForm, suffix};
+  CallParameters params{Nelements,
+                        Nq,
+                        Ng,
+                        constCoeff,
+                        poisson,
+                        computeGeom,
+                        wordSize,
+                        wordSizeGeo,
+                        Ndim,
+                        stressForm,
+                        suffix};
 
   if (cachedResults.count(params) > 0) {
     return cachedResults.at(params);
@@ -102,7 +111,7 @@ occa::kernel benchmarkAx(int Nelements,
   props["includes"] += diffDataFile.c_str();
 
   props["defines/dfloat"] = (wordSize == sizeof(double)) ? "double" : "float";
-  props["defines/FP32"]   = (wordSize == sizeof(double)) ? 0 : 1;
+  props["defines/FP32"] = (wordSize == sizeof(double)) ? 0 : 1;
   props["defines/gfloat"] = (wordSizeGeo == sizeof(double)) ? "double" : "float";
 
   if (Ng != N) {
@@ -147,7 +156,7 @@ occa::kernel benchmarkAx(int Nelements,
 
     std::vector<int> kernelVariants;
 
-    if (platform->serial) {
+    if (platform->serial()) {
       const int Nkernels = 1;
       for (int knl = 0; knl < Nkernels; ++knl) {
         kernelVariants.push_back(knl);
@@ -449,13 +458,9 @@ occa::kernel benchmarkAx(int Nelements,
           if (verbosity > 1)
             std::cout << " elapsed time=" << elapsed;
 
-          std::cout << " wordSize=" << 8 * wordSize 
-                    << " wordSizeGeo=" << 8 * wordSizeGeo
-                    << " GDOF/s=" << GDOFPerSecond 
-                    << " GB/s=" << bw
-                    << " GFLOPS/s=" << gflops 
-                    << " constCoeff=" << constCoeff 
-                    << " poisson=" << poisson
+          std::cout << " wordSize=" << 8 * wordSize << " wordSizeGeo=" << 8 * wordSizeGeo
+                    << " GDOF/s=" << GDOFPerSecond << " GB/s=" << bw << " GFLOPS/s=" << gflops
+                    << " constCoeff=" << constCoeff << " poisson=" << poisson
                     << " kernelVer=" << kernelVariant << "\n";
         }
       }
@@ -504,41 +509,40 @@ occa::kernel benchmarkAx(int Nelements,
 }
 
 template occa::kernel benchmarkAx<float, float>(int Nelements,
-                                         int Nq,
-                                         int Ng,
-                                         bool constCoeff,
-                                         bool poisson,
-                                         bool computeGeom,
-                                         int Ndim,
-                                         bool stressForm,
-                                         int verbosity,
-                                         double targetTime,
-                                         bool runAutotuner,
-                                         std::string suffix);
+                                                int Nq,
+                                                int Ng,
+                                                bool constCoeff,
+                                                bool poisson,
+                                                bool computeGeom,
+                                                int Ndim,
+                                                bool stressForm,
+                                                int verbosity,
+                                                double targetTime,
+                                                bool runAutotuner,
+                                                std::string suffix);
 
 template occa::kernel benchmarkAx<double, double>(int Nelements,
-                                         int Nq,
-                                         int Ng,
-                                         bool constCoeff,
-                                         bool poisson,
-                                         bool computeGeom,
-                                         int Ndim,
-                                         bool stressForm,
-                                         int verbosity,
-                                         double targetTime,
-                                         bool runAutotuner,
-                                         std::string suffix);
-
+                                                  int Nq,
+                                                  int Ng,
+                                                  bool constCoeff,
+                                                  bool poisson,
+                                                  bool computeGeom,
+                                                  int Ndim,
+                                                  bool stressForm,
+                                                  int verbosity,
+                                                  double targetTime,
+                                                  bool runAutotuner,
+                                                  std::string suffix);
 
 template occa::kernel benchmarkAx<double, float>(int Nelements,
-                                          int Nq,
-                                          int Ng,
-                                          bool constCoeff,
-                                          bool poisson,
-                                          bool computeGeom,
-                                          int Ndim,
-                                          bool stressForm,
-                                          int verbosity,
-                                          double targetTime,
-                                          bool runAutotuner,
-                                          std::string suffix);
+                                                 int Nq,
+                                                 int Ng,
+                                                 bool constCoeff,
+                                                 bool poisson,
+                                                 bool computeGeom,
+                                                 int Ndim,
+                                                 bool stressForm,
+                                                 int verbosity,
+                                                 double targetTime,
+                                                 bool runAutotuner,
+                                                 std::string suffix);

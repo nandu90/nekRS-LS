@@ -20,7 +20,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
 
   const std::string section = "core-";
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/core/");
-  const std::string extension = platform->serial ? ".c" : ".okl";
+  const std::string extension = platform->serial() ? ".c" : ".okl";
   const std::string suffix = "Hex3D";
 
   std::string kernelName;

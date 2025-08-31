@@ -163,7 +163,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("FLUID VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
     options.setArgs("FLUID PRESSURE PRECONDITIONER", "MULTIGRID+SEMFEM");
     options.setArgs("FLUID PRESSURE COARSE SOLVER LOCATION", "DEVICE");
-    if (platform->serial) { 
+    if (platform->serial()) { 
       options.setArgs("FLUID PRESSURE COARSE SOLVER LOCATION", "CPU");
     } 
   }
@@ -199,7 +199,7 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   if (ciMode == 7) {
     options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
     options.setArgs("FLUID VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
-    options.setArgs("FLUID PRESSURE MAXIMUM ITERATIONS", "1000");
+    options.setArgs("FLUID PRESSURE SOLVER MAXIMUM ITERATIONS", "1000");
     options.setArgs("FLUID PRESSURE PRECONDITIONER", "JACOBI");
     options.setArgs("END TIME", std::string("0.012"));
   }

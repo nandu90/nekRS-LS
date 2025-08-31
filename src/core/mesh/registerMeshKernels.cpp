@@ -61,7 +61,7 @@ void registerMeshKernels(occa::properties kernelInfoBC)
         props["defines/p_NpCoarse"] = (Nc + 1) * (Nc + 1) * (Nc + 1);
         ;
 
-        const std::string ext = platform->serial ? ".c" : ".okl";
+        const std::string ext = platform->serial() ? ".c" : ".okl";
         const std::string orderSuffix =
             std::string("_Nf_") + std::to_string(Nf) + std::string("_Nc_") + std::to_string(Nc);
 
@@ -125,7 +125,9 @@ void registerMeshKernels(occa::properties kernelInfoBC)
 
       prop["defines/p_mode"] = 1;
       kernelName = "surfaceAreaMultiplyIntegrateHex3D";
-      platform->kernelRequests.add(meshPrefix + "surfaceAreaNormalMultiplyVectorIntegrateHex3D", fileName, prop);
+      platform->kernelRequests.add(meshPrefix + "surfaceAreaNormalMultiplyVectorIntegrateHex3D",
+                                   fileName,
+                                   prop);
 
       prop["defines/p_mode"] = 2;
       kernelName = "surfaceAreaMultiplyIntegrateHex3D";

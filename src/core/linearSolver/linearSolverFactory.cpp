@@ -11,6 +11,7 @@ linearSolverFactory<T>::create(const std::string &_solver,
                                int Nfields,
                                dlong fieldOffset,
                                const occa::memory &o_weight,
+                               bool removeMean,
                                std::function<void(const occa::memory &o_q, occa::memory &o_Aq)> Ax,
                                std::function<void(const occa::memory &o_r, occa::memory &o_z)> Pc)
 {
@@ -30,7 +31,15 @@ linearSolverFactory<T>::create(const std::string &_solver,
         combined = true;
       }
 
-      return new cg<T>(Nlocal, Nfields, fieldOffset, o_weight, flexible, combined, Ax, Pc);
+      return new cg<T>(Nlocal, 
+                       Nfields, 
+                       fieldOffset, 
+                       o_weight, 
+                       flexible, 
+                       combined, 
+                       removeMean, 
+                       Ax, 
+                       Pc);
     } else if (solver.find("gmres") != std::string::npos) {
       auto iR = false;
       if (solver.find("ir") != std::string::npos) {
@@ -51,6 +60,7 @@ linearSolverFactory<T>::create(const std::string &_solver,
                           nRestartVectors,
                           flexible,
                           iR,
+                          removeMean,
                           Ax,
                           Pc);
     } else {

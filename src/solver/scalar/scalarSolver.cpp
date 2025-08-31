@@ -901,7 +901,7 @@ void scalar_t::computeUrst()
 
 void registerScalarKernels(occa::properties kernelInfoBC)
 {
-  const bool serial = platform->serial;
+  const bool serial = platform->serial();
   const std::string extension = serial ? ".c" : ".okl";
   occa::properties kernelInfo = platform->kernelInfo;
   kernelInfo["defines"].asObject();
