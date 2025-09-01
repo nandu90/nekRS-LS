@@ -39,32 +39,27 @@ struct data_t {
   std::vector<dfloat> r;
   std::vector<dfloat> dist2; // distance squared from found to requested point (in xyz space)
 
-  dlong *code_base;
-  dlong *proc_base;
-  dlong *el_base;
-  dfloat *r_base;
-  dfloat *dist2_base;
+  dlong *code_base = nullptr;
+  dlong *proc_base = nullptr;
+  dlong *el_base = nullptr;
+  dfloat *r_base = nullptr;
+  dfloat *dist2_base = nullptr;
 
   data_t() {}
 
-  data_t(int npt)
+  void resize(const int npt)
   {
-    code = std::vector<dlong>(npt, 0);
-    proc = std::vector<dlong>(npt, 0);
-    el = std::vector<dlong>(npt, 0);
-    r = std::vector<dfloat>(3 * npt, 0);
-    dist2 = std::vector<dfloat>(npt, 0);
+    code.resize(npt, 0);
+    proc.resize(npt, 0);
+    el.resize(npt, 0);
+    r.resize(3 * npt, 0);
+    dist2.resize(npt, 1e30);
 
     code_base = code.data();
     proc_base = proc.data();
     el_base = el.data();
     r_base = r.data();
     dist2_base = dist2.data();
-
-    for (dlong i = 0; i < npt; ++i) {
-      dist2_base[i] = 1e30;
-      code_base[i] = CODE_NOT_FOUND;
-    }
   }
 };
 

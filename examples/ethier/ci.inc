@@ -549,12 +549,22 @@ void ciTestPointInterpolation(nrs_t *nrs, double time, occa::kernel exactUVWPKer
   std::array<occa::memory, nRandomInterp> o_UintRand;
   for (int n = 0; n < nRandomInterp; ++n) {
     o_UintRand[n] = platform->device.malloc<dfloat>(nrs->meshV->dim * pointsX[n].size());
-    interpRand[n]->eval(nrs->meshV->dim, nrs->fieldOffset, o_Ue, pointsX[n].size(), o_UintRand[n]);
+    if (n == nRandomInterp - 1) {
+      interpRand[n]->eval(nrs->meshV->dim, nrs->fieldOffset, o_Ue, pointsX[n].size(), o_UintRand[n]);
+
+      std::tie(pointsX[n], pointsY[n], pointsZ[n]) = generatePoints(mesh->Nlocal / 4, R);
+      interpRand[n]->setPoints(pointsX[n], pointsY[n], pointsZ[n]);
+      interpRand[n]->find(verbosity);
+
+      interpRand[n]->eval(nrs->meshV->dim, nrs->fieldOffset, o_Ue, pointsX[n].size(), o_UintRand[n]);
+    } else {
+      interpRand[n]->eval(nrs->meshV->dim, nrs->fieldOffset, o_Ue, pointsX[n].size(), o_UintRand[n]);
+    }
   }
 
   std::array<occa::memory, nRandomInterp> o_UeRand;
   for (int n = 0; n < nRandomInterp; ++n) {
-    const dlong nPoints = pointsX[0].size();
+    const dlong nPoints = pointsX[n].size();
 
     o_UeRand[n] = platform->device.malloc<dfloat>(nrs->meshV->dim * nPoints);
 
