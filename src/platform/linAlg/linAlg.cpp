@@ -180,6 +180,51 @@ void linAlg_t::crossProduct(const dlong N,
   linAlgLaunchKernel(getKnlPrefix<dfloat>() + "crossProduct", N, fieldOffset, o_x, o_y, o_z);
 }
 
+void linAlg_t::dotProduct(const dlong N,
+                          const dlong fieldOffset,
+                          const occa::memory &o_x,
+                          const occa::memory &o_y,
+                          occa::memory &o_z)
+{
+  nekrsCheck(o_x.length() < (3 * fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_x too small to store a vector field!\n");
+  nekrsCheck(o_y.length() < (3 * fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_x too small to store a vector field!\n");
+  nekrsCheck(o_z.length() < (3 * fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_x too small to store a vector field!\n");
+
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "dotProduct", N, fieldOffset, o_x, o_y, o_z);
+}
+
+void linAlg_t::dotProduct(const dlong N,
+                           const dlong fieldOffset,
+                           const occa::memory &o_x,
+                           const std::array<dfloat, 3> y,
+                           occa::memory &o_z)
+{
+  nekrsCheck(o_x.length() < (3 * fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_x too small to store a vector field!\n");
+  nekrsCheck(o_z.length() < (3 * fieldOffset),
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s",
+             "o_x too small to store a vector field!\n");
+
+  linAlgLaunchKernel(getKnlPrefix<dfloat>() + "dotConstProduct", N, fieldOffset, o_x, y[0], y[1], y[2], o_z);
+}
+
 void linAlg_t::unitVector(const dlong N, const dlong fieldOffset, occa::memory &o_v)
 {
   linAlgLaunchKernel(getKnlPrefix<dfloat>() + "unitVector", N, fieldOffset, o_v);

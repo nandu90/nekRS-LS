@@ -50,6 +50,8 @@ void registerLinAlgKernels()
       {"weightedInnerProdMulti", false},
       {"weightedInnerProdMultiDevice", false},
       {"crossProduct", false},
+      {"dotProduct", false},
+      {"dotConstProduct", false},
       {"unitVector", false},
       {"entrywiseMag", false},
       {"linearCombination", false},
