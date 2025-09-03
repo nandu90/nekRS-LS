@@ -224,7 +224,7 @@ void MGSolver_t::runAdditiveVcycle()
   if (nThreads > 1) {
     o_rhs = platform->memoryPool.reserve<pfloat>(levels[baseLevel]->o_rhs.size());
     o_rhs.copyFrom(levels[baseLevel]->o_rhs);
-    o_x = platform->memoryPool.reserve<pfloat>(o_x.size());
+    o_x = platform->memoryPool.reserve<pfloat>(levels[baseLevel]->o_x.size());
   } else {
     o_rhs = levels[baseLevel]->o_rhs;
     o_x = levels[baseLevel]->o_x;
