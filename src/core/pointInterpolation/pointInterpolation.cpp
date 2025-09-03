@@ -36,7 +36,7 @@ pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
              "Communicator must be either platform->comm.mpiComm()()or platform->comm.mpiComm()Parent");
 
   newton_tol =
-      (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(1e-6, newton_tol_);
+      (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(5e-5, newton_tol_);
 
   auto x = platform->device.mallocHost<dfloat>(mesh->Nlocal);
   auto y = platform->device.mallocHost<dfloat>(mesh->Nlocal);
