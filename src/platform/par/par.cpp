@@ -22,13 +22,6 @@ MPI_Comm comm;
 int nscal = 0;
 std::map<std::string, int> scalarMap;
 
-static std::string mapTemperatureToScalarString()
-{
-  std::string sid = scalarDigitStr(0);
-  return "scalar" + sid;
-}
-
-
 bool checkForTrue(const std::string &s)
 {
   return (s.find("true") != std::string::npos) || (s.find("yes") != std::string::npos) ||

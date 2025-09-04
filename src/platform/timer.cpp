@@ -31,11 +31,6 @@ std::vector<std::string> userStat;
 
 int ifSync_;
 
-inline int ifSync()
-{
-  return ifSync_;
-}
-
 int enable_sync_;
 
 int enabled;

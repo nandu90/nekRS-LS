@@ -244,7 +244,8 @@ int udfMake(setupAide &options, const std::string &solverName, int rank)
   }
 
   if (rank == 0) {
-    printf("done (%gs)\n", std::chrono::high_resolution_clock::now() - tStart);
+    auto elapsed = std::chrono::high_resolution_clock::now() - tStart;
+    printf("done (%gs)\n", elapsed);
   }
   fflush(stdout);
 

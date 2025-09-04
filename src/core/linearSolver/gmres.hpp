@@ -31,7 +31,7 @@ public:
 
     Nblock = (this->Nlocal + BLOCKSIZE - 1) / BLOCKSIZE;
 
-    this->tiny = 10 * std::numeric_limits<T>::min();
+    this->tiny = static_cast<T>(10.0) * std::numeric_limits<T>::min();
     this->FPfactor = (std::is_same<T, dfloat>::value) ? 1.0 : 0.5;
     this->knlPrefix = std::string("gmres::") + ((std::is_same<T, double>::value) ? "double::" : "float::") +
                       std::to_string(this->Nfields) + "::";
