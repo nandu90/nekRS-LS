@@ -911,6 +911,11 @@ void nrs_t::printRunStat(int step)
                                  "DEVICE:MAX",
                                  tPressurePreco);
 
+  platform->timer.printStatEntry("        coarse grid     ",
+                                 "fluid pressure coarseSolve",
+                                 "HOST:MAX",
+                                 tPressurePreco);
+
   platform->timer.set("fluid pressure proj",
                       platform->timer.query("fluid pressure proj pre", "DEVICE:MAX") +
                           platform->timer.query("fluid pressure proj post", "DEVICE:MAX"),

@@ -137,8 +137,7 @@ public:
   void freeWorkStorage();
 
 private:
-  void runVcycle(int k);
-  void runAdditiveVcycle();
+  void runVcycle();
 };
 
 #endif

@@ -28,60 +28,6 @@ SOFTWARE.
 #include "platform.hpp"
 #include "linAlg.hpp"
 
-namespace
-{
-
-void coarsenV(MGSolver_t *M)
-{
-  for (int k = 0; k < M->numLevels - 1; ++k) {
-    auto level = M->levels[k];
-    auto o_rhs = level->o_rhs;
-    auto o_res = level->o_res;
-    auto levelC = M->levels[k + 1];
-    auto o_rhsC = levelC->o_rhs;
-
-    o_res.copyFrom(o_rhs, level->Nrows);
-    levelC->coarsen(o_res, o_rhsC);
-  }
-}
-
-void prolongateV(MGSolver_t *M)
-{
-  for (int k = M->numLevels - 2; k >= 0; --k) {
-    auto level = M->levels[k];
-    auto o_x = level->o_x;
-
-    auto levelC = M->levels[k + 1];
-    auto o_xC = levelC->o_x;
-
-    // x = x + P xC
-    levelC->prolongate(o_xC, o_x);
-  }
-}
-
-void schwarzSolve(MGSolver_t *M)
-{
-  for (int k = 0; k < M->numLevels - 1; ++k) {
-    auto level = M->levels[k];
-    auto o_rhs = level->o_rhs;
-    auto o_x = level->o_x;
-    auto o_res = level->o_res;
-    auto levelC = M->levels[k + 1];
-    auto o_rhsC = levelC->o_rhs;
-    auto o_xC = levelC->o_x;
-
-    // apply smoother to x and then compute res = rhs-Ax
-    level->smooth(o_rhs, o_x, true);
-
-    o_res.copyFrom(o_rhs, level->Nrows);
-
-    // rhsC = P^T res
-    levelC->coarsen(o_res, o_rhsC);
-  }
-}
-
-} // namespace
-
 MGSolver_t::MGSolver_t(const std::string &name_, occa::device device_, MPI_Comm comm_, setupAide options_)
 {
   name = name_;
@@ -92,61 +38,46 @@ MGSolver_t::MGSolver_t(const std::string &name_, occa::device device_, MPI_Comm 
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &size);
 
+  nekrsCheck(!options.compareArgs("MGSOLVER CYCLE", "VCYCLE"),
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "%s\n",
+             "Unknown multigrid cycle type!");
+
   levels = (MGSolver_t::multigridLevel **)calloc(MAX_LEVELS, sizeof(MGSolver_t::multigridLevel *));
 
   coarseLevel = new coarseLevel_t(name, options, comm);
 
   numLevels = 0;
 
-  if (options.compareArgs("MGSOLVER CYCLE", "VCYCLE")) {
-    ctype = VCYCLE;
-    additive = false;
-    if (options.compareArgs("MGSOLVER CYCLE", "ADDITIVE")) {
-      if (options.compareArgs("MGSOLVER SMOOTHER", "CHEBYSHEV")) {
-        if (rank == 0) {
-          printf("Additive vcycle is not supported for Chebyshev!\n");
-        }
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-      }
-      additive = true;
-      overlapCrsGridSolve = false;
-      if (options.compareArgs("MGSOLVER CYCLE", "OVERLAPCRS")) {
-        if (platform->device.mode() == "Serial" || platform->device.mode() == "OpenMP") {
-          overlapCrsGridSolve = false;
-        } else {
-          overlapCrsGridSolve = true;
-          int provided;
-          MPI_Query_thread(&provided);
-          if (provided != MPI_THREAD_MULTIPLE) {
-            overlapCrsGridSolve = false;
-            if (rank == 0 && size > 1) {
-              printf("disable overlapping coarse solve as MPI_THREAD_MULTIPLE is not supported!\n");
-            }
-          }
-          if (size == 1) {
-            overlapCrsGridSolve = true;
-          }
-        }
-        if (rank == 0 && overlapCrsGridSolve) {
-          printf("overlapping coarse grid solve enabled\n");
-        }
-      }
-    } else {
-      if (options.compareArgs("MGSOLVER SMOOTHER", "RAS") ||
-          options.compareArgs("MGSOLVER SMOOTHER", "ASM")) {
-        if (!options.compareArgs("MGSOLVER SMOOTHER", "CHEBYSHEV")) {
-          if (rank == 0) {
-            printf("Multiplicative vcycle is not supported for RAS/ASM smoother without Chebyshev!\n");
-          }
-          MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-        }
+  ctype = VCYCLE;
+  additive = (options.compareArgs("MGSOLVER CYCLE", "ADDITIVE")) ? true : false;
+
+  overlapCrsGridSolve = false;
+  if (options.compareArgs("MGSOLVER CYCLE", "OVERLAPCRS")) {
+    if (size > 1) {
+      const auto env = std::getenv("NEKRS_MPI_THREAD_MULTIPLE");
+      nekrsCheck(!(env && std::string(env) == "1"),
+                 platform->comm.mpiComm(),
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "overlapping coarse solve requires NEKRS_MPI_THREAD_MULTIPLE=1!");
+
+      int provided;
+      MPI_Query_thread(&provided);
+      if (provided != MPI_THREAD_MULTIPLE) {
+        overlapCrsGridSolve = false;
+        nekrsAbort(platform->comm.mpiComm(),
+                   EXIT_FAILURE,
+                   "%s\n",
+                   "overlapping coarse solve requires MPI_THREAD_MULTIPLE support!");
       }
     }
-  } else {
+    overlapCrsGridSolve = true;
+
     if (rank == 0) {
-      printf("Unknown multigrid cycle type!\n");
+      printf("overlapping coarse grid solve enabled\n");
     }
-    MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
   }
 }
 
@@ -168,13 +99,7 @@ void MGSolver_t::Run(occa::memory o_rhsFine, occa::memory o_xFine)
   levels[0]->o_x = o_xFine;
   levels[0]->o_rhs = o_rhsFine;
 
-  if (ctype == VCYCLE) {
-    if (additive) {
-      runAdditiveVcycle();
-    } else {
-      runVcycle(0);
-    }
-  }
+  runVcycle();
 
   levels[0]->o_x = nullptr;
   levels[0]->o_rhs = nullptr;
@@ -182,76 +107,90 @@ void MGSolver_t::Run(occa::memory o_rhsFine, occa::memory o_xFine)
 
 void MGSolver_t::Report() {}
 
-void MGSolver_t::runVcycle(int k)
+void MGSolver_t::runVcycle()
 {
-  MGSolver_t::multigridLevel *level = levels[k];
-  auto &o_rhs = level->o_rhs;
-  auto &o_x = level->o_x;
-  auto &o_res = level->o_res;
+  // precompute coarse rhs for all levels
+  if (additive || this->overlapCrsGridSolve) {
+    for (int k = 0; k < numLevels - 1; ++k) {
+      auto &level = levels[k];
+      auto &o_rhs = level->o_rhs;
+      auto &o_wrk = level->o_res;
+      auto &levelC = levels[k + 1];
+      auto &o_rhsC = levelC->o_rhs;
 
-  if (k == baseLevel) {
-    // zero initialize o_x as we don't solve for masked points
-    platform->linAlg->fill<pfloat>(o_x.size(), 0.0, o_x);
-    coarseLevel->solvePtr(coarseLevel, o_rhs, o_x);
-    return;
+      o_wrk.copyFrom(o_rhs, level->Nrows);
+      levelC->coarsen(o_wrk, o_rhsC);
+    }
   }
 
-  MGSolver_t::multigridLevel *levelC = levels[k + 1];
-  auto &o_rhsC = levelC->o_rhs;
-  auto &o_xC = levelC->o_x;
-
-  level->smooth(o_rhs, o_x, true);
-  level->residual(o_rhs, o_x, o_res);
-
-  levelC->coarsen(o_res, o_rhsC);
-
-  this->runVcycle(k + 1); // recursive call
-
-  levelC->prolongate(o_xC, o_x);
-
-  level->smooth(o_rhs, o_x, false);
-}
-
-void MGSolver_t::runAdditiveVcycle()
-{
-  {
-    coarsenV(this);
-  }
-
-  const auto nThreads = this->overlapCrsGridSolve ? 2 : 1;
-
-  occa::memory o_x, o_rhs;
-  if (nThreads > 1) {
-    o_rhs = platform->memoryPool.reserve<pfloat>(levels[baseLevel]->o_rhs.size());
-    o_rhs.copyFrom(levels[baseLevel]->o_rhs);
-    o_x = platform->memoryPool.reserve<pfloat>(levels[baseLevel]->o_x.size());
+  occa::memory o_xCoarse, o_rhsCoarse;
+  if (this->overlapCrsGridSolve) {
+    o_rhsCoarse = platform->memoryPool.reserve<pfloat>(levels[baseLevel]->o_rhs.size());
+    o_rhsCoarse.copyFrom(levels[baseLevel]->o_rhs);
+    o_xCoarse = platform->memoryPool.reserve<pfloat>(levels[baseLevel]->o_x.size());
+    auto xCoarsePtr = o_xCoarse.ptr<pfloat>();
+    for (int i = 0; i < o_xCoarse.size(); ++i) {
+      xCoarsePtr[i] = 0;
+    }
   } else {
-    o_rhs = levels[baseLevel]->o_rhs;
-    o_x = levels[baseLevel]->o_x;
+    o_rhsCoarse = levels[baseLevel]->o_rhs;
+    o_xCoarse = levels[baseLevel]->o_x;
+    platform->linAlg->fill<pfloat>(o_xCoarse.size(), 0.0, o_xCoarse);
   }
 
-  o_x.getDevice().finish();
+  o_rhsCoarse.getDevice().finish();
+
+  // overlap the downward V-cycle phase with the coarse-level solve on the host
+  // parallel execution of downward additive V-cycle (on device) is not utilized
+  const auto nThreads = this->overlapCrsGridSolve ? 2 : 1;
 #pragma omp parallel proc_bind(close) num_threads(nThreads)
   {
 #pragma omp single
     {
 #pragma omp task
       {
-        schwarzSolve(this);
+        for (int k = 0; k < numLevels - 1; ++k) {
+          auto &level = levels[k];
+          auto &o_rhs = levels[k]->o_rhs;
+          auto &o_x = levels[k]->o_x;
+
+          auto &levelC = levels[k + 1];
+          auto &o_rhsC = levelC->o_rhs;
+          auto &o_xC = levelC->o_x;
+
+          level->smooth(o_rhs, o_x, true);
+          if (!additive) {
+            level->residual(o_rhs, o_x, level->o_res);
+            levelC->coarsen(level->o_res, o_rhsC);
+          }
+        }
       }
+
 #pragma omp task
       {
-        coarseLevel->solvePtr(coarseLevel, o_rhs, o_x);
+        coarseLevel->solvePtr(coarseLevel, o_rhsCoarse, o_xCoarse);
       }
     }
   }
 
-  if (nThreads > 1) {
-    levels[baseLevel]->o_x.copyFrom(o_x);  
+  if (this->overlapCrsGridSolve) {
+    levels[baseLevel]->o_x.copyFrom(o_xCoarse);
   }
 
-  {
-    prolongateV(this);
+  // upward V-cycle
+  for (int k = numLevels - 2; k >= 0; --k) {
+    auto &level = levels[k];
+    auto &o_rhs = levels[k]->o_rhs;
+    auto &o_x = levels[k]->o_x;
+
+    auto &levelC = levels[k + 1];
+    auto &o_rhsC = levelC->o_rhs;
+    auto &o_xC = levelC->o_x;
+
+    levelC->prolongate(o_xC, o_x);
+    if (!additive) {
+      level->smooth(o_rhs, o_x, false);
+    }
   }
 }
 

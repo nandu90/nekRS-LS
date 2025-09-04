@@ -89,12 +89,14 @@ void pMGLevel::smooth(occa::memory o_rhs, occa::memory o_x, bool x_is_zero)
 {
   platform->timer.tic(elliptic->timerName + " preconditioner smoother N=" + std::to_string(mesh->N));
 
+#if 1
   if (!x_is_zero && smootherType == SmootherType::ASM) {
     return;
   }
   if (!x_is_zero && smootherType == SmootherType::RAS) {
     return;
   }
+#endif
 
   if (smootherType == SmootherType::CHEBYSHEV) {
     this->smoothChebyshev(o_rhs, o_x, x_is_zero);
@@ -105,6 +107,8 @@ void pMGLevel::smooth(occa::memory o_rhs, occa::memory o_x, bool x_is_zero)
     this->smoothSchwarz(o_rhs, o_x, x_is_zero);
   } else if (smootherType == SmootherType::JACOBI) {
     this->smoothJacobi(o_rhs, o_x, x_is_zero);
+  } else {
+    nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "invalid smootherType!");
   }
 
   platform->timer.toc(elliptic->timerName + " preconditioner smoother N=" + std::to_string(mesh->N));
