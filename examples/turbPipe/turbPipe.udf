@@ -255,7 +255,7 @@ void UDF_Setup()
     std::vector<deviceMemory<dfloat>> o_U{o_ux, o_uy, o_uz};
     nekAscent::addVariable("velocity", meshV, o_U);
 
-    deviceMemory<dfloat> o_s00(scalar->o_solution("s00")); 
+    deviceMemory<dfloat> o_s00(nrs->scalar->o_solution("s00")); 
     nekAscent::addVariable("scalar00", meshT, std::vector<deviceMemory<dfloat>>{o_s00});
 
     nekAscent::addVariable("Qcriterion", meshV, std::vector<deviceMemory<dfloat>>{o_qcriterion});
@@ -290,9 +290,13 @@ void UDF_ExecuteStep(double time, int tstep)
   }
 
 #ifdef NEKRS_ASCENT_ENABLED
-  blockSignal(ASCENT_UPDATE_SIGNAL);
-  MPI_Bcast(const_cast<sig_atomic_t*>(&processAscentYaml), 1, MPI_INT, 0, platform->comm.mpiComm());
-  processAscentYaml = processAscentYaml || (tstep % processAscentYamlFrequency == 0 && tstep > 0);
+  {
+    blockSignal(ASCENT_UPDATE_SIGNAL);
+    int tmp = processAscentYaml;
+    MPI_Bcast(&tmp, 1, MPI_INT, 0, platform->comm.mpiComm());
+    processAscentYaml = tmp;
+    processAscentYaml = processAscentYaml || (tstep % processAscentYamlFrequency == 0 && tstep > 0);
+  }
 #endif
 
   if (nrs->checkpointStep || processAscentYaml) {
