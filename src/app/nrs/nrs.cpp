@@ -729,7 +729,7 @@ void nrs_t::printRunStat(int step)
   double gsTime = ogsTime(/* reportHostTime */ true);
   MPI_Allreduce(MPI_IN_PLACE, &gsTime, 1, MPI_DOUBLE, MPI_MAX, comm_);
 
-  const double tElapsedTime = platform->timer.query("elapsed", "DEVICE:MAX");
+  const double tElapsedTime = platform->timer.query("elapsed", "HOST:MAX");
 
   if (rank == 0) {
     std::cout << "\n>>> runtime statistics (step= " << step << "  totalElapsed= " << tElapsedTime << "s"
@@ -748,12 +748,12 @@ void nrs_t::printRunStat(int step)
               << "calls\n";
   }
 
-  const double tElapsedTimeSolve = platform->timer.query("elapsedStepSum", "DEVICE:MAX");
+  const double tElapsedTimeSolve = platform->timer.query("elapsedStepSum", "HOST:MAX");
   platform->timer.printStatSetElapsedTimeSolve(tElapsedTimeSolve);
-  const double tSetup = platform->timer.query("setup", "DEVICE:MAX");
+  const double tSetup = platform->timer.query("setup", "HOST:MAX");
 
-  const double tMinSolveStep = platform->timer.query("minSolveStep", "DEVICE:MAX");
-  const double tMaxSolveStep = platform->timer.query("maxSolveStep", "DEVICE:MAX");
+  const double tMinSolveStep = platform->timer.query("minSolveStep", "HOST:MAX");
+  const double tMaxSolveStep = platform->timer.query("maxSolveStep", "HOST:MAX");
 
   const double tScalarCvode = platform->timer.query("cvode_t::solve", "DEVICE:MAX");
 
@@ -889,7 +889,7 @@ void nrs_t::printRunStat(int step)
                                  "fluid pressureSolve",
                                  "DEVICE:MAX",
                                  tElapsedTimeSolve);
-  platform->timer.printStatEntry("      rhs               ", "pressure rhs", "DEVICE:MAX", tPressure);
+  platform->timer.printStatEntry("      rhs               ", "fluid pressure rhs", "DEVICE:MAX", tPressure);
 
   const double tPressurePreco = platform->timer.query("fluid pressure preconditioner", "DEVICE:MAX");
   platform->timer.printStatEntry("      preconditioner    ",
@@ -905,11 +905,6 @@ void nrs_t::printRunStat(int step)
     }
     platform->timer.printStatEntry("        pMG smoother    ", tag, "DEVICE:MAX", tPressurePreco);
   }
-
-  platform->timer.printStatEntry("        coarse grid     ",
-                                 "fluid pressure coarseSolve",
-                                 "DEVICE:MAX",
-                                 tPressurePreco);
 
   platform->timer.printStatEntry("        coarse grid     ",
                                  "fluid pressure coarseSolve",
