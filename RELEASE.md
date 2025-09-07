@@ -32,6 +32,7 @@
 * AmgX support was removed (replaced by HYPRE)
 * Field file extension starts with 0-index
 * nrsqsub scripts are moved to [HPCsupport](https://github.com/Nek5000/nekRS_HPCsupport/)
+* First time step may take longer due to initialization overhead
 
 ## Breaking Changes
 
@@ -95,8 +96,9 @@ This list provides an overview of the most significant changes in this release, 
 
 ## Known Bugs / Restrictions
 
-* Code is not fully optimized on CPUs and Intel GPUs
+* Code is not fully optimized on CPUs and AMD MI300 GPUs
 * planar avg in 1D is limited to 256 gridpoints per direction locally (per MPI Rank) 
+* SEMFEM preconditioner not available when using DPCPP
 * [606](https://github.com/Nek5000/nekRS/issues/606)
 * [507](https://github.com/Nek5000/nekRS/issues/507)
 * [485](https://github.com/Nek5000/nekRS/issues/485)
