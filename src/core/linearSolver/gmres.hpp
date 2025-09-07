@@ -83,14 +83,14 @@ public:
       o_w = platform->deviceMemoryPool.reserve<T>(n);
 
       o_r = platform->deviceMemoryPool.reserve<double>(n);
-      if (std::is_same<T, float>::value) {
+      if constexpr (std::is_same_v<T, float>) {
         platform->copyFloatToDoubleKernel(o_r.size(), o_r0, o_r);
       } else {
         o_r.copyFrom(o_r0);
       }
 
       o_xCorr = platform->deviceMemoryPool.reserve<T>(n);
-      if (std::is_same<T, float>::value) {
+      if constexpr (std::is_same_v<T, float>) {
         o_x = platform->deviceMemoryPool.reserve<double>(n);
       } else {
         o_x = o_xIn.slice(0, n);
@@ -147,7 +147,7 @@ public:
 
     _nIter = Niter;
 
-    if (std::is_same<T, float>::value) {
+    if constexpr (std::is_same_v<T, float>) {
       platform->copyDoubleToFloatKernel(o_x.size(), o_x, o_xIn);
     }
 
@@ -245,7 +245,7 @@ private:
 
     double norm = 0;
     if (platform->serial()) {
-      norm = o_wrk.ptr<double>()[0];
+      norm = o_wrk.template ptr<double>()[0];
     } else {
       auto h_wrk = platform->memoryPool.reserve<double>(o_wrk.size());
       o_wrk.copyTo(h_wrk);
@@ -309,7 +309,7 @@ private:
     // init o_V0
     auto o_rT = [&]() {
       auto o_rT = o_w;
-      if (std::is_same<T, float>::value) {
+      if constexpr (std::is_same_v<T, float>) {
         platform->copyDoubleToFloatKernel(o_r.size(), o_r, o_w);
         return o_w;
       } else {
