@@ -1313,7 +1313,6 @@ int setup(int numberActiveFields)
 
 long long set_glo_num(long long *glo_num, int nx, int isTMesh, int numberInterior)
 {
-  std::cout << "set_glo_num: " << nx << "," << isTMesh << "," << numberInterior << std::endl;
   return (*nek_set_vert_ptr)(glo_num, &nx, &isTMesh, &numberInterior);
 }
 
