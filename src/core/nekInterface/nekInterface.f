@@ -63,8 +63,6 @@ c-----------------------------------------------------------------------
       call nekrs_registerPtr('boundaryID', boundaryID)
       call nekrs_registerPtr('boundaryIDt', boundaryIDt)
 
-      call nekrs_registerPtr('glo_num', glo_num)
-
       call nekrs_registerPtr('nekcomm', nekcomm)
       call nekrs_registerPtr('istep', istep)
 
@@ -132,9 +130,6 @@ c-----------------------------------------------------------------------
       integer stsform
 
       common /rdump/ ntdump
-
-      common /ivrtx/ vertex ((2**ldim)*lelt)
-      integer*8 vertex
 
       etimes = dnekclock_sync()
 
@@ -741,35 +736,10 @@ c-----------------------------------------------------------------------
 
       include 'SIZE'
       include 'TOTAL'
+      include 'NEKINTF'
 
-      common /nekmpi/ mid,mp,nekcomm,nekgroup,nekreal
-
-      integer sum
-      integer*8 bid8(2*ldim*lelt)
       integer maxbid
 
-#if 0
-      if(isTmsh.eq.1) then
-        n = 2*ndim*nelt
-        do i = 1,n
-           bid8(i) = boundaryIDt(i,1)
-        enddo
-      else
-        n = 2*ndim*nelv
-        do i = 1,n
-           bid8(i) = boundaryID(i,1)
-        enddo
-      endif
-
-      call fgslib_gs_unique(bid8, n, nekcomm, np)
-
-      sum = 0 
-      do i = 1,n
-        if(bid8(i).gt.0) sum = sum + 1
-      enddo
-
-      nekf_nbid = iglsum(sum,1)
-#else
       maxbid = 0
       if(isTmsh.eq.1) then
         n = 2*ndim*nelt
@@ -784,18 +754,18 @@ c-----------------------------------------------------------------------
       endif
 
       nekf_nbid = iglmax(maxbid,1)
-#endif
 
       return
       end
 c-----------------------------------------------------------------------
-      integer*8 function nekf_set_vert(nx, isTmsh, numberInt)
+      integer*8 function nekf_set_vert(glo_num, nx, isTmsh, numberInt)
 
       include 'SIZE'
       include 'TOTAL'
       include 'NEKINTF'
 
-      integer npts, isTmsh, numberInt
+      integer*8 glo_num(*)
+      integer nx, isTmsh, numberInt
 
       common /ivrtx/ vertex ((2**ldim),lelt)
       integer*8 vertex
@@ -807,6 +777,7 @@ c-----------------------------------------------------------------------
       if (isTmsh.eq.0) nel = nelv
       numberInt_ = .false.
       if (numberInt.eq.1) numberInt_ = .true. 
+
       call set_vert(glo_num,ngv,nx,nel,vertex,numberInt_)
 
       nekf_set_vert = ngv
@@ -1236,6 +1207,7 @@ c-----------------------------------------------------------------------
       include 'SIZE'
       include 'TOTAL'
       include 'RESTART'
+      include 'NEKINTF'
 
       real xm1_(lx1,ly1,lz1,*), ym1_(lx1,ly1,lz1,*), zm1_(lx1,ly1,lz1,*)
       real vx_ (lx1,ly1,lz1,*), vy_ (lx1,ly1,lz1,*), vz_ (lx1,ly1,lz1,*)
@@ -1247,8 +1219,6 @@ c-----------------------------------------------------------------------
       common /scrns/ wk(lwk)
 
       integer*8 offs0,offs,nbyte,stride,strideB,nxyzr8
-
-      common /nekmpi/ nid_,np_,nekcomm,nekgroup,nekreal
 
       integer   disp_unit
       integer*8 win_size
