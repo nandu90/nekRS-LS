@@ -135,7 +135,7 @@ struct mesh_t {
   dlong Nlocal;
   hlong Nglobal; // global T-vector size 
 
-  bool solid;
+  bool solid = false;
 
   hlong NboundaryFaces;
   hlong *EToV = nullptr; // element-to-vertex connectivity

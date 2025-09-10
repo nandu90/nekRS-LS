@@ -38,6 +38,7 @@ void meshGlobalFaceIds(mesh_t *mesh)
   meshExt->Np = meshExt->Nq * meshExt->Nq * meshExt->Nq;
   meshExt->Nfp = meshExt->Nq * meshExt->Nq;
   meshExt->Nfaces = mesh->Nfaces;
+  meshExt->solid = mesh->solid;
 
   meshGlobalIds(meshExt);
 
