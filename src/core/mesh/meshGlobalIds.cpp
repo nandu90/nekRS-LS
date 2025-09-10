@@ -14,11 +14,7 @@ struct parallelNode_t {
 // uniquely label each node with a global index, used for gatherScatter
 static void meshNekParallelConnectNodes(mesh_t *mesh, bool numberInterior)
 {
-  int rank, size;
-  rank = platform->comm.mpiRank();
-  size = platform->comm.mpiCommSize();
-
-  auto Nlocal = std::pow(mesh->N + 1, mesh->dim) * mesh->Nelements;
+  const auto Nlocal = std::pow(mesh->N + 1, mesh->dim) * mesh->Nelements;
 
   mesh->globalIds = (hlong *)calloc(Nlocal, sizeof(hlong));
   hlong ngv = nek::set_glo_num(mesh->globalIds, mesh->N + 1, mesh->solid, numberInterior);
