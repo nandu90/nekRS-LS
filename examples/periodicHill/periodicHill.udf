@@ -81,8 +81,7 @@ void UDF_LoadKernels(deviceKernelProperties &kernelInfo)
 #if 0
   {
     auto props = kernelInfo;
-    props.define("p_edd_free") = 0.01; //for external flows
-    props.define("p_ywlim") = 0.5;     //for external flows
+    props.define("p_ywlim") = 0.05;     //for external flows
     RANSktau::buildKernel(props);
   }
 #endif
