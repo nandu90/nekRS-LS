@@ -284,8 +284,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
   if (options.compareArgs("PRECONDITIONER", "SEMFEM")) { // smoothed SEMFEM
     precon->SEMFEMSolver = new SEMFEMSolver_t(ellipticCoarse);
     auto baseLevel = (pMGLevel *)levels[elliptic->levels.size() - 1];
-    precon->MGSolver->coarseLevel->solvePtr = [elliptic, baseLevel](MGSolver_t::coarseLevel_t *coarseLevel,
-                                                                    occa::memory &o_rhs,
+    precon->MGSolver->coarseLevel->solvePtr = [elliptic, baseLevel](occa::memory &o_rhs,
                                                                     occa::memory &o_x) {
       auto &o_res = baseLevel->o_res;
       baseLevel->smooth(o_rhs, o_x, true);
@@ -301,7 +300,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
     precon->SEMFEMSolver = new SEMFEMSolver_t(ellipticCoarse);
     auto baseLevel = (pMGLevel *)levels[elliptic->levels.size() - 1];
     precon->MGSolver->coarseLevel->solvePtr =
-        [elliptic](MGSolver_t::coarseLevel_t *, occa::memory &o_rhs, occa::memory &o_x) {
+        [elliptic](occa::memory &o_rhs, occa::memory &o_x) {
           elliptic->precon->SEMFEMSolver->run(o_rhs, o_x);
         };
   } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "JPCG")) {
@@ -327,8 +326,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
         extractQualifierValue(baseLevel->options.getArgs("MULTIGRID COARSE SOLVER"), "residualTol", 1e-4);
 
     precon->MGSolver->coarseLevel->solvePtr =
-        [maxNiter, tol, baseLevel](MGSolver_t::coarseLevel_t *coarseLevel,
-                                   occa::memory &o_rhs,
+        [maxNiter, tol, baseLevel](occa::memory &o_rhs,
                                    occa::memory &o_x) {
           auto &elliptic = baseLevel->elliptic;
 
@@ -342,9 +340,10 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
     ellipticCoarseFEMGridSetup(elliptic);
     if (options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER")) {
       auto baseLevel = (pMGLevel *)levels[elliptic->levels.size() - 1];
+      auto& coarseLevel = precon->MGSolver->coarseLevel;
 
       precon->MGSolver->coarseLevel->solvePtr =
-          [baseLevel](MGSolver_t::coarseLevel_t *coarseLevel, occa::memory &o_rhs, occa::memory &o_x) {
+          [baseLevel, &coarseLevel](occa::memory &o_rhs, occa::memory &o_x) {
             auto &o_res = baseLevel->o_res;
             baseLevel->smooth(o_rhs, o_x, true);
             baseLevel->residual(o_rhs, o_x, o_res);
@@ -359,7 +358,7 @@ void ellipticMultiGridSetup(elliptic_t *elliptic_)
   } else if (options.compareArgs("MULTIGRID COARSE SOLVER", "SMOOTHER")) {
     auto baseLevel = (pMGLevel *)levels[elliptic->levels.size() - 1];
     precon->MGSolver->coarseLevel->solvePtr =
-        [baseLevel](MGSolver_t::coarseLevel_t *, occa::memory &o_rhs, occa::memory &o_x) {
+        [baseLevel](occa::memory &o_rhs, occa::memory &o_x) {
           baseLevel->smooth(o_rhs, o_x, true);
         };
   } else {

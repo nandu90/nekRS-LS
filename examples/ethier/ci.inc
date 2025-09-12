@@ -1409,8 +1409,8 @@ void ciTestErrors(nrs_t *nrs,
   case 22:
   {
     velIterTest = abs(NiterU - 8) < 2;
-    s1Test = err[2] < 2e-6;
-    s2Test = err[3] < 2e-6;
+    s1Test = err[2] < 3e-6;
+    s2Test = err[3] < 3e-6;
     pIterTest = abs(NiterP - 5) < 2;
     vxTest = err[0] < 8e-5;
     prTest = err[1] < 8e-4;

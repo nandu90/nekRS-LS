@@ -86,6 +86,8 @@ public:
 
     std::string name;
 
+    bool solveOnHost;
+
     MPI_Comm comm;
     occa::device device;
 
@@ -98,7 +100,7 @@ public:
     void updateMatrix(dlong nnz, hlong *Ai, hlong *Aj, dfloat *Avals);
 
     void solve(occa::memory &o_rhs, occa::memory &o_x);
-    std::function<void(coarseLevel_t *, occa::memory &, occa::memory &)> solvePtr = nullptr;
+    std::function<void(occa::memory &, occa::memory &)> solvePtr = nullptr;
 
     void *boomerAMG = nullptr;
     AMGX_t *AMGX = nullptr;

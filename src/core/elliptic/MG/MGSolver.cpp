@@ -66,7 +66,6 @@ MGSolver_t::MGSolver_t(const std::string &name_, occa::device device_, MPI_Comm 
       int provided;
       MPI_Query_thread(&provided);
       if (provided != MPI_THREAD_MULTIPLE) {
-        overlapCrsGridSolve = false;
         nekrsAbort(platform->comm.mpiComm(),
                    EXIT_FAILURE,
                    "%s\n",
@@ -74,6 +73,7 @@ MGSolver_t::MGSolver_t(const std::string &name_, occa::device device_, MPI_Comm 
       }
     }
     overlapCrsGridSolve = true;
+    coarseLevel->solveOnHost = true;
 
     if (rank == 0) {
       printf("overlapping coarse grid solve enabled\n");
@@ -168,7 +168,7 @@ void MGSolver_t::runVcycle()
 
 #pragma omp task
       {
-        coarseLevel->solvePtr(coarseLevel, o_rhsCoarse, o_xCoarse);
+        coarseLevel->solvePtr(o_rhsCoarse, o_xCoarse);
       }
     }
   }

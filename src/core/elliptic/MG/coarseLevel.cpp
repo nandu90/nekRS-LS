@@ -42,7 +42,10 @@ MGSolver_t::coarseLevel_t::coarseLevel_t(const std::string &name_, setupAide opt
   name = name_;
   options = options_;
   comm = comm_;
-  solvePtr = &MGSolver_t::coarseLevel_t::solve;
+  solveOnHost = false;
+  solvePtr = [this](occa::memory &rhs, occa::memory &x) {
+      this->solve(rhs, x);
+  };
 }
 
 void MGSolver_t::coarseLevel_t::updateMatrix(
@@ -234,7 +237,7 @@ MGSolver_t::coarseLevel_t::~coarseLevel_t()
 
 void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
 {
-  if (o_x.mode() == "Serial") {
+  if (solveOnHost) {
     platform->timer.hostTic(name + " coarseSolve", true);
 
     // masked E->T
