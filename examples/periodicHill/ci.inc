@@ -3,7 +3,7 @@
 static int ciMode = 0;
 
 #define EPS_SST 8.71e-2
-#define EPS_DDES 1.74e-1
+#define EPS_DDES 1.75e-1
 #define EPS_IDDES 2.54e-1
 
 dfloat hill_step(dfloat x, dfloat w, dfloat h);

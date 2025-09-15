@@ -74,8 +74,9 @@ dfloat coeff[] = {
     0.856,     // sigom2
     0.44,      // gamma2
     // Free-stream limiter
-    0.0, // edd_free //0.01 for external flows
-    0.0, // ywlim    //0.5 for external flows
+    0.01,      // edd_free 
+    0.0,       // ywlim    //0.05 for external flows
+    1e-10,     // TINYSST
 
     // DES parameters
     0.78, // cdes1
@@ -181,20 +182,23 @@ void RANSktau::buildKernel(occa::properties _kernelInfo)
   if (!kernelInfo.get<std::string>("defines/p_ywlim").size()) {
     kernelInfo["defines/p_ywlim"] = coeff[24];
   }
+  if (!kernelInfo.get<std::string>("defines/p_tinySST").size()) {
+    kernelInfo["defines/p_tinySST"] = coeff[25];
+  }
   if (!kernelInfo.get<std::string>("defines/p_cdes1").size()) {
-    kernelInfo["defines/p_cdes1"] = coeff[25];
+    kernelInfo["defines/p_cdes1"] = coeff[26];
   }
   if (!kernelInfo.get<std::string>("defines/p_cdes2").size()) {
-    kernelInfo["defines/p_cdes2"] = coeff[26];
+    kernelInfo["defines/p_cdes2"] = coeff[27];
   }
   if (!kernelInfo.get<std::string>("defines/p_cd1").size()) {
-    kernelInfo["defines/p_cd1"] = coeff[27];
+    kernelInfo["defines/p_cd1"] = coeff[28];
   }
   if (!kernelInfo.get<std::string>("defines/p_cd2").size()) {
-    kernelInfo["defines/p_cd2"] = coeff[28];
+    kernelInfo["defines/p_cd2"] = coeff[29];
   }
   if (!kernelInfo.get<std::string>("defines/p_vkappa").size()) {
-    kernelInfo["defines/p_vkappa"] = coeff[29];
+    kernelInfo["defines/p_vkappa"] = coeff[30];
   }
 
   if (platform->comm.mpiRank() == 0 && platform->verbose()) {
