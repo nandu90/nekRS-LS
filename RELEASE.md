@@ -15,23 +15,24 @@
 * Improved JIT compilation performance
 * HIP support for SEMFEM  
 * Aero forces
-* opSEM class
+* SEM ops
 * Mesh surface ops
 * Gradient jump penalty method and improved avm reguarlization
 * Linear implicit velocity source term
 * T-mesh support for all scalars
 * Robin boundary conditions
-* Add RANS ktau variants SST, DDES, IDDES
+* RANS ktau variants SST, DDES, IDDES
 * Various bug fixes
 
 ## Good to know
 
 * GPU aware MPI is disabled by default (to enable set env-var `NEKRS_GPU_MPI=1`) which may cause a performance regression
 * [reproducibility] variable time step controller restricts dt to 5 significant digits
-* nrsman <par, env>  can be used to display the par file or environment settings
+* nrsman <par, env>  can be used to display man pages 
 * AmgX support was removed (replaced by HYPRE)
 * Field file extension starts with 0-index
-* nrsqsub scripts are moved to https://github.com/Nek5000/nekRS_HPCsupport
+* nrsqsub scripts are moved to [HPCsupport](https://github.com/Nek5000/nekRS_HPCsupport/)
+* First time step may take longer due to initialization overhead
 
 ## Breaking Changes
 
@@ -49,18 +50,18 @@ This list provides an overview of the most significant changes in this release, 
 * use `iofld` class () instead of `writeFld`
 * use `planarCopy` class instead of `velRecycling`
 * `::postProcessing` functions are now members of `nrs_t` (except planarAvg)
+* use boundary functions like `udfDirichlet` for all fields
 
 ### Interface Changes 
 * define `time` as double (instead of defloat) in all UDF functions
-* remove `nrs_t` argument from all UDF functions (nrs object is now globally accessible within udf if the Navier Stokes solver is enabled)
-
+* `nrs_t` is no longer passed from UDF functions (nrs object is now globally accessible within udf if the Navier Stokes solver is enabled)
+* `nrs_t` is no longer passed from `<plugin>::setup`
 * `udf::properties = std::function<void(nrs_t *, dfloat, occa::memory, occa::memory, occa::memory, occa::memory)>` -> `nrs_t::userProperties = std::function<void(double)>`
 * `udf::uEqnSource = std::function<void(nrs_t *, dfloat, occa::memory, occa::memory)>` -> `nrs_t::userSource = std::function<void(double)>` (same hook for all fields)
 * `udf::udfconv = std::function<int(nrs_t *, int)>` -> `nrs_t::userConvergenceCheck = std::function<bool(int)>`
 * `udf::udfdif = std::function<void(nrs_t *, dfloat, occa::memory)>` -> `nrs_t::userDivergence = std::function<void(double)>`
 * `tavg::setup(nrs_t*)` -> `tavg::setup(dlong fieldOffset, const fields& fields)`
-* `postProcessing::planarAvg(nrs_t*, const std::string&, int, int, int, int, occa::memory)` -> `planarAvg(mesh_t*, const std::string&, int, int, int, int, dlong, occa::memory o_avg)`
-* remove `nrs_t` argument from `<plugin>::setup`
+* `postProcessing::planarAvg(nrs_t*, const std::string&, int, int, int, int, occa::memory)` -> `mesh_t::planarAvg(const std::string&, int, int, int, int, dlong, occa::memory o_avg)`
 * `pointInterpolation_t::setPoints(int, dfloat*, dfloat*, dfloat*)` -> `pointInterpolation_t::setPoints(const std::vector<dfloat>&, const std::vector<dfloat>&, const std::vector<dfloat>&)`
 
 ### Name Changes
@@ -95,15 +96,16 @@ This list provides an overview of the most significant changes in this release, 
 
 ## Known Bugs / Restrictions
 
-* Code is not fully optimized on CPUs and Intel GPUs
-* [606](https://github.com/Nek5000/nekRS/issues/606)
+* Code is not fully optimized on CPUs and AMD MI300 GPUs
+* planar avg in 1D is limited to 256 gridpoints per direction locally (per MPI Rank) 
+* SEMFEM preconditioner not available when using DPCPP
 * [507](https://github.com/Nek5000/nekRS/issues/507)
 * [485](https://github.com/Nek5000/nekRS/issues/485)
 * [258](https://github.com/Nek5000/nekRS/issues/258)
 
 ## Thanks to our Contributors
 
-@yslan, @kris-rowe, @tcew, @MalachiTimothyPhillips, @thilinarmtb
+@yslan, @kris-rowe, @tcew, @MalachiTimothyPhillips, @thilinarmtb, @nandu90
 
 We are grateful to all who added new features, filed issues or helped resolve them, 
 asked and answered questions, and were part of inspiring discussions.
@@ -156,6 +158,7 @@ asked and answered questions, and were part of inspiring discussions.
 * [485](https://github.com/Nek5000/Nek5000/issues/485)
 * [729](https://github.com/Nek5000/Nek5000/issues/759)
 * [258](https://github.com/Nek5000/nekRS/issues/258)
+* planarAvg is limited by ogs::gatherNodesPerBloc
 
 ## Thanks to our Contributors
 

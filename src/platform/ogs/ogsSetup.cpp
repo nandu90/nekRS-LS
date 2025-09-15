@@ -78,8 +78,8 @@ void setupRowBlocks(ogs_t *ogs, occa::device &device)
 
     if (rowSize > ogs::gatherNodesPerBlock) {
       //this row is pathalogically big. We can't currently run this
-      std::cout << "Multiplicity of global node id: " << i << "in ogsSetup is too large.";
-      exit(1);
+      std::cerr << "ogsSetup: rowsize of gs-node id " << i << " is " << rowSize << " > " << ogs::gatherNodesPerBlock << "!\n";
+      MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
     if (blockSum+rowSize > ogs::gatherNodesPerBlock) { //adding this row will exceed the nnz per block

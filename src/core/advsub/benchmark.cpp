@@ -148,7 +148,7 @@ occa::kernel benchmarkAdvsub(int Nfields,
   const std::string fileName = oklpath + "/core/" + kernelName + ext;
 
   std::vector<int> kernelVariants = {0};
-  if (!platform->serial && dealias) {
+  if (!platform->serial() && dealias) {
 
     if (!isScalar) {
 

@@ -89,6 +89,17 @@ public:
   void disableTimer();
 
 #include "linAlg.tpp"
+  void dotProduct(const dlong N,
+                  const dlong fieldOffset,
+                  const occa::memory &o_x,
+                  const std::array<dfloat, 3> y,
+                  occa::memory &o_z);
+
+  void dotProduct(const dlong N,
+                  const dlong fieldOffset,
+                  const occa::memory &o_x,
+                  const occa::memory &o_y,
+                  occa::memory &o_z);
 
   // z = x \cross y
   void crossProduct(const dlong N,

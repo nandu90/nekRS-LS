@@ -42,7 +42,10 @@ MGSolver_t::coarseLevel_t::coarseLevel_t(const std::string &name_, setupAide opt
   name = name_;
   options = options_;
   comm = comm_;
-  solvePtr = &MGSolver_t::coarseLevel_t::solve;
+  solveOnHost = false;
+  solvePtr = [this](occa::memory &rhs, occa::memory &x) {
+      this->solve(rhs, x);
+  };
 }
 
 void MGSolver_t::coarseLevel_t::updateMatrix(
@@ -234,9 +237,9 @@ MGSolver_t::coarseLevel_t::~coarseLevel_t()
 
 void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
 {
-  platform->timer.tic(name + " coarseSolve");
+  if (solveOnHost) {
+    platform->timer.hostTic(name + " coarseSolve", true);
 
-  if (o_x.mode() == "Serial") {
     // masked E->T
     auto rhsPtr = o_rhs.ptr<pfloat>();
     auto weightPtr = h_weight.ptr<pfloat>();
@@ -256,7 +259,9 @@ void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
 
     // masked T->E
     ogsScatter(o_x.ptr<pfloat>(), h_xBuffer.ptr<pfloat>(), ogsPfloat, ogsAdd, ogs);
+    platform->timer.hostToc(name + " coarseSolve");
   } else {
+    platform->timer.tic(name + " coarseSolve", true);
     const bool useDevice = options.compareArgs("MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
 
     // masked E->T
@@ -289,7 +294,6 @@ void MGSolver_t::coarseLevel_t::solve(occa::memory &o_rhs, occa::memory &o_x)
       o_Gx.copyFrom(h_xBuffer, N);
       ogsScatter(o_x, o_Gx, ogsPfloat, ogsAdd, ogs);
     }
+    platform->timer.toc(name + " coarseSolve");
   }
-
-  platform->timer.toc(name + " coarseSolve");
 }

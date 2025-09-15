@@ -34,9 +34,6 @@ struct nekdata_private {
   double *pr;
   double *t;
 
-  /* global vertex ids */
-  long long *glo_num;
-
   /* Boundary data */
   char *cbc;
   int *boundaryID;
@@ -139,7 +136,7 @@ int bcmap(int bid, int ifld);
 int globalElementIdToRank(long long id);
 int globalElementIdToLocal(long long id);
 
-long long set_glo_num(int npts, int isTMesh, int numberInterior = 0);
+long long set_glo_num(long long *glo_num, int Nq, int isTMesh, int numberInterior = 0);
 
 void bdfCoeff(dfloat *g0, dfloat *coeff, dfloat *dt, int order);
 void extCoeff(dfloat *coeff, dfloat *dt, int nAB, int nBDF);

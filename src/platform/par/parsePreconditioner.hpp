@@ -66,6 +66,7 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
   for (std::string entry : entries) {
     checkValidity(rank, validValues, entry);
   }
+  entries.erase(std::remove(entries.begin(), entries.end(), "boomeramg"), entries.end());
 
   const int smoother = p_coarseSolver.find("smoother") != std::string::npos;
   const int cg = p_coarseSolver.find("jpcg") != std::string::npos;
@@ -103,9 +104,7 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
     }
 
     for (std::string entry : entries) {
-      if (entry.find("boomeramg") != std::string::npos) {
-        //
-      } else if (entry.find("smoother") != std::string::npos) {
+      if (entry.find("smoother") != std::string::npos) {
         auto val = options.getArgs(parSectionName + "MULTIGRID COARSE SOLVER"); 
         options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER", val + "+SMOOTHER");
       } else if (entry.find("cpu") != std::string::npos) {
@@ -115,12 +114,10 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
       } else if (entry.find("overlap") != std::string::npos) {
         std::string currentSettings = options.getArgs(parSectionName + "MGSOLVER CYCLE");
         options.setArgs(parSectionName + "MGSOLVER CYCLE", currentSettings + "+OVERLAPCRS");
-
-        if (!options.compareArgs(parSectionName + "MGSOLVER CYCLE", "ADDITIVE")) {
-          append_error("Overlapping coarse solve requires additive multigrid!\n");
-        }
       } else {
-        append_error("Invalid coarseGrid qualifier " + entry + "!\n");
+        if (entry.find("boomeramg") != std::string::npos) {
+          append_error("Invalid coarseGrid qualifier " + entry + "!\n");
+        }
       }
     }
   } else if (cg) {
@@ -157,14 +154,6 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
     }
   }
 
-  {
-    std::string preconditioner;
-    options.getArgs(parSectionName + "MGSOLVER CYCLE", preconditioner);
-    if (preconditioner.find("additive") != std::string::npos) {
-      append_error("additive V-cycle does not support coarseSolver = smoother!\n");
-    }
-  }
-
   if (amgx && options.compareArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION", "CPU")) {
     append_error("AMGX on CPU is not supported!\n");
   }
@@ -177,6 +166,25 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
 
   const bool runSolverOnDevice = options.compareArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
   const bool overlapCrsSolve = options.compareArgs(parSectionName + "MGSOLVER CYCLE", "OVERLAPCRS");
+
+  {
+    auto val = p_coarseSolver;
+
+    std::string pattern = "+overlap";
+    if (auto pos = val.find(pattern); pos != std::string::npos) {
+      val.erase(pos, pattern.length());
+    }
+
+    pattern = "+cpu";
+    if (auto pos = val.find(pattern); pos != std::string::npos) {
+      val.erase(pos, pattern.length());
+    }
+
+    if (overlapCrsSolve && val != "boomeramg") {
+       append_error("Overlaping coarse grid solve is only supported with boomerAMG!\n");
+    }
+  }
+
   if (overlapCrsSolve && runSolverOnDevice) {
     append_error("Cannot overlap coarse grid solve when running coarse solver on the GPU!\n");
   }
@@ -279,21 +287,12 @@ void parseSmoother(const int rank, setupAide &options, inipp::Ini *ini, std::str
         if (s.find("jac") != std::string::npos) {
           surrogateSmootherSet = true;
           options.setArgs(parSection + "MULTIGRID SMOOTHER", chebyshevType + "+DAMPEDJACOBI");
-          if (p_preconditioner.find("additive") != std::string::npos) {
-            append_error("Additive vcycle is not supported for Chebyshev smoother");
-          }
         } else if (s.find("asm") != std::string::npos) {
           surrogateSmootherSet = true;
           options.setArgs(parSection + "MULTIGRID SMOOTHER", chebyshevType + "+ASM");
-          if (p_preconditioner.find("additive") != std::string::npos) {
-            append_error("Additive vcycle is not supported for hybrid Schwarz/Chebyshev smoother");
-          }
         } else if (s.find("ras") != std::string::npos) {
           surrogateSmootherSet = true;
           options.setArgs(parSection + "MULTIGRID SMOOTHER", chebyshevType + "+RAS");
-          if (p_preconditioner.find("additive") != std::string::npos) {
-            append_error("Additive vcycle is not supported for hybrid Schwarz/Chebyshev smoother");
-          }
         }
       }
 
@@ -308,28 +307,11 @@ void parseSmoother(const int rank, setupAide &options, inipp::Ini *ini, std::str
     options.removeArgs(parSection + "MULTIGRID CHEBYSHEV MAX EIGENVALUE BOUND FACTOR");
     if (p_smoother.find("asm") == 0) {
       options.setArgs(parSection + "MULTIGRID SMOOTHER", "ASM");
-      if (p_preconditioner.find("multigrid") != std::string::npos) {
-        if (p_preconditioner.find("additive") == std::string::npos) {
-          append_error("ASM smoother only supported for additive V-cycle");
-        }
-      } else {
-        options.setArgs(parSection + "MGSOLVER CYCLE", "VCYCLE+ADDITIVE+OVERLAPCRS");
-      }
     } else if (p_smoother.find("ras") == 0) {
       options.setArgs(parSection + "MULTIGRID SMOOTHER", "RAS");
-      if (p_preconditioner.find("multigrid") != std::string::npos) {
-        if (p_preconditioner.find("additive") == std::string::npos) {
-          append_error("RAS smoother only supported for additive V-cycle");
-        }
-      } else {
-        options.setArgs(parSection + "MGSOLVER CYCLE", "VCYCLE+ADDITIVE+OVERLAPCRS");
-      }
     } else if (p_smoother.find("jac") == 0) {
       append_error("Jacobi smoother requires Chebyshev");
       options.setArgs(parSection + "MULTIGRID SMOOTHER", "DAMPEDJACOBI");
-      if (p_preconditioner.find("additive") != std::string::npos) {
-        append_error("Additive vcycle is not supported for Jacobi smoother");
-      }
     } else {
       append_error("Unknown ::smootherType");
     }

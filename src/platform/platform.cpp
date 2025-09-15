@@ -197,9 +197,9 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
     kernelInfo["defines/XeHPC"] = 1;
   }
 
-  serial = device.mode() == "Serial" || device.mode() == "OpenMP";
+  _serial = device.mode() == "Serial" || device.mode() == "OpenMP";
 
-  if (serial) {
+  if (_serial) {
     kernelInfo["includes"] += "math.h";
   }
 
@@ -208,7 +208,7 @@ platform_t::platform_t(setupAide &_options, MPI_Comm _commg, MPI_Comm _comm)
     kernelInfo["defines/FP32"] = 1;
   }
 
-  const std::string extension = serial ? ".c" : ".okl";
+  const std::string extension = _serial ? ".c" : ".okl";
 
   if (rank == 0) {
     compileDummyKernel(*this);

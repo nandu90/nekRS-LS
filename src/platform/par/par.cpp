@@ -22,13 +22,6 @@ MPI_Comm comm;
 int nscal = 0;
 std::map<std::string, int> scalarMap;
 
-static std::string mapTemperatureToScalarString()
-{
-  std::string sid = scalarDigitStr(0);
-  return "scalar" + sid;
-}
-
-
 bool checkForTrue(const std::string &s)
 {
   return (s.find("true") != std::string::npos) || (s.find("yes") != std::string::npos) ||
@@ -594,7 +587,7 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *ini)
                                               "ELLIPTIC COEFF FIELD",
                                               "REGULARIZATION",
                                               "BOUNDARY TYPE MAP",
-                                              "LINEAR SOLVER MAXIMUM ITERATIONS",
+                                              "SOLVER MAXIMUM ITERATIONS",
                                               "BLOCK SOLVER",
                                               "PRECONDITIONER",
                                               "ELLIPTIC",

@@ -263,7 +263,7 @@ void setup(mesh_t *mesh_,
   uniform = uniform_;
   async = async_;
   stageThroughHost = stageThroughHost_;
-  if (platform->serial) {
+  if (platform->serial()) {
     stageThroughHost = false;
   }
 

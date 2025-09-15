@@ -14,7 +14,6 @@ set(ELLIPTIC_SOURCES
         ${ELLIPTIC_SOURCE_DIR}/SEMFEMSolverBuild.cpp
         ${ELLIPTIC_SOURCE_DIR}/registerEllipticKernels.cpp
         ${ELLIPTIC_SOURCE_DIR}/registerEllipticPreconditionerKernels.cpp
-        ${ELLIPTIC_SOURCE_DIR}/ellipticZeroMean.cpp
         ${ELLIPTIC_SOURCE_DIR}/MG/ellipticBuildMultigridLevelFine.cpp
         ${ELLIPTIC_SOURCE_DIR}/MG/ellipticBuildMultigridLevel.cpp
         ${ELLIPTIC_SOURCE_DIR}/MG/ellipticMultiGridUpdateLambda.cpp

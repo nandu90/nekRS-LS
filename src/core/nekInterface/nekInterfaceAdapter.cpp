@@ -5,6 +5,12 @@
 #include "re2Reader.hpp"
 #include "solver.hpp"
 
+#if defined(__APPLE__) && defined(__aarch64__)
+#include <mach-o/dyld.h>
+#include <mach-o/getsect.h>
+#include <mach-o/loader.h>
+#endif
+
 static bool usrFileExists = false;
 
 nekdata_private nekData;
@@ -74,7 +80,7 @@ static void (*nek_setics_ptr)(void);
 static int (*nek_bcmap_ptr)(int *, int *, int *);
 static void (*nek_gen_bcmap_ptr)(void);
 static int (*nek_nbid_ptr)(int *);
-static long long (*nek_set_vert_ptr)(int *, int *, int *);
+static long long (*nek_set_vert_ptr)(long long *, int *, int *, int *);
 
 static void (*nek_setbd_ptr)(double *, double *, int *);
 static void (*nek_setabbd_ptr)(double *, double *, int *, int *);
@@ -528,6 +534,42 @@ DEFINE_USER_FUNC(useric)
 DEFINE_USER_FUNC(usrsetvert)
 DEFINE_USER_FUNC(userqtl)
 
+static void check_library_data_size(void *handle, const char *lib_name)
+{
+
+// workaround for missing relocation overflow check
+#if defined(__APPLE__) && defined(__aarch64__)
+  const struct mach_header_64 *header = nullptr;
+  uint32_t n = _dyld_image_count();
+  for (uint32_t i = 0; i < n; ++i) {
+    const char *name = _dyld_get_image_name(i);
+    if (strstr(name, lib_name)) {
+      header = (const struct mach_header_64 *)_dyld_get_image_header(i);
+      break;
+    }
+  }
+
+  const load_command *cmd = (const load_command *)(header + 1);
+  size_t total_data = 0;
+  for (uint32_t j = 0; j < header->ncmds; ++j) {
+    if (cmd->cmd == LC_SEGMENT_64) {
+      const segment_command_64 *seg = (const segment_command_64 *)cmd;
+      if (strcmp(seg->segname, "__DATA") == 0) {
+        total_data += seg->vmsize; // includes .bss
+      }
+    }
+    cmd = (const load_command *)((const char *)cmd + cmd->cmdsize);
+  }
+
+  const size_t TWO_GB = 2UL * 1024 * 1024 * 1024;
+  nekrsCheck(total_data > TWO_GB,
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "__DATA segment too large (%ld bytes) for ARM64 small code model and mcmodel=medium/large is not supported!\n",
+             total_data);
+#endif
+}
+
 void set_usr_handles(const char *session_in, int verbose)
 {
   std::string cache_dir(getenv("NEKRS_CACHE_DIR"));
@@ -543,6 +585,8 @@ void set_usr_handles(const char *session_in, int verbose)
   void *handle = dlopen(lib.c_str(), RTLD_NOW | RTLD_LOCAL);
 
   nekrsCheck(!handle, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", dlerror());
+
+  check_library_data_size(handle, lib.c_str());
 
   // check if we need to append an underscore
   auto us = [handle] {
@@ -631,7 +675,7 @@ void set_usr_handles(const char *session_in, int verbose)
   check_error(dlerror());
   nek_nbid_ptr = (int (*)(int *))dlsym(handle, fname("nekf_nbid"));
   check_error(dlerror());
-  nek_set_vert_ptr = (long long (*)(int *, int *, int *))dlsym(handle, fname("nekf_set_vert"));
+  nek_set_vert_ptr = (long long (*)(long long *, int *, int *, int *))dlsym(handle, fname("nekf_set_vert"));
   check_error(dlerror());
 
   nek_setbd_ptr = (void (*)(double *, double *, int *))dlsym(handle, fname("setbd"));
@@ -1144,8 +1188,6 @@ int setup(int numberActiveFields)
   nekData.nx1 = *ptr<int>("nx1");
   nekData.ldimt = *ptr<int>("ldimt");
 
-  nekData.glo_num = ptr<long long>("glo_num");
-
   nekData.p0th = ptr<double>("p0th");
   nekData.vx = ptr<double>("vx");
   nekData.vy = ptr<double>("vy");
@@ -1269,9 +1311,9 @@ int setup(int numberActiveFields)
   return 0;
 }
 
-long long set_glo_num(int nx, int isTMesh, int numberInterior)
+long long set_glo_num(long long *glo_num, int nx, int isTMesh, int numberInterior)
 {
-  return (*nek_set_vert_ptr)(&nx, &isTMesh, &numberInterior);
+  return (*nek_set_vert_ptr)(glo_num, &nx, &isTMesh, &numberInterior);
 }
 
 void bdfCoeff(dfloat *g0, dfloat *coeff, dfloat *_dt, int order)
@@ -1287,12 +1329,17 @@ void bdfCoeff(dfloat *g0, dfloat *coeff, dfloat *_dt, int order)
 
 void extCoeff(dfloat *coeff, dfloat *_dt, int nAB, int nBDF)
 {
+#if 0
   nekrsCheck(nAB < nBDF,
              MPI_COMM_SELF,
              EXIT_FAILURE,
              "%s\n",
              "order for extrapolation cannot be smaller than for BDF");
-
+#else
+  if (nAB < nBDF) {
+    nBDF = nAB;
+  }
+#endif
 
   double dt[3] = {_dt[0], _dt[1], _dt[2]};
   double nekCoeff[3];

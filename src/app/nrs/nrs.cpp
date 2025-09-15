@@ -729,7 +729,7 @@ void nrs_t::printRunStat(int step)
   double gsTime = ogsTime(/* reportHostTime */ true);
   MPI_Allreduce(MPI_IN_PLACE, &gsTime, 1, MPI_DOUBLE, MPI_MAX, comm_);
 
-  const double tElapsedTime = platform->timer.query("elapsed", "DEVICE:MAX");
+  const double tElapsedTime = platform->timer.query("elapsed", "HOST:MAX");
 
   if (rank == 0) {
     std::cout << "\n>>> runtime statistics (step= " << step << "  totalElapsed= " << tElapsedTime << "s"
@@ -748,12 +748,12 @@ void nrs_t::printRunStat(int step)
               << "calls\n";
   }
 
-  const double tElapsedTimeSolve = platform->timer.query("elapsedStepSum", "DEVICE:MAX");
+  const double tElapsedTimeSolve = platform->timer.query("elapsedStepSum", "HOST:MAX");
   platform->timer.printStatSetElapsedTimeSolve(tElapsedTimeSolve);
-  const double tSetup = platform->timer.query("setup", "DEVICE:MAX");
+  const double tSetup = platform->timer.query("setup", "HOST:MAX");
 
-  const double tMinSolveStep = platform->timer.query("minSolveStep", "DEVICE:MAX");
-  const double tMaxSolveStep = platform->timer.query("maxSolveStep", "DEVICE:MAX");
+  const double tMinSolveStep = platform->timer.query("minSolveStep", "HOST:MAX");
+  const double tMaxSolveStep = platform->timer.query("maxSolveStep", "HOST:MAX");
 
   const double tScalarCvode = platform->timer.query("cvode_t::solve", "DEVICE:MAX");
 
@@ -889,7 +889,7 @@ void nrs_t::printRunStat(int step)
                                  "fluid pressureSolve",
                                  "DEVICE:MAX",
                                  tElapsedTimeSolve);
-  platform->timer.printStatEntry("      rhs               ", "pressure rhs", "DEVICE:MAX", tPressure);
+  platform->timer.printStatEntry("      rhs               ", "fluid pressure rhs", "DEVICE:MAX", tPressure);
 
   const double tPressurePreco = platform->timer.query("fluid pressure preconditioner", "DEVICE:MAX");
   platform->timer.printStatEntry("      preconditioner    ",
@@ -908,7 +908,7 @@ void nrs_t::printRunStat(int step)
 
   platform->timer.printStatEntry("        coarse grid     ",
                                  "fluid pressure coarseSolve",
-                                 "DEVICE:MAX",
+                                 "HOST:MAX",
                                  tPressurePreco);
 
   platform->timer.set("fluid pressure proj",
@@ -983,7 +983,6 @@ void nrs_t::printRunStat(int step)
 
   platform->timer.printStatEntry("      preconditioner    ", "scalar preconditioner", "DEVICE:MAX", tScalar);
   platform->timer.printStatEntry("      initial guess     ", "scalar proj", "DEVICE:MAX", tScalar);
-
 
   platform->timer.printStatEntry("    gsMPI               ", gsTime, tElapsedTimeSolve);
 
@@ -1950,7 +1949,7 @@ void nrs_t::registerKernels(occa::properties kernelInfoBC)
     std::cout << "registerNrsKernels" << std::endl;
   }
 
-  const bool serial = platform->serial;
+  const bool serial = platform->serial();
   const std::string extension = serial ? ".c" : ".okl";
   const std::string suffix = "Hex3D";
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR") + std::string("/app/nrs/");
@@ -2108,7 +2107,7 @@ void nrs_t::initOuterStep(double time, dfloat _dt, int tstep)
     neknek->exchange(exchangeAllTimes, lagState);
   }
 
-  neknek->exchangeTimes(std::vector<dfloat>(this->dt, this->dt + sizeof(this->dt)/sizeof(dfloat)), time);
+  neknek->exchangeTimes(std::vector<dfloat>(this->dt, this->dt + sizeof(this->dt) / sizeof(dfloat)), time);
 }
 
 void nrs_t::finishOuterStep() {}

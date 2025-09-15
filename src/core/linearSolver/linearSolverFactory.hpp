@@ -14,6 +14,7 @@ public:
          int Nfields,
          dlong fieldOffset,
          const occa::memory &o_weight,
+         bool removeMean,
          std::function<void(const occa::memory &o_q, occa::memory &o_Aq)> Ax,
          std::function<void(const occa::memory &o_r, occa::memory &o_z)> Pc = nullptr);
 };

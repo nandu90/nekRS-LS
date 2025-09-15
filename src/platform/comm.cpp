@@ -23,20 +23,21 @@ comm_t::comm_t(MPI_Comm commParentIn, MPI_Comm commIn)
   }
 }
 
-MPI_Datatype comm_t::toMPI_Datatype(const occa::memory& t) const
+MPI_Datatype comm_t::toMPI_Datatype(const occa::memory &t) const
 {
-  const auto type = t.dtype(); 
+  const auto type = t.dtype();
 
-  if (type == occa::dtype::get<double>()) 
-   return MPI_DOUBLE;
-  else if (type == occa::dtype::get<float>()) 
-   return MPI_FLOAT;
-  else if (type == occa::dtype::get<int>()) 
-   return MPI_INT;
-  else if (type == occa::dtype::get<long long int>()) 
-   return MPI_LONG_LONG_INT;
-  else
+  if (type == occa::dtype::get<double>()) {
+    return MPI_DOUBLE;
+  } else if (type == occa::dtype::get<float>()) {
+    return MPI_FLOAT;
+  } else if (type == occa::dtype::get<int>()) {
+    return MPI_INT;
+  } else if (type == occa::dtype::get<long long int>()) {
+    return MPI_LONG_LONG_INT;
+  } else {
     nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "Unkown datatype!");
+  }
 
   return 0;
 }
@@ -77,10 +78,7 @@ void comm_t::reallocScratch(size_t Nbytes) const
   }
 };
 
-int comm_t::allreduce(occa::memory recvbuf,
-                      int count,
-                      comm_t::op op,
-                      MPI_Comm comm) const
+int comm_t::allreduce(occa::memory recvbuf, int count, comm_t::op op, MPI_Comm comm) const
 {
   auto mpiDataType = toMPI_Datatype(recvbuf);
   auto mpiOp = toMPI_Op(op);
@@ -88,7 +86,7 @@ int comm_t::allreduce(occa::memory recvbuf,
   int sizeBytes;
   MPI_Type_size(mpiDataType, &sizeBytes);
 
-  if (useGPUAware || platform->serial) {
+  if (useGPUAware || platform->serial()) {
     platform->device.finish();
     return MPI_Allreduce(MPI_IN_PLACE, (void *)recvbuf.ptr(), count, mpiDataType, mpiOp, comm);
   } else {

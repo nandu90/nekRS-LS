@@ -263,7 +263,7 @@ public:
     meshLoadReferenceNodesHex3D(meshNew, p, 0);
 
     auto intpKernel = [&]() {
-      const std::string ext = platform->serial ? ".c" : ".okl";
+      const std::string ext = platform->serial() ? ".c" : ".okl";
       std::string kernelName;
       std::string orderSuffix;
       if (p > mesh->N) {
