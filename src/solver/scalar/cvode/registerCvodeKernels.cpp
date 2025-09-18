@@ -26,7 +26,7 @@ void registerCvodeKernels()
 
   const std::string suffix = "Hex3D";
   const std::string prefix = "cvode_t::";
-  const std::string extension = platform->serial ? ".c" : ".okl";
+  const std::string extension = platform->serial() ? ".c" : ".okl";
 
   const std::string oklpath = getenv("NEKRS_KERNEL_DIR");
 

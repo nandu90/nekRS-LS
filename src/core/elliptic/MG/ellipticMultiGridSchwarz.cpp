@@ -704,7 +704,8 @@ static mesh_t *create_extended_mesh(elliptic_t *elliptic, hlong *maskedGlobalIds
 
   mesh_t *mesh = new mesh_t();
   mesh->N = meshRoot->N + 2;
-  mesh->Np = (mesh->N + 1) * (mesh->N + 1) * (mesh->N + 1);
+  mesh->Nq = mesh->N + 1;
+  mesh->Np = std::pow(mesh->Nq, mesh->dim);
   mesh->Nelements = meshRoot->Nelements;
   mesh->Nverts = meshRoot->Nverts;
   mesh->Nfaces = meshRoot->Nfaces;

@@ -117,15 +117,15 @@ struct mesh_t {
     return {x, y, z}; 
   };
 
-  int dim;
+  int dim = 3;
   int Nverts, Nfaces, NfaceVertices;
 
   int Nbid;
 
   hlong Nnodes;
-  dfloat *EX; // coordinates of vertices for each element
-  dfloat *EY;
-  dfloat *EZ;
+  dfloat *EX = nullptr; // coordinates of vertices for each element
+  dfloat *EY = nullptr;
+  dfloat *EZ = nullptr;
 
   dlong fieldOffset;
 
@@ -135,37 +135,37 @@ struct mesh_t {
   dlong Nlocal;
   hlong Nglobal; // global T-vector size 
 
-  bool solid;
+  bool solid = false;
 
   hlong NboundaryFaces;
-  hlong *EToV; // element-to-vertex connectivity
-  dlong *EToE; // element-to-element connectivity
-  int *EToF;   // element-to-(local)face connectivity
-  int *EToP;   // element-to-partition/process connectivity
-  int *EToB;   // element-to-boundary condition type
+  hlong *EToV = nullptr; // element-to-vertex connectivity
+  dlong *EToE = nullptr; // element-to-element connectivity
+  int *EToF = nullptr;   // element-to-(local)face connectivity
+  int *EToP = nullptr;   // element-to-partition/process connectivity
+  int *EToB = nullptr;   // element-to-boundary condition type
 
   dlong *elementInfo; // type of element
   occa::memory o_elementInfo;
 
-  hlong *globalIds;
-  hlong *globalFaceIds;
+  hlong *globalIds = nullptr;
+  hlong *globalFaceIds = nullptr;
   ogs_t *ogs;
   oogs_t *oogs;
   oogs_t *oogs3;
 
   // list of all elements
   // elementList[e] = e
-  dlong *elementList;
+  dlong *elementList = nullptr;
   occa::memory o_elementList;
 
   // list of elements that are needed for global gather-scatter
   dlong NglobalGatherElements;
-  dlong *globalGatherElementList;
+  dlong *globalGatherElementList = nullptr;
   occa::memory o_globalGatherElementList;
 
   // list of elements that are not needed for global gather-scatter
   dlong NlocalGatherElements;
-  dlong *localGatherElementList;
+  dlong *localGatherElementList = nullptr;
   occa::memory o_localGatherElementList;
 
   // volumeGeometricFactors;
@@ -177,32 +177,32 @@ struct mesh_t {
   // volume node info
   static constexpr int maxNqIntp = 16; 
   int N, Np;
-  dfloat *r, *s, *t; // coordinates of local nodes
-  dfloat *MM;
+  dfloat *r = nullptr, *s = nullptr, *t = nullptr; // coordinates of local nodes
+  dfloat *MM = nullptr;
 
   dfloat volume;
 
   // indices of vertex nodes
-  int *vertexNodes;
+  int *vertexNodes = nullptr;
 
   // indices of edge nodes
-  int *edgeNodes;
+  int *edgeNodes = nullptr;
 
   int NedgeNodes;
 
   // quad specific quantity
   int Nq, NqP, NpP;
 
-  dfloat *D;    // 1D differentiation matrix (for tensor-product)
-  dfloat *DW;   // weak 1D differentiation matrix (for tensor-product)
-  dfloat *gllz; // 1D GLL quadrature nodes
-  dfloat *gllw; // 1D GLL quadrature weights
+  dfloat *D = nullptr;    // 1D differentiation matrix (for tensor-product)
+  dfloat *DW = nullptr;   // weak 1D differentiation matrix (for tensor-product)
+  dfloat *gllz = nullptr; // 1D GLL quadrature nodes
+  dfloat *gllw = nullptr; // 1D GLL quadrature weights
 
   // face node info
   int Nfp;           // number of nodes per face
-  int *faceNodes;    // list of element reference interpolation nodes on element faces
-  dlong *vmapM;      // list of volume nodes that are face nodes
-  int *faceVertices; // list of mesh vertices on each face
+  int *faceNodes = nullptr;    // list of element reference interpolation nodes on element faces
+  dlong *vmapM = nullptr;      // list of volume nodes that are face nodes
+  int *faceVertices = nullptr; // list of mesh vertices on each face
 
   dlong Nsgeo;
 
@@ -213,20 +213,20 @@ struct mesh_t {
   int cubNp, cubNfp, cubNq;
   dfloat *cubr, *cubs, *cubt, *cubw; // coordinates and weights of local cubature nodes
   dfloat *cubx, *cuby, *cubz;        // coordinates of physical nodes
-  dfloat *cubInterp;                 // interpolate from W&B to cubature nodes
-  dfloat *cubProject;                // projection matrix from cubature nodes to W&B nodes
-  dfloat *cubD;                      // 1D differentiation matrix
-  dfloat *cubDiffInterp;             // 1D weak differentiation matrix
-  dfloat *cubDW;                     // 1D weak differentiation matrix
-  dfloat *cubDWmatrices;
+  dfloat *cubInterp = nullptr;                 // interpolate from W&B to cubature nodes
+  dfloat *cubProject = nullptr;                // projection matrix from cubature nodes to W&B nodes
+  dfloat *cubD = nullptr;                      // 1D differentiation matrix
+  dfloat *cubDiffInterp = nullptr;             // 1D weak differentiation matrix
+  dfloat *cubDW = nullptr;                     // 1D weak differentiation matrix
+  dfloat *cubDWmatrices = nullptr;
 
-  dfloat *interpRaise;
-  dfloat *interpLower;
+  dfloat *interpRaise = nullptr;
+  dfloat *interpLower = nullptr;
 
   // surface integration node info
   int intNfp;                 // number of integration nodes on each face
-  dfloat *intInterp;          // interp from surface node to integration nodes
-  dfloat *intx, *inty, *intz; // coordinates of suface integration nodes
+  dfloat *intInterp = nullptr;          // interp from surface node to integration nodes
+  dfloat *intx = nullptr, *inty = nullptr, *intz = nullptr; // coordinates of suface integration nodes
 
   occa::memory o_LMM, o_invLMM;
 

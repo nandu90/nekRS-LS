@@ -36,7 +36,7 @@ pointInterpolation_t::pointInterpolation_t(mesh_t *mesh_,
              "Communicator must be either platform->comm.mpiComm()()or platform->comm.mpiComm()Parent");
 
   newton_tol =
-      (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(1e-6, newton_tol_);
+      (sizeof(dfloat) == sizeof(double)) ? std::max(5e-13, newton_tol_) : std::max(5e-5, newton_tol_);
 
   auto x = platform->device.mallocHost<dfloat>(mesh->Nlocal);
   auto y = platform->device.mallocHost<dfloat>(mesh->Nlocal);
@@ -110,17 +110,23 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
   }
 
   if (verbosity != VerbosityLevel::None) {
-
-    auto *h_x = _x;
-    auto *h_y = _y;
-    auto *h_z = _z;
-    if (useDevicePoints && verbosity == VerbosityLevel::Detailed) {
-      h_x = h_x_vec.data();
-      h_y = h_y_vec.data();
-      h_z = h_z_vec.data();
-      _o_x.copyTo(h_x, n);
-      _o_y.copyTo(h_y, n);
-      _o_z.copyTo(h_z, n);
+    auto xPtr = _x;
+    auto yPtr = _y;
+    auto zPtr = _z;
+    
+    occa::memory h_x;
+    occa::memory h_y;
+    occa::memory h_z;
+    if (!useHostPoints && verbosity == VerbosityLevel::Detailed) {
+      h_x = platform->memoryPool.reserve<dfloat>(n);
+      h_y = platform->memoryPool.reserve<dfloat>(n);
+      h_z = platform->memoryPool.reserve<dfloat>(n);
+      _o_x.copyTo(h_x);
+      _o_y.copyTo(h_y);
+      _o_z.copyTo(h_z);
+      xPtr = h_x.ptr<dfloat>();
+      yPtr = h_y.ptr<dfloat>();
+      zPtr = h_z.ptr<dfloat>();
     }
 
     const auto maxVerbosePoints = 5;
@@ -136,7 +142,7 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
           nBoundary++;
           if (nBoundary < maxVerbosePoints && verbosity == VerbosityLevel::Detailed) {
             std::cout << "pointInterpolation_t::find: WARNING point on boundary or outside the mesh"
-                      << " xyz= " << h_x[in] << " " << h_y[in] << " " << h_z[in]
+                      << " xyz= " << xPtr[in] << " " << yPtr[in] << " " << zPtr[in]
                       << " distNorm= " << std::scientific << std::setprecision(3) << distNorm << std::endl;
           }
         }
@@ -144,7 +150,7 @@ void pointInterpolation_t::find(pointInterpolation_t::VerbosityLevel verbosity, 
         nOutside++;
         if (nOutside < maxVerbosePoints && verbosity == VerbosityLevel::Detailed) {
           std::cout << "pointInterpolation_t::find: WARNING point outside the mesh"
-                    << " xyz= " << h_x[in] << " " << h_y[in] << " " << h_z[in] << std::endl;
+                    << " xyz= " << xPtr[in] << " " << yPtr[in] << " " << zPtr[in] << std::endl;
         }
       }
     }
@@ -177,16 +183,20 @@ void pointInterpolation_t::eval(dlong nFields,
                                 dlong nPointsIn,
                                 dlong offset)
 {
-  if (inputFieldOffset == 0) {
-    inputFieldOffset = o_in.size();
-  }
-  if (outputFieldOffset == 0) {
-    outputFieldOffset = o_out.size();
+  if (nFields == 1) {
+    inputFieldOffset = mesh->Nlocal;
   }
 
-  auto nPoints_ = (nPointsIn > -1) ? nPointsIn : nPoints;
+  const auto nPoints_ = (nPointsIn > -1) ? nPointsIn : nPoints;
+  nekrsCheck(nPointsIn > nPoints_, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "nPointsIn too large!");
+
+  if (nFields == 1) {
+    outputFieldOffset = nPoints_;
+  }
+
+  // enforce update as cache cannot be used (might have different size from a previous call)
   if (nPointsIn > -1) {
-    data_.updateCache = true; // enforce update as cache cannot be used
+    data_.updateCache = true;
   }
 
   nekrsCheck(!findCalled, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "find has not been called prior to eval!");
@@ -269,28 +279,26 @@ void pointInterpolation_t::setPoints(const occa::memory &o_x,
                                      const occa::memory &o_z,
                                      const occa::memory &o_session)
 {
-  const int n = o_x.size();
+  nPoints = o_x.size();
 
   pointsAdded = true;
   useHostPoints = false;
   useDevicePoints = true;
 
-  if (n > nPoints) {
-    data_ = findpts::data_t(n);
+  if (data_.code.size() < nPoints) {
+    data_.resize(nPoints);
   }
 
-  if (n > 0) {
-    _o_x = o_x;
-    _o_y = o_y;
-    _o_z = o_z;
-    _o_session = o_session;
-
-    h_x_vec.resize(n);
-    h_y_vec.resize(n);
-    h_z_vec.resize(n);
+  for (int i = 0; i < nPoints; ++i) {
+    data_.dist2_base[i] = 1e30;
+    data_.code_base[i] = CODE_NOT_FOUND;
   }
+  data_.updateCache = true;
 
-  nPoints = n;
+  _o_session = o_session;
+  _o_x = o_x;
+  _o_y = o_y;
+  _o_z = o_z;
 }
 
 void pointInterpolation_t::setTimerLevel(TimerLevel level)

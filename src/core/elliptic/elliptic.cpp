@@ -25,6 +25,24 @@ static std::vector<int> generateEllipticEToB(const std::string &name, mesh_t *me
   return EToB;
 }
 
+// project out mean (<1, q>_w == 0) using the exact same inner product as in KSP
+static void removeMean(elliptic_t *elliptic, occa::memory &o_q)
+{
+  nekrsCheck(elliptic->Nfields > 1,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "NULL space handling for Block solver current not supported!");
+
+  const auto dotp = 
+     platform->linAlg->innerProd(elliptic->mesh->Nlocal,
+                                 elliptic->o_invDegree,
+                                 o_q,
+                                 platform->comm.mpiComm());
+
+  platform->linAlg->add(elliptic->mesh->Nlocal, -dotp / elliptic->invDegreeSum, o_q);
+}
+
 elliptic::elliptic(const std::string &name,
                    mesh_t *mesh,
                    dlong fieldOffset,
@@ -315,12 +333,11 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     auto o_r = platform->deviceMemoryPool.reserve<dfloat>(o_x0.size());
     platform->linAlg
         ->axpbyzMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, -1.0, o_Ap, 1.0, o_rhs, o_r);
-
-    if (elliptic->nullspace) {
-      ellipticZeroMean(elliptic, o_r);
-    }
     ellipticApplyMask(elliptic, o_r);
     oogs::startFinish(o_r, elliptic->Nfields, elliptic->fieldOffset, ogsDfloat, ogsAdd, elliptic->oogs);
+    if (elliptic->nullspace) {
+      removeMean(elliptic, o_r);
+    }
 
     return o_r;
   }();
@@ -372,6 +389,18 @@ void elliptic::_solve(const occa::memory &o_lambda0,
       }
     }
 
+    if (platform->verbose() && elliptic->nullspace) {
+      const auto dotp =
+         platform->linAlg->innerProd(elliptic->mesh->Nlocal,
+                                     elliptic->o_invDegree,
+                                     o_r,
+                                     platform->comm.mpiComm());
+
+      if (platform->comm.mpiRank() == 0) {
+        std::cout << "mean(o_r): " << dotp / elliptic->invDegreeSum << std::endl;
+      }
+    }
+
     // A(dx) = r = b - A(x0)
     elliptic->KSP->solve(tol * std::sqrt(mesh->volume), maxIter, o_r, o_x);
     elliptic->Niter = elliptic->KSP->nIter();
@@ -388,11 +417,10 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     elliptic->res00Norm = elliptic->res0Norm;
   }
 
-  // x = x0 + dx
+  // update solution x <- x + x0
   platform->linAlg->axpbyMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_x0, 1.0, o_x);
-
   if (elliptic->nullspace) {
-    ellipticZeroMean(elliptic, o_x);
+    removeMean(elliptic, o_x); // violates Dirichlet BCs 
   }
 
   elliptic->o_lambda0 = nullptr;
@@ -656,6 +684,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     }
     elliptic->ogs = ogs;
     elliptic->o_invDegree = elliptic->ogs->o_invDegree;
+    elliptic->invDegreeSum = platform->linAlg->sum(mesh->Nlocal, elliptic->o_invDegree, platform->comm.mpiComm());
   }
 
   {
@@ -773,10 +802,6 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     }
 
     platform->timer.toc(elliptic->timerName + " preconditioner");
-
-    if (elliptic->nullspace) {
-      ellipticZeroMean(elliptic, o_z);
-    }
   };
 
   {
@@ -786,6 +811,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
                                                         elliptic->Nfields,
                                                         elliptic->fieldOffset,
                                                         elliptic->o_invDegree,
+                                                        elliptic->nullspace,
                                                         Ax,
                                                         Pc);
 

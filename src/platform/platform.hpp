@@ -37,12 +37,14 @@ public:
     return singleton;
   }
 
-  bool multiSession()
+  bool multiSession() const
   {
     int result = 0;
     MPI_Comm_compare(comm.mpiCommParent(), comm.mpiComm(), &result);
     return (result != 0) ? true : false;
   }
+
+  bool serial() const { return _serial; };
 
 private:
   static platform_t *singleton;
@@ -59,7 +61,7 @@ public:
   kernelManager_t kernelRequests;
   Par *par;
   app_t *app;
-  bool serial;
+  bool _serial;
   linAlg_t *linAlg;
   std::unique_ptr<flopCounter_t> flopCounter;
   int exitValue;

@@ -89,7 +89,7 @@ private:
   bool useHostPoints = false;
   bool useDevicePoints = false;
 
-  int nPoints;
+  int nPoints = 0;
 
   dfloat *_x = nullptr;
   dfloat *_y = nullptr;
@@ -101,11 +101,6 @@ private:
   occa::memory _o_z;
   occa::memory _o_session;
   occa::memory _o_distanceINT;
-
-  // for storing host points to output when a particle leaves the domain
-  std::vector<dfloat> h_x_vec;
-  std::vector<dfloat> h_y_vec;
-  std::vector<dfloat> h_z_vec;
 };
 
 #endif

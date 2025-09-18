@@ -35,12 +35,13 @@ void meshNekReaderHex3D(int N, mesh_t *mesh)
   memcpy(mesh->faceVertices, faceVertices[0], mesh->NfaceVertices * mesh->Nfaces * sizeof(int));
 
   // generate element vertex numbering
-  mesh->Nnodes = nek::set_glo_num(2, mesh->solid);
+  std::vector<hlong> glo_num(mesh->Nelements * mesh->Nverts);
+  mesh->Nnodes = nek::set_glo_num(glo_num.data(), 2, mesh->solid);
 
   mesh->EToV = (hlong *)calloc(mesh->Nelements * mesh->Nverts, sizeof(hlong));
   for (int e = 0; e < mesh->Nelements; ++e) {
     for (int j = 0; j < mesh->Nverts; j++) {
-      mesh->EToV[e * mesh->Nverts + j] = nekData.glo_num[e * mesh->Nverts + vtxMap[j]];
+      mesh->EToV[e * mesh->Nverts + j] = glo_num[e * mesh->Nverts + vtxMap[j]];
     }
   }
 

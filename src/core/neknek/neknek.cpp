@@ -363,13 +363,13 @@ void neknek_t::lag()
 
 void neknek_t::extrapolate(int tstep, dfloat *dt)
 {
-  int extOrder = std::min(tstep, this->nEXT_);
-
   int nBDF;
   platform->options.getArgs("BDF ORDER", nBDF);
   int bdfOrder = std::min(tstep, nBDF);
 
-  nek::extCoeff(this->coeffEXT.data(), dt, extOrder, bdfOrder);
+  int extOrder = std::min(tstep, this->nEXT_);
+
+  nek::extCoeff(this->coeffEXT.data(), dt, extOrder, extOrder);
 
   for (int i = this->nEXT_; i > extOrder; i--) {
     this->coeffEXT[i - 1] = 0.0;

@@ -450,16 +450,16 @@ mesh_t *createMeshV(MPI_Comm comm, int N, int cubN, mesh_t *meshT, occa::propert
 
   mesh->Nlocal = mesh->Nelements * mesh->Np;
 
-  free(mesh->elementInfo);
+#if 0
   mesh->elementInfo = meshT->elementInfo;
-  free(mesh->EX);
   mesh->EX = meshT->EX;
-  free(mesh->EY);
   mesh->EY = meshT->EY;
-  free(mesh->EZ);
   mesh->EZ = meshT->EZ;
+#endif
 
   meshGlobalFaceIds(mesh);
+
+  //meshGlobalIds(mesh);
 
   // find mesh->EToP, mesh->EToE and mesh->EToF, required mesh->EToV
   meshParallelConnect(mesh);

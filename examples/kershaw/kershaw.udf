@@ -73,7 +73,7 @@ void runBenchmarks(nrs_t *nrs)
       Nrep = bp5NReps;
       solver->options().setArgs("PRECONDITIONER", "NONE");
       solver->options().setArgs("SOLVER", "PCG");
-      solver->options().setArgs("MAXIMUM ITERATIONS", "1000");
+      solver->options().setArgs("SOLVER MAXIMUM ITERATIONS", "1000");
       solver->options().setArgs("SOLVER TOLERANCE", to_string_f(1e-15));
     }
     if (benchmark == "BPS5") {
@@ -89,7 +89,7 @@ void runBenchmarks(nrs_t *nrs)
       Nrep = bp6NReps;
       solver->options().setArgs("PRECONDITIONER", "NONE");
       solver->options().setArgs("SOLVER", "PCG");
-      solver->options().setArgs("MAXIMUM ITERATIONS", "1000");
+      solver->options().setArgs("SOLVER MAXIMUM ITERATIONS", "1000");
       solver->options().setArgs("SOLVER TOLERANCE", to_string_f(1e-15));
     }
     if (benchmark == "BP6_PCGC") {
@@ -98,7 +98,7 @@ void runBenchmarks(nrs_t *nrs)
       Nrep = bp6NReps;
       solver->options().setArgs("PRECONDITIONER", "NONE");
       solver->options().setArgs("SOLVER", "PCG+COMBINED");
-      solver->options().setArgs("MAXIMUM ITERATIONS", "1000");
+      solver->options().setArgs("SOLVER MAXIMUM ITERATIONS", "1000");
       solver->options().setArgs("SOLVER TOLERANCE", to_string_f(1e-15));
     }
 

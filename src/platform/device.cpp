@@ -274,7 +274,7 @@ occa::memory device_t::malloc(size_t Nbytes, const occa::properties &properties)
 occa::memory device_t::malloc(size_t Nbytes, const void *src, const occa::properties &properties)
 {
   auto props = properties;
-  if (platform->serial) {
+  if (platform->serial()) {
     props["use_host_pointer"] = true;
   }
 
@@ -285,7 +285,7 @@ occa::memory device_t::malloc(size_t Nbytes, const void *src, const occa::proper
 occa::memory device_t::malloc(size_t Nword, size_t wordSize, const occa::memory &src)
 {
   occa::properties props;
-  if (platform->serial) {
+  if (platform->serial()) {
     props["use_host_pointer"] = true;
   }
 

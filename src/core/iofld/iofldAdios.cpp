@@ -530,12 +530,16 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
 
       interp = std::make_unique<pointInterpolation_t>(mesh_vis, platform->comm.mpiComm());
     } else {
-      const dlong pointBlockSize = alignStride<dfloat>(512 * mesh->Np);
+      const dlong pointBlockSize = std::min(mesh->Nlocal, static_cast<dlong>(512 * alignStride<dfloat>(mesh->Np)));
       int nBlocks = (mesh->o_x.size() + pointBlockSize - 1) / pointBlockSize;
       MPI_Allreduce(MPI_IN_PLACE, &nBlocks, 1, MPI_INT, MPI_MAX, platform->comm.mpiComm());
 
       dlong pointOffset = 0;
       for (int block = 0; block < nBlocks; block++) {
+        if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+          std::cout << "interpolate " << name << " block " << block+1 << "/" << nBlocks << std::endl;
+        }
+
         const auto nPoints =
           std::max(std::min(static_cast<dlong>(mesh->o_x.size()) - pointOffset, pointBlockSize), 0);
 
@@ -546,13 +550,15 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
         interp->find(platform->verbose() ? pointInterpolation_t::VerbosityLevel::Detailed
                                          : pointInterpolation_t::VerbosityLevel::None);
 
+
         auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(nPoints);
         for (int dim = 0; dim < o_work.size(); dim++) {
           interp->eval(1, 
                        0, 
-                       o_work.at(dim).slice(pointOffset, nPoints), 
+                       o_work.at(dim), 
                        0, 
                        o_tmp); 
+
           convertFromDfloat(o_tmp, o_userBuf.at(dim).slice(pointOffset, nPoints));
         }
 

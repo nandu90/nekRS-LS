@@ -54,7 +54,7 @@ public:
 
   void computeUrst();
 
-  const dlong fieldOffset() const
+  dlong fieldOffset() const
   {
     return _fieldOffset;
   };
