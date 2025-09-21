@@ -10,17 +10,6 @@ void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *ini, s
   std::string residualTol;
   if (ini->extract(parScope, "residualtol", residualTol) ||
       ini->extract(parScope, "residualtolerance", residualTol)) {
-    if (residualTol.find("relative") != std::string::npos) {
-      options.setArgs(parSectionName + "LINEAR SOLVER STOPPING CRITERION", "RELATIVE");
-
-      const auto subStr = residualTol.substr(residualTol.find("relative"));
-      if (subStr != "relative") {
-        auto relTolerance = std::strtod(parseValueForKey(subStr, "relative").c_str(), nullptr);
-        if (relTolerance > 0) {
-          options.setArgs(parSectionName + "SOLVER RELATIVE TOLERANCE", to_string_f(relTolerance));
-        }
-      }
-    }
 
     std::vector<std::string> entries = serializeString(residualTol, '+');
     for (std::string entry : entries) {
@@ -31,6 +20,13 @@ void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *ini, s
         checkValidity(rank, validValues, entry);
       }
     }
+    for (std::string entry : entries) {
+      if (entry == "relative") {
+        options.setArgs(parSectionName + "SOLVER TOLERANCE", 
+          options.getArgs(parSectionName + "SOLVER TOLERANCE") + "+RELATIVE");
+      }
+    }
+
   }
 
   std::string absoluteTol;

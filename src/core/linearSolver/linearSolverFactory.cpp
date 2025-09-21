@@ -70,6 +70,8 @@ linearSolverFactory<T>::create(const std::string &_solver,
   }();
 
   KSP->name(varName);
+  KSP->relativeTolerance(false);
+
   return KSP;
 }
 

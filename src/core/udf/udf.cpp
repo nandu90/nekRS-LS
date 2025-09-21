@@ -28,13 +28,6 @@ static void verifyOudf()
     const auto field = key.first;
     const auto typeId = value;
 
-    if (typeId == bdryBase::bcType_zeroDirichletYZ_zeroNeumann ||
-        typeId == bdryBase::bcType_zeroDirichletXZ_zeroNeumann ||
-        typeId == bdryBase::bcType_zeroDirichletXY_zeroNeumann ||
-        typeId == bdryBase::bcType_zeroDirichletT_zeroNeumann || typeId == bdryBase::bcType_zeroNeumann) {
-      oudfFindDirichlet(field);
-    }
-
     if (typeId == bdryBase::bcType_udfDirichlet || typeId == bdryBase::bcType_interpolation) {
       oudfFindDirichlet(field);
     }

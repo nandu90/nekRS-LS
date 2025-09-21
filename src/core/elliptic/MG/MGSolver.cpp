@@ -187,7 +187,7 @@ void MGSolver_t::runVcycle()
     auto &o_rhsC = levelC->o_rhs;
     auto &o_xC = levelC->o_x;
 
-    levelC->prolongate(o_xC, o_x);
+    levelC->prolongate(o_xC, o_x); // o_x = o_x + P(o_xC)
     if (!additive) {
       level->smooth(o_rhs, o_x, false);
     }

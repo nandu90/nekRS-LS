@@ -21,13 +21,14 @@ public:
 
   // solve Ax = b (assumes zero initial guess, zeroing is done in solve) 
   virtual void 
-  solve(const dfloat tol, const int maxIter, const occa::memory &o_b, occa::memory &o_x) = 0;
+  solve(dfloat tol, const int maxIter, const occa::memory &o_b, occa::memory &o_x) = 0;
 
   occa::memory o_invDiagA;
   
   int nIter() const { return _nIter; }; 
   dfloat initialResidualNorm() const { return r0Norm; };
   dfloat finalResidualNorm() const { return rNorm; };
+  void relativeTolerance(dfloat val) { relTol = val; };
 
   void name(const std::string &val)
   {
@@ -46,6 +47,7 @@ protected:
   int _nIter;
   dfloat r0Norm;
   dfloat rNorm;
+  bool relTol;
 };
 
 #endif

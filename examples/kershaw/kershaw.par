@@ -10,7 +10,6 @@ numSteps = 0
 
 [FLUID PRESSURE]
 #solver = gmres+flexible+nVector=15
-maxIterations = 200
 residualTol = 1e-8+relative
 
 # p-MG multiplicative V-cycle, coarse grid solve
@@ -38,7 +37,7 @@ boundaryTypeMap = zeroNeumann #zeroDirichlet
 rho = 1.0
 viscosity = 1.0
 
-#[BOOMERAMG]
+#[FLUID PRESSURE BOOMERAMG]
 #coarsenType = 8 
 #interpolationType = 6
 #smootherType = 16

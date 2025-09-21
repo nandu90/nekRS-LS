@@ -135,7 +135,6 @@ void pMGLevel::updateSetupSmootherChebyshev()
 
 void pMGLevel::setupSmoother(elliptic_t *ellipticBase)
 {
-
   const bool useASM = options.compareArgs("MULTIGRID SMOOTHER", "ASM");
   const bool useRAS = options.compareArgs("MULTIGRID SMOOTHER", "RAS");
   const bool useJacobi = options.compareArgs("MULTIGRID SMOOTHER", "DAMPEDJACOBI");
@@ -157,15 +156,15 @@ void pMGLevel::setupSmoother(elliptic_t *ellipticBase)
     updateSetupSmootherChebyshev();
   }
 
-  std::string schedule = options.getArgs("MULTIGRID SCHEDULE");
+  const auto schedule = options.getArgs("MULTIGRID SCHEDULE");
   if (!schedule.empty()) {
-    auto [scheduleMap, errorString] =
+    auto [map, errorString] =
         ellipticParseMultigridSchedule(schedule, options, DownLegChebyshevDegree);
-    if (scheduleMap[{degree, true}] > -1) {
-      UpLegChebyshevDegree = scheduleMap[{degree, true}];
+    if (map[{degree, true}] > -1) {
+      DownLegChebyshevDegree = map[{degree, true}];
     }
-    if (scheduleMap[{degree, false}] > -1) {
-      DownLegChebyshevDegree = scheduleMap[{degree, false}];
+    if (map[{degree, false}] > -1) {
+      UpLegChebyshevDegree = map[{degree, false}];
     }
   }
 
@@ -206,7 +205,7 @@ void pMGLevel::Report()
     }
     if (options.compareArgs("MULTIGRID SMOOTHER", "CHEBYSHEV")) {
       smootherString +=
-          "(" + std::to_string(UpLegChebyshevDegree) + "," + std::to_string(DownLegChebyshevDegree) + ")";
+          "(" + std::to_string(DownLegChebyshevDegree) + "," + std::to_string(UpLegChebyshevDegree) + ")";
     }
   }
 

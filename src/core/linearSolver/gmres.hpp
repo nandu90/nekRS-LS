@@ -42,7 +42,7 @@ public:
     gsOrthoKernel = platform->kernelRequests.load(this->knlPrefix + "gramSchmidtOrthogonalization");
   };
 
-  void solve(const dfloat tol, const int _maxIter, const occa::memory &o_rIn, occa::memory &o_xIn) override
+  void solve(dfloat tol, const int _maxIter, const occa::memory &o_rIn, occa::memory &o_xIn) override
   {
     o_r0 = o_rIn;
     this->r0Norm = this->rNorm = platform->linAlg->weightedNorm2Many<T>(this->Nlocal,
@@ -51,6 +51,7 @@ public:
                                                                         this->o_weight,
                                                                         o_r0,
                                                                         platform->comm.mpiComm());
+    if (relTol) tol *= this->r0Norm;
 
     nekrsCheck(!std::isfinite(this->r0Norm),
                MPI_COMM_SELF,
