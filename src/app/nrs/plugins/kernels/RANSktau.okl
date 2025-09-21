@@ -229,7 +229,7 @@ void SSTBlendingFunc(const dfloat rho,
 
       // compute source term for tau
       const dfloat tau_max = 8.0 * beta / 3.0;
-      const dfloat S_tau = fmin(8.0f * mue * xtq * Rfact, tau_max);
+      const dfloat S_tau = fmin(8.0f * mue * xtq, tau_max) * Rfact;
       const dfloat S_taup = 8.0 * rho * kk * xtq * sigom * Rfact;     
 
       dfloat tauSrc = 0.0;
