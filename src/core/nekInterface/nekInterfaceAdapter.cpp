@@ -45,7 +45,8 @@ static void (*nek_outfld_ptr)(char *,
                               int *,
                               int);
 static void (*nek_openfld_ptr)(char *, double *, double *, int);
-static void (*nek_readfld_ptr)(double *,
+static void (*nek_readfld_ptr)(int *,
+                               double *,
                                double *,
                                double *,
                                double *,
@@ -169,7 +170,7 @@ fldData openFld(const std::string &filename, std::vector<std::string> &_availabl
   return data;
 }
 
-void readFld(fldData &data)
+void readFld(fldData &data, bool pointInterpolation)
 {
   const auto nxyz = nekData.nx1 * nekData.nx1 * nekData.nx1;
   const auto Nlocal = nekData.nelt * nxyz;
@@ -205,7 +206,9 @@ void readFld(fldData &data)
     s = platform->memoryPool.reserve<double>(nekFieldOffset * nsr);
   }
 
-  (*nek_readfld_ptr)(static_cast<double *>(xm.ptr()),
+  int ifpi = pointInterpolation;
+  (*nek_readfld_ptr)(static_cast<int *>(&ifpi),
+                     static_cast<double *>(xm.ptr()),
                      static_cast<double *>(ym.ptr()),
                      static_cast<double *>(zm.ptr()),
                      static_cast<double *>(vx.ptr()),
@@ -654,7 +657,7 @@ void set_usr_handles(const char *session_in, int verbose)
   nek_openfld_ptr = (void (*)(char *, double *, double *, int))dlsym(handle, fname("nekf_openfld"));
   check_error(dlerror());
   nek_readfld_ptr =
-      (void (*)(double *, double *, double *, double *, double *, double *, double *, double *, double *))
+      (void (*)(int *, double *, double *, double *, double *, double *, double *, double *, double *, double *))
           dlsym(handle, fname("nekf_readfld"));
   check_error(dlerror());
 

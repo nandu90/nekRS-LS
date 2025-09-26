@@ -110,9 +110,8 @@ size_t iofldNek::write()
       return count;
     }();
 
-    const auto isStart = (data.o_t.size() > 0) ? 1 : 0;
     for (int is = 0; is < Nscalar; is++) {
-      if (auto o_buf = inquireVariable<std::vector<occa::memory>>("scalar" + scalarDigitStr(isStart + is))) {
+      if (auto o_buf = inquireVariable<std::vector<occa::memory>>("scalar" + scalarDigitStr(is))) {
         data.o_s.push_back(o_buf->get());
       }
     }
@@ -120,6 +119,7 @@ size_t iofldNek::write()
     return data;
   }();
 
+  std::cout << "data.o_s.size(): " << data.o_s.size() << std::endl; 
   nek::writeFld(fileName,
                 data,
                 (precision == 64) ? true : false,
@@ -144,13 +144,7 @@ size_t iofldNek::write()
 
 size_t iofldNek::read()
 {
-  nekrsCheck(pointInterpolation,
-             MPI_COMM_SELF,
-             EXIT_FAILURE,
-             "%s\n",
-             "read attribute interpolate not supported!");
-
-  nek::readFld(fldData);
+  nek::readFld(fldData, pointInterpolation);
 
   if (auto time = inquireVariable<double>("time")) {
     time->get() = fldData.time;
