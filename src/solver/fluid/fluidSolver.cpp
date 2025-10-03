@@ -704,6 +704,11 @@ void fluidSolver_t::makeForcing()
 
 void fluidSolver_t::makeAdvection(double time, int tstep)
 {
+  if (userAdvectionTerm) {
+    userAdvectionTerm(time, tstep);
+    return;
+  }
+
   if (Nsubsteps) {
     advectionSubcycling(std::min(tstep, static_cast<int>(o_coeffEXT.size())), time);
   } else {
