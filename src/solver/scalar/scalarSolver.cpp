@@ -196,8 +196,8 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
     dfloat diffSolid = diff;
     dfloat rhoSolid = rho;
-    options.getArgs("SCALAR" + sid + " DIFFUSIONCOEF SOLID", diffSolid);
-    options.getArgs("SCALAR" + sid + " TRANSPORTCOEF SOLID", rhoSolid);
+    options.getArgs("SCALAR" + sid + " DIFFUSIONCOEFF SOLID", diffSolid);
+    options.getArgs("SCALAR" + sid + " TRANSPORTCOEFF SOLID", rhoSolid);
     for (int i = meshV->Nlocal; i < this->_mesh[is]->Nlocal; i++) {
       diffTmp[i] = diffSolid;
       rhoTmp[i] = rhoSolid;
