@@ -71,7 +71,7 @@ public:
         platform->kernelRequests.load(this->knlPrefix + "combinedPCGUpdateConvergedSolution");
   };
 
-  void solve(const dfloat tol, const int MAXIT, const occa::memory &o_rIn, occa::memory &o_x) override
+  void solve(dfloat tol, const int MAXIT, const occa::memory &o_rIn, occa::memory &o_x) override
   {
     this->r0Norm = platform->linAlg->weightedNorm2Many<T>(this->Nlocal,
                                                           this->Nfields,
@@ -79,6 +79,7 @@ public:
                                                           this->o_weight,
                                                           o_rIn,
                                                           platform->comm.mpiComm());
+    if (relTol) tol *= this->r0Norm;
 
     nekrsCheck(!std::isfinite(this->r0Norm),
                MPI_COMM_SELF,

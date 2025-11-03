@@ -231,12 +231,13 @@ void pMGLevel::smoothChebyshev(occa::memory &o_r, occa::memory &o_x, bool xIsZer
 void pMGLevel::smoothFourthKindChebyshev(occa::memory &o_r, occa::memory &o_x, bool xIsZero)
 {
   const auto ChebyshevDegree = xIsZero ? DownLegChebyshevDegree : UpLegChebyshevDegree;
-  auto &betas = xIsZero ? DownLegBetas : UpLegBetas;
 
   // p_0(0) = I -> no-op smoothing
   if (ChebyshevDegree == 0) {
     return;
   }
+
+  auto &betas = xIsZero ? DownLegBetas : UpLegBetas;
 
   pfloat one = 1., mone = -1., zero = 0.0;
 

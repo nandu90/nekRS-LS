@@ -104,8 +104,8 @@ solver                      none                                       linear so
                               +block [D for VELOCITY]
                               +flexible
                               +maxiter=<int>
-                            GMRES [D for PRESSURE] 
-                              +flexible [D for PRESSURE]
+                            GMRES [D for FLUID PRESSURE] 
+                              +flexible [D for FLUID PRESSURE]
                               +maxiter=<int>
                               +nVector=<int>                           dimension of Krylov space
                               +iR                                      iterative refinement 
@@ -119,11 +119,11 @@ absoluteTol                 <float>                                    absolute 
 
 initialGuess                previous
                             extrapolation [D] 
-                            projection, projectionAconj [D for PRESSURE]                           
+                            projection, projectionAconj [D for FLUID PRESSURE]                           
                               +nVector=<int>                           dimension of projection space
 
 preconditioner              Jacobi [D]
-                            multigrid [D for PRESSURE]                 polynomial multigrid + coarse grid correction
+                            multigrid [D for FLUID PRESSURE]                 polynomial multigrid + coarse grid correction
                               +multiplicative [D] or +additive
                               +SEMFEM                                  smoothed SEMFEM
                             SEMFEM
@@ -213,7 +213,11 @@ file                        "<string>"                                 name of .
 
 ...
 ----------------------------------------------------------------------------------------------------------------------
-[VELOCITY]
+[FLUID PRESSURE]
+
+...
+----------------------------------------------------------------------------------------------------------------------
+[FLUID VELOCITY]
 
 density                     <float>                                    density
 rho

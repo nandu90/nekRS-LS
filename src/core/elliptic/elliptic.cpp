@@ -374,20 +374,20 @@ void elliptic::_solve(const occa::memory &o_lambda0,
 
   // solve A(x0 + dx) = b
   {
-    // absolute tol
-    dfloat tol = 1e-6;
-    options.getArgs("SOLVER TOLERANCE", tol);
+    auto parseTol = [](const std::string& _s) {
+        auto s = lowerCase(_s);
+        std::regex numRegex(R"([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)");
+        std::smatch match;
 
-    // absolute tol + relative
-    if (!options.getArgs("SOLVER RELATIVE TOLERANCE").empty()) {
-      dfloat relTol;
-      options.getArgs("SOLVER RELATIVE TOLERANCE", relTol);
-      tol = std::max(relTol * elliptic->res0Norm, tol);
-    } else { // relative and absolute tolerance are the same
-      if (options.compareArgs("LINEAR SOLVER STOPPING CRITERION", "RELATIVE")) {
-        tol *= elliptic->res0Norm;
-      }
-    }
+        if (!std::regex_search(s, match, numRegex)) {
+            throw std::runtime_error("No number found in string: " + s);
+        }
+
+        return std::pair<dfloat, bool>(
+            std::stod(match.str()),
+            s.find("+relative") != std::string::npos
+        );
+    };
 
     if (platform->verbose() && elliptic->nullspace) {
       const auto dotp =
@@ -402,6 +402,9 @@ void elliptic::_solve(const occa::memory &o_lambda0,
     }
 
     // A(dx) = r = b - A(x0)
+    const auto [tol, relative] = parseTol(options.getArgs("SOLVER TOLERANCE"));
+    elliptic->KSP->relativeTolerance(relative);
+
     elliptic->KSP->solve(tol * std::sqrt(mesh->volume), maxIter, o_r, o_x);
     elliptic->Niter = elliptic->KSP->nIter();
     elliptic->res0Norm = elliptic->KSP->initialResidualNorm();

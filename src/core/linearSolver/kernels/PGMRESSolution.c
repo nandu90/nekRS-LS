@@ -25,11 +25,11 @@
  */
 
 extern "C" void FUNC(PGMRESSolution)(const dlong &N,
-                                          const dlong &offset,
-                                           const dlong &gmresSize,
-                                           const dfloat *__restrict__ y,
-                                           const dfloat *__restrict__ Z,
-                                           dfloat *__restrict__ x)
+                                     const dlong &offset,
+                                     const int &gmresSize,
+                                     const dfloat *__restrict__ y,
+                                     const dfloat *__restrict__ Z,
+                                     dfloat *__restrict__ x)
 {
 #ifdef __NEKRS__OMP__
 #pragma omp parallel for collapse(3)

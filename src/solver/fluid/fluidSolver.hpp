@@ -120,6 +120,7 @@ public:
   occa::memory o_pressureName;
 
   std::function<occa::memory(double)> userImplicitLinearTerm = nullptr;
+  std::function<occa::memory(double, int)> userAdvectionTerm = nullptr;
 
   occa::memory o_U;
   occa::memory o_Ue;

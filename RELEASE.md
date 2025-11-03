@@ -51,6 +51,7 @@ This list provides an overview of the most significant changes in this release, 
 * use `planarCopy` class instead of `velRecycling`
 * `::postProcessing` functions are now members of `nrs_t` (except planarAvg)
 * use boundary functions like `udfDirichlet` for all fields
+* par key GENERAL::checkpointInterval <= 0 will turn off checkpoints
 
 ### Interface Changes 
 * define `time` as double (instead of defloat) in all UDF functions

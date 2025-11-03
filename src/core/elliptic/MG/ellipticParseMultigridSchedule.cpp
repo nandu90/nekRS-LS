@@ -50,15 +50,15 @@ ellipticParseMultigridSchedule(const std::string &schedule, setupAide& options, 
         degree = std::stoi(serializeString(token, '=').at(1));
       }
       else if (token.find("sweeps") != std::string::npos) {
-        errorString += "setting number of sweeps is currently not supported!\n";
+        errorString += "setting number of MG sweeps is currently not supported!\n";
       }
       else {
-        errorString += "unknown token '" + token + "' in schedule '" + schedule + "'!\n";
+        errorString += "unknown token '" + token + "' in MG schedule '" + schedule + "'!\n";
       }
     }
 
     if (order == INVALID) {
-      errorString += "order not specified in " + entry + "\n";
+      errorString += "MG p not specified in " + entry + "\n";
     }
 
     if (degree == INVALID && order != minOrder){
@@ -86,7 +86,7 @@ ellipticParseMultigridSchedule(const std::string &schedule, setupAide& options, 
   }
 
   if (downLegOrders != upLegOrders) {
-    errorString += "down leg and up leg orders must be identical!\n";
+    errorString += "down leg and up leg pMG must be identical!\n";
   }
 
   // all orders, except the coarse grid, must have a degree associated with them
@@ -95,14 +95,14 @@ ellipticParseMultigridSchedule(const std::string &schedule, setupAide& options, 
       continue;
     }
     if (entry.second == INVALID) {
-      errorString += "degree not specified for order " + std::to_string(entry.first.first) + "!\n";
+      errorString += "degree not specified for pMG " + std::to_string(entry.first.first) + "!\n";
     }
   }
 
   // all levels are positive
   for(auto&& level : levels){
     if(level < 1){
-      errorString += "encountered level = " + std::to_string(level) + " < 1!\n";
+      errorString += "encountered MG level = " + std::to_string(level) + " < 1!\n";
     }
   }
 
@@ -110,8 +110,8 @@ ellipticParseMultigridSchedule(const std::string &schedule, setupAide& options, 
   int N;
   options.getArgs("POLYNOMIAL DEGREE", N);
   if(N != levels.front()){
-    errorString += "finest degree " + std::to_string(levels.front())
-      + " does not match polynomial degree " + std::to_string(N) + "!\n";
+    errorString += "finest pMG " + std::to_string(levels.front())
+      + " does not match polynomialOrder " + std::to_string(N) + "!\n";
   }
 
 #if 0

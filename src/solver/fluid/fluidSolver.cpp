@@ -543,7 +543,7 @@ void fluidSolver_t::setupEllipticSolver()
       return platform->app->bc->isOutflow(bcType) ? ellipticBcType::DIRICHLET : ellipticBcType::NEUMANN;
     });
 
-    ellipticSolverP = new elliptic(pressureName, mesh, fieldOffset, EToBP, o_lambda0, o_NULL);
+    ellipticSolverP = new elliptic(pressureName, mesh, 0, EToBP, o_lambda0, o_NULL);
   }
 }
 
@@ -704,6 +704,11 @@ void fluidSolver_t::makeForcing()
 
 void fluidSolver_t::makeAdvection(double time, int tstep)
 {
+  if (userAdvectionTerm) {
+    userAdvectionTerm(time, tstep);
+    return;
+  }
+
   if (Nsubsteps) {
     advectionSubcycling(std::min(tstep, static_cast<int>(o_coeffEXT.size())), time);
   } else {

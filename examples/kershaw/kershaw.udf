@@ -8,6 +8,10 @@ static int bp5NReps, bps5NReps, bp6NReps;
 
 #ifdef __okl__
 
+void udfDirichlet(bcData *bc)
+{
+}
+
 #endif
 
 dfloat stdDev(const std::vector<dfloat>& data) 
@@ -80,8 +84,7 @@ void runBenchmarks(nrs_t *nrs)
       solver = nrs->fluid->ellipticSolverP;
 
       Nrep = bps5NReps;
-      solver->options().setArgs("SOLVER TOLERANCE", to_string_f(1e-8));
-      solver->options().setArgs("LINEAR SOLVER STOPPING CRITERION", "RELATIVE");
+      solver->options().setArgs("SOLVER TOLERANCE", "1e-8+RELATIVE");
     }
     if (benchmark == "BP6") {
       solver = nrs->fluid->ellipticSolver[0];
@@ -144,7 +147,7 @@ void runBenchmarks(nrs_t *nrs)
           smootherTime.push_back(val);
         }
       }
-      crsTime.push_back(platform->timer.query("coarseSolve", "DEVICE:MAX"));
+      crsTime.push_back(platform->timer.query(solver->name() + " coarseSolve", "DEVICE:MAX"));
     }
     if (platform->comm.mpiRank() == 0) {
       printf("\n");

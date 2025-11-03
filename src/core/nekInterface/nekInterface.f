@@ -1157,6 +1157,8 @@ c-----------------------------------------------------------------------
       character*1    fnam1(132)
       equivalence   (fnam1,fname)
 
+      common /nekf_rfname/ fname 
+
       character*1    frontc
 
       ifile = 1 ! single file only
@@ -1201,7 +1203,8 @@ c-----------------------------------------------------------------------
       return
       end
 c-----------------------------------------------------------------------
-      subroutine nekf_readfld(xm1_,ym1_,zm1_,vx_,vy_,vz_,pm1_,t_,ps_)
+      subroutine nekf_readfld(ifpi, 
+     $                        xm1_,ym1_,zm1_,vx_,vy_,vz_,pm1_,t_,ps_)
 
       include 'mpif.h'
       include 'SIZE'
@@ -1209,6 +1212,7 @@ c-----------------------------------------------------------------------
       include 'RESTART'
       include 'NEKINTF'
 
+      integer ifpi
       real xm1_(lx1,ly1,lz1,*), ym1_(lx1,ly1,lz1,*), zm1_(lx1,ly1,lz1,*)
       real vx_ (lx1,ly1,lz1,*), vy_ (lx1,ly1,lz1,*), vz_ (lx1,ly1,lz1,*)
       real pm1_(lx1,ly1,lz1,*)
@@ -1222,6 +1226,40 @@ c-----------------------------------------------------------------------
 
       integer   disp_unit
       integer*8 win_size
+
+      character*132  fname
+      common /nekf_rfname/ fname 
+
+      if (ifpi.eq.1) then 
+        call gfldr(fname)
+
+        ntot = nelt * nx1 * ny1 * nz1
+        if (ifgetxr) then
+          call copy(xm1_, xm1, ntot)
+          call copy(ym1_, ym1, ntot)
+          call copy(zm1_, zm1, ntot)
+        endif
+
+        if (ifgetur) then
+          call copy(vx_, vx, ntot)
+          call copy(vy_, vy, ntot)
+          call copy(vz_, vz, ntot)
+        endif
+
+        if (ifgetpr) then
+          call copy(pm1_, pr, ntot)
+        endif
+
+        if (ifgettr) then
+          call copy(t_, t, ntot)
+        endif
+
+        do k=1,npsr
+           call copy(ps_(1,1,1,1,k), t(1,1,1,1,k+1), ntot)
+        enddo
+
+        return
+      endif 
 
 #ifdef MPI
       disp_unit = 4 
