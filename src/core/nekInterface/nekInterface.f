@@ -25,6 +25,8 @@ c-----------------------------------------------------------------------
 
       character*1  re2fle1(132)
       equivalence  (RE2FLE,re2fle1)
+      character*1  reafle1(132)
+      equivalence  (REAFLE,reafle1)
 
       ! set word size for REAL
       wdsize = sizeof(rtest)
@@ -52,6 +54,11 @@ c-----------------------------------------------------------------------
       call chcopy(re2fle1(lp+1),mesh_in,len(mesh_in))
       ls = lp + len(mesh_in)
       call blank(re2fle1(ls+1),len(re2fle)-ls)
+
+      lp = 0
+      call chcopy(reafle1(lp+1),mesh_in,len(mesh_in)) ! for co2
+      ls = lp + len(mesh_in)
+      call blank(reafle1(ls+1),len(reafle)-ls)
 
       call nekrs_registerPtr('ndim', ndim)
       call nekrs_registerPtr('nelv', nelv)
