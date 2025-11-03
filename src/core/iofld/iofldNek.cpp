@@ -119,7 +119,6 @@ size_t iofldNek::write()
     return data;
   }();
 
-  std::cout << "data.o_s.size(): " << data.o_s.size() << std::endl; 
   nek::writeFld(fileName,
                 data,
                 (precision == 64) ? true : false,
