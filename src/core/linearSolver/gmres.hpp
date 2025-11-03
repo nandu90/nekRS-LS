@@ -18,7 +18,10 @@ public:
   {
     this->Nlocal = _Nlocal;
     this->Nfields = _Nfields;
-    this->fieldOffset = _fieldOffset;
+
+    // ensure valid fieldOffset for o_Z/o_V allocation even if Nfields = 1 
+    this->fieldOffset = (_fieldOffset <= 0) ? alignStride<T>(this->Nlocal) : _fieldOffset;
+
     o_weight = _o_weight;
     nRestartVectors = _nRestartVectors;
     flexible = _flexible;
@@ -74,14 +77,7 @@ public:
     h_scratch = platform->memoryPool.reserve<T>(o_scratch.size());
 
     {
-      const auto n =
-          (this->Nfields > 1) ? this->Nfields * static_cast<size_t>(this->fieldOffset) : this->Nlocal;
-
-      o_V = platform->deviceMemoryPool.reserve<T>(alignStride<T>(n) * nRestartVectors);
-      o_Z = platform->deviceMemoryPool.reserve<T>(alignStride<T>(n) * ((flexible) ? nRestartVectors : 1));
-
-      o_tmp = platform->deviceMemoryPool.reserve<T>(n);
-      o_w = platform->deviceMemoryPool.reserve<T>(n);
+      const auto n = this->Nfields * static_cast<size_t>(this->fieldOffset); 
 
       o_r = platform->deviceMemoryPool.reserve<double>(n);
       if constexpr (std::is_same_v<T, float>) {
@@ -97,6 +93,18 @@ public:
         o_x = o_xIn.slice(0, n);
       }
       platform->linAlg->fill<double>(o_x.size(), 0.0, o_x);
+
+      o_tmp = platform->deviceMemoryPool.reserve<T>(n);
+      o_w = platform->deviceMemoryPool.reserve<T>(n);
+
+      nekrsCheck(n != alignStride<T>(n),
+                 MPI_COMM_SELF,
+                 EXIT_FAILURE,
+                 "%s\n!",
+                 "fieldOffset does not meet alignment requirements");
+
+      o_V = platform->deviceMemoryPool.reserve<T>(n * nRestartVectors);
+      o_Z = platform->deviceMemoryPool.reserve<T>(n * ((flexible) ? nRestartVectors : 1));
     }
 
     if (platform->comm.mpiRank() == 0 && platform->verbose()) {
@@ -309,7 +317,6 @@ private:
 
     // init o_V0
     auto o_rT = [&]() {
-      auto o_rT = o_w;
       if constexpr (std::is_same_v<T, float>) {
         platform->copyDoubleToFloatKernel(o_r.size(), o_r, o_w);
         return o_w;
@@ -326,8 +333,8 @@ private:
                                    0.0,
                                    o_V);
 
-    int i;
-    for (i = 0; i < nRestartVectors; ++i) {
+    int i = 0;
+    for (; i < nRestartVectors; ++i) {
       // right preconditioning: z_k = M^{-1} v_k
       auto o_zk = [&]() {
         const auto n = o_w.size();

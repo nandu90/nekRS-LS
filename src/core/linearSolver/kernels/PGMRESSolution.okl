@@ -25,11 +25,11 @@
  */
 
 @kernel void PGMRESSolution(const dlong N,
-                                  const dlong offset,
-                                  const dlong gmresSize,
-                                  @ restrict const dfloat *y,
-                                  @ restrict const dfloat *Z,
-                                  @ restrict dfloat *x)
+                            const dlong offset,
+                            const int gmresSize,
+                            @ restrict const dfloat *y,
+                            @ restrict const dfloat *Z,
+                            @ restrict dfloat *x)
 {
   for (dlong n = 0; n < N; ++n; @tile(p_blockSize, @outer, @inner)) {
     if (n < N) {
