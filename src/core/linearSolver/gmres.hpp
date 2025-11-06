@@ -77,7 +77,9 @@ public:
     h_scratch = platform->memoryPool.reserve<T>(o_scratch.size());
 
     {
-      const auto n = this->Nfields * static_cast<size_t>(this->fieldOffset); 
+      const auto n = (this->Nfields > 1)
+                     ? this->Nfields * static_cast<size_t>(this->fieldOffset)
+                     : this->Nlocal; 
 
       o_r = platform->deviceMemoryPool.reserve<double>(n);
       if constexpr (std::is_same_v<T, float>) {
@@ -97,14 +99,18 @@ public:
       o_tmp = platform->deviceMemoryPool.reserve<T>(n);
       o_w = platform->deviceMemoryPool.reserve<T>(n);
 
-      nekrsCheck(n != alignStride<T>(n),
-                 MPI_COMM_SELF,
-                 EXIT_FAILURE,
-                 "%s\n!",
-                 "fieldOffset does not meet alignment requirements");
 
-      o_V = platform->deviceMemoryPool.reserve<T>(n * nRestartVectors);
-      o_Z = platform->deviceMemoryPool.reserve<T>(n * ((flexible) ? nRestartVectors : 1));
+      {
+        const auto offset = this->Nfields * static_cast<size_t>(this->fieldOffset); 
+        nekrsCheck(offset != alignStride<T>(offset),
+                   MPI_COMM_SELF,
+                   EXIT_FAILURE,
+                   "%s\n!",
+                   "fieldOffset does not meet alignment requirements");
+
+        o_V = platform->deviceMemoryPool.reserve<T>(offset * nRestartVectors);
+        o_Z = platform->deviceMemoryPool.reserve<T>(offset * ((flexible) ? nRestartVectors : 1));
+      }
     }
 
     if (platform->comm.mpiRank() == 0 && platform->verbose()) {
