@@ -659,11 +659,10 @@ void nrs_t::setIC()
   }
 
   if (!platform->options.getArgs("RESTART FILE NAME").empty()) {
-    std::string restartStr;
-    platform->options.getArgs("RESTART FILE NAME", restartStr);
-    std::vector<std::string> fileList = serializeString(restartStr, ',');
+    std::vector<std::string> list;
+    platform->options.getArgs("RESTART FILE NAME", list, ",");
 
-    restartFromFiles(fileList);
+    restartFromFiles(list);
   }
 
   double startTime;
