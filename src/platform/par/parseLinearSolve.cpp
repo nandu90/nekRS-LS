@@ -3,6 +3,8 @@ void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *ini, s
 
   std::string parSectionName = upperCase(parPrefixFromParSection(parScope));
 
+  options.setArgs(parSectionName + "SOLVER TOLERANCE", "1e-6"); 
+
   const std::vector<std::string> validValues = {
       {"relative"},
   };
