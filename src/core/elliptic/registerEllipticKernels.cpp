@@ -20,6 +20,8 @@ void registerEllipticKernels(std::string section, bool stressForm)
   kernelInfo["include_paths"].asArray();
   kernelInfo += meshKernelProperties(N);
 
+  const bool svv = false; //TODO
+
   const auto poisson = platform->options.compareArgs(optionsPrefix + "HELMHOLTZ TYPE", "POISSON");
 
   const auto blockSolver = [&]() {
@@ -106,6 +108,7 @@ void registerEllipticKernels(std::string section, bool stressForm)
           !coeffField,
           poisson,
           false,
+          svv,
           Nfields,
           stressForm,
           verbosity,

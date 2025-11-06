@@ -42,7 +42,9 @@ extern "C" void FUNC(ellipticPartialAxCoeffHex3D_v0)(const dlong & Nelements,
           const dfloat r_G22 = ggeo[gbase + p_G22ID * p_Np];
 
           const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
+#ifndef p_svv
           const dfloat r_lam0 = lambda0[p_lambda*id + 0 * loffset];
+#endif
 
           dfloat qr = 0;
           dfloat qs = 0;
@@ -66,9 +68,15 @@ extern "C" void FUNC(ellipticPartialAxCoeffHex3D_v0)(const dlong & Nelements,
           Gqt += r_G12 * qs;
           Gqt += r_G22 * qt;
 
+#ifndef p_svv
           s_Gqr[k][j][i] = r_lam0 * Gqr;
           s_Gqs[k][j][i] = r_lam0 * Gqs;
           s_Gqt[k][j][i] = r_lam0 * Gqt;
+#else
+          s_Gqr[k][j][i] = Gqr;
+          s_Gqs[k][j][i] = Gqs;
+          s_Gqt[k][j][i] = Gqt;
+#endif
         }
 
     for(int k = 0; k < p_Nq; k++)
@@ -79,7 +87,7 @@ extern "C" void FUNC(ellipticPartialAxCoeffHex3D_v0)(const dlong & Nelements,
           const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
 
           dfloat r_Aq = 0;
-#ifndef p_poisson
+#if !defined(p_poisson) && !defined(p_svv)
           const dfloat r_lam1 = lambda1[p_lambda*id + 0 * loffset];
           r_Aq = ggeo[gbase + p_GWJID * p_Np] * r_lam1 * s_q[k][j][i];
 #endif
@@ -90,8 +98,12 @@ extern "C" void FUNC(ellipticPartialAxCoeffHex3D_v0)(const dlong & Nelements,
             r_Aqs += D[m*p_Nq+j] * s_Gqs[k][m][i];
             r_Aqt += D[m*p_Nq+k] * s_Gqt[m][j][i];
           }
-
+#ifndef p_svv
           Aq[id] = r_Aqr + r_Aqs + r_Aqt + r_Aq;
+#else
+          const dfloat r_lam0 = lambda0[p_lambda*id + 0 * loffset];
+          Aq[id] = r_lam0 * (r_Aqr + r_Aqs + r_Aqt);
+#endif
         }
   }
 }

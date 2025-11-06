@@ -34,6 +34,7 @@ int main(int argc, char **argv)
   int Ndim = 1;
   int okl = 1;
   int BKmode = 0;
+  int SVVmode = 0;
   size_t wordSize = 8;
   int computeGeom = 0;
   bool stressForm = false;
@@ -50,6 +51,7 @@ int main(int argc, char **argv)
                                            {"fp32", no_argument, 0, 'f'},
                                            {"help", required_argument, 0, 'h'},
                                            {"stress", no_argument, 0, 's'},
+                                           {"svv-mode", no_argument, 0, 'v'},
                                            {0, 0, 0, 0}};
     int option_index = 0;
     int c = getopt_long(argc, argv, "", long_options, &option_index);
@@ -93,6 +95,9 @@ int main(int argc, char **argv)
     case 'h':
       err = 1;
       break;
+    case 'v':
+      SVVmode = 1;
+      break;
     default:
       err = 1;
     }
@@ -103,7 +108,7 @@ int main(int argc, char **argv)
       printf("Usage: ./nekrs-axhelm  --p-order <n> --elements <n> --backend <CPU|CUDA|HIP|DPCPP|OPENCL>\n"
              "                    [--block-dim <n>]\n"
              "                    [--g-order <n>] [--computeGeom]\n"
-             "                    [--bk-mode] [--fp32] [--stress]\n");
+             "                    [--bk-mode] [--fp32] [--stress] [--svv-mode]\n");
     }
     exit(1);
   }
@@ -130,6 +135,12 @@ int main(int argc, char **argv)
     constCoeff = true;
   }
 
+  // SVVmode 
+  bool svv = false;
+  if(SVVmode) {
+    svv = true;
+  }
+
   platform = platform_t::getInstance(options, MPI_COMM_WORLD, MPI_COMM_WORLD);
   platform->options.setArgs("BUILD ONLY", "FALSE");
   platform->device.compileWhenLoad();
@@ -143,6 +154,7 @@ int main(int argc, char **argv)
                                                poisson,
                                                constCoeff,
                                                computeGeom,
+                                               svv,
                                                Ndim,
                                                stressForm,
                                                verbosity,

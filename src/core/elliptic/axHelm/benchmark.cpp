@@ -21,6 +21,7 @@ struct CallParameters {
   bool constCoeff;
   bool poisson;
   bool computeGeom;
+  bool svv;
   size_t wordSize;
   size_t wordSizeGeo;
   int Ndim;
@@ -41,6 +42,7 @@ template <> struct less<CallParameters> {
                       v.constCoeff,
                       v.poisson,
                       v.computeGeom,
+                      v.svv,
                       v.wordSize,
                       v.wordSizeGeo,
                       v.Ndim,
@@ -64,6 +66,7 @@ occa::kernel benchmarkAx(int Nelements,
                          bool constCoeff,
                          bool poisson,
                          bool computeGeom,
+                         bool svv,
                          int Ndim,
                          bool stressForm,
                          int verbosity,
@@ -87,6 +90,7 @@ occa::kernel benchmarkAx(int Nelements,
                         constCoeff,
                         poisson,
                         computeGeom,
+                        svv,
                         wordSize,
                         wordSizeGeo,
                         Ndim,
@@ -128,6 +132,10 @@ occa::kernel benchmarkAx(int Nelements,
     props["defines/p_lambda"] = 1;
   }
 
+  if (svv) {
+    props["defines/p_svv"] = 1;
+  }
+
   std::string kernelName = "elliptic";
   if (Ndim > 1) {
     kernelName += stressForm ? "Stress" : "Block";
@@ -163,7 +171,8 @@ occa::kernel benchmarkAx(int Nelements,
       }
     } else {
       if (kernelName == "ellipticPartialAxCoeffHex3D") {
-        const int Nkernels = 10;
+        int Nkernels = 10;
+        if(svv) Nkernels = 8; //exclude const differentiation matrices kernels
         for (int knl = 0; knl < Nkernels; ++knl) {
           kernelVariants.push_back(knl);
         }
@@ -514,6 +523,7 @@ template occa::kernel benchmarkAx<float, float>(int Nelements,
                                                 bool constCoeff,
                                                 bool poisson,
                                                 bool computeGeom,
+                                                bool svv,
                                                 int Ndim,
                                                 bool stressForm,
                                                 int verbosity,
@@ -527,6 +537,7 @@ template occa::kernel benchmarkAx<double, double>(int Nelements,
                                                   bool constCoeff,
                                                   bool poisson,
                                                   bool computeGeom,
+                                                  bool svv,
                                                   int Ndim,
                                                   bool stressForm,
                                                   int verbosity,
@@ -540,6 +551,7 @@ template occa::kernel benchmarkAx<double, float>(int Nelements,
                                                  bool constCoeff,
                                                  bool poisson,
                                                  bool computeGeom,
+                                                 bool svv,
                                                  int Ndim,
                                                  bool stressForm,
                                                  int verbosity,

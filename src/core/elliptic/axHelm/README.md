@@ -6,6 +6,10 @@ or in BK mode
 ```
 AU = [A]u
 ```
+or in SVV mode
+```
+AU = lambda0*[A]u
+```
 on deformed hexhedral spectral elements where A is the Laplace operator.
 
 # Usage
