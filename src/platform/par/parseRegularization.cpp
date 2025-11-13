@@ -16,6 +16,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           {"hpfrt"},
           {"gjp"},
           {"avm"},
+          {"svv"},
           {"c0"},
           {"nmodes"},
           {"cutoffratio"},
@@ -23,6 +24,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           {"activationwidth"},
           {"decaythreshold"},
           {"noisethreshold"},
+          {"filterpower"},
 
       };
       const std::vector<std::string> list = serializeString(regularization, '+');
@@ -36,13 +38,18 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
       const bool usesAVM = std::find(list.begin(), list.end(), "avm") != list.end();
       const bool usesGJP = std::find(list.begin(), list.end(), "gjp") != list.end();
       const bool usesHPFRT = std::find(list.begin(), list.end(), "hpfrt") != list.end();
+      const bool usesSVV = std::find(list.begin(), list.end(), "svv") != list.end();
 
-      if (!usesAVM && !usesHPFRT && !usesGJP) {
+      if (!usesAVM && !usesHPFRT && !usesGJP && !usesSVV) {
         append_error("unknown regularization!\n");
       }
 
       if (usesAVM && isVelocity) {
         append_error("avm regularization is only enabled for scalars!\n");
+      }
+
+      if (usesSVV && isVelocity) {
+        append_error("svv regularization is only enabled for scalars!\n");
       }
 
       if (usesGJP) {
@@ -52,6 +59,27 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           const auto penaltyStr = parseValueForKey(s, "scalingcoeff");
           if (!penaltyStr.empty()) {
             options.setArgs(parPrefix + "REGULARIZATION GJP SCALING COEFF", penaltyStr);
+          }
+        }
+      }
+
+      if (usesSVV) {
+        options.setArgs(parPrefix + "REGULARIZATION METHOD", "SVV");
+        options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF", "0.1");
+        options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER", "2");
+        if (usesGJP) {
+          options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP+SVV");
+        }
+
+        for (std::string s : list) {
+          const auto scaleStr = parseValueForKey(s, "scalingcoeff");
+          if (!scaleStr.empty()) {
+            options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF", scaleStr);
+          }
+
+          const auto powerStr = parseValueForKey(s, "filterpower");
+          if (!powerStr.empty()) {
+            options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER", powerStr);
           }
         }
       }
@@ -184,6 +212,17 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           options.setArgs(parPrefix + "REGULARIZATION AVM C0", options.getArgs("REGULARIZATION AVM C0"));
           options.setArgs(parPrefix + "REGULARIZATION HPF MODES",
                           options.getArgs("REGULARIZATION HPF MODES"));
+        }
+
+        if (defaultSettings.find("svv") != std::string::npos) {
+          if (isVelocity) {
+            // Catch if the general block is using SVV + no [VELOCITY] specification
+            append_error("svv regularization is only enabled for scalars!\n");
+          }
+          options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF",
+                          options.getArgs("REGULARIZATION SVV SCALING COEFF"));
+          options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER",
+                          options.getArgs("REGULARIZATION SVV FILTER POWER"));
         }
       }
     }

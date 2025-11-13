@@ -343,7 +343,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
         auto o_svvDT = this->o_svvDT.slice(is * Nmodes * Nmodes, Nmodes * Nmodes);
 
         dfloat NSVV = 2.0;
-        options.getArgs("SCALAR" + sid + " SVV FILTER POWER", NSVV);
+        options.getArgs("SCALAR" + sid + " REGULARIZATION SVV FILTER POWER", NSVV);
         svv::convoluteDerivative(NSVV, o_svvD, o_svvDT);
       }
     }

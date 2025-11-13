@@ -116,7 +116,7 @@ namespace svv
       if(platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD","SVV")) {
         applySVV[is] = 1;
 
-        platform->options.getArgs("SCALAR" + sid + " SVV SCALING COEFF", scale[is]);
+        platform->options.getArgs("SCALAR" + sid + " REGULARIZATION SVV SCALING COEFF", scale[is]);
       }
     }
 
