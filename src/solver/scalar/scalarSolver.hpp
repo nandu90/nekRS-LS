@@ -130,6 +130,10 @@ public:
   occa::memory o_filterS;
   occa::memory o_filterRT;
 
+  occa::memory o_svvD;
+  occa::memory o_svvDT;
+  occa::memory o_svvmu;
+
   int Nsubsteps = 0;
 
   bool dpdt = false;

@@ -13,6 +13,7 @@ set(CORE_SOURCES
     src/core/iofld/iofldAdios.cpp
     src/core/lowPassFilter.cpp
     src/core/avm.cpp
+    src/core/svv.cpp
     src/core/bdry/bdryBase.cpp
     src/core/bdry/alignment.cpp
     src/core/neknek/registerNekNekKernels.cpp

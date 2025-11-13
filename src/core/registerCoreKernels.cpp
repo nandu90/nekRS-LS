@@ -367,5 +367,16 @@ void registerCoreKernels(occa::properties kernelInfoBC)
                  BLOCKSIZE,
                  Nq * Nq);
     }
+
+    // register SVV kernels
+    {
+      kernelName = "svvMeshScale";
+      fileName = oklpath + kernelName + ".okl";
+      platform->kernelRequests.add(section + "svv::" + kernelName, fileName, meshProps);
+
+      kernelName = "svvViscosityScale";
+      fileName = oklpath + kernelName + ".okl";
+      platform->kernelRequests.add(section + "svv::" + kernelName, fileName, meshProps);
+    }
   }
 }

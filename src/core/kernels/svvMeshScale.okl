@@ -1,0 +1,14 @@
+@kernel void svvMeshScale(const dlong Nelements,
+                          @restrict const dfloat* vgeo,
+                          @restrict dfloat* svvf)
+{
+  for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
+    for (dlong n = 0; n < p_Np; ++n; @inner(0)) {
+      const dlong id = e * p_Np + n;
+      const dlong gid = e * p_Np * p_Nvgeo + n;
+      const dfloat J = vgeo[gid + p_JID * p_Np];
+
+      svvf[id] = 2.0 * pow(J, 1.0/3.0) / (p_Nq - 1.0);
+    }
+  }
+}

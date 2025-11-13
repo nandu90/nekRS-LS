@@ -1,0 +1,23 @@
+@kernel void svvViscosityScale(const dlong N,
+                               const dlong vOffset,
+                               const dlong offset,
+                               const dlong NSfields,
+                               @restrict const dlong* IFSVV,
+                               @restrict const dfloat* SCALE,
+                               @restrict const dfloat* U,
+                               @restrict const dfloat* SVVF,
+                               @restrict dfloat* SVVMU)
+{
+  for(dlong n = 0; n < N; ++n; @tile(p_blockSize,@outer,@inner))
+    if(n < N) {
+      const dfloat u = U[n + 0 * vOffset];
+      const dfloat v = U[n + 1 * vOffset];
+      const dfloat w = U[n + 2 * vOffset];
+      const dfloat u2 = u*u + v*v + w*w;
+      const dfloat umag = sqrt(u2);
+
+      for (int is = 0; is < NSfields; is++)
+        if(IFSVV[is]) 
+          SVVMU[n + is * offset] = SVVF[n] * umag * SCALE[is];
+    }
+}

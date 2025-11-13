@@ -3,6 +3,7 @@
 #include "udf.hpp"
 #include "lowPassFilter.hpp"
 #include "avm.hpp"
+#include "svv.hpp"
 #include "re2Reader.hpp"
 #include "scalarSolver.hpp"
 #include "advectionSubCycling.hpp"
@@ -1927,6 +1928,7 @@ void nrs_t::evaluateProperties(const double timeNew)
   } else {
     if (Nscalar) {
       scalar->applyAVM();
+      svv::computeViscosityScale(fluid->fieldOffset, fluid->o_U, scalar->o_svvmu);
     }
   }
 
