@@ -2081,6 +2081,14 @@ void nrs_t::registerKernels(occa::properties kernelInfoBC)
     return false;
   };
 
+  const auto svvForm = [&](const std::string &field) {
+    const std::string optionsPrefix = createOptionsPrefix(field);
+    if (platform->options.compareArgs(optionsPrefix + "REGULARIZATION METHOD", "SVV")) {
+      return true;
+    }
+    return false;
+  };
+
   {
     auto ellipticFieldsToRegister = fieldsToSolve();
 
@@ -2092,7 +2100,7 @@ void nrs_t::registerKernels(occa::properties kernelInfoBC)
     }
 
     for (auto &&entry : ellipticFieldsToRegister) {
-      registerEllipticKernels(entry, stressForm(entry));
+      registerEllipticKernels(entry, stressForm(entry), svvForm(entry));
     }
   }
 }

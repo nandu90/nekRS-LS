@@ -2,7 +2,7 @@
 #include "elliptic.h"
 #include "benchmarkAx.hpp"
 
-void registerEllipticKernels(std::string section, bool stressForm)
+void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
 {
   if (platform->comm.mpiRank() == 0 && platform->verbose()) {
     std::cout << "registerEllipticKernels for " << section << std::endl;
@@ -19,8 +19,6 @@ void registerEllipticKernels(std::string section, bool stressForm)
   kernelInfo["flags"].asObject();
   kernelInfo["include_paths"].asArray();
   kernelInfo += meshKernelProperties(N);
-
-  const bool svv = false; //TODO
 
   const auto poisson = platform->options.compareArgs(optionsPrefix + "HELMHOLTZ TYPE", "POISSON");
 
@@ -80,14 +78,15 @@ void registerEllipticKernels(std::string section, bool stressForm)
       continue;
     }
 
-    auto addRequest = [&](const std::string &dataType, occa::kernel &kernel) {
+    auto addRequest = [&](const std::string &dataType, occa::kernel &kernel, bool svv = false) {
       std::string kernelNamePrefix = (poisson) ? "poisson-" : "";
+      if(svv) kernelNamePrefix += "svv-";
       kernelNamePrefix += "elliptic";
       if (blockSolver) {
         kernelNamePrefix += (stressForm) ? "Stress" : "Block";
       }
       std::string kernelName = "Ax";
-      if (coeffField) {
+      if (coeffField && !svv) {
         kernelName += "Var";
       }
       kernelName += "Coeff";
@@ -100,7 +99,7 @@ void registerEllipticKernels(std::string section, bool stressForm)
       platform->kernelRequests.add(kernelNamePrefix + "Partial" + kernelName, kernel);
     };
 
-    auto axKernel = [&](auto typeTag, auto geoTypeTag) {
+    auto axKernel = [&](auto typeTag, auto geoTypeTag, bool svv = false) {
       return benchmarkAx<decltype(typeTag), decltype(geoTypeTag)>(
           NelemBenchmark,
           N + 1,
@@ -123,6 +122,13 @@ void registerEllipticKernels(std::string section, bool stressForm)
       }
     }
 
+    if(svvForm) {
+      auto kernel = axKernel(dfloat{}, dfloat{}, svvForm);
+      if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
+        addRequest(dfloatString, kernel, svvForm);
+      }
+    }
+
     if (std::is_same<dfloat, float>::value && platform->options.compareArgs(optionsPrefix + "SOLVER", "IR")) {
       auto kernel = axKernel(double{}, float{}); // required from GMRES-IR
       if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
@@ -131,5 +137,5 @@ void registerEllipticKernels(std::string section, bool stressForm)
     }
   }
 
-  registerEllipticPreconditionerKernels(section);
+  registerEllipticPreconditionerKernels(section, svvForm);
 }

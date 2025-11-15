@@ -71,7 +71,7 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
   }
 }
 
-void registerJacobiKernels(const std::string &section, int N, int poissonEquation)
+void registerJacobiKernels(const std::string &section, int N, int poissonEquation, int svv)
 {
   const std::string suffix = "Hex3D";
   const std::string poissonPrefix = poissonEquation ? "poisson-" : "";
@@ -88,6 +88,14 @@ void registerJacobiKernels(const std::string &section, int N, int poissonEquatio
     auto kernelName = "ellipticBlockBuildDiagonal" + suffix;
     auto fileName = oklpath + kernelName + ".okl";
     platform->kernelRequests.add(poissonPrefix + kernelName, fileName, props);
+  }
+
+  if(svv) {
+    auto props = platform->kernelInfo + meshKernelProperties(N);
+    props["defines/p_svv"] = 1;
+    auto kernelName = "ellipticBlockBuildDiagonal" + suffix;
+    auto fileName = oklpath + kernelName + ".okl";
+    platform->kernelRequests.add("svv-" + kernelName, fileName, props);
   }
 }
 
@@ -365,7 +373,7 @@ void registerSEMFEMKernels(const std::string &section, int N, int poissonEquatio
 
 } // namespace
 
-void registerEllipticPreconditionerKernels(std::string section)
+void registerEllipticPreconditionerKernels(std::string section, bool svvForm)
 {
   int N;
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
@@ -384,6 +392,6 @@ void registerEllipticPreconditionerKernels(std::string section)
     registerSEMFEMKernels(section, N, poisson);
   }
   if (platform->options.compareArgs(optionsPrefix + "PRECONDITIONER", "JACOBI")) {
-    registerJacobiKernels(section, N, poisson);
+    registerJacobiKernels(section, N, poisson, svvForm);
   }
 }

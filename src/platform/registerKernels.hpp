@@ -18,8 +18,8 @@ void registerNekNekKernels();
 void registerCvodeKernels();
 void registerMeshKernels(occa::properties kernelInfoBC);
 void registerScalarKernels(occa::properties kernelInfoBC);
-void registerEllipticKernels(std::string section, bool stressForm = false);
-void registerEllipticPreconditionerKernels(std::string section);
+void registerEllipticKernels(std::string section, bool stressForm = false, bool svvForm = false);
+void registerEllipticPreconditionerKernels(std::string section, bool svvForm = false);
 void registerFluidSolverKernels(occa::properties kernelInfoBC);
 void registerGeomSolverKernels(occa::properties kernelInfoBC);
 
