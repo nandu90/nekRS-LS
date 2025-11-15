@@ -45,6 +45,7 @@ struct elliptic_t {
   int Nfields = 1;
   int stressForm = 0;
   int poisson = 0;
+  int svv = 0;
 
   const dlong loffset = 0; // same operator coeffs for all components
 
@@ -107,6 +108,10 @@ struct elliptic_t {
   dfloat lambda0Avg = NAN;
   occa::memory o_lambda1;
   dfloat lambda1Avg = NAN;
+
+  occa::memory o_svvlambda;
+  occa::memory o_svvD;
+  occa::memory o_svvDT;
 
   std::vector<int> levels;
 

@@ -851,6 +851,18 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   fflush(stdout);
 }
 
+void elliptic::setupEllipticSVV(occa::memory& o_svvD, occa::memory& o_svvDT, occa::memory& o_svvlambda)
+{
+  auto *elliptic = solver;
+
+  elliptic->svv = 1;
+
+  elliptic->o_svvD = o_svvD;
+  elliptic->o_svvDT = o_svvDT;
+
+  elliptic->o_svvlambda = o_svvlambda;
+}
+
 void elliptic::op(const occa::memory &o_q, occa::memory &o_Aq, bool masked)
 {
   ellipticOperator(solver, o_q, o_Aq, masked);

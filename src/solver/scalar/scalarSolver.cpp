@@ -715,6 +715,14 @@ void scalar_t::setupEllipticSolver()
     platform->linAlg->axpby(_mesh[is]->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_lambda1);
 
     ellipticSolver[is] = new elliptic("scalar" + sid, _mesh[is], _fieldOffset, o_lambda0, o_lambda1);
+
+    if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV")) {
+      auto Nmodes = _mesh[is]->Nq;
+      auto o_svvD = this->o_svvD.slice(is * Nmodes * Nmodes, Nmodes * Nmodes);
+      auto o_svvDT = this->o_svvDT.slice(is * Nmodes * Nmodes, Nmodes * Nmodes);
+      auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
+      ellipticSolver[is]->setupEllipticSVV(o_svvD, o_svvDT, o_svvmu);
+    }
   }
 }
 
