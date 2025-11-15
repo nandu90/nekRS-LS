@@ -1147,7 +1147,7 @@ c     Interpolate xm(m,m,m,...) to xn(n,n,n,...) (GLL-->GLL)
       return
       end
 c-----------------------------------------------------------------------
-      subroutine nekf_openfld(fname_in, time_, p0th_)
+      subroutine nekf_openfld(fname_in, time_, p0th_, icrrs, lbrst_)
       include 'mpif.h'
       include 'SIZE'
       include 'TOTAL'
@@ -1158,7 +1158,7 @@ c-----------------------------------------------------------------------
       real time_
       real p0th_
 
-      integer nps_
+      integer nps_, icrrs_, lbrst_
 
       character*132  fname
       character*1    fnam1(132)
@@ -1206,6 +1206,12 @@ c-----------------------------------------------------------------------
         gtpsr(i) = 1
         if (.not. ifgtpsr(i)) gtpsr(i) = 0
       enddo
+
+      ifcrrs = .true.
+      if (icrrs.eq.0) ifcrrs = .false.
+
+      lbrst = min(1024,lelt)
+      if (lbrst_.gt.0) lbrst = lbrst_
 
       return
       end
@@ -1269,17 +1275,32 @@ c-----------------------------------------------------------------------
       endif 
 
 #ifdef MPI
-      disp_unit = 4 
-      win_size  = int(disp_unit,8)*size(wk)
-      if (commrs .eq. MPI_COMM_NULL) then
-        call mpi_comm_dup(nekcomm,commrs,ierr)
-        call MPI_Win_create(wk,
-     $                      win_size,
-     $                      disp_unit,
-     $                      MPI_INFO_NULL,
-     $                      commrs,rsH,ierr)
+      lbrst = min(lbrst, lelt)
+      if (lbrst.lt.nelt) then
+        if(nio.eq.0) write(*,*)'Batched restart with lbrst',lbrst,nelt
+      endif
 
-        if (ierr .ne. 0 ) call exitti('MPI_Win_allocate failed!$',0)
+      call rzero(rst_etime,4) ! mpiio / pack / transfer / unpack
+
+      if (ifcrrs) then
+        call fgslib_crystal_setup(cr_mfi,nekcomm,np)
+      else
+        disp_unit = 4
+        win_size  = int(disp_unit,8)*size(wk)
+        if (lbrst.lt.nelt) then
+          win_size = int(disp_unit,8)*(7*lx1*ly1*lz1*lbrst)*(wdsize/4)
+        endif
+        if (commrs .eq. MPI_COMM_NULL) then
+          call mpi_comm_dup(nekcomm,commrs,ierr)
+          call MPI_Win_create(wk,
+     $                        win_size,
+     $                        disp_unit,
+     $                        MPI_INFO_NULL,
+     $                        commrs,rsH,ierr)
+
+          if (ierr .ne. 0 ) call exitti('MPI_Win_allocate failed!$',0)
+          call rzero(wk,lwk) ! avoid unexpected FE_INVALID
+        endif
       endif
 #endif
 

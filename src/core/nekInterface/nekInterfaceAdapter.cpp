@@ -44,7 +44,7 @@ static void (*nek_outfld_ptr)(char *,
                               double *,
                               int *,
                               int);
-static void (*nek_openfld_ptr)(char *, double *, double *, int);
+static void (*nek_openfld_ptr)(char *, double *, double *, int *, int *, int);
 static void (*nek_readfld_ptr)(int *,
                                double *,
                                double *,
@@ -143,7 +143,11 @@ fldData openFld(const std::string &filename, std::vector<std::string> &_availabl
   double time_;
   double p0th_;
 
-  (*nek_openfld_ptr)(fname, &time_, &p0th_, static_cast<int>(filename.size()));
+  int lbrst_ = 0;
+  options->getArgs("CHECKPOINT READ BATCH SIZE", lbrst_);
+  int icrrs_ = options->compareArgs("CHECKPOINT READ CRYSTAL ROUTER", "TRUE") ? 1 : 0;
+
+  (*nek_openfld_ptr)(fname, &time_, &p0th_, &icrrs_, &lbrst_, static_cast<int>(filename.size()));
 
   if (*ptr<int>("getxr")) {
     _availableVariables.push_back("mesh");
@@ -654,7 +658,7 @@ void set_usr_handles(const char *session_in, int verbose)
                              int *,
                              int))dlsym(handle, fname("nekf_outfld"));
   check_error(dlerror());
-  nek_openfld_ptr = (void (*)(char *, double *, double *, int))dlsym(handle, fname("nekf_openfld"));
+  nek_openfld_ptr = (void (*)(char *, double *, double *, int *, int*, int))dlsym(handle, fname("nekf_openfld"));
   check_error(dlerror());
   nek_readfld_ptr =
       (void (*)(int *, double *, double *, double *, double *, double *, double *, double *, double *, double *))
