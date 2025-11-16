@@ -1,0 +1,69 @@
+#ifdef __okl__
+
+#include "shock.oudf"
+
+#endif
+
+void extractLine(double time)
+{
+  const auto np = (platform->comm.mpiRank() == 0) ? 10001 : 0;
+  const auto offset = np;
+
+  static pointInterpolation_t *interpolator = nullptr;
+  static std::vector<dfloat> xp, yp, zp;
+  static deviceMemory<dfloat> o_Sp;
+
+  if (!interpolator) {
+    if (np) {
+      const auto y0 = 0.25;
+      const auto z0 = 0.25;
+      const auto dx = 1.0 / (np - 1);
+
+      for (int i = 0; i < np; ++i) {
+        xp.push_back(i * dx);
+        yp.push_back(y0);
+        zp.push_back(z0);
+      }
+
+      o_Sp.resize(nrs->Nscalar * offset);
+    }
+
+    interpolator = new pointInterpolation_t(nrs->meshV, platform->comm.mpiComm());
+    interpolator->setPoints(xp, yp, zp);
+    interpolator->find();
+  }
+
+  interpolator->eval(nrs->Nscalar, nrs->fieldOffset, nrs->scalar->o_S, offset, o_Sp);
+
+  if (platform->comm.mpiRank() == 0) {
+    std::vector<dfloat> Sp(nrs->Nscalar * np);
+    o_Sp.copyTo(Sp);
+
+    std::ofstream f("profile.dat");
+    for (int i = 0; i < np; ++i) {
+      f << std::scientific << time << " " << xp[i] << " " << yp[i] << " " << zp[i];
+      for (int s = 0; s < nrs->Nscalar; ++s) {
+        f << " " << Sp[i + s * offset];
+      }
+      f << std::endl;
+    }
+    f.close();
+  }
+}
+
+void UDF_Setup()
+{
+  auto mesh = nrs->meshV;
+
+  if (platform->options.getArgs("RESTART FILE NAME").empty()) {
+    auto &scalar = nrs->scalar;
+    udfic(mesh->Nlocal, nrs->fieldOffset, mesh->o_x, nrs->fluid->o_U, scalar->o_S);
+  }
+}
+
+void UDF_ExecuteStep(double time, int tstep)
+{
+  if(nrs->lastStep){
+    extractLine(time);
+  }
+}

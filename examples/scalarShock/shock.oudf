@@ -1,0 +1,30 @@
+@kernel void udfic(const dlong N,
+                   const dlong offset,
+                   @ restrict const dfloat *x,
+                   @ restrict dfloat *U,
+                   @ restrict dfloat *s)
+{
+  for (dlong n = 0; n < N; ++n; @tile(p_blockSize, @outer, @inner)) {
+    U[n + 0 * offset] = 1.0;
+    U[n + 1 * offset] = 0.0;
+    U[n + 2 * offset] = 0.0;
+
+    const dfloat xx = x[n];
+
+    dfloat exact = 0.0;
+    if(xx > 0.35 && xx < 0.55){
+      exact = 1.0; 
+    }
+    else if(xx > 0.7 && xx < 0.9){
+      exact = sqrt(1.0 - pow((xx-0.8)/0.1, 2.0));
+    }
+    else if(xx > 0.08 && xx <= 0.15){
+      exact = (1.0/0.0049)*xx*xx - (0.16/0.0049)*xx + 0.0064/0.0049;
+    }
+    else if(xx > 0.15 && xx <= 0.22){
+      exact = (1.0/0.0049)*xx*xx - (0.44/0.0049)*xx + 0.0484/0.0049;
+    }
+    s[n + 0 * offset] = exact;
+    s[n + 1 * offset] = exact;
+  }
+}

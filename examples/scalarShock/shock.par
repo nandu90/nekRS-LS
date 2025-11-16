@@ -1,0 +1,26 @@
+[GENERAL]
+polynomialOrder = 5
+stopAt = endTime
+endTime = 1.0
+dt = 1e-4
+timeStepper = tombo2
+
+checkPointControl = simulationTime 
+checkPointInterval = 1e-1
+
+scalars = s00, s01
+
+[FLUID VELOCITY]
+solver = none
+
+[SCALAR S00]
+transportCoeff = 1.0
+diffusionCoeff = 1e-12
+residualTol = 1e-08
+regularization = svv+scalingCoeff=0.1+filterPower=3.0
+
+[SCALAR S01]
+transportCoeff = 1.0
+diffusionCoeff = 1e-12
+residualTol = 1e-08
+regularization = avm+c0+scalingCoeff=0.1+noiseThreshold=1e-3
