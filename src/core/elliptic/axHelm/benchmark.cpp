@@ -469,7 +469,7 @@ occa::kernel benchmarkAx(int Nelements,
 
           std::cout << " wordSize=" << 8 * wordSize << " wordSizeGeo=" << 8 * wordSizeGeo
                     << " GDOF/s=" << GDOFPerSecond << " GB/s=" << bw << " GFLOPS/s=" << gflops
-                    << " constCoeff=" << constCoeff << " poisson=" << poisson
+                    << " constCoeff=" << constCoeff << " poisson=" << poisson << " svv=" << svv
                     << " kernelVer=" << kernelVariant << "\n";
         }
       }
