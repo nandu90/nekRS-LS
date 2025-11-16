@@ -210,7 +210,7 @@ c-----------------------------------------------------------------------
       do ifc = 1,2*ndim
          if(bc(5,ifc,iel,ifld_bId).gt.0) then
            boundaryID(ifc,iel) = bc(5,ifc,iel,ifld_bId)
-           idx = ibsearch(bIDMap, bIDMapSize, bc(5,ifc,iel,ifld_bId))
+           idx = lsearch_ur(bIDMap, bIDMapSize, boundaryID(ifc,iel))
            if(idx.gt.0) then
              boundaryID(ifc,iel) = idx 
            endif
