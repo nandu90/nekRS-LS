@@ -56,6 +56,18 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
          elliptic->o_lambda1,
          o_invDiagA);
 
+  if(elliptic->svv)
+    elliptic->ellipticBlockBuildDiagonalSVVKernel(mesh->Nelements,
+                                                  elliptic->Nfields,
+                                                  elliptic->fieldOffset,
+                                                  elliptic->loffset,
+                                                  mesh->o_ggeo,
+                                                  elliptic->o_svvD,
+                                                  elliptic->o_svvDT,
+                                                  elliptic->o_svvlambda,
+                                                  o_NULL,
+                                                  o_invDiagA);
+
   dfloat flopCount = 0.0;
   flopCount += 12 * mesh->Nq + 12;
   flopCount += (elliptic->poisson) ? 0.0 : 2.0;

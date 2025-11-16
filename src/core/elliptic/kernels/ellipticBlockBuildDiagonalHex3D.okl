@@ -128,7 +128,7 @@
             Aq[id + l * offset] = r_q;
 #else
             const dfloat lbda_0 = lambda0[id + l * loffset];
-            Aq[id + l * offset] = r_q * lbda_0;
+            Aq[id + l * offset] += r_q * lbda_0;
 #endif
           }
         }

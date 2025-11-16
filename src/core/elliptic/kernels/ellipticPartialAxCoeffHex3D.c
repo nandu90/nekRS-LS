@@ -102,7 +102,7 @@ extern "C" void FUNC(ellipticPartialAxCoeffHex3D_v0)(const dlong & Nelements,
           Aq[id] = r_Aqr + r_Aqs + r_Aqt + r_Aq;
 #else
           const dfloat r_lam0 = lambda0[p_lambda*id + 0 * loffset];
-          Aq[id] = r_lam0 * (r_Aqr + r_Aqs + r_Aqt);
+          Aq[id] += r_lam0 * (r_Aqr + r_Aqs + r_Aqt);
 #endif
         }
   }

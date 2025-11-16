@@ -92,6 +92,7 @@ struct elliptic_t {
   occa::memory o_zPfloat;
 
   occa::kernel AxKernel;
+  occa::kernel AxSVVKernel;
 
   occa::kernel fusedCopyDfloatToPfloatKernel;
 
@@ -103,6 +104,7 @@ struct elliptic_t {
 
   occa::kernel ellipticBlockBuildDiagonalKernel;
   occa::kernel ellipticBlockBuildDiagonalPfloatKernel;
+  occa::kernel ellipticBlockBuildDiagonalSVVKernel;
 
   occa::memory o_lambda0;
   dfloat lambda0Avg = NAN;

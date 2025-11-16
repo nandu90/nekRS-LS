@@ -49,8 +49,9 @@ void ellipticAx(elliptic_t *elliptic,
   auto& o_lambda0 = elliptic->o_lambda0;
   auto o_lambda1 = (elliptic->poisson) ? o_NULL : elliptic->o_lambda1;
 
-  auto loadKernel = [&]() {
+  auto loadKernel = [&](bool svv = false) {
     std::string kernelNamePrefix = (elliptic->poisson) ? "poisson-" : "";
+    if(svv) kernelNamePrefix += "svv-";
     kernelNamePrefix += "elliptic";
     if (elliptic->Nfields > 1) {
       kernelNamePrefix += (elliptic->stressForm) ? "Stress" : "Block";
@@ -61,7 +62,7 @@ void ellipticAx(elliptic_t *elliptic,
         kernelName += "Var";
       }
     } else {
-       if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE")) {
+       if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE") && !svv) {
          kernelName += "Var";
        }
     }
@@ -104,6 +105,21 @@ void ellipticAx(elliptic_t *elliptic,
                      o_lambda1,
                      o_q,
                      o_Aq);
+
+  if(elliptic->svv) {
+    if (!elliptic->AxSVVKernel.isInitialized()) elliptic->AxSVVKernel = loadKernel(true);
+    elliptic->AxSVVKernel(NelementsList,
+        elliptic->fieldOffset,
+        elliptic->loffset,
+        o_elementsList,
+        o_geom_factors,
+        elliptic->o_svvD,
+        elliptic->o_svvDT,
+        elliptic->o_svvlambda,
+        o_NULL,
+        o_q,
+        o_Aq);
+  }
 
   double flopCount = mesh->Np * 12 * mesh->Nq + 15 * mesh->Np;
 

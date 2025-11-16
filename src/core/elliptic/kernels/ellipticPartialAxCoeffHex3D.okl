@@ -155,7 +155,7 @@
           Aq[id] = r_Aq[k];
 #else
           const dfloat lbda0 = lambda0[p_lambda*id + 0 * loffset];
-          Aq[id] = lbda0 * r_Aq[k];
+          Aq[id] += lbda0 * r_Aq[k];
 #endif          
         }
       }
@@ -336,7 +336,7 @@
           Aq[id + k * p_Nq * p_Nq] = r_Au[k];
 #else
           const dfloat lbda0 = lambda0[p_lambda* (id + k * p_Nq * p_Nq) + 0 * loffset];
-          Aq[id + k * p_Nq * p_Nq] = lbda0 * r_Au[k];
+          Aq[id + k * p_Nq * p_Nq] += lbda0 * r_Au[k];
 #endif          
         }
       }
@@ -619,7 +619,7 @@
               Aq[id + k * p_Nq * p_Nq] = r_Au[k];
 #else
               const dfloat lbda0 = lambda0[p_lambda * (id + k * p_Nq * p_Nq) + 0 * loffset];
-              Aq[id + k * p_Nq * p_Nq] = lbda0 * r_Au[k];
+              Aq[id + k * p_Nq * p_Nq] += lbda0 * r_Au[k];
 #endif              
             }
           }
@@ -847,7 +847,7 @@
 #ifndef p_svv            
             Aq[base] = tmpAp;
 #else
-            Aq[base] = tmpAp * lambda0[p_lambda*id + 0 * loffset];
+            Aq[base] += tmpAp * lambda0[p_lambda*id + 0 * loffset];
 #endif            
           }
         }
@@ -1096,7 +1096,7 @@
               Aq[id + k * p_Nq * p_Nq] = r_Au[k];
 #else
               const dfloat lbda0 = lambda0[p_lambda * (id + k * p_Nq * p_Nq) + 0 * loffset];
-              Aq[id + k * p_Nq * p_Nq] = r_Au[k] * lbda0;
+              Aq[id + k * p_Nq * p_Nq] += r_Au[k] * lbda0;
 #endif              
             }
           }
@@ -1304,7 +1304,7 @@
               Aq[id + k * p_Nq * p_Nq] = r_Au[k];
 #else
               const dfloat lbda0 = lambda0[p_lambda * (id + k * p_Nq * p_Nq) + 0 * loffset];
-              Aq[id + k * p_Nq * p_Nq] = r_Au[k] * lbda0;
+              Aq[id + k * p_Nq * p_Nq] += r_Au[k] * lbda0;
 #endif              
             }
           }
@@ -1529,7 +1529,7 @@
           Aq[id + k * p_Nq * p_Nq] = r_Au[k];
 #else
           const dfloat lbda0 = lambda0[p_lambda * (id + k * p_Nq * p_Nq) + 0 * loffset];
-          Aq[id + k * p_Nq * p_Nq] = r_Au[k] * lbda0;
+          Aq[id + k * p_Nq * p_Nq] += r_Au[k] * lbda0;
 #endif          
         }
       }
@@ -1737,7 +1737,7 @@
           Aq[id + k * p_Nq * p_Nq] = r_Au[k];
 #else
           const dfloat lbda0 = lambda0[p_lambda * (id + k * p_Nq * p_Nq) + 0 * loffset];
-          Aq[id + k * p_Nq * p_Nq] = r_Au[k] * lbda0;
+          Aq[id + k * p_Nq * p_Nq] += r_Au[k] * lbda0;
 #endif          
         }
       }

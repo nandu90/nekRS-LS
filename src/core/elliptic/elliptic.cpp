@@ -699,6 +699,11 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     if (options.compareArgs("PRECONDITIONER", "JACOBI")) {
       kernelName = "ellipticBlockBuildDiagonal" + suffix;
       elliptic->ellipticBlockBuildDiagonalKernel = platform->kernelRequests.load(poissonPrefix + kernelName);
+
+      if(options.compareArgs("REGULARIZATION METHOD","SVV")) {
+        kernelName = "svv-ellipticBlockBuildDiagonal" + suffix;
+        elliptic->ellipticBlockBuildDiagonalSVVKernel = platform->kernelRequests.load(kernelName);
+      }
     }
 
     kernelName = "fusedCopyDfloatToPfloat";
