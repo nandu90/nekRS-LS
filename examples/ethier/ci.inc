@@ -112,6 +112,10 @@ void ciSetup(MPI_Comm comm, setupAide &options)
   std::fesetexceptflag(&flag, FE_ALL_EXCEPT);  
 
   options.setArgs("POLYNOMIAL DEGREE", std::string("9"));
+  if (platform->options.getArgs("CASENAME") == "ethierRefine") {
+    options.setArgs("POLYNOMIAL DEGREE", std::string("7"));
+  }
+
   options.setArgs("SOLUTION OUTPUT INTERVAL", "0");
   options.setArgs("FLUID VISCOSITY", std::string("0.01"));
   options.setArgs("FLUID DENSITY", std::string("1"));
@@ -324,6 +328,71 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("NUMBER TIMESTEPS", std::string("0"));
     options.setArgs("END TIME", std::string("0"));
     options.setArgs("CHECKPOINT INTERVAL", std::string("0"));
+  }
+
+  if (ciMode == 24 || ciMode == 25 || ciMode == 26 || ciMode == 27 || ciMode == 28) {
+    std::string casename = platform->options.getArgs("CASENAME");
+    nekrsCheck(casename != "ethierRefine",
+               platform->comm.mpiComm(),
+               EXIT_FAILURE,
+               "Unexpected input file for CI mode %d\n",
+               ciMode);
+  }
+
+  auto checkCheckpointingFile = [&](std::string fname, int ciPrev) {
+    nekrsCheck(!fs::exists(fname),
+               platform->comm.mpiComm(),
+               EXIT_FAILURE,
+               "Missing required checkpoint file %s. Run cimode=%d first!\n",
+               fname.c_str(), ciPrev);
+  };
+
+  // refine = 2 
+  if (ciMode == 24) {
+    options.setArgs("END TIME", std::string("0.01"));
+    options.setArgs("MESH HREFINEMENT SCHEDULE", "2");
+    options.setArgs("DT", std::string("1e-3"));
+    options.setArgs("CHECKPOINT INTERVAL", std::string("0"));
+  }
+  // refine = 2,2
+  if (ciMode == 25) {
+    options.setArgs("END TIME", std::string("0.005"));
+    options.setArgs("MESH HREFINEMENT SCHEDULE", "2,2");
+    options.setArgs("DT", std::string("5e-4"));
+    options.setArgs("CHECKPOINT INTERVAL", std::string("0"));
+  }
+  // refine = 2 + checkpoint
+  if (ciMode == 26) {
+    options.setArgs("MESH HREFINEMENT SCHEDULE", "2");
+    options.setArgs("NUMBER TIMESTEPS", std::string("0"));
+    options.setArgs("END TIME", std::string("0"));
+    options.setArgs("CHECKPOINT INTERVAL", std::string("0"));
+
+    checkCheckpointingFile("ci23.fld", 23);
+    checkCheckpointingFile("ci23.bp", 23);
+  }
+  // refine = 2,2 + checkpoint
+  if (ciMode == 27) {
+    options.setArgs("MESH HREFINEMENT SCHEDULE", "2,2");
+    options.setArgs("NUMBER TIMESTEPS", std::string("0"));
+    options.setArgs("END TIME", std::string("0"));
+    options.setArgs("CHECKPOINT INTERVAL", std::string("0"));
+    
+    checkCheckpointingFile("ci23.fld", 23);
+    checkCheckpointingFile("ci23.bp", 23);
+    checkCheckpointingFile("ci26.fld", 26);
+    checkCheckpointingFile("ci26.bp", 26);
+  }
+  // refine = 2,3 + checkpoint
+  if (ciMode == 28) {
+    options.setArgs("MESH HREFINEMENT SCHEDULE", "2,3");
+    options.setArgs("NUMBER TIMESTEPS", std::string("0"));
+    options.setArgs("END TIME", std::string("0"));
+    options.setArgs("CHECKPOINT INTERVAL", std::string("0"));
+    checkCheckpointingFile("ci23.fld", 23);
+    checkCheckpointingFile("ci23.bp", 23);
+    checkCheckpointingFile("ci26.fld", 26);
+    checkCheckpointingFile("ci26.bp", 26);
   }
 }
 
@@ -799,19 +868,71 @@ void ciCheckpointing(nrs_t *nrs)
     }
   };
 
-  platform->options.setArgs("CHECKPOINT PRECISION", "FP64");
-  platform->options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
-  run("1", "NEK", {"ethier0.f00000"}); // FP64, with mesh
-  platform->options.setArgs("CHECKPOINT PRECISION", "FP32");
+  if (ciMode==23) {
+    platform->options.setArgs("CHECKPOINT PRECISION", "FP64");
+    platform->options.setArgs("CHECKPOINT OUTPUT MESH", "TRUE");
+    run("1", "NEK", {"ethier0.f00000"}); // FP64, with mesh
+    platform->options.setArgs("CHECKPOINT PRECISION", "FP32");
 
-  run("2", "NEK", {"ethier0.f00001"}); // FP32, with mesh
-  run("3", "NEK", {"ethier0.f00001+U+P+S"}, true);
+    run("2", "NEK", {"ethier0.f00001"}); // FP32, with mesh
+    run("3", "NEK", {"ethier0.f00001+U+P+S"}, true);
 
-  breakMesh(); // force loading mesh from file
-  run("4", "NEK", {"ethier0.f00000+X", "ethier0.f00001+U+P+S"}, true);
+    breakMesh(); // force loading mesh from file
+    run("4", "NEK", {"ethier0.f00000+X", "ethier0.f00001+U+P+S"}, true);
 
-  run("5", "ADIOS", {"ethier.bp"});
-  run("6", "ADIOS", {"ethier.bp+int"}, true);
+    run("5", "ADIOS", {"ethier.bp"});
+    run("6", "ADIOS", {"ethier.bp+U+P+S"}, true);
+    run("7", "ADIOS", {"ethier.bp+int"}, true);
+
+    MPI_Barrier(platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) { // for cimode = 26, 27
+      fs::rename("ethier0.f00000", "ci23.fld");
+
+      if (fs::exists("ci23.bp")) fs::remove_all("ci23.bp");
+      fs::rename("ethier.bp", "ci23.bp");
+    }
+    MPI_Barrier(platform->comm.mpiComm());
+  }
+  if (ciMode==26) { // ref = 2
+    run("1", "NEK", {"ethierRefine0.f00000"});
+    run("2", "NEK", {"ci23.fld+U+P+S"}, true);
+    breakMesh();
+    run("3", "NEK", {"ethierRefine0.f00000+X", "ci23.fld+U+P+S"}, true);
+    run("4", "NEK", {"ethierRefine0.f00001"});
+    run("5", "ADIOS", {"ethierRefine.bp"});
+
+    run("6", "ADIOS", {"ci23.bp+U+P+S"}, true); // test if read flds match orig mesh
+    breakMesh();
+    run("7", "ADIOS", {"ci23.bp"}, true);
+
+    MPI_Barrier(platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) { // for cimode = 27 and 28
+      std::rename("ethierRefine0.f00000", "ci26.fld");
+
+      if (fs::exists("ci26.bp")) fs::remove_all("ci26.bp");
+      fs::rename("ethierRefine.bp", "ci26.bp");
+    }
+    MPI_Barrier(platform->comm.mpiComm());
+  }
+  if (ciMode==27 || ciMode==28) { // refine = 2,2 or 2,3
+    run("1", "NEK", {"ethierRefine0.f00000"});
+    run("2", "NEK", {"ci26.fld+U+P+S"}, true);
+    run("3", "NEK", {"ci23.fld+U+P+S"}, true);
+    breakMesh();
+    run("4", "NEK", {"ethierRefine0.f00000+X", "ci23.fld+U", "ci26.fld+P+S"}, true);
+    run("5", "NEK", {"ethierRefine0.f00001"});
+    run("6", "ADIOS", {"ethierRefine.bp"});
+
+    run("7", "ADIOS", {"ci26.bp+U+P+S"}, true);
+    breakMesh();
+    run("8", "ADIOS", {"ci26.bp"}, true);
+    run("9", "ADIOS", {"ci23.bp+U+P+S"}, true);
+    breakMesh();
+    run("10", "ADIOS", {"ci23.bp"}, true);
+
+    breakMesh();
+    run("11", "ADIOS", {"ethierRefine.bp+X", "ci23.bp+U", "ci26.bp+P+S"}, true);
+  }
 }
 
 void ciTestDistance(nrs_t *nrs)
@@ -1032,7 +1153,8 @@ void ciTestErrors(nrs_t *nrs,
     return; // don't run the rest of the tests
   }
 
-  if (tstep == 1 && ciMode != 7 && ciMode != 13 && ciMode != 8) {
+  if (tstep == 1 && ciMode != 7 && ciMode != 13 && ciMode != 8 &&
+      ciMode != 24 && ciMode != 25 && ciMode != 26 && ciMode != 27) {
     const auto NiterP = nrs->fluid->ellipticSolverP->Niter();
 
     int expectedNiterP = 5; 
@@ -1414,6 +1536,17 @@ void ciTestErrors(nrs_t *nrs,
     pIterTest = abs(NiterP - 5) < 2;
     vxTest = err[0] < 8e-5;
     prTest = err[1] < 8e-4;
+    break;
+  }
+  case 24:
+  case 25:
+  {
+    velIterTest = NiterU < 30;
+    s1Test = err[2] < 5.42E-12;
+    s2Test = err[3] < 6.30E-12;
+    pIterTest = NiterP < 10;
+    vxTest = err[0] < 2.77E-10;
+    prTest = err[1] < 2.E-9;
     break;
   }
 

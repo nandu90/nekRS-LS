@@ -203,6 +203,10 @@ void meshLoadKernels(mesh_t *mesh)
           platform->kernelRequests.load(meshPrefix + prefix + std::string("_Nc_") + std::to_string(mesh->N));
     }
   }
+  { // h-refine
+    const auto prefix = "hRefineProlongateHex3D_N_" + std::to_string(mesh->N);
+    mesh->hRefineIntpKernel = platform->kernelRequests.load(meshPrefix + prefix);
+  }
 }
 
 std::pair<mesh_t *, mesh_t *> createMesh(MPI_Comm comm, int N, int cubN, occa::properties &kernelInfo)
@@ -216,7 +220,7 @@ std::pair<mesh_t *, mesh_t *> createMesh(MPI_Comm comm, int N, int cubN, occa::p
   mesh->solid = [&]() {
     int nelgt, nelgv;
     const std::string meshFile = platform->options.getArgs("MESH FILE");
-    re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
+    re2::nelg(meshFile, true, nelgt, nelgv, platform->comm.mpiComm());
     return nelgt != nelgv;
   }();
 

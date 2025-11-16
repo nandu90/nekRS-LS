@@ -101,6 +101,7 @@ namespace nek {
 struct fldData {
   double time = 0;
   double p0th = 0;
+  int nelgr = 0;
   std::vector<occa::memory> o_x; 
   std::vector<occa::memory> o_u;
   std::vector<occa::memory> o_p; 
@@ -108,12 +109,13 @@ struct fldData {
   std::vector<std::vector<occa::memory>> o_s; 
 };
 
-fldData openFld(const std::string& filename, std::vector<std::string>& _availableVariables);
-void readFld(fldData& data, bool pointInterpolation = false);
+fldData openFld(const std::string& filename, std::vector<std::string>& _availableVariables, std::vector<int>& hRefineSchedule);
+void readFld(fldData& data,  bool pointInterpolation = false, std::vector<int> hrefineSchedule = {});
 void writeFld(const std::string& filename,
               const fldData& data,
               bool FP64 = false,
               const std::vector<int>& elementMask = {},
+              const std::vector<int>& hSchedule = {},
               int Nout = 0,
               bool uniform = false);
 

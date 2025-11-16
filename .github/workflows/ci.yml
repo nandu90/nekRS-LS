@@ -87,7 +87,10 @@ jobs:
 
     - name: 'ethier'
       working-directory: ${{ env.NEKRS_EXAMPLES }}/build
-      run: ctest --output-on-failure -R ethier 
+      run: ctest --output-on-failure -R "ethier_"
+    - name: 'ethierRefine'
+      working-directory: ${{ env.NEKRS_EXAMPLES }}/build
+      run: ctest --output-on-failure -R "ethierRefine_"
 
   lowMach:
     needs: install

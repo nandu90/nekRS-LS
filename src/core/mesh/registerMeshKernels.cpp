@@ -117,6 +117,22 @@ void registerMeshKernels(occa::properties kernelInfoBC)
         }
       }
 
+      { // h-refine
+        auto props = kernelInfo;
+        const int Nq = N + 1, Np = Nq * Nq * Nq;
+
+        props["defines/pfloat"] = dfloatString;
+        props["defines/p_NqFine"] = Nq;
+        props["defines/p_NqCoarse"] = Nq;
+        props["defines/p_NpFine"] = Np;
+        props["defines/p_NpCoarse"] = Np;
+
+        kernelName = "hRefineProlongateHex3D";
+        const std::string orderSuffix = std::string("_N_") + std::to_string(N);
+        fileName = oklpath + "/core/mesh/" + kernelName + ".okl";
+        platform->kernelRequests.add(meshPrefix + kernelName + orderSuffix, fileName, props);
+      };
+
       auto prop = kernelInfo;
       prop["defines/p_mode"] = 0;
       kernelName = "surfaceAreaMultiplyIntegrateHex3D";

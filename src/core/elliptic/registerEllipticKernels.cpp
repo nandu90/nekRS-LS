@@ -64,7 +64,7 @@ void registerEllipticKernels(std::string section, bool stressForm)
 
   int nelgt, nelgv;
   const std::string meshFile = platform->options.getArgs("MESH FILE");
-  re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
+  re2::nelg(meshFile, false, nelgt, nelgv, platform->comm.mpiComm());
 
   //  if (section.find("elliptic") != std::string::npos) return;
 

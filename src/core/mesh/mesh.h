@@ -61,6 +61,9 @@ struct mesh_t {
   occa::memory intpMatrix(std::vector<dfloat> M);
   void interpolate(const occa::memory& o_z, mesh_t *meshC, occa::memory& o_zC, bool uniform = false, dlong nel = 0);
 
+  occa::memory hRefineIntpMatrix(const int ncut);
+  void hRefineInterpolate(std::vector<int> &hSchedule, const occa::memory &o_in, occa::memory &o_out);
+
   template <typename Func>
   std::vector<int> createEToB(Func ff)
   {
@@ -265,6 +268,7 @@ struct mesh_t {
   occa::kernel haloExtractKernel;
 
   std::array<occa::kernel, maxNqIntp> intpKernel;
+  occa::kernel hRefineIntpKernel;
 
   occa::kernel geometricFactorsKernel;
   occa::kernel surfaceGeometricFactorsKernel;

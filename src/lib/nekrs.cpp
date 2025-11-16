@@ -207,7 +207,7 @@ void setup(MPI_Comm commg_in,
 
   {
     int nelgt, nelgv;
-    re2::nelg(platform->options.getArgs("MESH FILE"), nelgt, nelgv, comm);
+    re2::nelg(platform->options.getArgs("MESH FILE"), false, nelgt, nelgv, comm);
     nekrsCheck(size > nelgv,
                platform->comm.mpiComm(),
                EXIT_FAILURE,

@@ -24,7 +24,7 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
 
   int nelgt, nelgv;
   const std::string meshFile = platform->options.getArgs("MESH FILE");
-  re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
+  re2::nelg(meshFile, false, nelgt, nelgv, platform->comm.mpiComm());
   const int NelemBenchmark = nelgv / platform->comm.mpiCommSize();
 
   occa::properties AxKernelInfo = kernelInfo;
@@ -184,7 +184,7 @@ void registerSchwarzKernels(const std::string &section, int N)
 
     int nelgt, nelgv;
     const std::string meshFile = platform->options.getArgs("MESH FILE");
-    re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
+    re2::nelg(meshFile, false, nelgt, nelgv, platform->comm.mpiComm());
     const int NelemBenchmark = nelgv / platform->comm.mpiCommSize();
 
     const auto verbosity = platform->verbose() ? 2 : 1;

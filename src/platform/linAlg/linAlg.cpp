@@ -36,7 +36,7 @@ void linAlg_t::runTimers()
 {
   int nelgt, nelgv;
   const std::string meshFile = platform->options.getArgs("MESH FILE");
-  re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
+  re2::nelg(meshFile, false, nelgt, nelgv, platform->comm.mpiComm());
   const int nel = nelgv / platform->comm.mpiCommSize();
 
   int N;

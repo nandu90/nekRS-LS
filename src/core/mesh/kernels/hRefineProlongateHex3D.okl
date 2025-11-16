@@ -1,0 +1,147 @@
+/*
+
+   The MIT License (MIT)
+
+   Copyright (c) 2017 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+ */
+
+
+/*
+   h-refinement: splits each element into Ncut^3 sub-elements via tensor product
+   interpolation
+      kron(Jt, Js, Jr) * u (cf. Nek5000's tensor3).
+
+   Inputs:
+      R   - 1D interpolation matrices for each cut; maps [-1,1] to segments
+            Each matrix, Rij, is stored as R[i][j] with offset
+            "icut * p_NqCoarse * p_NqFine".
+      qc  - Coarse element field, shape: Nelements x p_NpCoarse.
+
+   Output:
+      qN  - Refined field, shape: Ncut^3 x Nelements x p_NpFine
+ */
+@kernel void hRefineProlongateHex3D(const dlong Nelements,
+                                    const dlong Ncut,
+                                    @ restrict const pfloat *R,
+                                    @ restrict const pfloat *qc,
+                                    @ restrict pfloat *qN)
+{
+  for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
+    for (dlong kc = 0; kc < Ncut; kc++)
+    for (dlong jc = 0; jc < Ncut; jc++)
+    for (dlong ic = 0; ic < Ncut; ic++) {
+      // new elements ordered lexicographically
+      const dlong en = e * Ncut*Ncut*Ncut + kc * Ncut*Ncut + jc * Ncut + ic;
+
+      @exclusive dfloat r_q[p_NqFine];
+      @shared dfloat s_q[p_NqCoarse][p_NqCoarse];
+      @shared dfloat s_Pq[p_NqFine][p_NqCoarse];
+
+      @shared dfloat s_Ri[p_NqCoarse][p_NqFine]; // matrix in  r-s-t direction
+      @shared dfloat s_Rj[p_NqCoarse][p_NqFine]; // applies to i-j-k index
+      @shared dfloat s_Rk[p_NqCoarse][p_NqFine];
+
+      for (int j = 0; j < p_NqFine; ++j; @inner(1))
+        for (int i = 0; i < p_NqFine; ++i; @inner(0)) {
+          int t = i + j * p_NqFine;
+          if (t < p_NqCoarse * p_NqFine) {
+            s_Ri[i][j] = R[t + ic * p_NqCoarse * p_NqFine]; // ic-th matrix
+            s_Rj[i][j] = R[t + jc * p_NqCoarse * p_NqFine]; // jc-th matrix
+            s_Rk[i][j] = R[t + kc * p_NqCoarse * p_NqFine]; // kc-th matrix
+          }
+        }
+
+      @barrier();
+
+      for (int j = 0; j < p_NqFine; ++j; @inner(1))
+        for (int i = 0; i < p_NqFine; ++i; @inner(0)) {
+          const int t = i + j * p_NqFine;
+
+          if (t < p_NqCoarse * p_NqCoarse) {
+            for (int k = 0; k < p_NqFine; ++k)
+              r_q[k] = 0;
+
+            for (int k = 0; k < p_NqCoarse; ++k) { // mat-vec along "t" fiber
+              const int id = t + k * p_NqCoarse * p_NqCoarse + e * p_NpCoarse;
+              const dfloat tmp = qc[id];
+
+              for (int m = 0; m < p_NqFine; ++m){
+                r_q[m] += s_Rk[k][m] * tmp;
+              }
+            }
+          }
+        }
+
+      for (int k = 0; k < p_NqFine; ++k) { // "t" slices
+        @barrier();
+
+        for (int j = 0; j < p_NqFine; ++j; @inner(1))
+          for (int i = 0; i < p_NqFine; ++i; @inner(0)) {
+            const int t = i + j * p_NqFine;
+            if (t < p_NqCoarse * p_NqCoarse) {
+              const int ti = t % p_NqCoarse;
+              const int tj = t / p_NqCoarse;
+
+              s_q[tj][ti] = r_q[k];
+            }
+          }
+
+        @barrier();
+
+        for (int j = 0; j < p_NqFine; ++j; @inner(1))
+          for (int i = 0; i < p_NqFine; ++i; @inner(0)) {
+            const int t = i + j * p_NqFine;
+
+            if (t < p_NqCoarse * p_NqFine) {
+              const int ti = t % p_NqCoarse;
+              const int tj = t / p_NqCoarse;
+
+              dfloat res = 0;
+
+              for (int m = 0; m < p_NqCoarse; ++m) // mat-vec along "s" fiber
+                res += s_Rj[m][tj] * s_q[m][ti];
+
+              s_Pq[tj][ti] = res;
+            }
+          }
+
+        @barrier();
+
+        for (int j = 0; j < p_NqFine; ++j; @inner(1))
+          for (int i = 0; i < p_NqFine; ++i; @inner(0)) {
+            dfloat res = 0;
+
+            for (int m = 0; m < p_NqCoarse; ++m) // mat-vec along "r" fiber
+              res += s_Ri[m][i] * s_Pq[j][m];
+
+            const int id = i + j * p_NqFine + k * p_NqFine * p_NqFine + en * p_NpFine;
+
+#if p_add
+            qN[id] += res;
+#else
+            qN[id] = res;
+#endif
+          }
+      } // t slices
+    } // Ncut loops
+  } // e loop
+}

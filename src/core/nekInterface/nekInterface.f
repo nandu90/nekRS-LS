@@ -107,6 +107,12 @@ c-----------------------------------------------------------------------
       call nekrs_registerPtr('gettr', gettr)
       call nekrs_registerPtr('gtpsr', gtpsr(1))
 
+      call nekrs_registerPtr('nelgr', nelgr)
+      call nekrs_registerPtr('nhref', nhref)
+      call nekrs_registerPtr('hrefcuts', hrefcuts)
+      call nekrs_registerPtr('nhrefrs', nhrefrs)
+      call nekrs_registerPtr('hrefcutsrs', hrefcutsrs)
+
       call nekrs_registerPtr('npsr', npsr)
 
       call nekrs_registerPtr('out_mask', out_mask)
@@ -116,7 +122,7 @@ c-----------------------------------------------------------------------
       return
       end
 c-----------------------------------------------------------------------
-      subroutine nekf_setup(ifflow_in, 
+      subroutine nekf_setup(ifflow_in, hrefine, hrefineSize,
      $                      bIDMap, bIDMapSize, bIDtMap, bIDtMapSize,
      $                      npscal_in, idpss_in, p32, mpart, contol,
      $                      rho, mue, rhoCp, lambda, stsform) 
@@ -125,6 +131,9 @@ c-----------------------------------------------------------------------
       include 'TOTAL'
       include 'DOMAIN'
       include 'NEKINTF'
+
+      integer hrefineSize
+      integer hrefine(hrefineSize)
 
       integer bIDMapSize
       integer bIDtMapSize
@@ -192,12 +201,13 @@ c-----------------------------------------------------------------------
         write(6,*) 'bIDtMap', bIDtMap
       endif
 #endif
+      call ifill(boundaryID, -1, 6*lelv)
+      call ifill(boundaryIDt, -1, 6*lelt)
 
       ifld_bId = 2
       if(ifflow) ifld_bId = 1
       do iel = 1,nelv
       do ifc = 1,2*ndim
-         boundaryID(ifc,iel) = -1
          if(bc(5,ifc,iel,ifld_bId).gt.0) then
            boundaryID(ifc,iel) = bc(5,ifc,iel,ifld_bId)
            idx = ibsearch(bIDMap, bIDMapSize, bc(5,ifc,iel,ifld_bId))
@@ -212,7 +222,6 @@ c-----------------------------------------------------------------------
       if(nelgt.ne.nelgv) then 
         do iel = 1,nelt
         do ifc = 1,2*ndim
-         boundaryIDt(ifc,iel) = -1
          if(bc(5,ifc,iel,2).gt.0) then
            boundaryIDt(ifc,iel) = bc(5,ifc,iel,2)
            idx = ibsearch(bIDtMap, bIDtMapSize, bc(5,ifc,iel,2))
@@ -246,6 +255,10 @@ c-----------------------------------------------------------------------
       call gengeom(igeom)  ! Generate geometry, after usrdat 
 
       if(nio.eq.0) write(6,*) 'call usrdat2'
+      do iref=1,hrefineSize
+        call h_refine_usrdat2(hrefine(iref))
+        call fix_geom
+      enddo
       call usrdat2
       if(nio.eq.0) write(6,'(A,/)') ' done :: usrdat2' 
 
@@ -1188,6 +1201,7 @@ c-----------------------------------------------------------------------
 
       time_ = timer
       p0th_ = p0th
+      nelgr_ = nelgr
 
       ! what fields exist in file
       getxr = 1
@@ -1242,6 +1256,9 @@ c-----------------------------------------------------------------------
 
       character*132  fname
       common /nekf_rfname/ fname 
+
+      lbrst = lelt
+      ifcrrs = .false.
 
       if (ifpi.eq.1) then 
         call gfldr(fname)
@@ -1353,5 +1370,30 @@ c-----------------------------------------------------------------------
       endif
       call err_chk(ierr,'Error closing restart file, in mfi.$')
 
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_hrefine_map_elements(hrefine, hrefineSize)
+      implicit none
+      integer hrefineSize, hrefine(hrefineSize)
+
+      call h_refine_remap_elem(hrefine, hrefineSize)
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekf_hrefine_readfld(xm1_,ym1_,zm1_,vx_,vy_,vz_
+     $                               ,pm1_,t_,ps_, hrefine, hrefineSize)
+      implicit none
+
+      integer hrefineSize, hrefine(hrefineSize)
+      real xm1_(*), ym1_(*), zm1_(*)
+      real vx_ (*), vy_ (*), vz_ (*)
+      real pm1_(*)
+      real t_  (*)
+      real ps_ (*)
+
+      call h_refine_readfld(xm1_,ym1_,zm1_,vx_,vy_,vz_
+     $                     ,pm1_,t_,ps_, hrefine, hrefineSize)
       return
       end

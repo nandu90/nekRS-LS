@@ -1,7 +1,7 @@
 #include "re2Reader.hpp"
 #include <cstring>
 
-void re2::nelg(const std::string &meshFile, int &nelgt, int &nelgv, MPI_Comm comm)
+void re2::nelg(const std::string &meshFile, const bool fromMesh, int &nelgt, int &nelgv, MPI_Comm comm)
 {
   int rank = 0;
   MPI_Comm_rank(comm, &rank);
@@ -44,4 +44,17 @@ void re2::nelg(const std::string &meshFile, int &nelgt, int &nelgv, MPI_Comm com
 
   MPI_Bcast(&nelgt, 1, MPI_INT, 0, comm);
   MPI_Bcast(&nelgv, 1, MPI_INT, 0, comm);
+
+  if (fromMesh) return;
+
+  std::string hSchedule;
+  if (platform->options.getArgs("MESH HREFINEMENT SCHEDULE", hSchedule)) {
+    int ncut = 1, ndim = 3;
+    for (auto &&s : serializeString(hSchedule, ',')) {
+      ncut *= std::stoi(s);
+    }
+    int scale = (ncut > 1) ? static_cast<int>(std::pow(ncut, ndim)) : 1;
+    nelgt *= scale;
+    nelgv *= scale;
+  }
 }
