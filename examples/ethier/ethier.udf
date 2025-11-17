@@ -508,7 +508,7 @@ void UDF_ExecuteStep(double time, int tstep)
   }
 #endif
 
-  if (ciMode == 23) {
+  if (ciMode == 23 || ciMode == 26 || ciMode == 27 || ciMode == 28) {
     ciCheckpointing(nrs);
   }
 

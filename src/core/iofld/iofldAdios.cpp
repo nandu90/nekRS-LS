@@ -220,7 +220,7 @@ template <typename OutputType> size_t iofldAdios::write_()
              "write attribute polynomialOrder order cannot be changed after the initial step");
 
   if (uniform || (N > 0 && N != mesh_vis->N)) {
-    mesh_vis = genVisMesh();
+    mesh_vis = genVisMesh(mesh->Nelements, N);
   }
   const uint32_t NumOfCells = mesh_vis->Nelements * std::pow(mesh_vis->N, mesh_vis->dim);
   const uint32_t VTK_CELL_TYPE = VTK_HEXAHEDRON;
@@ -267,6 +267,14 @@ template <typename OutputType> size_t iofldAdios::write_()
                             {static_cast<size_t>(mesh_vis->Nlocal), static_cast<size_t>(mesh_vis->dim)},
                             adiosMode);
     writtenBytes += o_coordVertices.size() * sizeof(OutputType);
+
+    auto o_hSchedule = platform->memoryPool.reserve<uint32_t>(hRefineScheduleSim.size());
+    auto hSchedulePtr = static_cast<uint32_t *>(o_hSchedule.ptr());
+    for (int i = 0; i < hRefineScheduleSim.size(); i++) {
+      hSchedulePtr[i] = hRefineScheduleSim[i];
+    }
+    putVariable<uint32_t>("hRefineSchedule", o_hSchedule, {o_hSchedule.size()}, adiosMode);
+    writtenBytes += o_hSchedule.size() * sizeof(uint32_t);
   }
 
   std::vector<occa::memory> o_fldDataScratch;
@@ -340,17 +348,25 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
     const auto gids = static_cast<uint64_t *>(data.ptr());
     std::vector<uint64_t> globalElementIds(gids, gids + data.size());
 
+    int hscale = 1;
+    for (int ncut : hRefineScheduleApply) {
+      const int nblk = std::pow(ncut, mesh_vis->dim);
+      hscale *= nblk;
+    }
+
     for (int e = 0; e < globalElementIds.size(); e++) {
-      const auto gid = globalElementIds[e];
-      targetInfo.push_back(std::make_pair(nek::globalElementIdToRank(gid), nek::globalElementIdToLocal(gid)));
+      auto gid = globalElementIds[e] * hscale;
+      int jnid = nek::globalElementIdToRank(gid);
+      int jeln = nek::globalElementIdToLocal(gid) / hscale;
+      targetInfo.push_back(std::make_pair(jnid, jeln));
     }
     return targetInfo;
   }();
 
   const auto maxRemoteSizes = [&]() {
     std::vector<int> work(2);
-    work[0] = o_in.size();
-    work[1] = o_inEntrySize;
+    work[0] = o_in.size();   // dim
+    work[1] = o_inEntrySize; // field size
     MPI_Allreduce(MPI_IN_PLACE,
                   work.data(),
                   work.size(),
@@ -403,7 +419,7 @@ std::vector<occa::memory> iofldAdios::redistributeField(const std::vector<occa::
   const auto o_outSize = maxRemoteSizes.first;
   for (int dim = 0; dim < o_outSize; dim++) {
     o_out.push_back(platform->deviceMemoryPool.reserve<T>(mesh_vis->Nlocal));
-    o_out[dim].copyFrom(o_win.slice(dim * winFieldOffset));
+    o_out[dim].copyFrom(o_win.slice(dim * winFieldOffset), mesh_vis->Nlocal); // host to device
   }
 
   return o_out;
@@ -481,26 +497,26 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
     return o_out;
   }();
 
-  auto convertToDfloat = [&]() {
+  auto convertToDfloat = [&](std::vector<occa::memory> o_in) {
     std::vector<occa::memory> o_work;
     // type of o_userBuf might not be available (in case it's zero),
     // instead use the type matching o_userBuf
     if (o_userBuf.at(0).dtype() == occa::dtype::get<dfloat>()) {
-      o_work = o_convDistributedData;
+      o_work = o_in;
     } else {
-      const auto Nlocal = o_convDistributedData.at(0).size();
-      for (int dim = 0; dim < o_convDistributedData.size(); dim++) {
+      const auto Nlocal = o_in.at(0).size();
+      for (int dim = 0; dim < o_in.size(); dim++) {
         o_work.push_back(platform->deviceMemoryPool.reserve<dfloat>(Nlocal));
 
         if (o_userBuf.at(0).dtype() == occa::dtype::get<double>()) {
-          platform->copyDoubleToDfloatKernel(Nlocal, o_convDistributedData.at(dim), o_work.at(dim));
+          platform->copyDoubleToDfloatKernel(Nlocal, o_in.at(dim), o_work.at(dim));
           nekrsCheck((std::is_same<float, dfloat>::value),
                      MPI_COMM_SELF,
                      EXIT_FAILURE,
                      "%s\n",
                      "cannot convert field of type double to float!");
         } else {
-          platform->copyFloatToDfloatKernel(Nlocal, o_convDistributedData.at(dim), o_work.at(dim));
+          platform->copyFloatToDfloatKernel(Nlocal, o_in.at(dim), o_work.at(dim));
         }
       }
     }
@@ -516,7 +532,7 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
   };
 
   if (pointInterpolation) {
-    auto o_work = convertToDfloat();
+    auto o_work = convertToDfloat(o_convDistributedData);
     if (name == "mesh") {
       mesh_vis->Nelements = o_work.at(0).size() / mesh_vis->Np;
       mesh_vis->Nlocal = mesh_vis->Nelements * mesh_vis->Np;
@@ -566,7 +582,7 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
       }
     }
   } else if (mesh_vis->N != mesh->N) {
-    auto o_work = convertToDfloat();
+    auto o_work = convertToDfloat(o_convDistributedData);
     for (int dim = 0; dim < o_work.size(); dim++) {
       auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(o_userBuf.at(dim).size());
       mesh_vis->interpolate(o_work.at(dim), mesh, o_tmp);
@@ -580,9 +596,19 @@ void iofldAdios::getData(const std::string &name, std::vector<occa::memory> &o_u
                  "user buffer for %s too small!\n",
                  name.c_str());
 
-      o_userBuf.at(dim).copyFrom(o_convDistributedData.at(dim));
+      o_userBuf.at(dim).copyFrom(o_convDistributedData.at(dim), o_convDistributedData.at(dim).size());
     }
   }
+
+  if (hRefineScheduleApply.size()) {
+    auto o_work = convertToDfloat(o_userBuf);
+    for (int dim = 0; dim < o_work.size(); dim++) {
+      auto o_tmp = platform->deviceMemoryPool.reserve<dfloat>(o_work.at(dim).size());
+      mesh_hrefine->hRefineInterpolate(hRefineScheduleApply, o_work.at(dim), o_tmp);
+      convertFromDfloat(o_tmp, o_userBuf.at(dim));
+    }
+  }
+
 }
 
 template <typename Tadios> void iofldAdios::getData(const std::string &name, variantType &variant)
@@ -720,6 +746,12 @@ size_t iofldAdios::read()
     return exists;
   };
 
+  nekrsCheck(pointInterpolation && hRefineScheduleApply.size() > 0,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "read attribute conflict: interpolate + href not supported!");
+
   // first allocate then get variable to ensure deferred pointer to memPool remains valid
   for (int pass = 0; pass < 2; pass++) {
     const auto allocateOnly = (pass == 0) ? true : false;
@@ -729,6 +761,10 @@ size_t iofldAdios::read()
 
     getVariable<uint64_t>(allocateOnly, "globalElementIds", 0);
     isAvailable("globalElementIds", true);
+
+    if (isAvailable("hRefineSchedule")) {
+      getVariable<uint32_t>(allocateOnly, "hRefineSchedule", 0);
+    }
 
     for (auto name : userVariables) {
       const auto &type = adiosIO.VariableType(name);
@@ -792,11 +828,56 @@ size_t iofldAdios::read()
     }
   }
 
+  { // chk and set h-refine schedule
+    hRefineScheduleFld.clear();
+    if (isAvailable("hRefineSchedule")) {
+      auto &data = variables["hRefineSchedule"].data;
+      const auto dataPtr = static_cast<uint32_t *>(data.ptr());
+      std::vector<uint32_t> dataVec(dataPtr, dataPtr + data.size());
+
+      hRefineScheduleFld.resize(data.size(), 0);
+      for (int i = 0; i < data.size(); i++) {
+         hRefineScheduleFld[i] = dataVec[i];
+      }
+    }
+
+    int NelementsGlobalFld = [&]() {
+      auto &data = variables["globalElementIds"].data;
+      int NelementsFld = data.size();
+      MPI_Allreduce(MPI_IN_PLACE, &NelementsFld, 1, MPI_INT, MPI_SUM, platform->comm.mpiComm());
+      return NelementsFld;
+    }();
+
+    hRefineDiffSchedule(mesh->NelementsGlobal, NelementsGlobalFld);
+  }
+
   mesh_vis = [&]() {
     variantType v = std::ref(N);
     getData<uint32_t>("polynomialOrder", v);
-    if (N != mesh->N || pointInterpolation) {
-      return genVisMesh();
+
+    Nelements = mesh->Nelements;
+    if (hRefineScheduleApply.size()) {
+      const int hscale = hRefineScale(hRefineScheduleApply);
+      Nelements /= hscale;
+    }
+
+    if (N != mesh->N || Nelements != mesh->Nelements || pointInterpolation || hRefineScheduleApply.size()) {
+      return genVisMesh(Nelements, N);
+    } else {
+      return mesh;
+    }
+  }();
+
+  mesh_hrefine = [&]() {
+    N = mesh->N;
+    Nelements = mesh->Nelements;
+    if (hRefineScheduleApply.size()) {
+      const int hscale = hRefineScale(hRefineScheduleApply);
+      Nelements /= hscale;
+    }
+
+    if (hRefineScheduleApply.size()) {
+      return genVisMesh(Nelements, N, false);
     } else {
       return mesh;
     }
@@ -816,6 +897,10 @@ size_t iofldAdios::read()
       }
 
       const auto &adiosType = variables[name].type;
+
+      if (platform->comm.mpiRank() == 0) {
+        std::cout << "reading variables ..." << name << std::endl;
+      }
 
       if (adiosType == adios2::GetType<double>()) {
         getData<double>(name, o_userBuf);

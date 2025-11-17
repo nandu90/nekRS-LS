@@ -44,7 +44,7 @@ static void (*nek_outfld_ptr)(char *,
                               double *,
                               int *,
                               int);
-static void (*nek_openfld_ptr)(char *, double *, double *, int);
+static void (*nek_openfld_ptr)(char *, double *, double *, int *, int *, int);
 static void (*nek_readfld_ptr)(int *,
                                double *,
                                double *,
@@ -55,6 +55,19 @@ static void (*nek_readfld_ptr)(int *,
                                double *,
                                double *,
                                double *);
+static void (*nek_hrefine_map_elements_ptr)(int *,
+                                            int *);
+static void (*nek_hrefine_readfld_ptr)(double *,
+                                       double *,
+                                       double *,
+                                       double *,
+                                       double *,
+                                       double *,
+                                       double *,
+                                       double *,
+                                       double *,
+                                       int *,
+                                       int *);
 static void (*nek_uic_ptr)(int *);
 static void (*nek_end_ptr)(void);
 static void (*nek_restart_ptr)(char *, int *);
@@ -62,6 +75,8 @@ static void (*nek_map_m_to_n_ptr)(double *a, int *na, double *b, int *nb, int *i
 static int (*nek_lglel_ptr)(int *);
 static void (*nek_bootstrap_ptr)(int *, char *, char *, char *, int, int, int);
 static void (*nek_setup_ptr)(int *,
+                             int *,
+                             int *,
                              int *,
                              int *,
                              int *,
@@ -136,14 +151,19 @@ long long int localElementIdToGlobal(int _id)
   return static_cast<long long int>(gid - 1);
 }
 
-fldData openFld(const std::string &filename, std::vector<std::string> &_availableVariables)
+fldData openFld(const std::string &filename, std::vector<std::string> &_availableVariables, std::vector<int>& hRefineSchedule)
 {
   auto fname = const_cast<char *>(filename.c_str());
 
   double time_;
   double p0th_;
+  int nelgr_;
 
-  (*nek_openfld_ptr)(fname, &time_, &p0th_, static_cast<int>(filename.size()));
+  int lbrst_ = 0;
+  options->getArgs("CHECKPOINT READ BATCH SIZE", lbrst_);
+  int icrrs_ = options->compareArgs("CHECKPOINT READ CRYSTAL ROUTER", "TRUE") ? 1 : 0;
+
+  (*nek_openfld_ptr)(fname, &time_, &p0th_, &icrrs_, &lbrst_, static_cast<int>(filename.size()));
 
   if (*ptr<int>("getxr")) {
     _availableVariables.push_back("mesh");
@@ -163,14 +183,24 @@ fldData openFld(const std::string &filename, std::vector<std::string> &_availabl
     _availableVariables.push_back("scalar" + scalarDigitStr(i));
   }
 
+  {
+    const auto nek_hScheduleSize = *ptr<int>("nhrefrs");
+    auto nek_hScheduleData = ptr<int>("hrefcutsrs");
+    hRefineSchedule.resize(nek_hScheduleSize, 0);
+    for (int i = 0; i < nek_hScheduleSize; i++) {
+      hRefineSchedule[i] = nek_hScheduleData[i];
+    }
+  }
+
   fldData data;
   data.time = time_;
   data.p0th = p0th_;
+  data.nelgr = nelgr_;
 
   return data;
 }
 
-void readFld(fldData &data, bool pointInterpolation)
+void readFld(fldData &data, bool pointInterpolation, std::vector<int> hrefineSchedule)
 {
   const auto nxyz = nekData.nx1 * nekData.nx1 * nekData.nx1;
   const auto Nlocal = nekData.nelt * nxyz;
@@ -206,6 +236,39 @@ void readFld(fldData &data, bool pointInterpolation)
     s = platform->memoryPool.reserve<double>(nekFieldOffset * nsr);
   }
 
+  int ierr = 0;
+  int hrefineScheduleSize = hrefineSchedule.size();
+  int nelRemain = nekData.nelt;
+  if (hrefineScheduleSize > 0) {
+    if (rank == 0) {
+      printf("readFld: refine fields ...");
+    }
+    for (int i = 0; i < hrefineScheduleSize; i++) {
+      const int ncut = hrefineSchedule[i];
+      const int nblk = ncut * ncut * ncut; // 3d
+      if (rank == 0) {
+        printf(" %d", ncut);
+      }
+      if (nelRemain % nblk != 0) {
+        ierr = 1;
+      }
+      nelRemain /= nblk;
+    }
+    if (rank == 0) {
+      printf("\n");
+    }
+
+    nekrsCheck(ierr,
+               platform->comm.mpiComm(),
+               EXIT_FAILURE,
+               "%s\n",
+               "readFld: nel is not divisible by refine schedule");
+  }
+
+  if (hrefineScheduleSize > 0) {
+    (*nek_hrefine_map_elements_ptr)(hrefineSchedule.data(), &hrefineScheduleSize);
+  }
+
   int ifpi = pointInterpolation;
   (*nek_readfld_ptr)(static_cast<int *>(&ifpi),
                      static_cast<double *>(xm.ptr()),
@@ -217,6 +280,20 @@ void readFld(fldData &data, bool pointInterpolation)
                      static_cast<double *>(pr.ptr()),
                      static_cast<double *>(t.ptr()),
                      static_cast<double *>(s.ptr()));
+
+  if (hrefineScheduleSize > 0) {
+    (*nek_hrefine_readfld_ptr)(static_cast<double *>(xm.ptr()),
+                               static_cast<double *>(ym.ptr()),
+                               static_cast<double *>(zm.ptr()),
+                               static_cast<double *>(vx.ptr()),
+                               static_cast<double *>(vy.ptr()),
+                               static_cast<double *>(vz.ptr()),
+                               static_cast<double *>(pr.ptr()),
+                               static_cast<double *>(t.ptr()),
+                               static_cast<double *>(s.ptr()),
+                               hrefineSchedule.data(),
+                               &hrefineScheduleSize);
+  }
 
   auto populate = [&](const std::vector<occa::memory> &fields, std::vector<occa::memory> &o_u) {
     auto o_tmpDouble = platform->device.malloc<double>(Nlocal);
@@ -260,6 +337,7 @@ void writeFld(const std::string &filename,
               const fldData &data,
               bool FP64,
               const std::vector<int> &elementMask,
+              const std::vector<int> &hSchedule,
               int Nout,
               bool uniform)
 {
@@ -394,6 +472,14 @@ void writeFld(const std::string &filename,
       for (auto &entry : elementMask) {
         nek_out_mask[entry] = 1;
       }
+    }
+
+    // h-refine
+    auto &nek_hScheduleSize = *ptr<int>("nhref");
+    auto nek_hScheduleData = ptr<int>("hrefcuts");
+    nek_hScheduleSize = hSchedule.size();
+    for (int i = 0; i < hSchedule.size(); i++) {
+      nek_hScheduleData[i] = hSchedule[i];
     }
 
     (*nek_outfld_ptr)(const_cast<char *>(filename.c_str()),
@@ -626,6 +712,8 @@ void set_usr_handles(const char *session_in, int verbose)
                             int *,
                             int *,
                             int *,
+                            int *,
+                            int *,
                             double *,
                             double *,
                             double *,
@@ -654,11 +742,18 @@ void set_usr_handles(const char *session_in, int verbose)
                              int *,
                              int))dlsym(handle, fname("nekf_outfld"));
   check_error(dlerror());
-  nek_openfld_ptr = (void (*)(char *, double *, double *, int))dlsym(handle, fname("nekf_openfld"));
+  nek_openfld_ptr = (void (*)(char *, double *, double *, int *, int*, int))dlsym(handle, fname("nekf_openfld"));
   check_error(dlerror());
   nek_readfld_ptr =
       (void (*)(int *, double *, double *, double *, double *, double *, double *, double *, double *, double *))
           dlsym(handle, fname("nekf_readfld"));
+  check_error(dlerror());
+
+  nek_hrefine_map_elements_ptr = (void (*)(int *, int *))dlsym(handle, fname("nekf_hrefine_map_elements"));
+  check_error(dlerror());
+  nek_hrefine_readfld_ptr =
+      (void (*)(double *, double *, double *, double *, double *, double *, double *, double *, double *, int *, int *))
+          dlsym(handle, fname("nekf_hrefine_readfld"));
   check_error(dlerror());
 
   nek_restart_ptr = (void (*)(char *, int *))dlsym(handle, fname("nekf_restart"));
@@ -908,11 +1003,11 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
       int nelgt, nelgv;
       const int ndim = 3;
       const std::string meshFile = options.getArgs("MESH FILE");
-      re2::nelg(meshFile, nelgt, nelgv, MPI_COMM_SELF);
-
+      re2::nelg(meshFile, false, nelgt, nelgv, MPI_COMM_SELF);
       int lelt = (nelgt / np) + 3;
+
       if (lelt > nelgt) {
-        lelt = nelgt;
+        lelt = nelgt + 1; // preserve 1-extra in h-refine
       }
 
       const std::string sizeFile = cache_dir + "/SIZE";
@@ -1131,7 +1226,7 @@ int setup(int numberActiveFields)
   int velocityExists = (options->getArgs("FLUID").empty()) ? 0 : 1;
 
   int nelgt, nelgv;
-  re2::nelg(options->getArgs("MESH FILE"), nelgt, nelgv, platform->comm.mpiComm());
+  re2::nelg(options->getArgs("MESH FILE"), false, nelgt, nelgv, platform->comm.mpiComm());
 
   const auto cht = [&]() {
     for (int is = 0; is < nscal; is++) {
@@ -1155,12 +1250,27 @@ int setup(int numberActiveFields)
     return map;
   };
 
+  auto makeHrefineSchedule = [&] () {
+    std::vector<std::string> list;
+    options->getArgs("MESH HREFINEMENT SCHEDULE", list, ",");
+
+    std::vector<int> map;
+    for (auto &entry : list) {
+      map.push_back(std::stoi(entry));
+    }
+    return map;
+  };
+  auto meshHrefineSchedule = makeHrefineSchedule();
+  int meshHrefineScheduleSize = meshHrefineSchedule.size();
+
   auto bMapV = boundaryIDMap(true);
   int bMapVSize = bMapV.size();
   auto bMapT = boundaryIDMap();
   int bMapTSize = (cht) ? bMapT.size() : 0;
 
   (*nek_setup_ptr)(&velocityExists,
+                   meshHrefineSchedule.data(),
+                   &meshHrefineScheduleSize,
                    bMapV.data(),
                    &bMapVSize,
                    bMapT.data(),

@@ -53,7 +53,7 @@ void iofldNek::openEngine()
       std::cout << "reading checkpoint ..." << std::endl;
       std::cout << " fileName: " << fileName << std::endl << std::flush;
     }
-    fldData = nek::openFld(fileName, _availableVariables);
+    fldData = nek::openFld(fileName, _availableVariables, hRefineScheduleFld);
   }
 }
 
@@ -123,6 +123,7 @@ size_t iofldNek::write()
                 data,
                 (precision == 64) ? true : false,
                 elementMask,
+                hRefineScheduleSim,
                 (N > 0) ? N : mesh->N,
                 uniform);
 
@@ -143,7 +144,15 @@ size_t iofldNek::write()
 
 size_t iofldNek::read()
 {
-  nek::readFld(fldData, pointInterpolation);
+  hRefineDiffSchedule(mesh->NelementsGlobal, fldData.nelgr);
+
+  nekrsCheck(pointInterpolation && hRefineScheduleApply.size() > 0,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "read conflict: interpolate + h-refine restart not supported!");
+
+  nek::readFld(fldData, pointInterpolation, hRefineScheduleApply);
 
   if (auto time = inquireVariable<double>("time")) {
     time->get() = fldData.time;

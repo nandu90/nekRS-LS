@@ -33,6 +33,7 @@ public:
   {
     mesh = mesh_;
     mesh_vis = mesh;
+    mesh_hrefine = mesh;
 
     engineMode = mode_;
 
@@ -64,6 +65,73 @@ public:
   bool redistribute = true;
   bool pointInterpolation = false;
 
+  std::vector<int> hRefineScheduleSim = {};
+  std::vector<int> hRefineScheduleFld = {};
+  std::vector<int> hRefineScheduleApply = {};
+  dlong Nelements;
+
+  int hRefineScale(std::vector<int> &schedule) {
+    int scale = 1;
+    for (int ncut : schedule) {
+      scale *= std::pow(ncut, mesh->dim);
+    }
+    return scale;
+  };
+
+  void hRefineDiffSchedule(int NelementsGlobalSim, int NelementsGlobalFld)
+  {
+    hRefineScheduleApply.clear();
+    if (hRefineScheduleSim.size()==0) return;
+
+    auto printSchedule = [&](std::vector<int> schedule, std::string name) {
+      if (platform->comm.mpiRank() == 0) {
+        std::cout << name << " [";
+        for (int i = 0; i < schedule.size(); i++) {
+          if (i) std::cout << ", ";
+          std::cout << schedule[i];
+        }
+        std::cout << "]\n";
+      }
+    };
+
+    printSchedule(hRefineScheduleSim, " h-refine schedule, sim:");
+    printSchedule(hRefineScheduleFld, " h-refine schedule, fld:");
+
+    auto checkSchedule = [&]() {
+      int NelementsBaseSim = NelementsGlobalSim / hRefineScale(hRefineScheduleSim);
+      int NelementsBaseFld = NelementsGlobalFld / hRefineScale(hRefineScheduleFld);
+      nekrsCheck(NelementsBaseSim != NelementsBaseFld,
+                 platform->comm.mpiComm(),
+                 EXIT_FAILURE,
+                 "h-refine base meshes of Sim and Fld mismatched E= %d vs %d!\n",
+                 NelementsBaseSim,
+                 NelementsBaseFld);
+
+      int ierr = (hRefineScheduleFld.size() > hRefineScheduleSim.size()) ? 1 : 0;
+      for (int i = 0; i < hRefineScheduleFld.size(); i++) {
+        if (hRefineScheduleFld[i] != hRefineScheduleSim[i]) {
+          ierr = 1;
+        }
+      }
+      nekrsCheck(ierr,
+                 platform->comm.mpiComm(),
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "h-refine schedules mismatched: Fld must be a subset of Sim!");
+    };
+
+    checkSchedule();
+
+    // generate diff schedule
+    const int ndiff = hRefineScheduleSim.size() - hRefineScheduleFld.size();
+    hRefineScheduleApply.resize(ndiff, 0);
+    for (int i = 0; i < ndiff; i++) {
+      hRefineScheduleApply[i] = hRefineScheduleSim[i + hRefineScheduleFld.size()];
+    }
+
+    printSchedule(hRefineScheduleApply, " h-refine schedule, dif:");
+  };
+
   void writeAttribute(const std::string &key_, const std::string &val)
   {
     nekrsCheck(!initialized, MPI_COMM_SELF, EXIT_FAILURE, "%s\n", "illegal to call prior to iofld::open()!");
@@ -86,6 +154,11 @@ public:
       outputMesh = (val == "true") ? true : false;
     } else if (key == "redistribute") {
       redistribute = (val == "true") ? true : false;
+    } else if (key == "hschedule") {
+      hRefineScheduleSim.clear();
+      for (auto &&s : serializeString(val, ',')) {
+        hRefineScheduleSim.push_back(std::stoi(s));
+      }
     } else {
       nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "invalid attribute %s\n", key_.c_str());
     }
@@ -102,6 +175,13 @@ public:
       if (pointInterpolation) {
         redistribute = false;
       }
+    } else if (key == "hschedule") {
+      hRefineScheduleSim.clear();
+      for (auto &&s : serializeString(val, ',')) {
+        hRefineScheduleSim.push_back(std::stoi(s));
+      }
+    } else {
+      nekrsAbort(MPI_COMM_SELF, EXIT_FAILURE, "invalid attribute %s\n", key_.c_str());
     }
   }
 
@@ -242,20 +322,30 @@ public:
 
   mesh_t *mesh;
   mesh_t *mesh_vis;
+  mesh_t *mesh_hrefine;
 
-  mesh_t *genVisMesh()
+  mesh_t *genVisMesh(dlong Nelements_ = 0, int N_ = 0, bool isVis = true)
   {
-    if (mesh_vis != mesh) {
-      meshFree(mesh_vis);
+    if (isVis) {
+      if (mesh_vis != mesh) {
+        meshFree(mesh_vis);
+      }
+    } else if (mesh_hrefine != mesh) {
+      meshFree(mesh_hrefine);
     }
 
-    auto p = (N > 0) ? N : mesh->N;
+    auto p = (N_ > 0) ? N_ : mesh->N;
+    auto E = (Nelements_ > 0) ? Nelements_ : mesh->Nelements;
     if (platform->comm.mpiRank() == 0 && platform->verbose()) {
-      std::cout << " gernerating vis mesh with N=" << p << std::endl;
+      std::cout << " gernerating vis mesh with N=" << p << " E=" << E << std::endl;
     }
+
+    hlong NelementsGlobal = E;
+    MPI_Allreduce(MPI_IN_PLACE, &NelementsGlobal, 1, MPI_INT, MPI_SUM, platform->comm.mpiComm());
 
     auto meshNew = new mesh_t();
-    meshNew->Nelements = mesh->Nelements;
+    meshNew->Nelements = E;
+    meshNew->NelementsGlobal = NelementsGlobal;
     meshNew->dim = mesh->dim;
     meshNew->Nverts = mesh->Nverts;
     meshNew->Nfaces = mesh->Nfaces;
@@ -282,6 +372,8 @@ public:
       return platform->kernelRequests.load("mesh-" + kernelName + orderSuffix);
     };
     meshNew->intpKernel[mesh->N] = intpKernel();
+
+    meshNew->hRefineIntpKernel = mesh->hRefineIntpKernel;
 
     return meshNew;
   };

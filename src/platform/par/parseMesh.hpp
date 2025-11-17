@@ -29,6 +29,17 @@ void parseMeshSection(const int rank, setupAide &options, inipp::Ini *ini)
     if (ini->extract("mesh", "boundaryidmapfluid", boundaryIDs)) {
       options.setArgs("MESHV BOUNDARY ID MAP", boundaryIDs);
     }
+
+    std::string hrefineSchedule;
+    if (ini->extract("mesh", "hrefine", hrefineSchedule)) {
+      int ncut = 1;
+      for (auto &&s : serializeString(hrefineSchedule, ',')) {
+        ncut *= std::stoi(s);
+      }
+      if (ncut > 1) {
+        options.setArgs("MESH HREFINEMENT SCHEDULE", hrefineSchedule);
+      }
+    }
   }
 }
 

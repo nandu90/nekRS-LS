@@ -81,9 +81,8 @@ mpirun -np 2 nekrs --setup turbPipe.par
 For convenience we provide various launch scripts in the `bin` directory.
 
 ## Documentation 
-For documentation, see our [readthedocs page](https://nekrs.readthedocs.io/en/latest/). For now it's just a dummy. We recognize the importance of having comprehensive documentation to support our users. Creating such documentation requires initiative and collaboration and we hope to improve it soon. 
-
-The manual pages for the `par` file and environment variables can be accessed through `nrsman`
+For documentation, see [readthedocs page](https://nekrs.readthedocs.io/en/latest/). 
+The manual pages for the `par` file and environment variables `env` can be accessed through `nrsman`
 
 ## Discussion Group
 Please visit [GitHub Discussions](https://github.com/Nek5000/nekRS/discussions). Here we help, find solutions, share ideas, and follow discussions.

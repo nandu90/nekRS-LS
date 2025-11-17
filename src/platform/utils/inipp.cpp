@@ -32,6 +32,7 @@
 #include <cctype>
 #include <sstream>
 #include <vector>
+#include <regex>
 
 #include <inipp.hpp>
 
@@ -145,20 +146,17 @@ void Ini::parse(std::stringstream & is, bool lowerValue)
         detail::rtrim(variable);
         detail::ltrim(value);
 
-        std::string::size_type start_position = 0;
-        std::string::size_type end_position = 0; 
-        std::string valueInQuotes;
-
-        start_position = value.find("\"");
-        if (start_position != std::string::npos)
-        {
-          ++start_position;
-          end_position = value.find("\"");
-          if (end_position != std::string::npos)
-          {
-            valueInQuotes = value.substr(start_position, end_position - start_position - 1);
-          }    
-        }
+        std::vector<std::string> quotedWords;
+        { 
+          std::regex re("\"([^\"]*)\"");  // Match text inside double quotes
+          std::smatch match;
+ 
+          auto it = value.cbegin();
+          while (std::regex_search(it, value.cend(), match, re)) {
+              quotedWords.push_back(match[1]);  // Capture group inside quotes
+              it = match.suffix().first;
+          }
+        } 
  
         const auto isEnvVar = value.find(envPrefix, 0) != std::string::npos;
         if (isEnvVar) { 
@@ -175,10 +173,18 @@ void Ini::parse(std::stringstream & is, bool lowerValue)
                     [](int c){return std::tolower(c);});
         }
 
-        if (start_position != std::string::npos)
-          value.replace(start_position, end_position - start_position, valueInQuotes);
-
-        value.erase(std::remove(value.begin(), value.end(), '"'), value.end());
+        // replace the quoted section (including quotes) with the original word
+        size_t pos = 0;
+        for (const auto& word : quotedWords) {
+            // find next pair of quotes
+            size_t start = value.find('"', pos);
+            if (start == std::string::npos) break;
+            size_t end = value.find('"', start + 1);
+            if (end == std::string::npos) break;
+  
+            value.replace(start, end - start + 1, word);
+            pos = start + word.size(); // advance
+        }
 
         auto & sec = sections[section];
         if (sec.find(variable) == sec.end()) {

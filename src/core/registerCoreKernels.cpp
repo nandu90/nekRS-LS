@@ -221,7 +221,7 @@ void registerCoreKernels(occa::properties kernelInfoBC)
       {
         int nelgt, nelgv;
         const std::string meshFile = platform->options.getArgs("MESH FILE");
-        re2::nelg(meshFile, nelgt, nelgv, platform->comm.mpiComm());
+        re2::nelg(meshFile, false, nelgt, nelgv, platform->comm.mpiComm());
 
         bool verbose = platform->verbose();
         const int verbosity = verbose ? 2 : 1;

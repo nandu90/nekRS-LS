@@ -175,6 +175,7 @@ static std::vector<std::string> meshKeys = {
     {"connectivitytol"},
     {"boundaryidmapfluid"},
     {"boundaryidmap"},
+    {"hrefine"},
 };
 
 static std::vector<std::string> velocityKeys = {

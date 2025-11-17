@@ -71,6 +71,8 @@ setupAide *setDefaultSettings(std::string casename)
   options->setArgs("CHECKPOINT OUTPUT MESH", "FALSE");
   options->setArgs("CHECKPOINT PRECISION", "FP32");
 
+  options->setArgs("CHECKPOINT READ CRYSTAL ROUTER", "TRUE");
+
   options->setArgs("START TIME", "0.0");
 
   options->setArgs("ENABLE GS COMM OVERLAP", "TRUE");
@@ -205,7 +207,7 @@ void setup(MPI_Comm commg_in,
 
   {
     int nelgt, nelgv;
-    re2::nelg(platform->options.getArgs("MESH FILE"), nelgt, nelgv, comm);
+    re2::nelg(platform->options.getArgs("MESH FILE"), false, nelgt, nelgv, comm);
     nekrsCheck(size > nelgv,
                platform->comm.mpiComm(),
                EXIT_FAILURE,

@@ -211,6 +211,8 @@ connectivityTol             <float>
                             0.2 [D]
 
 file                        "<string>"                                 name of .re2 file
+
+hRefine                     <int>, <int>, ...                          number of splits per direction along an element  
 ----------------------------------------------------------------------------------------------------------------------
 [GEOM]
 
