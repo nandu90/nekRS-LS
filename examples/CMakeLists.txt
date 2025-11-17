@@ -130,6 +130,8 @@ add("ktauChannel" 2 "channel.par" "1;2" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
 
 add("periodicHill" 2 "periodicHill.par" "1;2;3" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
 
+add("scalarShock" 2 "scalarShock.par" "1" "${USE_FP32}" "${dir}" "${BUILD_ONLY}")
+
 add_eddy_neknek()
 add_eddy_nekneknek()
 
