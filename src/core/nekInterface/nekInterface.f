@@ -224,7 +224,7 @@ c-----------------------------------------------------------------------
         do ifc = 1,2*ndim
          if(bc(5,ifc,iel,2).gt.0) then
            boundaryIDt(ifc,iel) = bc(5,ifc,iel,2)
-           idx = ibsearch(bIDtMap, bIDtMapSize, bc(5,ifc,iel,2))
+           idx = lsearch_ur(bIDtMap, bIDtMapSize, boundaryIDt(ifc,iel))
            if(idx.gt.0) then 
              boundaryIDt(ifc,iel) = idx
            endif
