@@ -1,7 +1,5 @@
 #ifdef __okl__
 
-#include "shock.oudf"
-
 #endif
 
 void extractLine(double time)
@@ -51,13 +49,43 @@ void extractLine(double time)
   }
 }
 
+dfloat exactSolution(const dfloat x)
+{
+    dfloat exact = 0.0;
+    if(x > 0.35 && x < 0.55){
+      exact = 1.0; 
+    }
+    else if(x > 0.7 && x < 0.9){
+      exact = sqrt(1.0 - pow((x-0.8)/0.1, 2.0));
+    }
+    else if(x > 0.08 && x <= 0.15){
+      exact = (1.0/0.0049)*x*x - (0.16/0.0049)*x + 0.0064/0.0049;
+    }
+    else if(x > 0.15 && x <= 0.22){
+      exact = (1.0/0.0049)*x*x - (0.44/0.0049)*x + 0.0484/0.0049;
+    }
+    return exact;
+}
+
 void UDF_Setup()
 {
   auto mesh = nrs->meshV;
 
+  std::vector<dfloat> U(mesh->dim * nrs->fluid->fieldOffset, 0.0);
+  std::vector<dfloat> sexact(mesh->Nlocal, 0.0);
+
   if (platform->options.getArgs("RESTART FILE NAME").empty()) {
     auto &scalar = nrs->scalar;
-    udfic(mesh->Nlocal, nrs->fieldOffset, mesh->o_x, nrs->fluid->o_U, scalar->o_S);
+    auto [x, y, z] = mesh->xyzHost();
+    for(int n = 0; n < mesh->Nlocal; n++) {
+      U[n + 0 * nrs->fluid->fieldOffset] = 1.0;
+      U[n + 1 * nrs->fluid->fieldOffset] = 0.0;
+      U[n + 2 * nrs->fluid->fieldOffset] = 0.0;
+      sexact[n] = exactSolution(x[n]);
+    }
+    nrs->fluid->o_U.copyFrom(U.data(), U.size());
+    nrs->scalar->o_solution("s00").copyFrom(sexact.data(), sexact.size()); 
+    nrs->scalar->o_solution("s01").copyFrom(sexact.data(), sexact.size()); 
   }
 }
 

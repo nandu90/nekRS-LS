@@ -134,6 +134,12 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
       if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
         addRequest("double", kernel);
       }
+      if(svvForm) {
+        auto kernel = axKernel(double{}, float{}, svvForm);
+        if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
+          addRequest("double", kernel, svvForm);
+        }
+      }
     }
   }
 
