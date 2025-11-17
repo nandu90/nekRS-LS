@@ -102,7 +102,7 @@ void UDF_Setup()
 void UDF_ExecuteStep(double time, int tstep)
 {
   if(nrs->lastStep){
-    extractLine(time);
+    // extractLine(time);
   }
 
   if(ciMode) ciTestErrors(nrs, time, tstep);
