@@ -1,3 +1,5 @@
+#include "ci.inc"
+
 #ifdef __okl__
 
 #endif
@@ -67,6 +69,14 @@ dfloat exactSolution(const dfloat x)
     return exact;
 }
 
+void UDF_Setup0(MPI_Comm comm, setupAide &options)
+{
+  options.getArgs("CI-MODE", ciMode);
+  if (ciMode) {
+    ciSetup(comm, options);
+  }
+}
+
 void UDF_Setup()
 {
   auto mesh = nrs->meshV;
@@ -94,4 +104,6 @@ void UDF_ExecuteStep(double time, int tstep)
   if(nrs->lastStep){
     extractLine(time);
   }
+
+  if(ciMode) ciTestErrors(nrs, time, tstep);
 }
