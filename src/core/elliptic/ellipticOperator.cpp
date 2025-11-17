@@ -143,6 +143,10 @@ void ellipticAx(elliptic_t *elliptic,
     flopCount += (15 + 6) * mesh->Np;
   }
 
+  if (elliptic->svv) {
+    flopCount += mesh->Np * 12 * mesh->Nq + 15 * mesh->Np + mesh->Np;
+  }
+
   flopCount *= elliptic->Nfields * static_cast<double>(NelementsList);
 
   const double FPfactor = (o_Aq.dtype() == occa::dtype::get<float>()) ? 0.5 : 1.0;

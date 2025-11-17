@@ -11,7 +11,6 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
   // hardwired as MG currently does not support Nfields > 1
   constexpr int Nfields{1};
   const auto stressForm = false;
-  const auto svv = false; //TODO
 
   auto kernelInfo = platform->kernelInfo + meshKernelProperties(N);
   kernelInfo["defines/p_Nfields"] = Nfields;
@@ -43,7 +42,7 @@ void registerAxKernels(const std::string &section, int N, int poissonEquation)
         !coeffField,
         poissonEquation,
         false,
-        svv,
+        false, // no svv added to this preconditioner
         Nfields,
         false, // no stress formulation in preconditioner
         verbosity,

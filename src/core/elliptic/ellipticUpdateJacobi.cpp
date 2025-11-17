@@ -71,6 +71,7 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
   dfloat flopCount = 0.0;
   flopCount += 12 * mesh->Nq + 12;
   flopCount += (elliptic->poisson) ? 0.0 : 2.0;
+  flopCount += (elliptic->svv) ? 12 * mesh->Nq + 12 : 0.0;
   flopCount *= static_cast<double>(mesh->Nlocal) * elliptic->Nfields;
   flopCount *= (std::is_same<pfloat, float>::value && !std::is_same<pfloat, dfloat>::value) ? 0.5 : 1.0;
 
