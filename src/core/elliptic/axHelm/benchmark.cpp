@@ -406,13 +406,13 @@ occa::kernel benchmarkAx(int Nelements,
       size_t bytesMoved = Ndim * 2 * Np * wordSize; // x, Ax
       bytesMoved += 6 * Np_g * wordSize;            // geo
 
-      if (!poisson || stressForm) {
+      if ((!poisson && !svv) || stressForm) {
         bytesMoved += 1 * Np * wordSize; // Jw
       }
 
       if (!constCoeff) {
         bytesMoved += 1 * Np * wordSize; // lambda1
-        if (!poisson) {
+        if (!poisson && !svv) {
           bytesMoved += 1 * Np * wordSize; // lambda2
         }
       }
@@ -430,7 +430,7 @@ occa::kernel benchmarkAx(int Nelements,
         flopCount += 3 * Np;
       }
 
-      if (!poisson) {
+      if (!poisson && !svv) {
         flopCount += 3 * Np;
       }
 
