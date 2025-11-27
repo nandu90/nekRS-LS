@@ -2,14 +2,12 @@
 
 #include "platform.hpp"
 #include "svv.hpp"
-#include "udf.hpp"
-
 
 /**
  * Spectrally Vanishing Viscosity method (https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5397463) 
  **/
 
-namespace svv
+namespace //private
 {
   std::vector<dfloat> squareMatrixMultiply(int M, const std::vector<dfloat>& A_, const std::vector<dfloat>& B_)
   {
@@ -57,25 +55,26 @@ namespace svv
     return B;
   }
 
-  void convoluteDerivative(mesh_t* mesh, const dfloat NSVV, occa::memory& o_svvD, occa::memory& o_svvDT)
-  {
-    auto B = legendreBasis(mesh);
-    auto Binv = platform->linAlg->matrixInverse(mesh->Nq, B);
+} //namespace
 
-    std::vector<dfloat> Q(mesh->Nq * mesh->Nq, 0.0);
-    for (int i=0; i < mesh->Nq; i++){
-      Q[i * mesh->Nq + i] = pow(i/ dfloat(mesh->N), dfloat(mesh->N)/NSVV);
-    }
+void svv::convoluteDerivative(mesh_t* mesh, const dfloat NSVV, occa::memory& o_svvD, occa::memory& o_svvDT)
+{
+  auto B = legendreBasis(mesh);
+  auto Binv = platform->linAlg->matrixInverse(mesh->Nq, B);
 
-    auto tmp = squareMatrixMultiply(mesh->Nq, B, Q);
-
-    auto cmat = squareMatrixMultiply(mesh->Nq, tmp, Binv);
-
-    std::vector<dfloat> D(mesh->D, mesh->D + mesh->Nq * mesh->Nq);
-    auto svvD = squareMatrixMultiply(mesh->Nq, cmat, D);
-    auto svvDT = platform->linAlg->matrixTranspose(mesh->Nq, svvD);
-
-    o_svvD.copyFrom(svvD.data());
-    o_svvDT.copyFrom(svvDT.data());
+  std::vector<dfloat> Q(mesh->Nq * mesh->Nq, 0.0);
+  for (int i=0; i < mesh->Nq; i++){
+    Q[i * mesh->Nq + i] = pow(i/ dfloat(mesh->N), dfloat(mesh->N)/NSVV);
   }
-} //namespace svv
+
+  auto tmp = squareMatrixMultiply(mesh->Nq, B, Q);
+
+  auto cmat = squareMatrixMultiply(mesh->Nq, tmp, Binv);
+
+  std::vector<dfloat> D(mesh->D, mesh->D + mesh->Nq * mesh->Nq);
+  auto svvD = squareMatrixMultiply(mesh->Nq, cmat, D);
+  auto svvDT = platform->linAlg->matrixTranspose(mesh->Nq, svvD);
+
+  o_svvD.copyFrom(svvD.data());
+  o_svvDT.copyFrom(svvDT.data());
+}
