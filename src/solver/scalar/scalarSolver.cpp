@@ -565,8 +565,14 @@ void scalar_t::mueSVV()
       if(!initialized) {
         this->o_svvf = platform->device.malloc<dfloat>(_fieldOffset);
         this->o_svvmu = platform->device.malloc<dfloat>(NSfields * _fieldOffset);
+
+        if(!platform->options.compareArgs("MOVING MESH","TRUE"))
+          launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
+
+        initialized = true;
       }
-      if(!initialized || platform->options.compareArgs("MOVING MESH","TRUE"))
+
+      if(platform->options.compareArgs("MOVING MESH","TRUE"))
         launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
 
       if(!umagInitialized) {
@@ -579,10 +585,8 @@ void scalar_t::mueSVV()
 
       auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
       platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
-
     }
   }
-  initialized = true;
 }
 
 void scalar_t::applyDirichlet(double time)
