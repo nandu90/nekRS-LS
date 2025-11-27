@@ -128,12 +128,10 @@ void elliptic::updatePreconditioner()
   fflush(stdout);
 }
 
-void elliptic::solve(const occa::memory &o_lambda0,
-                     const occa::memory &o_lambda1,
-                     const occa::memory &RHS,
+void elliptic::solve(const occa::memory &RHS,
                      occa::memory x)
 {
-  _solve(o_lambda0, o_lambda1, RHS, x);
+  _solve(RHS, x);
 };
 
 std::string &elliptic::name() const
@@ -196,6 +194,21 @@ void elliptic::finalResidual(dfloat val)
   solver->resNorm = val;
 };
 
+void elliptic::mueSVV(const occa::memory& o_svvmue)
+{
+  solver->o_svvmue = o_svvmue;
+};
+
+void elliptic::coeff0HLM(const occa::memory& o_lambda0)
+{
+  solver->o_lambda0 = o_lambda0;
+};
+
+void elliptic::coeff1HLM(const occa::memory& o_lambda1)
+{
+  solver->o_lambda1 = o_lambda1;
+};
+
 dlong elliptic::Nmasked()
 {
   return solver->Nmasked;
@@ -250,15 +263,10 @@ std::tuple<int, int> elliptic::projectionCounters() const
   return {0, 0};
 };
 
-void elliptic::_solve(const occa::memory &o_lambda0,
-                      const occa::memory &o_lambda1,
-                      const occa::memory &o_rhs,
+void elliptic::_solve(const occa::memory &o_rhs,
                       occa::memory o_x)
 {
   auto &elliptic = this->solver;
-
-  elliptic->o_lambda0 = o_lambda0;
-  elliptic->o_lambda1 = o_lambda1;
 
   auto& options = elliptic->options;
   auto& precon = elliptic->precon;
@@ -857,7 +865,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   fflush(stdout);
 }
 
-void elliptic::setupEllipticSVV(occa::memory& o_svvlambda)
+void elliptic::setupSVV()
 {
   auto *elliptic = solver;
 
@@ -871,8 +879,6 @@ void elliptic::setupEllipticSVV(occa::memory& o_svvlambda)
   dfloat NSVV = 2.0;
   elliptic->options.getArgs("REGULARIZATION SVV FILTER POWER", NSVV);
   svv::convoluteDerivative(elliptic->mesh, NSVV, elliptic->o_svvD, elliptic->o_svvDT);
-
-  elliptic->o_svvlambda = o_svvlambda;
 }
 
 void elliptic::op(const occa::memory &o_q, occa::memory &o_Aq, bool masked)

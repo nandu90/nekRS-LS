@@ -719,7 +719,8 @@ void scalar_t::setupEllipticSolver()
 
     if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV")) {
       auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
-      ellipticSolver[is]->setupEllipticSVV(o_svvmu);
+      ellipticSolver[is]->mueSVV(o_svvmu);
+      ellipticSolver[is]->setupSVV();
     }
   }
 }
@@ -851,7 +852,9 @@ void scalar_t::solve(double time, int stage)
       return o_S0;
     }();
 
-    this->ellipticSolver[is]->solve(o_lambda0, o_lambda1, o_rhs, o_Si);
+    this->ellipticSolver[is]->coeff0HLM(o_lambda0);
+    this->ellipticSolver[is]->coeff1HLM(o_lambda1);
+    this->ellipticSolver[is]->solve(o_rhs, o_Si);
     o_Si.copyTo(o_S, o_Si.size(), fieldOffsetScan[is]);
   }
 

@@ -19,7 +19,7 @@ public:
 
   void updatePreconditioner(); // to accomodate mesh or coeff changes
 
-  void solve(const occa::memory& o_lambda0, const occa::memory& o_lambda1, const occa::memory& RHS, occa::memory x);
+  void solve(const occa::memory& RHS, occa::memory x);
 
   std::string& name() const;
   setupAide& options();
@@ -52,7 +52,11 @@ public:
   void userPreconditioner(const std::function<void(const occa::memory &o_r, occa::memory &o_z)>& f);
   void userAx(const std::function<void(elliptic_t *elliptic, dlong NelementsList, const occa::memory &o_elementsList, const occa::memory &o_x, occa::memory &o_Ax)>& f);
 
-  void setupEllipticSVV(occa::memory& o_svvlambda);
+  void coeff0HLM(const occa::memory& o_lambda0);
+  void coeff1HLM(const occa::memory& o_lambda1);
+
+  void mueSVV(const occa::memory& o_svvmue);
+  void setupSVV();
 
   std::tuple<int, int> projectionCounters() const; 
 
@@ -60,9 +64,7 @@ private:
   elliptic_t *solver;
   std::vector<int> _EToB;
 
-  void _solve(const occa::memory &o_lambda0,
-              const occa::memory &o_lambda1,
-              const occa::memory &o_r,
+  void _solve(const occa::memory &o_r,
               occa::memory o_x);
   
   void _setup(const occa::memory &o_lambda0, const occa::memory &o_lambda1);

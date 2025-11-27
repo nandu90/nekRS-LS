@@ -115,7 +115,7 @@ void ellipticAx(elliptic_t *elliptic,
         o_geom_factors,
         elliptic->o_svvD,
         elliptic->o_svvDT,
-        elliptic->o_svvlambda,
+        elliptic->o_svvmue,
         o_NULL,
         o_q,
         o_Aq);

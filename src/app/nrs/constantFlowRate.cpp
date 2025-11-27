@@ -95,7 +95,8 @@ void nrs_t::computeHomogenousStokesSolution(double time)
   }();
 
   platform->timer.tic(fluid->pressureName + "Solve");
-  fluid->ellipticSolverP->solve(o_lambda0, o_NULL, o_Prhs, o_Pc);
+  fluid->ellipticSolverP->coeff0HLM(o_lambda0);
+  fluid->ellipticSolverP->solve(o_Prhs, o_Pc);
   platform->timer.toc(fluid->pressureName + "Solve");
   o_Prhs.free();
   o_lambda0.free();
@@ -140,14 +141,23 @@ void nrs_t::computeHomogenousStokesSolution(double time)
   platform->linAlg->axpby(mesh->Nlocal, g0 / dt[0], fluid->o_rho, 0.0, o_lambda1);
 
   if (fluid->ellipticSolver.size() == 1) {
-    fluid->ellipticSolver[0]->solve(o_lambda0, o_lambda1, o_RhsVel, o_Uc);
+    fluid->ellipticSolver[0]->coeff0HLM(o_lambda0);
+    fluid->ellipticSolver[0]->coeff1HLM(o_lambda1);
+    fluid->ellipticSolver[0]->solve(o_RhsVel, o_Uc);
   } else {
     occa::memory o_Ucx = o_Uc + 0 * fieldOffset;
     occa::memory o_Ucy = o_Uc + 1 * fieldOffset;
     occa::memory o_Ucz = o_Uc + 2 * fieldOffset;
-    fluid->ellipticSolver[0]->solve(o_lambda0, o_lambda1, o_RhsVel.slice(0 * fieldOffset), o_Ucx);
-    fluid->ellipticSolver[1]->solve(o_lambda0, o_lambda1, o_RhsVel.slice(1 * fieldOffset), o_Ucy);
-    fluid->ellipticSolver[2]->solve(o_lambda0, o_lambda1, o_RhsVel.slice(2 * fieldOffset), o_Ucz);
+    fluid->ellipticSolver[0]->coeff0HLM(o_lambda0);
+    fluid->ellipticSolver[0]->coeff1HLM(o_lambda1);
+    fluid->ellipticSolver[1]->coeff0HLM(o_lambda0);
+    fluid->ellipticSolver[1]->coeff1HLM(o_lambda1);
+    fluid->ellipticSolver[2]->coeff0HLM(o_lambda0);
+    fluid->ellipticSolver[2]->coeff1HLM(o_lambda1);
+
+    fluid->ellipticSolver[0]->solve(o_RhsVel.slice(0 * fieldOffset), o_Ucx);
+    fluid->ellipticSolver[1]->solve(o_RhsVel.slice(1 * fieldOffset), o_Ucy);
+    fluid->ellipticSolver[2]->solve(o_RhsVel.slice(2 * fieldOffset), o_Ucz);
   }
   platform->timer.toc(fluid->velocityName + "Solve");
 

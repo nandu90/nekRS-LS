@@ -111,7 +111,7 @@ struct elliptic_t {
   occa::memory o_lambda1;
   dfloat lambda1Avg = NAN;
 
-  occa::memory o_svvlambda;
+  occa::memory o_svvmue;
   occa::memory o_svvD;
   occa::memory o_svvDT;
 

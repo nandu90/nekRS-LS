@@ -272,7 +272,8 @@ void fluidSolver_t::solvePressure(double time, int stage)
   platform->timer.toc(pressureName + " rhs");
   platform->flopCounter->add(pressureName + " rhs", flopCount);
 
-  ellipticSolverP->solve(o_lambda0(false), o_NULL, o_pRhs, o_P.slice(0, mesh->Nlocal));
+  ellipticSolverP->coeff0HLM(o_lambda0(false));
+  ellipticSolverP->solve(o_pRhs, o_P.slice(0, mesh->Nlocal));
 
   if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
@@ -442,14 +443,22 @@ void fluidSolver_t::solveVelocity(double time, int stage)
   }
 
   if (ellipticSolver.at(0)->Nfields() > 1) {
-    ellipticSolver.at(0)->solve(o_lambda0, o_lambda1, o_rhs, o_U.slice(0, fieldOffsetSum));
+    ellipticSolver.at(0)->coeff0HLM(o_lambda0);
+    ellipticSolver.at(0)->coeff1HLM(o_lambda1);
+    ellipticSolver.at(0)->solve(o_rhs, o_U.slice(0, fieldOffsetSum));
   } else {
     const auto o_rhsX = o_rhs.slice(0 * fieldOffset, mesh->Nlocal);
     const auto o_rhsY = o_rhs.slice(1 * fieldOffset, mesh->Nlocal);
     const auto o_rhsZ = o_rhs.slice(2 * fieldOffset, mesh->Nlocal);
-    ellipticSolver.at(0)->solve(o_lambda0, o_lambda1, o_rhsX, o_U.slice(0 * fieldOffset, mesh->Nlocal));
-    ellipticSolver.at(1)->solve(o_lambda0, o_lambda1, o_rhsY, o_U.slice(1 * fieldOffset, mesh->Nlocal));
-    ellipticSolver.at(2)->solve(o_lambda0, o_lambda1, o_rhsZ, o_U.slice(2 * fieldOffset, mesh->Nlocal));
+    ellipticSolver.at(0)->coeff0HLM(o_lambda0);
+    ellipticSolver.at(0)->coeff1HLM(o_lambda1);
+    ellipticSolver.at(1)->coeff0HLM(o_lambda0);
+    ellipticSolver.at(1)->coeff1HLM(o_lambda1);
+    ellipticSolver.at(2)->coeff0HLM(o_lambda0);
+    ellipticSolver.at(2)->coeff1HLM(o_lambda1);
+    ellipticSolver.at(0)->solve(o_rhsX, o_U.slice(0 * fieldOffset, mesh->Nlocal));
+    ellipticSolver.at(1)->solve(o_rhsY, o_U.slice(1 * fieldOffset, mesh->Nlocal));
+    ellipticSolver.at(2)->solve(o_rhsZ, o_U.slice(2 * fieldOffset, mesh->Nlocal));
   }
 
   if (platform->verbose()) {

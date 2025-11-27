@@ -131,7 +131,8 @@ void geomSolver_t::solve(double time, int iter)
     o_U.copyFrom(o_Ue);
   }
 
-  ellipticSolver.at(0)->solve(o_lambda0, o_NULL, o_rhs, o_U.slice(0, fieldOffsetSum));
+  ellipticSolver.at(0)->coeff0HLM(o_lambda0);
+  ellipticSolver.at(0)->solve(o_rhs, o_U.slice(0, fieldOffsetSum));
 
   platform->timer.toc("geomSolve");
 }

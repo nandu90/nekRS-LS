@@ -64,7 +64,7 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
                                                   mesh->o_ggeo,
                                                   elliptic->o_svvD,
                                                   elliptic->o_svvDT,
-                                                  elliptic->o_svvlambda,
+                                                  elliptic->o_svvmue,
                                                   o_NULL,
                                                   o_invDiagA);
 
