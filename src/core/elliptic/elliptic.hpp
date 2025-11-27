@@ -52,7 +52,7 @@ public:
   void userPreconditioner(const std::function<void(const occa::memory &o_r, occa::memory &o_z)>& f);
   void userAx(const std::function<void(elliptic_t *elliptic, dlong NelementsList, const occa::memory &o_elementsList, const occa::memory &o_x, occa::memory &o_Ax)>& f);
 
-  void setupEllipticSVV(occa::memory& o_svvD, occa::memory& o_svvDT, occa::memory& o_svvlambda);
+  void setupEllipticSVV(occa::memory& o_svvlambda);
 
   std::tuple<int, int> projectionCounters() const; 
 

@@ -11,21 +11,6 @@
 
 namespace svv
 {
-  oogs_t *gsh = nullptr;
-  mesh_t *mesh = nullptr;
-
-  occa::memory o_svvf;
-
-  occa::memory o_scale;
-  occa::memory o_applySVV;
-
-  bool enableSVV = false;
-  bool isScaleInitialized = false;
-  bool movingMesh = false;
-
-  dlong fieldOffset;
-  dlong NSfields;
-
   std::vector<dfloat> squareMatrixMultiply(int M, const std::vector<dfloat>& A_, const std::vector<dfloat>& B_)
   {
     double alpha = 1.0, beta = 0.0;
@@ -58,7 +43,7 @@ namespace svv
     return p3;
   }
 
-  std::vector<dfloat> legendreBasis()
+  std::vector<dfloat> legendreBasis(mesh_t* mesh)
   {
     std::vector<dfloat> B(mesh->Nq * mesh->Nq, 0.0);
 
@@ -72,9 +57,9 @@ namespace svv
     return B;
   }
 
-  void convoluteDerivative(const dfloat NSVV, occa::memory& o_svvD, occa::memory& o_svvDT)
+  void convoluteDerivative(mesh_t* mesh, const dfloat NSVV, occa::memory& o_svvD, occa::memory& o_svvDT)
   {
-    auto B = legendreBasis();
+    auto B = legendreBasis(mesh);
     auto Binv = platform->linAlg->matrixInverse(mesh->Nq, B);
 
     std::vector<dfloat> Q(mesh->Nq * mesh->Nq, 0.0);
@@ -92,58 +77,5 @@ namespace svv
 
     o_svvD.copyFrom(svvD.data());
     o_svvDT.copyFrom(svvDT.data());
-  }
-
-  void setup(mesh_t *mesh_, const dlong _fieldOffset, const dlong _NSfields)
-  {
-    mesh = mesh_;
-    gsh = mesh->oogs;
-
-    fieldOffset = _fieldOffset;
-    NSfields = _NSfields;
-
-    o_svvf = platform->device.malloc<dfloat>(fieldOffset);
-
-    enableSVV = true;
-
-    std::vector<dfloat> scale(NSfields, 0.1);
-
-    std::vector<dlong> applySVV(NSfields, 0);
-
-    for (int is = 0; is < NSfields; is++) {
-      const auto sid = scalarDigitStr(is);
-
-      if(platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD","SVV")) {
-        applySVV[is] = 1;
-
-        platform->options.getArgs("SCALAR" + sid + " REGULARIZATION SVV SCALING COEFF", scale[is]);
-      }
-    }
-
-    o_applySVV = platform->device.malloc<dlong>(NSfields, applySVV.data());
-    o_scale = platform->device.malloc<dfloat>(NSfields, scale.data());
-
-    movingMesh = platform->options.compareArgs("MOVING MESH","TRUE");
-  }
-
-  void computeViscosityScale(const dlong vfieldOffset, const occa::memory& o_U, occa::memory& o_svvmu)
-  {
-    if(!enableSVV) return;
-
-    if(!isScaleInitialized || movingMesh) 
-      launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
-
-    launchKernel("core-svv::svvViscosityScale",
-                 mesh->Nelements * mesh->Np,
-                 vfieldOffset,
-                 fieldOffset,
-                 NSfields,
-                 o_applySVV,
-                 o_scale,
-                 o_U,
-                 o_svvf,
-                 o_svvmu);
-
-    isScaleInitialized = true;
   }
 } //namespace svv

@@ -4,6 +4,7 @@
 #include "ellipticPrecon.h"
 #include "maskedFaceIds.hpp"
 #include "app.hpp"
+#include "svv.hpp"
 
 static std::vector<int> generateEllipticEToB(const std::string &name, mesh_t *mesh)
 {
@@ -856,14 +857,20 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   fflush(stdout);
 }
 
-void elliptic::setupEllipticSVV(occa::memory& o_svvD, occa::memory& o_svvDT, occa::memory& o_svvlambda)
+void elliptic::setupEllipticSVV(occa::memory& o_svvlambda)
 {
   auto *elliptic = solver;
 
   elliptic->svv = 1;
 
-  elliptic->o_svvD = o_svvD;
-  elliptic->o_svvDT = o_svvDT;
+  const dlong Nmodes = elliptic->mesh->Nq;
+
+  elliptic->o_svvD = platform->device.malloc<dfloat>(Nmodes * Nmodes);
+  elliptic->o_svvDT = platform->device.malloc<dfloat>(Nmodes * Nmodes);
+
+  dfloat NSVV = 2.0;
+  elliptic->options.getArgs("REGULARIZATION SVV FILTER POWER", NSVV);
+  svv::convoluteDerivative(elliptic->mesh, NSVV, elliptic->o_svvD, elliptic->o_svvDT);
 
   elliptic->o_svvlambda = o_svvlambda;
 }

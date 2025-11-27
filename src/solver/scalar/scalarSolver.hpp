@@ -48,7 +48,8 @@ public:
 
   void finalize() override;
 
-  void applyAVM();
+  void mueAVM();
+  void mueSVV();
 
   std::function<occa::memory(double, int)> userImplicitLinearTerm = nullptr;
 
@@ -130,9 +131,8 @@ public:
   occa::memory o_filterS;
   occa::memory o_filterRT;
 
-  occa::memory o_svvD;
-  occa::memory o_svvDT;
   occa::memory o_svvmu;
+  occa::memory o_svvf;
 
   int Nsubsteps = 0;
 

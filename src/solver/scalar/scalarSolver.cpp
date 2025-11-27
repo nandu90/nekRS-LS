@@ -3,7 +3,6 @@
 #include "advectionSubCycling.hpp"
 #include "avm.hpp"
 #include "gjp.hpp"
-#include "svv.hpp"
 #include <registerKernels.hpp>
 
 static void advectionFlops(mesh_t *mesh, int Nfields)
@@ -267,7 +266,6 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
   bool filteringEnabled = false;
   bool avmEnabled = false;
-  bool svvEnabled = false;
   for (int is = 0; is < NSfields; is++) {
     const auto sid = scalarDigitStr(is);
 
@@ -277,10 +275,6 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
     if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
       avmEnabled = true;
-    }
-
-    if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV")) {
-      svvEnabled = true;
     }
   }
 
@@ -317,36 +311,6 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
     o_filterS.copyFrom(filterS.data(), NSfields);
     o_applyFilterRT.copyFrom(applyFilterRT.data(), NSfields);
-  }
-
-  if(svvEnabled) {
-    svv::setup(meshV, _fieldOffset, NSfields);
-
-    this->o_svvmu = platform->device.malloc<dfloat>(fieldOffsetSum);
-
-    const dlong Nmodes = meshV->N + 1; // assumed to be the same for all fields
-    this->o_svvD = platform->device.malloc<dfloat>(NSfields * Nmodes * Nmodes);
-    this->o_svvDT = platform->device.malloc<dfloat>(NSfields * Nmodes * Nmodes);
-
-    for (int is = 0; is < NSfields; is++) {
-      std::string sid = scalarDigitStr(is);
-
-      if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "NONE")) {
-        continue;
-      }
-      if (!compute[is]) {
-        continue;
-      }
-
-      if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV")) {
-        auto o_svvD = this->o_svvD.slice(is * Nmodes * Nmodes, Nmodes * Nmodes);
-        auto o_svvDT = this->o_svvDT.slice(is * Nmodes * Nmodes, Nmodes * Nmodes);
-
-        dfloat NSVV = 2.0;
-        options.getArgs("SCALAR" + sid + " REGULARIZATION SVV FILTER POWER", NSVV);
-        svv::convoluteDerivative(NSVV, o_svvD, o_svvDT);
-      }
-    }
   }
 
   if (avmEnabled) {
@@ -498,7 +462,7 @@ void scalar_t::restoreSolutionState()
   o_prop0.copyTo(o_prop, o_prop.length());
 }
 
-void scalar_t::applyAVM()
+void scalar_t::mueAVM()
 {
   auto verbose = platform->verbose();
   auto mesh = this->meshV; // assumes mesh is the same for all scalars
@@ -582,6 +546,43 @@ void scalar_t::applyAVM()
       }
     }
   }
+}
+
+void scalar_t::mueSVV()
+{
+  auto mesh = this->meshV;
+
+  static auto initialized = false;
+
+  auto umagInitialized = false;
+
+  auto o_umag = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+  
+  for (int is = 0; is < NSfields; is++) {
+    const auto sid = scalarDigitStr(is);
+
+    if(platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV")) {
+      if(!initialized) {
+        this->o_svvf = platform->device.malloc<dfloat>(_fieldOffset);
+        this->o_svvmu = platform->device.malloc<dfloat>(NSfields * _fieldOffset);
+      }
+      if(!initialized || platform->options.compareArgs("MOVING MESH","TRUE"))
+        launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
+
+      if(!umagInitialized) {
+        platform->linAlg->magVector(mesh->Nlocal, vFieldOffset, o_U, o_umag);
+        umagInitialized = true;
+      }
+
+      dfloat scale = 0.1;
+      platform->options.getArgs("SCALAR" + sid + " REGULARIZATION SVV SCALING COEFF", scale);
+
+      auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
+      platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
+
+    }
+  }
+  initialized = true;
 }
 
 void scalar_t::applyDirichlet(double time)
@@ -717,11 +718,8 @@ void scalar_t::setupEllipticSolver()
     ellipticSolver[is] = new elliptic("scalar" + sid, _mesh[is], _fieldOffset, o_lambda0, o_lambda1);
 
     if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV")) {
-      auto Nmodes = _mesh[is]->Nq;
-      auto o_svvD = this->o_svvD.slice(is * Nmodes * Nmodes, Nmodes * Nmodes);
-      auto o_svvDT = this->o_svvDT.slice(is * Nmodes * Nmodes, Nmodes * Nmodes);
       auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
-      ellipticSolver[is]->setupEllipticSVV(o_svvD, o_svvDT, o_svvmu);
+      ellipticSolver[is]->setupEllipticSVV(o_svvmu);
     }
   }
 }
