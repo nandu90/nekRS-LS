@@ -231,6 +231,13 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
     }
 
     cvodeSolve[is] = options.compareArgs("SCALAR" + sid + " SOLVER", "CVODE");
+
+    nekrsCheck(cvodeSolve[is] && options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV"),
+               platform->comm.mpiComm(),
+               EXIT_FAILURE,
+               "%s\n",
+               "CVODE solver not supported with SVV regularization!");
+
     anyCvodeSolver |= cvodeSolve[is];
     anyEllipticSolver |= (!cvodeSolve[is] && compute[is]);
 
