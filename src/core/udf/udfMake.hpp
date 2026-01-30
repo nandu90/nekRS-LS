@@ -141,7 +141,8 @@ int udfMake(setupAide &options, const std::string &solverName, int rank)
                                                       {"nekrs_RANSktau_hpp_", "RANSktau::buildKernel"},
                                                       {"nekrs_lowMach_hpp_", "lowMach::buildKernel"},
                                                       {"nekrs_recycling_hpp_", "planarCopy::buildKernel"},
-                                                      {"nekrs_lpm_hpp_", "lpm_t::registerKernels"}};
+                                                      {"nekrs_lpm_hpp_", "lpm_t::registerKernels"},
+                                                      {"nekrs_LS_hpp_", "LS::buildKernel"}};
 
     f << "void UDF_AutoLoadPlugins(occa::properties& kernelInfo)" << std::endl << "{" << std::endl;
 

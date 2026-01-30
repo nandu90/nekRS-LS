@@ -1,0 +1,38 @@
+@kernel void signls(const dlong Ntotal,
+                    @ restrict const dfloat *S,
+                    @ restrict dfloat *sign)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    if (n < Ntotal) {
+      const dfloat phi = S[n];
+      sign[n] = tanh(phi / 0.5);
+    }
+  }
+}
+
+@kernel void normalVector(const dlong Ntotal,
+                          const dlong offset,
+                          @ restrict const dfloat *sign,
+                          @ restrict dfloat *nvec)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    if (n < Ntotal) {
+      const dfloat nx = nvec[n + 0 * offset];
+      const dfloat ny = nvec[n + 1 * offset];
+      const dfloat nz = nvec[n + 2 * offset];
+      const dfloat cmag2 = nx * nx + ny * ny + nz * nz;
+      const dfloat cmag  = sqrt(cmag2);
+
+      if(cmag > 1e-12) {
+        nvec[n + 0 * offset] = sign[n] * nx / cmag;
+        nvec[n + 1 * offset] = sign[n] * ny / cmag;
+        nvec[n + 2 * offset] = sign[n] * nz / cmag;
+      }
+      else {
+        nvec[n + 0 * offset] = 0.0;
+        nvec[n + 1 * offset] = 0.0;
+        nvec[n + 2 * offset] = 0.0;
+      }
+    }
+  }
+}
