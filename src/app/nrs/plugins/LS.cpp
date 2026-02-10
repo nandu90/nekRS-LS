@@ -83,6 +83,23 @@ void LS::setup()
   }
   isInitialized = true;
 
+  // we set these here for now --> TODO add LEVELSET section in par file
+  std::string lid = "00";
+  platform->options.setArgs("LS" + lid + " CHECKPOINTING", upperCase("false"));
+  platform->options.setArgs("LS" + lid + " DIFFUSIONCOEFF", to_string_f(1.0e-14));
+  platform->options.setArgs("LS" + lid + " ELLIPTIC COEFF FIELD", upperCase("true"));
+  platform->options.setArgs("LS" + lid + " ELLIPTIC PRECO COEFF FIELD", upperCase("true"));
+  platform->options.setArgs("LS" + lid + " INITIAL GUESS", "EXTRAPOLATION");
+  platform->options.setArgs("LS" + lid + " MESH", "FLUID");
+  platform->options.setArgs("LS" + lid + " NAME", "TLSR");
+  platform->options.setArgs("LS" + lid + " PRECONDITIONER", "JACOBI");
+  platform->options.setArgs("LS" + lid + " REGULARIZATION METHOD", "SVV");
+  platform->options.setArgs("LS" + lid + " REGULARIZATION SVV FILTER POWER", to_string_f(6.0));
+  platform->options.setArgs("LS" + lid + " REGULARIZATION SVV SCALING COEFF", to_string_f(2.0));
+  platform->options.setArgs("LS" + lid + " SOLVER", "CG");
+  platform->options.setArgs("LS" + lid + " SOLVER TOLERANCE", to_string_f(1.0e-08));
+  platform->options.setArgs("LS" + lid + " TRANSPORTCOEFF", to_string_f(1.0));
+
   nrs = dynamic_cast<nrs_t *>(platform->app);
   if (!nrs || !nrs->meshV) {
     throw std::runtime_error("LS::setup: nrs or nrs->meshV is null (mesh not initialized)");
@@ -105,23 +122,13 @@ void LS::setup()
   o_coeffEXT = platform->device.malloc<dfloat>(nEXT);
   o_coeffBDF = platform->device.malloc<dfloat>(nBDF);
 
-  dlong fieldOffset = nrs->meshV->fieldOffset;
-  dlong cubatureOffset = -1;
-  auto cubOffset = fieldOffset;
-  if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
-    cubOffset = std::max(cubOffset, nrs->meshV->Nelements * nrs->meshV->cubNp);
-  }
-  cubatureOffset = alignStride<dfloat>(cubOffset);
-
   tlsr = [&]() {
     lsConfig_t cfg;
     cfg.g0 = &nrs->g0;
     cfg.dt = nrs->dt;
-    cfg.dpdt = false;
     cfg.o_coeffBDF = o_coeffBDF;
     cfg.o_coeffEXT = o_coeffEXT;
-    cfg.fieldOffset = fieldOffset;
-    cfg.vCubatureOffset = cubatureOffset;
+    cfg.fieldOffset = nrs->meshV->fieldOffset;
     cfg.mesh = nrs->meshV;
     cfg.meshV = nrs->meshV;
     return std::make_unique<ls_t>(cfg);
@@ -130,13 +137,15 @@ void LS::setup()
   std::cout << "EXITING LS::setup()...\n";
 }
 
-
 ls_t::ls_t(lsConfig_t &cfg)
 {
   std::cout << "ENTERING LS::init()...\n";
   if (platform->comm.mpiRank() == 0) {
     std::cout << "================ " << "SETUP LEVEL-SET" << " ===============\n";
   }
+
+
+
   std::cout << "EXITING LS::init()...\n";
 }
 

@@ -15,12 +15,9 @@ void setup();
 
 struct lsConfig_t : public solverCfg_t {
 public:
-  int Nscalar;
   mesh_t *mesh;
   mesh_t *meshV;
-  dlong vCubatureOffset;
   dlong fieldOffset;
-  bool dpdt = false;
   dfloat *g0;
   dfloat *dt;
 };
@@ -50,8 +47,6 @@ public:
   void mueSVV();
 
   std::function<occa::memory(double, int)> userImplicitLinearTerm = nullptr;
-
-  void computeUrst();
 
   dlong fieldOffset() const
   {
@@ -106,12 +101,7 @@ public:
 
   occa::memory o_fieldOffsetScan;
 
-  dlong vFieldOffset;
-  dlong vCubatureOffset;
-
   std::vector<dlong> fieldOffsetScan; /* exclusive */
-
-  cvode_t *cvode = nullptr;
 
   bool anyCvodeSolver = false;
   bool anyEllipticSolver = false;
@@ -134,23 +124,16 @@ public:
 
   int Nsubsteps = 0;
 
-  bool dpdt = false;
   dfloat *dp0thdt = nullptr;
   dfloat *alpha0Ref = nullptr;
 
   dlong EToBOffset = -1;
-
-  occa::memory o_U;
-  occa::memory o_Ue;
-  occa::memory o_relUrst;
 
   occa::memory o_S;
   occa::memory o_Se;
 
   occa::memory o_rho;
   occa::memory o_diff;
-
-  //const std::unique_ptr<geomSolver_t> &geom;
 
   std::vector<std::string> name;
 
