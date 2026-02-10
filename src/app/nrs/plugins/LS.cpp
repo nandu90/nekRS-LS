@@ -1,8 +1,10 @@
+#include "app.hpp"
 #include "nrs.hpp"
 #include "platform.hpp"
-#include "nekInterfaceAdapter.hpp"
 #include "LS.hpp"
 #include "linAlg.hpp"
+#include "solver.hpp"
+#include <stdexcept>
 
 // private members
 namespace
@@ -11,6 +13,9 @@ nrs_t *nrs;
 occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
 bool buildKernelCalled = false;
+std::unique_ptr<ls_t> tlsr = nullptr;
+occa::memory o_coeffEXT, o_coeffBDF;
+int advectionSubcycingSteps = 0;
 };
 
 void LS::buildKernel(occa::properties _kernelInfo)
@@ -79,6 +84,73 @@ void LS::setup()
   isInitialized = true;
 
   nrs = dynamic_cast<nrs_t *>(platform->app);
+  if (!nrs || !nrs->meshV) {
+    throw std::runtime_error("LS::setup: nrs or nrs->meshV is null (mesh not initialized)");
+  }
+
+  int nBDF;
+  int nEXT;
+  platform->options.getArgs("BDF ORDER", nBDF);
+  platform->options.getArgs("EXT ORDER", nEXT);
+  platform->options.getArgs("SUBCYCLING STEPS", advectionSubcycingSteps);
+  if (advectionSubcycingSteps) {
+    nEXT = nBDF;
+    platform->options.setArgs("EXT ORDER", std::to_string(nEXT));
+  }
+  nekrsCheck(nEXT < nBDF,
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "%s\n",
+             "EXT order needs to be >= BDF order!");
+  o_coeffEXT = platform->device.malloc<dfloat>(nEXT);
+  o_coeffBDF = platform->device.malloc<dfloat>(nBDF);
+
+  dlong fieldOffset = nrs->meshV->fieldOffset;
+  dlong cubatureOffset = -1;
+  auto cubOffset = fieldOffset;
+  if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+    cubOffset = std::max(cubOffset, nrs->meshV->Nelements * nrs->meshV->cubNp);
+  }
+  cubatureOffset = alignStride<dfloat>(cubOffset);
+
+  tlsr = [&]() {
+    lsConfig_t cfg;
+    cfg.g0 = &nrs->g0;
+    cfg.dt = nrs->dt;
+    cfg.dpdt = false;
+    cfg.o_coeffBDF = o_coeffBDF;
+    cfg.o_coeffEXT = o_coeffEXT;
+    cfg.fieldOffset = fieldOffset;
+    cfg.vCubatureOffset = cubatureOffset;
+    cfg.mesh = nrs->meshV;
+    cfg.meshV = nrs->meshV;
+    return std::make_unique<ls_t>(cfg);
+  }();
 
   std::cout << "EXITING LS::setup()...\n";
 }
+
+
+ls_t::ls_t(lsConfig_t &cfg)
+{
+  std::cout << "ENTERING LS::init()...\n";
+  if (platform->comm.mpiRank() == 0) {
+    std::cout << "================ " << "SETUP LEVEL-SET" << " ===============\n";
+  }
+  std::cout << "EXITING LS::init()...\n";
+}
+
+void ls_t::solve(double time, int stage) {}
+
+void ls_t::saveSolutionState() {}
+void ls_t::restoreSolutionState() {}
+void ls_t::lagSolution() {}
+
+void ls_t::setTimeIntegrationCoeffs(int tstep) {}
+
+void ls_t::extrapolateSolution() {}
+
+void ls_t::applyDirichlet(double time) {}
+void ls_t::setupEllipticSolver() {}
+
+void ls_t::finalize() {}
