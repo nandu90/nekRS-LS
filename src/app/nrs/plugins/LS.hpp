@@ -4,7 +4,6 @@
 #include "platform.hpp"
 #include "solver.hpp"
 #include "geomSolver.hpp"
-#include "cvode.hpp"
 
 namespace LS
 {
@@ -15,7 +14,7 @@ void setup();
 
 struct lsConfig_t : public solverCfg_t {
 public:
-  mesh_t *mesh;
+  std::vector<mesh_t *> mesh;
   mesh_t *meshV;
   dlong fieldOffset;
   dfloat *g0;
@@ -103,7 +102,6 @@ public:
 
   std::vector<dlong> fieldOffsetScan; /* exclusive */
 
-  bool anyCvodeSolver = false;
   bool anyEllipticSolver = false;
 
   int NSfields = 0;
@@ -111,9 +109,7 @@ public:
   std::vector<QQt *> qqt;
 
   std::vector<int> compute;
-  std::vector<int> cvodeSolve;
   occa::memory o_compute;
-  occa::memory o_cvodeSolve;
 
   occa::memory o_applyFilterRT;
   occa::memory o_filterS;

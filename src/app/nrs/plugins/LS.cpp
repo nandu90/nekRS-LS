@@ -129,10 +129,12 @@ void LS::setup()
     cfg.o_coeffBDF = o_coeffBDF;
     cfg.o_coeffEXT = o_coeffEXT;
     cfg.fieldOffset = nrs->meshV->fieldOffset;
-    cfg.mesh = nrs->meshV;
+    cfg.mesh.resize(1);
+    cfg.mesh[0] = nrs->meshV;
     cfg.meshV = nrs->meshV;
     return std::make_unique<ls_t>(cfg);
   }();
+  tlsr->setupEllipticSolver();
 
   std::cout << "EXITING LS::setup()...\n";
 }
@@ -144,7 +146,175 @@ ls_t::ls_t(lsConfig_t &cfg)
     std::cout << "================ " << "SETUP LEVEL-SET" << " ===============\n";
   }
 
+  auto &options = platform->options;
+  platform_t *platform = platform_t::getInstance();
 
+  Nsubsteps = 0;
+  platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
+
+  int NLSfields = 1;
+
+  qqt.resize(NLSfields);
+  fieldOffsetScan.resize(NLSfields);
+  ellipticSolver.resize(NLSfields);
+  compute.resize(NLSfields);
+
+  meshV = cfg.meshV;
+
+  g0 = cfg.g0;
+  dt = cfg.dt;
+  o_coeffBDF = cfg.o_coeffBDF;
+  o_coeffEXT = cfg.o_coeffEXT;
+
+  _fieldOffset = cfg.fieldOffset; // for now same for all scalars
+
+  dlong sum = 0;
+  for (int s = 0; s < NLSfields; ++s) {
+    fieldOffsetScan[s] = (s > 0) ? sum : 0;
+    sum += _fieldOffset;
+    this->_mesh.push_back(cfg.mesh[s]);
+    qqt[s] = new QQt(this->_mesh[s]->oogs);
+  }
+  fieldOffsetSum = sum;
+  o_fieldOffsetScan = platform->device.malloc<dlong>(NLSfields, fieldOffsetScan.data());
+
+  o_prop = platform->device.malloc<dfloat>(2 * fieldOffsetSum);
+  o_diff = o_prop.slice(0 * fieldOffsetSum, fieldOffsetSum);
+  o_rho = o_prop.slice(1 * fieldOffsetSum, fieldOffsetSum);
+
+  for (int is = 0; is < NLSfields; is++) {
+    const std::string sid = scalarDigitStr(is);
+
+    const auto _name = lowerCase(options.getArgs("LS" + sid + " NAME"));
+    name.push_back(_name);
+    nameToIndex[_name] = is;
+
+    auto o_tmp = [&]() {
+      const auto prefixedName = "ls " + _name;
+      auto tmp = platform->device.malloc<char>(prefixedName.size() + 1);
+      tmp.copyFrom(prefixedName.data());
+      const char nullChar[] = {'\0'};
+      tmp.copyFrom(nullChar, 1, prefixedName.size());
+      return tmp;
+    }();
+    o_name.push_back(o_tmp);
+
+    if (options.compareArgs("LS" + sid + " SOLVER", "NONE")) {
+      continue;
+    }
+
+    nekrsCheck(options.compareArgs("LS" + sid + " SOLVER", "BLOCK"),
+               platform->comm.mpiComm(),
+               EXIT_FAILURE,
+               "%s\n",
+               "level-set does not support BLOCK solver!");
+
+    if (platform->comm.mpiRank() == 0) {
+      std::cout << "LS" << sid << ": " << name[is] << std::endl;
+    }
+    platform->app->bc->printBcTypeMapping("ls" + sid);
+    if (platform->comm.mpiRank() == 0) {
+      std::cout << std::endl;
+    }
+
+    dfloat diff = 1;
+    dfloat rho = 1;
+    options.getArgs("LS" + sid + " DIFFUSIONCOEFF", diff);
+    options.getArgs("LS" + sid + " TRANSPORTCOEFF", rho);
+
+    auto o_diff_i = o_diff + fieldOffsetScan[is];
+    auto o_rho_i = o_rho + fieldOffsetScan[is];
+
+    std::vector<dfloat> diffTmp(this->_mesh[is]->Nlocal, diff);
+    std::vector<dfloat> rhoTmp(this->_mesh[is]->Nlocal, rho);
+
+    dfloat diffSolid = diff;
+    dfloat rhoSolid = rho;
+    options.getArgs("LS" + sid + " DIFFUSIONCOEFF SOLID", diffSolid);
+    options.getArgs("LS" + sid + " TRANSPORTCOEFF SOLID", rhoSolid);
+    for (int i = meshV->Nlocal; i < this->_mesh[is]->Nlocal; i++) {
+      diffTmp[i] = diffSolid;
+      rhoTmp[i] = rhoSolid;
+    }
+
+    o_diff_i.copyFrom(diffTmp.data(), diffTmp.size());
+    o_rho_i.copyFrom(rhoTmp.data(), rhoTmp.size());
+  }
+
+  anyEllipticSolver = false;
+
+  EToBOffset = [&]() {
+    dlong NelementsMax = 0;
+    for (int is = 0; is < NLSfields; is++) {
+      NelementsMax = std::max(this->_mesh[is]->Nelements, NelementsMax);
+    }
+    return NelementsMax * meshV->Nfaces;
+  }();
+
+  std::vector<int> EToB(EToBOffset * NLSfields);
+
+  for (int is = 0; is < NLSfields; is++) {
+    std::string sid = scalarDigitStr(is);
+
+    compute[is] = 1;
+    if (options.compareArgs("LS" + sid + " SOLVER", "NONE")) {
+      compute[is] = 0;
+      continue;
+    }
+
+    anyEllipticSolver |= (compute[is]);
+
+    auto mesh = this->_mesh[is];
+
+    int cnt = 0;
+    for (int e = 0; e < mesh->Nelements; e++) {
+      for (int f = 0; f < mesh->Nfaces; f++) {
+        EToB[cnt + EToBOffset * is] =
+            platform->app->bc->typeId(mesh->EToB[f + e * mesh->Nfaces], "ls" + sid);
+        cnt++;
+      }
+    }
+  }
+
+  o_EToB = platform->device.malloc<int>(EToB.size());
+  o_EToB.copyFrom(EToB.data());
+
+  o_compute = platform->device.malloc<dlong>(NLSfields, compute.data());
+
+  int nFieldsAlloc = anyEllipticSolver ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
+  o_S = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
+
+  nFieldsAlloc = anyEllipticSolver ? o_coeffEXT.size() : 1;
+  o_ADV = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
+  o_EXT = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
+
+  if (anyEllipticSolver) {
+    o_Se = platform->device.malloc<dfloat>(fieldOffsetSum);
+    o_JwF = platform->device.malloc<dfloat>(fieldOffsetSum);
+  }
+
+  // TODO consider adding these options in later
+  bool filteringEnabled = false;
+  bool avmEnabled = false;
+
+  auto verifyBC = [&]() {
+    for (int is = 0; is < NLSfields; is++) {
+      if (!compute[is]) {
+        continue;
+      }
+
+      const std::string field = "ls" + scalarDigitStr(is);
+      nekrsCheck(_mesh[is]->Nbid != platform->app->bc->size(field),
+                 platform->comm.mpiComm(),
+                 EXIT_FAILURE,
+                 "Size of %s boundaryTypeMap (%d) does not match number of boundary IDs in mesh (%d)!\n",
+                 field.c_str(),
+                 platform->app->bc->size(field),
+                 _mesh[is]->Nbid);
+    }
+  };
+
+  verifyBC();
 
   std::cout << "EXITING LS::init()...\n";
 }
@@ -160,6 +330,29 @@ void ls_t::setTimeIntegrationCoeffs(int tstep) {}
 void ls_t::extrapolateSolution() {}
 
 void ls_t::applyDirichlet(double time) {}
-void ls_t::setupEllipticSolver() {}
+void ls_t::setupEllipticSolver()
+{
+  int NLSFields = 1;
+  for (int is = 0; is < NLSFields; is++) {
+    std::string sid = scalarDigitStr(is);
+
+    if (!compute[is]) {
+      continue;
+    }
+
+    auto o_rho_i = o_rho.slice(fieldOffsetScan[is], _mesh[is]->Nlocal);
+    auto o_lambda0 = o_diff.slice(fieldOffsetScan[is], _mesh[is]->Nlocal);
+    auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(_mesh[is]->Nlocal);
+    platform->linAlg->axpby(_mesh[is]->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_lambda1);
+
+    ellipticSolver[is] = new elliptic("ls" + sid, _mesh[is], _fieldOffset, o_lambda0, o_lambda1);
+
+    if (platform->options.compareArgs("LS" + sid + " REGULARIZATION METHOD", "SVV")) {
+      auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
+      ellipticSolver[is]->mueSVV(o_svvmu);
+      ellipticSolver[is]->setupSVV();
+    }
+  }
+}
 
 void ls_t::finalize() {}
