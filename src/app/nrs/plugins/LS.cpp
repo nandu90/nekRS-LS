@@ -4,6 +4,7 @@
 #include "LS.hpp"
 #include "linAlg.hpp"
 #include "solver.hpp"
+#include "bdryBase.hpp"
 #include <stdexcept>
 
 // private members
@@ -16,7 +17,28 @@ bool buildKernelCalled = false;
 std::unique_ptr<ls_t> tlsr = nullptr;
 occa::memory o_coeffEXT, o_coeffBDF;
 int advectionSubcycingSteps = 0;
+class bdry : public bdryBase
+{
+  public:
+    bdry(){};
+    void setup() override;
 };
+bdry bc;
+//std::unique_ptr<bdry> bc = std::make_unique<bdry>();
+};
+
+void bdry::setup() {
+  std::string field = "LS00";
+  std::string key = "zeroNeumann";
+  int bid = 0;
+  bToBc[make_pair(lowerCase(field), bid)] = vBcTextToID.at(lowerCase(key));
+  // for (const auto& [key, value] : bToBc) {
+  //   std::cout
+  //     << "(" << key.first << ", " << key.second << ") -> "
+  //     << value
+  //     << '\n';
+  // }
+}
 
 void LS::buildKernel(occa::properties _kernelInfo)
 {
@@ -99,6 +121,8 @@ void LS::setup()
   platform->options.setArgs("LS" + lid + " SOLVER", "CG");
   platform->options.setArgs("LS" + lid + " SOLVER TOLERANCE", to_string_f(1.0e-08));
   platform->options.setArgs("LS" + lid + " TRANSPORTCOEFF", to_string_f(1.0));
+
+  bc.setup();
 
   nrs = dynamic_cast<nrs_t *>(platform->app);
   if (!nrs || !nrs->meshV) {
@@ -212,7 +236,7 @@ ls_t::ls_t(lsConfig_t &cfg)
     if (platform->comm.mpiRank() == 0) {
       std::cout << "LS" << sid << ": " << name[is] << std::endl;
     }
-    platform->app->bc->printBcTypeMapping("ls" + sid);
+    bc.printBcTypeMapping("ls" + sid);
     if (platform->comm.mpiRank() == 0) {
       std::cout << std::endl;
     }
@@ -265,12 +289,11 @@ ls_t::ls_t(lsConfig_t &cfg)
     anyEllipticSolver |= (compute[is]);
 
     auto mesh = this->_mesh[is];
-
     int cnt = 0;
     for (int e = 0; e < mesh->Nelements; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
         EToB[cnt + EToBOffset * is] =
-            platform->app->bc->typeId(mesh->EToB[f + e * mesh->Nfaces], "ls" + sid);
+            bc.typeId(mesh->EToB[f + e * mesh->Nfaces], "ls" + sid);
         cnt++;
       }
     }
@@ -304,12 +327,12 @@ ls_t::ls_t(lsConfig_t &cfg)
       }
 
       const std::string field = "ls" + scalarDigitStr(is);
-      nekrsCheck(_mesh[is]->Nbid != platform->app->bc->size(field),
+      nekrsCheck(_mesh[is]->Nbid != bc.size(field),
                  platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "Size of %s boundaryTypeMap (%d) does not match number of boundary IDs in mesh (%d)!\n",
                  field.c_str(),
-                 platform->app->bc->size(field),
+                 bc.size(field),
                  _mesh[is]->Nbid);
     }
   };
