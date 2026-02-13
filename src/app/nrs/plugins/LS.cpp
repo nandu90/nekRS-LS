@@ -179,8 +179,8 @@ void LS::solveLSR()
   double time = 0.0;
   double dt = 4.0e-03;
   int outerIter = 0;
-  int outerIterMax = 10;
-  int innerIterMax = 1000;
+  int outerIterMax = 10000;
+  int innerIterMax = 100;
 
   // set the TLSR initial condition -- currently just copy the scalar S00. TODO: handle the correct initial condition
   tlsr->o_S.copyFrom(nrs->scalar->o_S);
@@ -188,9 +188,10 @@ void LS::solveLSR()
   while(outerIter < outerIterMax) {
     std::cout << "ITER: " << outerIter << std::endl;
     tlsr->computeAdvectionCoeff();
-    tlsr->makeAdvection(1, time, outerIter); // currently assume 1 LS equation -->  is = 1
+    tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
     // tlsr->makeExplicit();
     tlsr->makeForcing();
+    tlsr->mueSVV();
     int innerIter = 1;
     bool stepConverged = false;
     while(!stepConverged) {
@@ -433,7 +434,7 @@ void ls_t::makeAdvection(int is, double time, int tstep)
                    vFieldOffset,
                    vCubatureOffset,
                    o_S,
-                   o_W, // --> TODO change to w
+                   o_W,   // --> TODO change to w
                    o_rho, // --> set to 1
                    o_ADV);
     } else {
@@ -619,6 +620,7 @@ void ls_t::solve(double time, int stage)
 }
 
 void ls_t::saveSolutionState() {}
+
 void ls_t::restoreSolutionState() {}
 
 void ls_t::lagSolution()
@@ -635,7 +637,21 @@ void ls_t::lagSolution()
 
 void ls_t::setTimeIntegrationCoeffs(int tstep) {}
 
-void ls_t::extrapolateSolution() {}
+void ls_t::extrapolateSolution()
+{
+  if (!o_Se.isInitialized()) {
+    return;
+  }
+  const auto Nlocal = _fieldOffset; // assumed to be the same for all fields
+  launchKernel("core-extrapolate",
+               Nlocal,
+               NSfields,
+               static_cast<int>(o_coeffEXT.size()),
+               _fieldOffset,
+               o_coeffEXT,
+               o_S,
+               o_Se);
+}
 
 void ls_t::applyDirichlet(double time) {}
 
@@ -664,3 +680,44 @@ void ls_t::setupEllipticSolver()
 }
 
 void ls_t::finalize() {}
+
+void ls_t::mueSVV()
+{
+  auto mesh = this->meshV;
+
+  static auto initialized = false;
+
+  auto umagInitialized = false;
+
+  auto o_umag = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+
+  for (int is = 0; is < NSfields; is++) {
+    const auto sid = scalarDigitStr(is);
+
+    if(platform->options.compareArgs("LS" + sid + " REGULARIZATION METHOD", "SVV")) {
+      if(!initialized) {
+        this->o_svvf = platform->device.malloc<dfloat>(_fieldOffset);
+        this->o_svvmu = platform->device.malloc<dfloat>(NSfields * _fieldOffset);
+
+        if(!platform->options.compareArgs("MOVING MESH","TRUE"))
+          launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
+
+        initialized = true;
+      }
+
+      if(platform->options.compareArgs("MOVING MESH","TRUE"))
+        launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
+
+      if(!umagInitialized) {
+        platform->linAlg->magVector(mesh->Nlocal, vFieldOffset, o_W, o_umag); // changed o_U to o_W --> TODO: think if this is the right thing to do
+        umagInitialized = true;
+      }
+
+      dfloat scale = 0.1;
+      platform->options.getArgs("LS" + sid + " REGULARIZATION SVV SCALING COEFF", scale);
+
+      auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
+      platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
+    }
+  }
+}
