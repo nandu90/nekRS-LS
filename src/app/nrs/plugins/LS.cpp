@@ -209,14 +209,15 @@ void LS::solveLSR()
   int innerIterMax = 100;
 
   // set the TLSR initial condition -- currently just copy the scalar S00. TODO: handle the correct initial condition
-  printOccaArray(tlsr->o_S, "tlsr->o_S", 10);
   tlsr->o_S.copyFrom(nrs->scalar->o_S);
+  printOccaArray(tlsr->o_S, "tlsr->o_S", 10);
 
   while(outerIter < outerIterMax) {
     std::cout << "ITER: " << outerIter << std::endl;
     tlsr->computeAdvectionCoeff();
+    printOccaArray(tlsr->o_W, "tlsr->o_W", 10);
     tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
-    // tlsr->makeExplicit();
+    tlsr->makeExplicit(0, time, outerIter);
     tlsr->makeForcing();
     tlsr->mueSVV();
     int innerIter = 1;
@@ -532,6 +533,16 @@ void ls_t::advectionSubcycling(int nEXT, double time, int is)
       printf("%s%s advSub norm: %.15e\n", "scalar", scalarDigitStr(is).c_str(), debugNorm);
     }
   }
+}
+
+void ls_t::makeExplicit(int is, double time, int tstep)
+{
+  const std::string sid = scalarDigitStr(is);
+
+  auto mesh = this->_mesh[is];
+  const dlong isOffset = fieldOffsetScan[is];
+
+  o_explicitTerms("tlsr").copyFrom(o_signls); // TODO: shouldn't use tlsr here but will use this hack for now
 }
 
 void ls_t::makeForcing()
