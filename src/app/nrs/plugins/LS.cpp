@@ -7,6 +7,32 @@
 #include "bdryBase.hpp"
 #include "advectionSubCycling.hpp"
 #include <stdexcept>
+#include <algorithm>
+
+void printOccaArray(const occa::memory &o_mem, const std::string &name, size_t maxPrint = 0)
+{
+  const size_t bytes = o_mem.size();
+  if (bytes % sizeof(dfloat) != 0) {
+    std::cout << name << ": byte size " << bytes
+              << " not divisible by sizeof(dfloat)=" << sizeof(dfloat) << "\n";
+    return;
+  }
+
+  const size_t N = bytes / sizeof(dfloat);
+  std::vector<dfloat> h(N);
+
+  o_mem.copyTo(h.data(), N);
+
+
+  std::cout << name << " (N=" << N << ")\n";
+  const size_t nOut = (maxPrint > 0) ? std::min(maxPrint, N) : N;
+
+  for (size_t i = 0; i < nOut; ++i)
+    std::cout << "  [" << i << "] " << h[i] << "\n";
+
+  if (nOut < N)
+    std::cout << "  ... (" << (N - nOut) << " more entries)\n";
+}
 
 // private members
 namespace
@@ -183,6 +209,7 @@ void LS::solveLSR()
   int innerIterMax = 100;
 
   // set the TLSR initial condition -- currently just copy the scalar S00. TODO: handle the correct initial condition
+  printOccaArray(tlsr->o_S, "tlsr->o_S", 10);
   tlsr->o_S.copyFrom(nrs->scalar->o_S);
 
   while(outerIter < outerIterMax) {
