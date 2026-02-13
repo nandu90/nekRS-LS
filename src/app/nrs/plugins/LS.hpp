@@ -10,6 +10,7 @@ namespace LS
 void buildKernel(occa::properties kernelInfo);
 void updateSourceTerms();
 void setup();
+void solveLSR();
 }
 
 struct lsConfig_t : public solverCfg_t {
@@ -17,6 +18,8 @@ public:
   std::vector<mesh_t *> mesh;
   mesh_t *meshV;
   dlong fieldOffset;
+  dlong vFieldOffset;
+  dlong vCubatureOffset;
   dfloat *g0;
   dfloat *dt;
 };
@@ -26,6 +29,11 @@ class ls_t : public solver_t
 public:
 
   ls_t(lsConfig_t &cfg);
+
+  void computeAdvectionCoeff();
+  void makeExplicit(int is, double time, int tstep);
+  void makeAdvection(int is, double time, int tstep);
+  void makeForcing();
 
   void solve(double time, int stage) override;
 
@@ -100,6 +108,9 @@ public:
 
   occa::memory o_fieldOffsetScan;
 
+  dlong vFieldOffset;
+  dlong vCubatureOffset;
+
   std::vector<dlong> fieldOffsetScan; /* exclusive */
 
   bool anyEllipticSolver = false;
@@ -128,6 +139,8 @@ public:
   occa::memory o_S;
   occa::memory o_Se;
 
+  occa::memory o_W;
+  occa::memory o_signls;
   occa::memory o_rho;
   occa::memory o_diff;
 

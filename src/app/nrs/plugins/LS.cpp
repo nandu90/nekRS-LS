@@ -5,6 +5,7 @@
 #include "linAlg.hpp"
 #include "solver.hpp"
 #include "bdryBase.hpp"
+#include "advectionSubCycling.hpp"
 #include <stdexcept>
 
 // private members
@@ -125,7 +126,7 @@ void LS::setup()
   bc.setup();
 
   nrs = dynamic_cast<nrs_t *>(platform->app);
-  if (!nrs || !nrs->meshV) {
+  if (!nrs || !nrs->meshV || !nrs->scalar) {
     throw std::runtime_error("LS::setup: nrs or nrs->meshV is null (mesh not initialized)");
   }
 
@@ -153,6 +154,8 @@ void LS::setup()
     cfg.o_coeffBDF = o_coeffBDF;
     cfg.o_coeffEXT = o_coeffEXT;
     cfg.fieldOffset = nrs->meshV->fieldOffset;
+    cfg.vFieldOffset = nrs->scalar->vFieldOffset;       // TODO: is this a safe access?
+    cfg.vCubatureOffset = nrs->scalar->vCubatureOffset; // TODO: is this a safe access?
     cfg.mesh.resize(1);
     cfg.mesh[0] = nrs->meshV;
     cfg.meshV = nrs->meshV;
@@ -161,6 +164,49 @@ void LS::setup()
   tlsr->setupEllipticSolver();
 
   std::cout << "EXITING LS::setup()...\n";
+}
+
+void LS::solveLSR()
+{
+  std::cout << "ENTERING LS::solveLSR()...\n";
+
+  if (tlsr->fieldOffsetSum != nrs->scalar->fieldOffsetSum) {
+    throw std::runtime_error("LS::solveLSR: tlsr and nrs->scalar fieldOffsetSum are not equal.");
+  }
+
+  auto mesh = tlsr->meshV;
+
+  double time = 0.0;
+  double dt = 4.0e-03;
+  int outerIter = 0;
+  int outerIterMax = 10;
+  int innerIterMax = 1000;
+
+  // set the TLSR initial condition -- currently just copy the scalar S00. TODO: handle the correct initial condition
+  tlsr->o_S.copyFrom(nrs->scalar->o_S);
+
+  while(outerIter < outerIterMax) {
+    std::cout << "ITER: " << outerIter << std::endl;
+    tlsr->computeAdvectionCoeff();
+    tlsr->makeAdvection(1, time, outerIter); // currently assume 1 LS equation -->  is = 1
+    // tlsr->makeExplicit();
+    tlsr->makeForcing();
+    int innerIter = 1;
+    bool stepConverged = false;
+    while(!stepConverged) {
+      if (innerIter == 1) { tlsr->lagSolution(); }
+      // tlsr->applyDirichlet(timeNew);
+      tlsr->solve(time, innerIter);
+      stepConverged = true;
+    }
+    outerIter += 1;
+    time += dt;
+  }
+
+  // copy the TLSR solution back to the scalar S00
+  nrs->scalar->o_S.copyFrom(tlsr->o_S);
+
+  std::cout << "EXITING LS::solveLSR()...\n";
 }
 
 ls_t::ls_t(lsConfig_t &cfg)
@@ -176,12 +222,12 @@ ls_t::ls_t(lsConfig_t &cfg)
   Nsubsteps = 0;
   platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
 
-  int NLSfields = 1;
+  int NSfields = 1;
 
-  qqt.resize(NLSfields);
-  fieldOffsetScan.resize(NLSfields);
-  ellipticSolver.resize(NLSfields);
-  compute.resize(NLSfields);
+  qqt.resize(NSfields);
+  fieldOffsetScan.resize(NSfields);
+  ellipticSolver.resize(NSfields);
+  compute.resize(NSfields);
 
   meshV = cfg.meshV;
 
@@ -191,22 +237,23 @@ ls_t::ls_t(lsConfig_t &cfg)
   o_coeffEXT = cfg.o_coeffEXT;
 
   _fieldOffset = cfg.fieldOffset; // for now same for all scalars
+  vFieldOffset = cfg.vFieldOffset; // TODO: check if this is correct
+  vCubatureOffset = cfg.vCubatureOffset;
 
   dlong sum = 0;
-  for (int s = 0; s < NLSfields; ++s) {
+  for (int s = 0; s < NSfields; ++s) {
     fieldOffsetScan[s] = (s > 0) ? sum : 0;
     sum += _fieldOffset;
     this->_mesh.push_back(cfg.mesh[s]);
     qqt[s] = new QQt(this->_mesh[s]->oogs);
   }
   fieldOffsetSum = sum;
-  o_fieldOffsetScan = platform->device.malloc<dlong>(NLSfields, fieldOffsetScan.data());
+  o_fieldOffsetScan = platform->device.malloc<dlong>(NSfields, fieldOffsetScan.data());
 
   o_prop = platform->device.malloc<dfloat>(2 * fieldOffsetSum);
   o_diff = o_prop.slice(0 * fieldOffsetSum, fieldOffsetSum);
-  o_rho = o_prop.slice(1 * fieldOffsetSum, fieldOffsetSum);
-
-  for (int is = 0; is < NLSfields; is++) {
+  
+  for (int is = 0; is < NSfields; is++) {
     const std::string sid = scalarDigitStr(is);
 
     const auto _name = lowerCase(options.getArgs("LS" + sid + " NAME"));
@@ -269,15 +316,15 @@ ls_t::ls_t(lsConfig_t &cfg)
 
   EToBOffset = [&]() {
     dlong NelementsMax = 0;
-    for (int is = 0; is < NLSfields; is++) {
+    for (int is = 0; is < NSfields; is++) {
       NelementsMax = std::max(this->_mesh[is]->Nelements, NelementsMax);
     }
     return NelementsMax * meshV->Nfaces;
   }();
 
-  std::vector<int> EToB(EToBOffset * NLSfields);
+  std::vector<int> EToB(EToBOffset * NSfields);
 
-  for (int is = 0; is < NLSfields; is++) {
+  for (int is = 0; is < NSfields; is++) {
     std::string sid = scalarDigitStr(is);
 
     compute[is] = 1;
@@ -302,10 +349,14 @@ ls_t::ls_t(lsConfig_t &cfg)
   o_EToB = platform->device.malloc<int>(EToB.size());
   o_EToB.copyFrom(EToB.data());
 
-  o_compute = platform->device.malloc<dlong>(NLSfields, compute.data());
+  o_compute = platform->device.malloc<dlong>(NSfields, compute.data());
 
   int nFieldsAlloc = anyEllipticSolver ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
   o_S = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
+  o_W = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
+  o_signls = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
+  std::vector<dfloat> rho(nFieldsAlloc * fieldOffsetSum, (dfloat)1.0);
+  o_rho = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum, rho.data());
 
   nFieldsAlloc = anyEllipticSolver ? o_coeffEXT.size() : 1;
   o_ADV = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
@@ -321,7 +372,7 @@ ls_t::ls_t(lsConfig_t &cfg)
   bool avmEnabled = false;
 
   auto verifyBC = [&]() {
-    for (int is = 0; is < NLSfields; is++) {
+    for (int is = 0; is < NSfields; is++) {
       if (!compute[is]) {
         continue;
       }
@@ -342,21 +393,255 @@ ls_t::ls_t(lsConfig_t &cfg)
   std::cout << "EXITING LS::init()...\n";
 }
 
-void ls_t::solve(double time, int stage) {}
+void ls_t::computeAdvectionCoeff()
+{
+  // a. compute interface normals
+  launchKernel("core-gradientVolumeHex3D",
+               meshV->Nelements,
+               meshV->o_vgeo,
+               meshV->o_D,
+               _fieldOffset,
+               o_solution("tlsr"),
+               o_W);
+  oogs::startFinish(o_W, meshV->dim, _fieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
+  platform->linAlg->axmyVector(meshV->Nlocal, _fieldOffset, 0, 1.0, meshV->o_invLMM, o_W);
+  // b. compute sign function
+  signlsKernel(meshV->Nlocal, o_solution("tlsr"), o_signls);
+  // c. compute w = sign(phi) * n
+  normalVectorKernel(meshV->Nlocal, _fieldOffset, o_signls, o_W);
+}
+
+void ls_t::makeAdvection(int is, double time, int tstep)
+{
+  if (Nsubsteps) {
+    advectionSubcycling(std::min(tstep, static_cast<int>(o_coeffEXT.size())), time, is);
+  } else {
+    auto mesh = meshV;
+
+    if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+      launchKernel("core-strongAdvectionCubatureVolumeScalarHex3D",
+                   mesh->Nelements,
+                   1, /* nScalars */
+                   0, /* weighted */
+                   0, /* sharedRho */
+                   mesh->o_vgeo,
+                   mesh->o_cubDiffInterpT,
+                   mesh->o_cubInterpT,
+                   mesh->o_cubProjectT,
+                   o_compute + is,
+                   o_fieldOffsetScan + is,
+                   vFieldOffset,
+                   vCubatureOffset,
+                   o_S,
+                   o_W, // --> TODO change to w
+                   o_rho, // --> set to 1
+                   o_ADV);
+    } else {
+      launchKernel("core-strongAdvectionVolumeScalarHex3D",
+                   mesh->Nelements,
+                   1, /* nScalars */
+                   0, /* weighted */
+                   mesh->o_vgeo,
+                   mesh->o_D,
+                   o_compute + is,
+                   o_fieldOffsetScan + is,
+                   vFieldOffset,
+                   o_S,
+                   o_W, // --> TODO change to w
+                   o_rho, // --> set to 1
+                   o_ADV);
+    }
+  }
+}
+
+void ls_t::advectionSubcycling(int nEXT, double time, int is)
+{
+  const auto mesh = this->_mesh[is];
+
+  const auto nFields = 1;
+  
+  auto o_Si = o_S.slice(fieldOffsetScan[is], mesh->Nlocal);
+  auto o_JwFi = o_JwF.slice(fieldOffsetScan[is], mesh->Nlocal);
+
+  static occa::kernel kernel;
+  if (!kernel.isInitialized()) {
+    if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+      kernel = platform->kernelRequests.load("core-subCycleStrongCubatureVolumeScalarHex3D");
+    } else {
+      kernel = platform->kernelRequests.load("core-subCycleStrongVolumeScalarHex3D");
+    }
+  }
+
+  platform->linAlg->fill(o_JwFi.size(), 0, o_JwFi);
+
+  advectionSubcyclingRK(mesh,
+                        meshV,
+                        time,
+                        dt,
+                        Nsubsteps,
+                        o_coeffBDF,
+                        nEXT,
+                        nFields,
+                        kernel,
+                        meshV->oogs,
+                        mesh->fieldOffset,
+                        fieldOffset(),
+                        vCubatureOffset,
+                        fieldOffsetSum,
+                        o_NULL, // (geom) ? geom->o_div : o_NULL,
+                        o_W,
+                        o_Si,
+                        o_JwFi);
+
+  if (platform->verbose()) {
+    const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
+                                                                 1,
+                                                                 0,
+                                                                 mesh->ogs->o_invDegree,
+                                                                 o_JwFi,
+                                                                 platform->comm.mpiComm());
+    if (platform->comm.mpiRank() == 0) {
+      printf("%s%s advSub norm: %.15e\n", "scalar", scalarDigitStr(is).c_str(), debugNorm);
+    }
+  }
+}
+
+void ls_t::makeForcing()
+{
+  for (int is = 0; is < this->NSfields; is++) {
+    if (!compute[is]) {
+      continue;
+    }
+
+    launchKernel("scalar_t::sumMakef",
+                 _mesh[is]->Nlocal,
+                 _mesh[is]->o_LMM,
+                 1 / dt[0],
+                 o_coeffEXT,
+                 o_coeffBDF,
+                 fieldOffsetScan[is],
+                 fieldOffsetSum,
+                 _mesh[is]->fieldOffset,
+                 o_rho,
+                 o_S,
+                 o_ADV,
+                 o_EXT,
+                 o_JwF);
+  }
+
+  const auto n = std::max(o_coeffEXT.size(), o_coeffBDF.size());
+  for (int s = n; s > 1; s--) {
+    o_EXT.copyFrom(o_EXT, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
+    if (o_ADV.isInitialized()) {
+      o_ADV.copyFrom(o_ADV, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
+    }
+  }
+}
+
+void ls_t::solve(double time, int stage)
+{
+  for (int is = 0; is < NSfields; is++) {
+    if (!compute[is]) {
+      continue;
+    }
+
+    const std::string sid = scalarDigitStr(is);
+    auto mesh = this->_mesh[is];
+
+    auto o_rhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    o_rhs.copyFrom(o_JwF, mesh->Nlocal, 0, fieldOffsetScan[is]);
+
+    auto o_lhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+
+    launchKernel("scalar_t::neumannBCHex3D",
+                 o_name[is],
+                 mesh->Nelements,
+                 1,
+                 mesh->o_sgeo,
+                 mesh->o_vmapM,
+                 mesh->o_EToB,
+                 is,
+                 time,
+                 vFieldOffset,
+                 _fieldOffset,
+                 0,
+                 EToBOffset,
+                 mesh->o_x,
+                 mesh->o_y,
+                 mesh->o_z,
+                 o_W, // changed from o_Ue --> TODO: think about this
+                 o_S,
+                 o_EToB,
+                 o_diff,
+                 o_rho,
+                 bc.o_usrwrk,
+                 o_lhs,
+                 o_rhs);
+
+    const auto o_diff_i = o_diff.slice(fieldOffsetScan[is], mesh->Nlocal);
+
+    const auto o_lambda0 = o_diff_i;
+    const auto o_lambda1 = [&]() {
+      const auto o_rho_i = o_rho.slice(fieldOffsetScan[is], mesh->Nlocal);
+      auto o_l = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      platform->linAlg->axpby(mesh->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_l);
+
+      if (userImplicitLinearTerm) {
+        auto o_implicitLT = userImplicitLinearTerm(time, is);
+        if (o_implicitLT.isInitialized()) {
+          platform->linAlg->axpby(mesh->Nlocal, 1.0, o_implicitLT, 1.0, o_l);
+        }
+      }
+
+      //if (platform->app->bc->hasRobin("SCALAR" + sid)) {
+      //  platform->linAlg->axpby(mesh->Nlocal, 1.0, o_lhs, 1.0, o_l);
+      //}
+
+      return o_l;
+    }();
+
+    auto o_Si = [&]() {
+      auto o_S0 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      if (platform->options.compareArgs("LS" + sid + " INITIAL GUESS", "EXTRAPOLATION") && stage == 1) {
+        o_S0.copyFrom(o_Se, o_S0.size(), 0, fieldOffsetScan[is]);
+      } else {
+        o_S0.copyFrom(o_S, o_S0.size(), 0, fieldOffsetScan[is]);
+      }
+
+      return o_S0;
+    }();
+
+    this->ellipticSolver[is]->coeff0HLM(o_lambda0);
+    this->ellipticSolver[is]->coeff1HLM(o_lambda1);
+    this->ellipticSolver[is]->solve(o_rhs, o_Si);
+    o_Si.copyTo(o_S, o_Si.size(), fieldOffsetScan[is]);
+  }
+}
 
 void ls_t::saveSolutionState() {}
 void ls_t::restoreSolutionState() {}
-void ls_t::lagSolution() {}
+
+void ls_t::lagSolution()
+{
+  if (!anyEllipticSolver) {
+    return;
+  }
+
+  const auto n = std::max(o_coeffEXT.size(), o_coeffBDF.size());
+  for (int s = n; s > 1; s--) {
+    o_S.copyFrom(o_S, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
+  }
+}
 
 void ls_t::setTimeIntegrationCoeffs(int tstep) {}
 
 void ls_t::extrapolateSolution() {}
 
 void ls_t::applyDirichlet(double time) {}
+
 void ls_t::setupEllipticSolver()
 {
-  int NLSFields = 1;
-  for (int is = 0; is < NLSFields; is++) {
+  for (int is = 0; is < NSfields; is++) {
     std::string sid = scalarDigitStr(is);
 
     if (!compute[is]) {
