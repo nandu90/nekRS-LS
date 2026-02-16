@@ -6,25 +6,28 @@
 #include "solver.hpp"
 #include "bdryBase.hpp"
 #include "advectionSubCycling.hpp"
+#include "nekInterfaceAdapter.hpp"
 #include <stdexcept>
 #include <algorithm>
 
 void printOccaArray(const occa::memory &o_mem, const std::string &name, size_t maxPrint = 0)
 {
-  const size_t bytes = o_mem.size();
-  if (bytes % sizeof(dfloat) != 0) {
-    std::cout << name << ": byte size " << bytes
-              << " not divisible by sizeof(dfloat)=" << sizeof(dfloat) << "\n";
+  const size_t N = o_mem.size();                 // element count (dtype entries)
+  const size_t elemBytes = o_mem.dtype().bytes(); // bytes per entry
+  const size_t bytes = N * elemBytes;
+
+  if (elemBytes != sizeof(dfloat)) {
+    std::cout << name << ": dtype bytes=" << elemBytes
+              << " but sizeof(dfloat)=" << sizeof(dfloat) << "\n";
     return;
   }
 
-  const size_t N = bytes / sizeof(dfloat);
   std::vector<dfloat> h(N);
 
+  // In datatype-aware OCCA, this is element count, not bytes.
   o_mem.copyTo(h.data(), N);
 
-
-  std::cout << name << " (N=" << N << ")\n";
+  std::cout << name << " (N=" << N << ", bytes=" << bytes << ")\n";
   const size_t nOut = (maxPrint > 0) ? std::min(maxPrint, N) : N;
 
   for (size_t i = 0; i < nOut; ++i)
@@ -65,6 +68,44 @@ void bdry::setup() {
   //     << value
   //     << '\n';
   // }
+}
+
+void setTimeIntegrationCoeffs(int tstep, dfloat *g0, dfloat *dt)
+{
+  const auto bdfOrder = std::min(tstep, static_cast<int>(o_coeffBDF.size()));
+  const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
+
+  {
+    std::vector<dfloat> coeff(o_coeffBDF.size());
+    nek::bdfCoeff(g0, coeff.data(), dt, bdfOrder);
+    for (int i = coeff.size(); i > bdfOrder; i--) {
+      coeff[i - 1] = 0;
+    }
+
+    std::cout << "orderBDF = " << bdfOrder << '\n';
+    for (size_t i = 0; i < coeff.size(); ++i)
+    {
+        std::cout << "coeffBDF[" << i << "] = " << coeff[i] << '\n';
+    }
+
+    o_coeffBDF.copyFrom(coeff.data());
+  }
+
+  {
+    std::vector<dfloat> coeff(o_coeffEXT.size());
+    nek::extCoeff(coeff.data(), dt, extOrder, bdfOrder);
+    for (int i = coeff.size(); i > extOrder; i--) {
+      coeff[i - 1] = 0;
+    }
+
+    std::cout << "orderEXT = " << extOrder << '\n';
+    for (size_t i = 0; i < coeff.size(); ++i)
+    {
+        std::cout << "coeffEXT[" << i << "] = " << coeff[i] << '\n';
+    }
+
+    o_coeffEXT.copyFrom(coeff.data());
+  }
 }
 
 void LS::buildKernel(occa::properties _kernelInfo)
@@ -204,9 +245,14 @@ void LS::solveLSR()
 
   double time = 0.0;
   double dt = 4.0e-03;
-  int outerIter = 0;
+  int outerIter = 1;
   int outerIterMax = 10000;
   int innerIterMax = 100;
+
+  std::cout << "DT: " << tlsr->dt[0] << std::endl;
+
+  printOccaArray(tlsr->o_coeffBDF, "tlsr->o_coeffBDF");
+  printOccaArray(tlsr->o_coeffEXT, "tlsr->o_coeffEXT");
 
   // set the TLSR initial condition -- currently just copy the scalar S00. TODO: handle the correct initial condition
   tlsr->o_S.copyFrom(nrs->scalar->o_S);
@@ -214,11 +260,15 @@ void LS::solveLSR()
 
   while(outerIter < outerIterMax) {
     std::cout << "ITER: " << outerIter << std::endl;
+    setTimeIntegrationCoeffs(outerIter, tlsr->g0, tlsr->dt);
     tlsr->computeAdvectionCoeff();
     printOccaArray(tlsr->o_W, "tlsr->o_W", 10);
     tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
+    printOccaArray(tlsr->o_ADV, "tlsr->o_ADV", 10);
     tlsr->makeExplicit(0, time, outerIter);
+    printOccaArray(tlsr->o_EXT, "tlsr->o_EXT", 10);
     tlsr->makeForcing();
+    printOccaArray(tlsr->o_JwF, "tlsr->o_JwF", 10);
     tlsr->mueSVV();
     int innerIter = 1;
     bool stepConverged = false;
@@ -251,7 +301,7 @@ ls_t::ls_t(lsConfig_t &cfg)
   Nsubsteps = 0;
   platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
 
-  int NSfields = 1;
+  NSfields = 1;
 
   qqt.resize(NSfields);
   fieldOffsetScan.resize(NSfields);
@@ -281,6 +331,9 @@ ls_t::ls_t(lsConfig_t &cfg)
 
   o_prop = platform->device.malloc<dfloat>(2 * fieldOffsetSum);
   o_diff = o_prop.slice(0 * fieldOffsetSum, fieldOffsetSum);
+  std::vector<dfloat> rho(1 * fieldOffsetSum, (dfloat)1.0);
+  o_rho = platform->device.malloc<dfloat>(1 * fieldOffsetSum, rho.data());
+  printOccaArray(o_rho, "tlsr->o_rho", 10);
   
   for (int is = 0; is < NSfields; is++) {
     const std::string sid = scalarDigitStr(is);
@@ -384,8 +437,6 @@ ls_t::ls_t(lsConfig_t &cfg)
   o_S = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
   o_W = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
   o_signls = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
-  std::vector<dfloat> rho(nFieldsAlloc * fieldOffsetSum, (dfloat)1.0);
-  o_rho = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum, rho.data());
 
   nFieldsAlloc = anyEllipticSolver ? o_coeffEXT.size() : 1;
   o_ADV = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
@@ -672,8 +723,6 @@ void ls_t::lagSolution()
     o_S.copyFrom(o_S, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
   }
 }
-
-void ls_t::setTimeIntegrationCoeffs(int tstep) {}
 
 void ls_t::extrapolateSolution()
 {

@@ -41,7 +41,7 @@ public:
   void restoreSolutionState() override;
   void lagSolution() override;
 
-  void setTimeIntegrationCoeffs(int tstep) override;
+  void setTimeIntegrationCoeffs(int tstep) override {};
 
   void extrapolateSolution() override;
 
@@ -145,6 +145,7 @@ public:
   occa::memory o_diff;
 
   std::vector<std::string> name;
+  occa::memory o_ADV;
 
 private:
   void advectionSubcycling(int nEXT, double time, int scalarIdx);
@@ -154,7 +155,7 @@ private:
 
   dlong _fieldOffset = -1; // all scalar fields share the same offset
 
-  occa::memory o_ADV;
+  //occa::memory o_ADV;
 
   occa::memory o_S0;
   occa::memory o_EXT0;
