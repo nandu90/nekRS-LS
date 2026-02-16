@@ -7,6 +7,7 @@
 #include "bdryBase.hpp"
 #include "advectionSubCycling.hpp"
 #include "nekInterfaceAdapter.hpp"
+#include "iofldFactory.hpp"
 #include <stdexcept>
 #include <algorithm>
 
@@ -288,12 +289,13 @@ void LS::solveLSR()
       tlsr->solve(time, innerIter);
       stepConverged = true;
     }
+    tlsr->writeFile(time);
     outerIter += 1;
     time += tlsr->dt[0];
   }
 
   // copy the TLSR solution back to the scalar S00
-  nrs->scalar->o_S.copyFrom(tlsr->o_S);
+  //nrs->scalar->o_S.copyFrom(tlsr->o_S);
 
   std::cout << "EXITING LS::solveLSR()...\n";
 }
@@ -858,4 +860,27 @@ void ls_t::computeWrst()
                  o_NULL, // (geom) ? geom->o_U : o_NULL,
                  o_relWrst);
   }
+}
+
+void ls_t::writeFile(double time)
+{
+  if(!fieldWriter) {
+    fieldWriter = iofldFactory::create();
+
+    fieldWriter->open(meshV, iofld::mode::write, "tlsr");
+
+    if (platform->options.compareArgs("CHECKPOINT PRECISION", "FP32")) {
+      fieldWriter->writeAttribute("precision", "32");
+    } else {
+      fieldWriter->writeAttribute("precision", "64");
+    }
+
+    auto o_Si = o_S.slice(fieldOffsetScan[0], meshV->Nlocal);
+    fieldWriter->addVariable("scalar00", o_Si);
+  }
+
+  fieldWriter->writeAttribute("outputmesh", (!outfldCounter) ? "true" : "false");
+  fieldWriter->addVariable("time", const_cast<double &>(time));
+  fieldWriter->process();
+  outfldCounter++;
 }

@@ -150,6 +150,10 @@ public:
   std::vector<std::string> name;
   occa::memory o_ADV;
 
+  void writeFile(double time);
+  std::unique_ptr<iofld> fieldWriter;
+  int outfldCounter = 0;
+
 private:
   void advectionSubcycling(int nEXT, double time, int scalarIdx);
   std::vector<mesh_t *> _mesh;
