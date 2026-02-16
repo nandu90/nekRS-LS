@@ -260,11 +260,15 @@ void LS::solveLSR()
 
   // set the TLSR initial condition -- currently just copy the scalar S00. TODO: handle the correct initial condition
   tlsr->o_S.copyFrom(nrs->scalar->o_S);
-  printOccaArray(tlsr->o_S, "tlsr->o_S", 10);
 
   while(outerIter < outerIterMax) {
     std::cout << "ITER: " << outerIter << std::endl;
+    printOccaArray(tlsr->o_S, "tlsr->o_S", 10);
     setTimeIntegrationCoeffs(outerIter, tlsr->g0, tlsr->dt);
+    tlsr->extrapolateSolution();
+    if (tlsr->anyEllipticSolver) {
+      platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT);
+    }
     tlsr->computeAdvectionCoeff();
     printOccaArray(tlsr->o_W, "tlsr->o_W", 10);
     tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
