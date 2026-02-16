@@ -104,6 +104,8 @@ public:
     return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(fieldOffsetSum + fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   }
 
+  void computeWrst();
+
   mesh_t *meshV;
 
   occa::memory o_fieldOffsetScan;
@@ -140,6 +142,7 @@ public:
   occa::memory o_Se;
 
   occa::memory o_W;
+  occa::memory o_relWrst;
   occa::memory o_signls;
   occa::memory o_rho;
   occa::memory o_diff;

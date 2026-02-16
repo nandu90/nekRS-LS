@@ -249,7 +249,7 @@ void LS::solveLSR()
 
   double time = 0.0;
   int outerIter = 1;
-  int outerIterMax = 10000;
+  int outerIterMax = 1000;
   int innerIterMax = 100;
 
   // set constant dt --> TODO: need to change this if we want variable dt
@@ -266,6 +266,8 @@ void LS::solveLSR()
     printOccaArray(tlsr->o_S, "tlsr->o_S", 10);
     setTimeIntegrationCoeffs(outerIter, tlsr->g0, tlsr->dt);
     tlsr->extrapolateSolution();
+    tlsr->computeWrst();
+    printOccaArray(tlsr->o_relWrst, "tlsr->o_relWrst", 10);
     if (tlsr->anyEllipticSolver) {
       platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT);
     }
@@ -443,7 +445,11 @@ ls_t::ls_t(lsConfig_t &cfg)
 
   int nFieldsAlloc = anyEllipticSolver ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
   o_S = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
-  o_W = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
+  //o_W = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
+  o_W = platform->device.malloc<dfloat>(meshV->dim * std::max(o_coeffBDF.size(), o_coeffEXT.size()) * vFieldOffset);
+  const dlong Nstates = Nsubsteps ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
+  o_relWrst = platform->device.malloc<dfloat>(Nstates * meshV->dim * vCubatureOffset);
+
   o_signls = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
 
   nFieldsAlloc = anyEllipticSolver ? o_coeffEXT.size() : 1;
@@ -488,15 +494,15 @@ void ls_t::computeAdvectionCoeff()
                meshV->Nelements,
                meshV->o_vgeo,
                meshV->o_D,
-               _fieldOffset,
+               vFieldOffset,
                o_solution("tlsr"),
                o_W);
-  oogs::startFinish(o_W, meshV->dim, _fieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
-  platform->linAlg->axmyVector(meshV->Nlocal, _fieldOffset, 0, 1.0, meshV->o_invLMM, o_W);
+  oogs::startFinish(o_W, meshV->dim, vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
+  platform->linAlg->axmyVector(meshV->Nlocal, vFieldOffset, 0, 1.0, meshV->o_invLMM, o_W);
   // b. compute sign function
   signlsKernel(meshV->Nlocal, o_solution("tlsr"), o_signls);
   // c. compute w = sign(phi) * n
-  normalVectorKernel(meshV->Nlocal, _fieldOffset, o_signls, o_W);
+  normalVectorKernel(meshV->Nlocal, vFieldOffset, o_signls, o_W);
 }
 
 void ls_t::makeAdvection(int is, double time, int tstep)
@@ -521,7 +527,7 @@ void ls_t::makeAdvection(int is, double time, int tstep)
                    vFieldOffset,
                    vCubatureOffset,
                    o_S,
-                   o_W,   // --> TODO change to w
+                   o_relWrst,   // --> TODO change to w
                    o_rho, // --> set to 1
                    o_ADV);
     } else {
@@ -535,7 +541,7 @@ void ls_t::makeAdvection(int is, double time, int tstep)
                    o_fieldOffsetScan + is,
                    vFieldOffset,
                    o_S,
-                   o_W, // --> TODO change to w
+                   o_relWrst, // --> TODO change to w
                    o_rho, // --> set to 1
                    o_ADV);
     }
@@ -814,5 +820,42 @@ void ls_t::mueSVV()
       auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
       platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
     }
+  }
+}
+
+void ls_t::computeWrst()
+{
+  auto mesh = meshV;
+
+  if (Nsubsteps) {
+    for (int s = std::max(o_coeffBDF.size(), o_coeffEXT.size()); s > 1; s--) {
+      auto lagOffset = mesh->dim * vCubatureOffset;
+      o_relWrst.copyFrom(o_relWrst, lagOffset, (s - 1) * lagOffset, (s - 2) * lagOffset);
+    }
+  }
+
+  const auto relative = Nsubsteps; // const auto relative = geom && Nsubsteps;
+  if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+    launchKernel("nrs-UrstCubatureHex3D",
+                 mesh->Nelements,
+                 relative,
+                 mesh->o_cubvgeo,
+                 mesh->o_cubInterpT,
+                 vFieldOffset,
+                 0, // (geom) ? geom->fieldOffset : 0,
+                 vCubatureOffset,
+                 o_W,
+                 o_NULL, // (geom) ? geom->o_U : o_NULL,
+                 o_relWrst);
+  } else {
+    launchKernel("nrs-UrstHex3D",
+                 mesh->Nelements,
+                 relative,
+                 mesh->o_vgeo,
+                 vFieldOffset,
+                 0, // (geom) ? geom->fieldOffset : 0,
+                 o_W,
+                 o_NULL, // (geom) ? geom->o_U : o_NULL,
+                 o_relWrst);
   }
 }
