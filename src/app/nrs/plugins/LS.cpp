@@ -75,6 +75,10 @@ void setTimeIntegrationCoeffs(int tstep, dfloat *g0, dfloat *dt)
   const auto bdfOrder = std::min(tstep, static_cast<int>(o_coeffBDF.size()));
   const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
 
+  for (size_t i = 0; i < 3; ++i) {
+    std::cout << "dt[" << i << "] = " << dt[i] << '\n';
+  }
+
   {
     std::vector<dfloat> coeff(o_coeffBDF.size());
     nek::bdfCoeff(g0, coeff.data(), dt, bdfOrder);
@@ -244,13 +248,13 @@ void LS::solveLSR()
   auto mesh = tlsr->meshV;
 
   double time = 0.0;
-  double dt = 4.0e-03;
   int outerIter = 1;
   int outerIterMax = 10000;
   int innerIterMax = 100;
 
-  std::cout << "DT: " << tlsr->dt[0] << std::endl;
-
+  // set constant dt --> TODO: need to change this if we want variable dt
+  tlsr->dt[1] = tlsr->dt[0];
+  tlsr->dt[2] = tlsr->dt[0];
   printOccaArray(tlsr->o_coeffBDF, "tlsr->o_coeffBDF");
   printOccaArray(tlsr->o_coeffEXT, "tlsr->o_coeffEXT");
 
@@ -279,7 +283,7 @@ void LS::solveLSR()
       stepConverged = true;
     }
     outerIter += 1;
-    time += dt;
+    time += tlsr->dt[0];
   }
 
   // copy the TLSR solution back to the scalar S00
