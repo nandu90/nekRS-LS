@@ -63,12 +63,12 @@ void bdry::setup() {
   std::string key = "zeroNeumann";
   int bid = 0;
   bToBc[make_pair(lowerCase(field), bid)] = vBcTextToID.at(lowerCase(key));
-  // for (const auto& [key, value] : bToBc) {
-  //   std::cout
-  //     << "(" << key.first << ", " << key.second << ") -> "
-  //     << value
-  //     << '\n';
-  // }
+  for (const auto& [key, value] : bToBc) {
+    std::cout
+      << "(" << key.first << ", " << key.second << ") -> "
+      << value
+      << '\n';
+  }
 }
 
 void setTimeIntegrationCoeffs(int tstep, dfloat *g0, dfloat *dt)
@@ -233,6 +233,7 @@ void LS::setup()
     cfg.meshV = nrs->meshV;
     return std::make_unique<ls_t>(cfg);
   }();
+  tlsr->mueSVV(); // needs to be called before setupEllipticSolver() otherwise o_svvmue in elliptic solver will not initialized
   tlsr->setupEllipticSolver();
 
   std::cout << "EXITING LS::setup()...\n";
@@ -264,28 +265,28 @@ void LS::solveLSR()
 
   while(outerIter < outerIterMax) {
     std::cout << "ITER: " << outerIter << std::endl;
-    printOccaArray(tlsr->o_S, "tlsr->o_S", 10);
+    printOccaArray(tlsr->o_S, "tlsr->o_S", 256);
     setTimeIntegrationCoeffs(outerIter, tlsr->g0, tlsr->dt);
     tlsr->extrapolateSolution();
     tlsr->computeWrst();
-    printOccaArray(tlsr->o_relWrst, "tlsr->o_relWrst", 10);
+    printOccaArray(tlsr->o_relWrst, "tlsr->o_relWrst", 256);
     if (tlsr->anyEllipticSolver) {
       platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT);
     }
     tlsr->computeAdvectionCoeff();
-    printOccaArray(tlsr->o_W, "tlsr->o_W", 10);
+    printOccaArray(tlsr->o_W, "tlsr->o_W", 64);
     tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
-    printOccaArray(tlsr->o_ADV, "tlsr->o_ADV", 10);
+    printOccaArray(tlsr->o_ADV, "tlsr->o_ADV", 256);
     tlsr->makeExplicit(0, time, outerIter);
-    printOccaArray(tlsr->o_EXT, "tlsr->o_EXT", 10);
+    printOccaArray(tlsr->o_EXT, "tlsr->o_EXT", 256);
     tlsr->makeForcing();
-    printOccaArray(tlsr->o_JwF, "tlsr->o_JwF", 10);
+    printOccaArray(tlsr->o_JwF, "tlsr->o_JwF", 256);
     tlsr->mueSVV();
     int innerIter = 1;
     bool stepConverged = false;
     while(!stepConverged) {
       if (innerIter == 1) { tlsr->lagSolution(); }
-      // tlsr->applyDirichlet(timeNew);
+      // tlsr->applyDirichlet(time);
       tlsr->solve(time, innerIter);
       stepConverged = true;
     }
@@ -345,7 +346,7 @@ ls_t::ls_t(lsConfig_t &cfg)
   o_diff = o_prop.slice(0 * fieldOffsetSum, fieldOffsetSum);
   std::vector<dfloat> rho(1 * fieldOffsetSum, (dfloat)1.0);
   o_rho = platform->device.malloc<dfloat>(1 * fieldOffsetSum, rho.data());
-  printOccaArray(o_rho, "tlsr->o_rho", 10);
+  printOccaArray(o_rho, "tlsr->o_rho", 256);
   
   for (int is = 0; is < NSfields; is++) {
     const std::string sid = scalarDigitStr(is);
@@ -717,10 +718,16 @@ void ls_t::solve(double time, int stage)
       return o_S0;
     }();
 
+    printOccaArray(o_lambda0, "tlsr->o_lambda0", 256);
+    printOccaArray(o_lambda1, "tlsr->o_lambda1", 256);
+    printOccaArray(o_rhs, "tlsr->o_rhs", 64);
+    printOccaArray(o_Si, "tlsr->o_Si", 64);
+
     this->ellipticSolver[is]->coeff0HLM(o_lambda0);
     this->ellipticSolver[is]->coeff1HLM(o_lambda1);
     this->ellipticSolver[is]->solve(o_rhs, o_Si);
     o_Si.copyTo(o_S, o_Si.size(), fieldOffsetScan[is]);
+    printOccaArray(o_S, "tlsr->o_S", 256);
   }
 }
 
@@ -775,6 +782,7 @@ void ls_t::setupEllipticSolver()
     ellipticSolver[is] = new elliptic("ls" + sid, _mesh[is], _fieldOffset, o_lambda0, o_lambda1);
 
     if (platform->options.compareArgs("LS" + sid + " REGULARIZATION METHOD", "SVV")) {
+      std::cout << "CHECK SVV: HERE" << std::endl;
       auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
       ellipticSolver[is]->mueSVV(o_svvmu);
       ellipticSolver[is]->setupSVV();
@@ -821,6 +829,8 @@ void ls_t::mueSVV()
 
       auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
       platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
+      printOccaArray(o_svvf, "tlsr->o_svvf", 256);
+      printOccaArray(o_svvmu, "tlsr->o_svvmu", 256);
     }
   }
 }
