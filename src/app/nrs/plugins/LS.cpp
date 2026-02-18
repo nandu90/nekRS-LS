@@ -45,7 +45,6 @@ occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
 bool buildKernelCalled = false;
 std::unique_ptr<ls_t> tlsr = nullptr;
-occa::memory o_coeffEXT, o_coeffBDF;
 int advectionSubcycingSteps = 0;
 
 class bdry : public bdryBase
@@ -56,7 +55,7 @@ class bdry : public bdryBase
 };
 
 bdry bc;
-}
+} // namespace
 
 void bdry::setup() {
   std::string field = "LS00";
@@ -69,30 +68,6 @@ void bdry::setup() {
   //     << value
   //     << '\n';
   //}
-}
-
-void setTimeIntegrationCoeffs(int tstep, dfloat *g0, dfloat *dt)
-{
-  const auto bdfOrder = std::min(tstep, static_cast<int>(o_coeffBDF.size()));
-  const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
-
-  {
-    std::vector<dfloat> coeff(o_coeffBDF.size());
-    nek::bdfCoeff(g0, coeff.data(), dt, bdfOrder);
-    for (int i = coeff.size(); i > bdfOrder; i--) {
-      coeff[i - 1] = 0;
-    }
-    o_coeffBDF.copyFrom(coeff.data());
-  }
-
-  {
-    std::vector<dfloat> coeff(o_coeffEXT.size());
-    nek::extCoeff(coeff.data(), dt, extOrder, bdfOrder);
-    for (int i = coeff.size(); i > extOrder; i--) {
-      coeff[i - 1] = 0;
-    }
-    o_coeffEXT.copyFrom(coeff.data());
-  }
 }
 
 void LS::buildKernel(occa::properties _kernelInfo)
@@ -149,29 +124,10 @@ void LS::setup()
     throw std::runtime_error("LS::setup: nrs or nrs->meshV is null (mesh not initialized)");
   }
 
-  int nBDF;
-  int nEXT;
-  platform->options.getArgs("BDF ORDER", nBDF);
-  platform->options.getArgs("EXT ORDER", nEXT);
-  platform->options.getArgs("SUBCYCLING STEPS", advectionSubcycingSteps);
-  if (advectionSubcycingSteps) {
-    nEXT = nBDF;
-    platform->options.setArgs("EXT ORDER", std::to_string(nEXT));
-  }
-  nekrsCheck(nEXT < nBDF,
-             platform->comm.mpiComm(),
-             EXIT_FAILURE,
-             "%s\n",
-             "EXT order needs to be >= BDF order!");
-  o_coeffEXT = platform->device.malloc<dfloat>(nEXT);
-  o_coeffBDF = platform->device.malloc<dfloat>(nBDF);
-
   tlsr = [&]() {
     lsConfig_t cfg;
     cfg.g0 = &nrs->g0;
     cfg.dt = nrs->dt;
-    cfg.o_coeffBDF = o_coeffBDF;
-    cfg.o_coeffEXT = o_coeffEXT;
     cfg.fieldOffset = nrs->meshV->fieldOffset;
     cfg.vFieldOffset = nrs->scalar->vFieldOffset;       // TODO: is this a safe access?
     cfg.vCubatureOffset = nrs->scalar->vCubatureOffset; // TODO: is this a safe access?
@@ -206,7 +162,7 @@ void LS::solveLSR()
 
   while(outerIter < outerIterMax) {
     std::cout << "ITER: " << outerIter << std::endl;
-    setTimeIntegrationCoeffs(outerIter, tlsr->g0, tlsr->dt);
+    tlsr->setTimeIntegrationCoeffs(outerIter);
     tlsr->extrapolateSolution();
     if (tlsr->anyEllipticSolver) {
       platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT);
@@ -234,6 +190,30 @@ void LS::solveLSR()
   //nrs->scalar->o_S.copyFrom(tlsr->o_S);
 }
 
+void ls_t::setTimeIntegrationCoeffs(int tstep)
+{
+  const auto bdfOrder = std::min(tstep, static_cast<int>(o_coeffBDF.size()));
+  const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
+
+  {
+    std::vector<dfloat> coeff(o_coeffBDF.size());
+    nek::bdfCoeff(g0, coeff.data(), dt, bdfOrder);
+    for (int i = coeff.size(); i > bdfOrder; i--) {
+      coeff[i - 1] = 0;
+    }
+    o_coeffBDF.copyFrom(coeff.data());
+  }
+
+  {
+    std::vector<dfloat> coeff(o_coeffEXT.size());
+    nek::extCoeff(coeff.data(), dt, extOrder, bdfOrder);
+    for (int i = coeff.size(); i > extOrder; i--) {
+      coeff[i - 1] = 0;
+    }
+    o_coeffEXT.copyFrom(coeff.data());
+  }
+}
+
 ls_t::ls_t(lsConfig_t &cfg)
 {
   if (platform->comm.mpiRank() == 0) {
@@ -257,8 +237,24 @@ ls_t::ls_t(lsConfig_t &cfg)
 
   g0 = cfg.g0;
   dt = cfg.dt;
-  o_coeffBDF = cfg.o_coeffBDF;
-  o_coeffEXT = cfg.o_coeffEXT;
+
+  int nBDF;
+  int nEXT;
+  platform->options.getArgs("BDF ORDER", nBDF);
+  platform->options.getArgs("EXT ORDER", nEXT);
+  platform->options.getArgs("SUBCYCLING STEPS", advectionSubcycingSteps);
+  if (advectionSubcycingSteps) {
+    nEXT = nBDF;
+    platform->options.setArgs("EXT ORDER", std::to_string(nEXT));
+  }
+  nekrsCheck(nEXT < nBDF,
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "%s\n",
+             "EXT order needs to be >= BDF order!");
+
+  o_coeffBDF = platform->device.malloc<dfloat>(nBDF);
+  o_coeffEXT = platform->device.malloc<dfloat>(nEXT);
 
   _fieldOffset = cfg.fieldOffset; // for now same for all scalars
   vFieldOffset = cfg.vFieldOffset; // TODO: check if this is correct
