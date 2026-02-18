@@ -1,7 +1,6 @@
-#include "app.hpp"
+#include "LS.hpp"
 #include "nrs.hpp"
 #include "platform.hpp"
-#include "LS.hpp"
 #include "linAlg.hpp"
 #include "solver.hpp"
 #include "bdryBase.hpp"
@@ -63,12 +62,12 @@ void bdry::setup() {
   std::string key = "zeroNeumann";
   int bid = 0;
   bToBc[make_pair(lowerCase(field), bid)] = vBcTextToID.at(lowerCase(key));
-  for (const auto& [key, value] : bToBc) {
-    std::cout
-      << "(" << key.first << ", " << key.second << ") -> "
-      << value
-      << '\n';
-  }
+  //for (const auto& [key, value] : bToBc) {
+  //   std::cout
+  //     << "(" << key.first << ", " << key.second << ") -> "
+  //     << value
+  //     << '\n';
+  //}
 }
 
 void setTimeIntegrationCoeffs(int tstep, dfloat *g0, dfloat *dt)
@@ -76,23 +75,12 @@ void setTimeIntegrationCoeffs(int tstep, dfloat *g0, dfloat *dt)
   const auto bdfOrder = std::min(tstep, static_cast<int>(o_coeffBDF.size()));
   const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
 
-  for (size_t i = 0; i < 3; ++i) {
-    std::cout << "dt[" << i << "] = " << dt[i] << '\n';
-  }
-
   {
     std::vector<dfloat> coeff(o_coeffBDF.size());
     nek::bdfCoeff(g0, coeff.data(), dt, bdfOrder);
     for (int i = coeff.size(); i > bdfOrder; i--) {
       coeff[i - 1] = 0;
     }
-
-    std::cout << "orderBDF = " << bdfOrder << '\n';
-    for (size_t i = 0; i < coeff.size(); ++i)
-    {
-        std::cout << "coeffBDF[" << i << "] = " << coeff[i] << '\n';
-    }
-
     o_coeffBDF.copyFrom(coeff.data());
   }
 
@@ -102,21 +90,12 @@ void setTimeIntegrationCoeffs(int tstep, dfloat *g0, dfloat *dt)
     for (int i = coeff.size(); i > extOrder; i--) {
       coeff[i - 1] = 0;
     }
-
-    std::cout << "orderEXT = " << extOrder << '\n';
-    for (size_t i = 0; i < coeff.size(); ++i)
-    {
-        std::cout << "coeffEXT[" << i << "] = " << coeff[i] << '\n';
-    }
-
     o_coeffEXT.copyFrom(coeff.data());
   }
 }
 
 void LS::buildKernel(occa::properties _kernelInfo)
 {
-  std::cout << "ENTERING LS::buildKernel()...\n";
-
   occa::properties kernelInfo;
   kernelInfo += _kernelInfo;
 
@@ -135,43 +114,10 @@ void LS::buildKernel(occa::properties _kernelInfo)
 
   signlsKernel = buildKernel("signls");
   normalVectorKernel = buildKernel("normalVector");
-
-  std::cout << "EXITING LS::buildKernel()...\n";
-}
-
-void LS::updateSourceTerms()
-{
-  std::cout << "ENTERING LS::updateSourceTerms()...\n";
-
-  auto mesh = nrs->meshV;
-
-  // compute interface normals - currently we store this in nrs->fluid->o_U
-  launchKernel("core-gradientVolumeHex3D",
-               mesh->Nelements,
-               mesh->o_vgeo,
-               mesh->o_D,
-               nrs->fluid->fieldOffset,
-               nrs->scalar->o_solution("phi"),
-               nrs->fluid->o_U);
-  oogs::startFinish(nrs->fluid->o_U, mesh->dim, nrs->fluid->fieldOffset, ogsDfloat, ogsAdd, mesh->oogs);
-  platform->linAlg->axmyVector(mesh->Nlocal, nrs->fluid->fieldOffset, 0, 1.0, mesh->o_invLMM, nrs->fluid->o_U);
-
-  // compute sign function
-  auto o_signls = platform->deviceMemoryPool.reserve<dfloat>(nrs->fluid->fieldOffset);
-  signlsKernel(mesh->Nlocal, nrs->scalar->o_solution("phi"), o_signls);
-
-  normalVectorKernel(mesh->Nlocal, nrs->fluid->fieldOffset, o_signls, nrs->fluid->o_U);
-
-  // update source term
-  nrs->scalar->o_explicitTerms("phi").copyFrom(o_signls);
-
-  std::cout << "EXITING LS::updateSourceTerms()...\n";
 }
 
 void LS::setup()
 {
-  std::cout << "ENTERING LS::setup()...\n";
-
   static bool isInitialized = false;
   if (isInitialized) {
     return;
@@ -235,14 +181,10 @@ void LS::setup()
   }();
   tlsr->mueSVV(); // needs to be called before setupEllipticSolver() otherwise o_svvmue in elliptic solver will not initialized
   tlsr->setupEllipticSolver();
-
-  std::cout << "EXITING LS::setup()...\n";
 }
 
 void LS::solveLSR()
 {
-  std::cout << "ENTERING LS::solveLSR()...\n";
-
   if (tlsr->fieldOffsetSum != nrs->scalar->fieldOffsetSum) {
     throw std::runtime_error("LS::solveLSR: tlsr and nrs->scalar fieldOffsetSum are not equal.");
   }
@@ -257,30 +199,22 @@ void LS::solveLSR()
   // set constant dt --> TODO: need to change this if we want variable dt
   tlsr->dt[1] = tlsr->dt[0];
   tlsr->dt[2] = tlsr->dt[0];
-  printOccaArray(tlsr->o_coeffBDF, "tlsr->o_coeffBDF");
-  printOccaArray(tlsr->o_coeffEXT, "tlsr->o_coeffEXT");
 
   // set the TLSR initial condition -- currently just copy the scalar S00. TODO: handle the correct initial condition
   tlsr->o_S.copyFrom(nrs->scalar->o_S);
 
   while(outerIter < outerIterMax) {
     std::cout << "ITER: " << outerIter << std::endl;
-    printOccaArray(tlsr->o_S, "tlsr->o_S", 256);
     setTimeIntegrationCoeffs(outerIter, tlsr->g0, tlsr->dt);
     tlsr->extrapolateSolution();
     if (tlsr->anyEllipticSolver) {
       platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT);
     }
     tlsr->computeAdvectionCoeff();
-    printOccaArray(tlsr->o_W, "tlsr->o_W", 64);
     tlsr->computeWrst();
-    printOccaArray(tlsr->o_relWrst, "tlsr->o_relWrst", 256);
     tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
-    printOccaArray(tlsr->o_ADV, "tlsr->o_ADV", 256);
     tlsr->makeExplicit(0, time, outerIter);
-    printOccaArray(tlsr->o_EXT, "tlsr->o_EXT", 256);
     tlsr->makeForcing();
-    printOccaArray(tlsr->o_JwF, "tlsr->o_JwF", 256);
     tlsr->mueSVV();
     int innerIter = 1;
     bool stepConverged = false;
@@ -297,13 +231,10 @@ void LS::solveLSR()
 
   // copy the TLSR solution back to the scalar S00
   //nrs->scalar->o_S.copyFrom(tlsr->o_S);
-
-  std::cout << "EXITING LS::solveLSR()...\n";
 }
 
 ls_t::ls_t(lsConfig_t &cfg)
 {
-  std::cout << "ENTERING LS::init()...\n";
   if (platform->comm.mpiRank() == 0) {
     std::cout << "================ " << "SETUP LEVEL-SET" << " ===============\n";
   }
@@ -346,7 +277,6 @@ ls_t::ls_t(lsConfig_t &cfg)
   o_diff = o_prop.slice(0 * fieldOffsetSum, fieldOffsetSum);
   std::vector<dfloat> rho(1 * fieldOffsetSum, (dfloat)1.0);
   o_rho = platform->device.malloc<dfloat>(1 * fieldOffsetSum, rho.data());
-  printOccaArray(o_rho, "tlsr->o_rho", 256);
   
   for (int is = 0; is < NSfields; is++) {
     const std::string sid = scalarDigitStr(is);
@@ -486,8 +416,6 @@ ls_t::ls_t(lsConfig_t &cfg)
   };
 
   verifyBC();
-
-  std::cout << "EXITING LS::init()...\n";
 }
 
 void ls_t::computeAdvectionCoeff()
@@ -718,16 +646,10 @@ void ls_t::solve(double time, int stage)
       return o_S0;
     }();
 
-    printOccaArray(o_lambda0, "tlsr->o_lambda0", 256);
-    printOccaArray(o_lambda1, "tlsr->o_lambda1", 256);
-    printOccaArray(o_rhs, "tlsr->o_rhs", 64);
-    printOccaArray(o_Si, "tlsr->o_Si", 64);
-
     this->ellipticSolver[is]->coeff0HLM(o_lambda0);
     this->ellipticSolver[is]->coeff1HLM(o_lambda1);
     this->ellipticSolver[is]->solve(o_rhs, o_Si);
     o_Si.copyTo(o_S, o_Si.size(), fieldOffsetScan[is]);
-    printOccaArray(o_S, "tlsr->o_S", 256);
   }
 }
 
@@ -782,7 +704,6 @@ void ls_t::setupEllipticSolver()
     ellipticSolver[is] = new elliptic("ls" + sid, _mesh[is], _fieldOffset, o_lambda0, o_lambda1);
 
     if (platform->options.compareArgs("LS" + sid + " REGULARIZATION METHOD", "SVV")) {
-      std::cout << "CHECK SVV: HERE" << std::endl;
       auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
       ellipticSolver[is]->mueSVV(o_svvmu);
       ellipticSolver[is]->setupSVV();
@@ -829,8 +750,6 @@ void ls_t::mueSVV()
 
       auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
       platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
-      printOccaArray(o_svvf, "tlsr->o_svvf", 256);
-      printOccaArray(o_svvmu, "tlsr->o_svvmu", 256);
     }
   }
 }

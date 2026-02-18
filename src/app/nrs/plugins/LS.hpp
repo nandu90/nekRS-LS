@@ -4,11 +4,11 @@
 #include "platform.hpp"
 #include "solver.hpp"
 #include "geomSolver.hpp"
+#include "iofldFactory.hpp"
 
 namespace LS
 {
 void buildKernel(occa::properties kernelInfo);
-void updateSourceTerms();
 void setup();
 void solveLSR();
 }
