@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <algorithm>
 
-void printOccaArray(const occa::memory &o_mem, const std::string &name, size_t maxPrint = 0)
+static void printOccaArray(const occa::memory &o_mem, const std::string &name, size_t maxPrint = 0)
 {
   const size_t N = o_mem.size();                  // element count (dtype entries)
   const size_t elemBytes = o_mem.dtype().bytes(); // bytes per entry
@@ -175,30 +175,6 @@ void LS::solveLSR()
   //nrs->scalar->o_S.copyFrom(tlsr->o_S);
 }
 
-void ls_t::setTimeIntegrationCoeffs(int tstep)
-{
-  const auto bdfOrder = std::min(tstep, static_cast<int>(o_coeffBDF.size()));
-  const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
-
-  {
-    std::vector<dfloat> coeff(o_coeffBDF.size());
-    nek::bdfCoeff(g0, coeff.data(), dt, bdfOrder);
-    for (int i = coeff.size(); i > bdfOrder; i--) {
-      coeff[i - 1] = 0;
-    }
-    o_coeffBDF.copyFrom(coeff.data());
-  }
-
-  {
-    std::vector<dfloat> coeff(o_coeffEXT.size());
-    nek::extCoeff(coeff.data(), dt, extOrder, bdfOrder);
-    for (int i = coeff.size(); i > extOrder; i--) {
-      coeff[i - 1] = 0;
-    }
-    o_coeffEXT.copyFrom(coeff.data());
-  }
-}
-
 ls_t::ls_t(lsConfig_t &cfg)
 {
   if (platform->comm.mpiRank() == 0) {
@@ -256,8 +232,7 @@ ls_t::ls_t(lsConfig_t &cfg)
 
   o_prop = platform->device.malloc<dfloat>(2 * fieldOffsetSum);
   o_diff = o_prop.slice(0 * fieldOffsetSum, fieldOffsetSum);
-  std::vector<dfloat> rho(1 * fieldOffsetSum, (dfloat)1.0);
-  o_rho = platform->device.malloc<dfloat>(1 * fieldOffsetSum, rho.data());
+  o_rho = o_prop.slice(1 * fieldOffsetSum, fieldOffsetSum);
   
   for (int is = 0; is < NSfields; is++) {
     const std::string sid = scalarDigitStr(is);
@@ -396,6 +371,30 @@ ls_t::ls_t(lsConfig_t &cfg)
   };
 
   verifyBC();
+}
+
+void ls_t::setTimeIntegrationCoeffs(int tstep)
+{
+  const auto bdfOrder = std::min(tstep, static_cast<int>(o_coeffBDF.size()));
+  const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
+
+  {
+    std::vector<dfloat> coeff(o_coeffBDF.size());
+    nek::bdfCoeff(g0, coeff.data(), dt, bdfOrder);
+    for (int i = coeff.size(); i > bdfOrder; i--) {
+      coeff[i - 1] = 0;
+    }
+    o_coeffBDF.copyFrom(coeff.data());
+  }
+
+  {
+    std::vector<dfloat> coeff(o_coeffEXT.size());
+    nek::extCoeff(coeff.data(), dt, extOrder, bdfOrder);
+    for (int i = coeff.size(); i > extOrder; i--) {
+      coeff[i - 1] = 0;
+    }
+    o_coeffEXT.copyFrom(coeff.data());
+  }
 }
 
 void ls_t::computeAdvectionCoeff()
