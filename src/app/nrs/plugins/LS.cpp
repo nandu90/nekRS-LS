@@ -12,7 +12,7 @@
 
 void printOccaArray(const occa::memory &o_mem, const std::string &name, size_t maxPrint = 0)
 {
-  const size_t N = o_mem.size();                 // element count (dtype entries)
+  const size_t N = o_mem.size();                  // element count (dtype entries)
   const size_t elemBytes = o_mem.dtype().bytes(); // bytes per entry
   const size_t bytes = N * elemBytes;
 
@@ -47,15 +47,16 @@ bool buildKernelCalled = false;
 std::unique_ptr<ls_t> tlsr = nullptr;
 occa::memory o_coeffEXT, o_coeffBDF;
 int advectionSubcycingSteps = 0;
+
 class bdry : public bdryBase
 {
   public:
     bdry(){};
     void setup() override;
 };
+
 bdry bc;
-//std::unique_ptr<bdry> bc = std::make_unique<bdry>();
-};
+}
 
 void bdry::setup() {
   std::string field = "LS00";

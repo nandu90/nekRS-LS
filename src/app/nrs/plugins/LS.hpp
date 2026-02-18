@@ -34,6 +34,9 @@ public:
   void makeExplicit(int is, double time, int tstep);
   void makeAdvection(int is, double time, int tstep);
   void makeForcing();
+  void mueAVM();
+  void mueSVV();
+  void computeWrst();
 
   void solve(double time, int stage) override;
 
@@ -49,9 +52,6 @@ public:
   void setupEllipticSolver() override;
 
   void finalize() override;
-
-  void mueAVM();
-  void mueSVV();
 
   std::function<occa::memory(double, int)> userImplicitLinearTerm = nullptr;
 
@@ -104,8 +104,6 @@ public:
     return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(fieldOffsetSum + fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   }
 
-  void computeWrst();
-
   mesh_t *meshV;
 
   occa::memory o_fieldOffsetScan;
@@ -124,17 +122,17 @@ public:
   std::vector<int> compute;
   occa::memory o_compute;
 
-  occa::memory o_applyFilterRT;
-  occa::memory o_filterS;
-  occa::memory o_filterRT;
+  //occa::memory o_applyFilterRT;
+  //occa::memory o_filterS;
+  //occa::memory o_filterRT;
 
   occa::memory o_svvmu;
   occa::memory o_svvf;
 
   int Nsubsteps = 0;
 
-  dfloat *dp0thdt = nullptr;
-  dfloat *alpha0Ref = nullptr;
+  //dfloat *dp0thdt = nullptr;
+  //dfloat *alpha0Ref = nullptr;
 
   dlong EToBOffset = -1;
 
@@ -148,7 +146,6 @@ public:
   occa::memory o_diff;
 
   std::vector<std::string> name;
-  occa::memory o_ADV;
 
   void writeFile(double time);
   std::unique_ptr<iofld> fieldWriter;
@@ -162,7 +159,7 @@ private:
 
   dlong _fieldOffset = -1; // all scalar fields share the same offset
 
-  //occa::memory o_ADV;
+  occa::memory o_ADV;
 
   occa::memory o_S0;
   occa::memory o_EXT0;
