@@ -268,13 +268,13 @@ void LS::solveLSR()
     printOccaArray(tlsr->o_S, "tlsr->o_S", 256);
     setTimeIntegrationCoeffs(outerIter, tlsr->g0, tlsr->dt);
     tlsr->extrapolateSolution();
-    tlsr->computeWrst();
-    printOccaArray(tlsr->o_relWrst, "tlsr->o_relWrst", 256);
     if (tlsr->anyEllipticSolver) {
       platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT);
     }
     tlsr->computeAdvectionCoeff();
     printOccaArray(tlsr->o_W, "tlsr->o_W", 64);
+    tlsr->computeWrst();
+    printOccaArray(tlsr->o_relWrst, "tlsr->o_relWrst", 256);
     tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
     printOccaArray(tlsr->o_ADV, "tlsr->o_ADV", 256);
     tlsr->makeExplicit(0, time, outerIter);
