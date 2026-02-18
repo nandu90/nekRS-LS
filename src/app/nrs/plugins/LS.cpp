@@ -45,7 +45,6 @@ occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
 bool buildKernelCalled = false;
 std::unique_ptr<ls_t> tlsr = nullptr;
-int advectionSubcycingSteps = 0;
 } // namespace
 
 void LS::buildKernel(occa::properties _kernelInfo)
@@ -78,24 +77,24 @@ void LS::setup()
   }
   isInitialized = true;
 
-  // we set these here for now --> TODO add LEVELSET section in par file
-  std::string lid = "00";
-  platform->options.setArgs("LS" + lid + " CHECKPOINTING", upperCase("false"));
-  platform->options.setArgs("LS" + lid + " DIFFUSIONCOEFF", to_string_f(1.0e-14));
-  platform->options.setArgs("LS" + lid + " ELLIPTIC COEFF FIELD", upperCase("true"));
-  platform->options.setArgs("LS" + lid + " ELLIPTIC PRECO COEFF FIELD", upperCase("true"));
-  platform->options.setArgs("LS" + lid + " INITIAL GUESS", "EXTRAPOLATION");
-  platform->options.setArgs("LS" + lid + " MESH", "FLUID");
-  platform->options.setArgs("LS" + lid + " NAME", "TLSR");
-  platform->options.setArgs("LS" + lid + " PRECONDITIONER", "JACOBI");
-  platform->options.setArgs("LS" + lid + " REGULARIZATION METHOD", "SVV");
-  platform->options.setArgs("LS" + lid + " REGULARIZATION SVV FILTER POWER", to_string_f(6.0));
-  platform->options.setArgs("LS" + lid + " REGULARIZATION SVV SCALING COEFF", to_string_f(2.0));
-  platform->options.setArgs("LS" + lid + " SOLVER", "CG");
-  platform->options.setArgs("LS" + lid + " SOLVER TOLERANCE", to_string_f(1.0e-08));
-  platform->options.setArgs("LS" + lid + " TRANSPORTCOEFF", to_string_f(1.0));
+  // we hard-code these options here for now --> TODO: add LEVELSET section in par file
+  std::string sid = "00";
+  platform->options.setArgs("LS" + sid + " CHECKPOINTING", upperCase("false"));
+  platform->options.setArgs("LS" + sid + " DIFFUSIONCOEFF", to_string_f(1.0e-14));
+  platform->options.setArgs("LS" + sid + " ELLIPTIC COEFF FIELD", upperCase("true"));
+  platform->options.setArgs("LS" + sid + " ELLIPTIC PRECO COEFF FIELD", upperCase("true"));
+  platform->options.setArgs("LS" + sid + " INITIAL GUESS", "EXTRAPOLATION");
+  platform->options.setArgs("LS" + sid + " MESH", "FLUID");
+  platform->options.setArgs("LS" + sid + " NAME", "TLSR");
+  platform->options.setArgs("LS" + sid + " PRECONDITIONER", "JACOBI");
+  platform->options.setArgs("LS" + sid + " REGULARIZATION METHOD", "SVV");
+  platform->options.setArgs("LS" + sid + " REGULARIZATION SVV FILTER POWER", to_string_f(6.0));
+  platform->options.setArgs("LS" + sid + " REGULARIZATION SVV SCALING COEFF", to_string_f(2.0));
+  platform->options.setArgs("LS" + sid + " SOLVER", "CG");
+  platform->options.setArgs("LS" + sid + " SOLVER TOLERANCE", to_string_f(1.0e-08));
+  platform->options.setArgs("LS" + sid + " TRANSPORTCOEFF", to_string_f(1.0));
 
-  // add in the TLSR boundary condition per boundary
+  // add in the TLSR boundary condition per boundary --> TODO: handle multiple boundaries and multiple ls solvers
   std::string field = "ls00";
   std::vector<int> bcTypes = { bdryBase::bcType_zeroNeumann };
   platform->app->bc->setBcMap(field, false, bcTypes);
@@ -109,31 +108,28 @@ void LS::setup()
 
   nrs = dynamic_cast<nrs_t *>(platform->app);
   if (!nrs || !nrs->meshV || !nrs->scalar) {
-    throw std::runtime_error("LS::setup: nrs or nrs->meshV is null (mesh not initialized)");
+    throw std::runtime_error("LS::setup: nrs/nrs->meshV and/or nrs->scalar is null (mesh not initialized)");
   }
 
+  // currently just holds TLSR solver --> TODO: add in CLSR solver (separate object or hold both in one LS object?)
   tlsr = [&]() {
     lsConfig_t cfg;
     cfg.g0 = &nrs->g0;
     cfg.dt = nrs->dt;
     cfg.fieldOffset = nrs->meshV->fieldOffset;
-    cfg.vFieldOffset = nrs->scalar->vFieldOffset;       // TODO: is this a safe access?
-    cfg.vCubatureOffset = nrs->scalar->vCubatureOffset; // TODO: is this a safe access?
-    cfg.mesh.resize(1);
+    cfg.vFieldOffset = nrs->scalar->vFieldOffset;       // TODO: is it safe to assume nrs->scalar is always accessible?
+    cfg.vCubatureOffset = nrs->scalar->vCubatureOffset; // TODO: is it safe to assume nrs->scalar is always accessible?
+    cfg.mesh.resize(1); // currently hard-coded for one equation (e.g. TLSR) --> TODO: handle TLSR and CLSR
     cfg.mesh[0] = nrs->meshV;
     cfg.meshV = nrs->meshV;
     return std::make_unique<ls_t>(cfg);
   }();
-  tlsr->mueSVV(); // needs to be called before setupEllipticSolver() otherwise o_svvmue in elliptic solver will not initialized
+  tlsr->mueSVV(); // needs to be called before setupEllipticSolver() otherwise o_svvmue in elliptic solver will not be initialized --> TODO: handle AVM?
   tlsr->setupEllipticSolver();
 }
 
 void LS::solveLSR()
 {
-  if (tlsr->fieldOffsetSum != nrs->scalar->fieldOffsetSum) {
-    throw std::runtime_error("LS::solveLSR: tlsr and nrs->scalar fieldOffsetSum are not equal.");
-  }
-
   auto mesh = tlsr->meshV;
 
   double time = 0.0;
@@ -145,16 +141,17 @@ void LS::solveLSR()
   tlsr->dt[1] = tlsr->dt[0];
   tlsr->dt[2] = tlsr->dt[0];
 
-  // set the TLSR initial condition -- currently just copy the scalar S00. TODO: handle the correct initial condition
+  // set the TLSR initial condition -- currently just copy the scalar S00 --> TODO: handle the correct initial condition
+  if (tlsr->fieldOffsetSum != nrs->scalar->fieldOffsetSum) {
+    throw std::runtime_error("LS::solveLSR: tlsr and nrs->scalar fieldOffsetSum are not equal.");
+  }
   tlsr->o_S.copyFrom(nrs->scalar->o_S);
 
   while(outerIter < outerIterMax) {
     std::cout << "ITER: " << outerIter << std::endl;
     tlsr->setTimeIntegrationCoeffs(outerIter);
     tlsr->extrapolateSolution();
-    if (tlsr->anyEllipticSolver) {
-      platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT);
-    }
+    if (tlsr->anyEllipticSolver) { platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT); }
     tlsr->computeAdvectionCoeff();
     tlsr->computeWrst();
     tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
@@ -214,7 +211,7 @@ ls_t::ls_t(lsConfig_t &cfg)
   Nsubsteps = 0;
   platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
 
-  NSfields = 1;
+  NSfields = 1; // currently hard-coded for TLSR only --> TODO: add in CLSR support
 
   qqt.resize(NSfields);
   fieldOffsetScan.resize(NSfields);
@@ -230,8 +227,7 @@ ls_t::ls_t(lsConfig_t &cfg)
   int nEXT;
   platform->options.getArgs("BDF ORDER", nBDF);
   platform->options.getArgs("EXT ORDER", nEXT);
-  platform->options.getArgs("SUBCYCLING STEPS", advectionSubcycingSteps);
-  if (advectionSubcycingSteps) {
+  if (Nsubsteps) {
     nEXT = nBDF;
     platform->options.setArgs("EXT ORDER", std::to_string(nEXT));
   }
@@ -363,7 +359,6 @@ ls_t::ls_t(lsConfig_t &cfg)
 
   int nFieldsAlloc = anyEllipticSolver ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
   o_S = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
-  //o_W = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
   o_W = platform->device.malloc<dfloat>(meshV->dim * std::max(o_coeffBDF.size(), o_coeffEXT.size()) * vFieldOffset);
   const dlong Nstates = Nsubsteps ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
   o_relWrst = platform->device.malloc<dfloat>(Nstates * meshV->dim * vCubatureOffset);
