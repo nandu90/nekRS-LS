@@ -104,13 +104,13 @@ void LS::setup()
   int nBCs = platform->app->bc->size("scalar00");
   std::vector<int> bcTypes(nBCs, bdryBase::bcType_zeroNeumann);
   platform->app->bc->setBcMap(field, false, bcTypes);
-  auto bcMap = platform->app->bc->bIdToTypeId();
-  for (const auto& [key, value] : bcMap) {
-    std::cout
-      << "(" << key.first << ", " << key.second << ") -> "
-      << value
-      << '\n';
-  }
+  //auto bcMap = platform->app->bc->bIdToTypeId();
+  // for (const auto& [key, value] : bcMap) {
+  //   std::cout
+  //     << "(" << key.first << ", " << key.second << ") -> "
+  //     << value
+  //     << '\n';
+  // }
 
   // currently just holds TLSR solver --> TODO: add in CLSR solver (separate object or hold both in one LS object?)
   tlsr = [&]() {
