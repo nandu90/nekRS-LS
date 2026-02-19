@@ -176,6 +176,12 @@ void LS::solveLSR()
   //nrs->scalar->o_S.copyFrom(tlsr->o_S);
 }
 
+
+ls_t* LS::getLS()
+{
+  return tlsr.get();
+}
+
 ls_t::ls_t(lsConfig_t &cfg)
 {
   if (platform->comm.mpiRank() == 0) {

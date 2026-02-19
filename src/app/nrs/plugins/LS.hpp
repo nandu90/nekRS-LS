@@ -6,11 +6,14 @@
 #include "geomSolver.hpp"
 #include "iofldFactory.hpp"
 
+class ls_t;
+
 namespace LS
 {
 void buildKernel(occa::properties kernelInfo);
 void setup();
 void solveLSR();
+ls_t* getLS();
 }
 
 struct lsConfig_t : public solverCfg_t {
