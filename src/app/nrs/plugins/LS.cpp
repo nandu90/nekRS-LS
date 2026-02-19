@@ -77,6 +77,11 @@ void LS::setup()
   }
   isInitialized = true;
 
+  nrs = dynamic_cast<nrs_t *>(platform->app);
+  if (!nrs || !nrs->meshV || !nrs->scalar) {
+    throw std::runtime_error("LS::setup: nrs/nrs->meshV and/or nrs->scalar is null (mesh not initialized)");
+  }
+
   // we hard-code these options here for now --> TODO: add LEVELSET section in par file
   std::string sid = "00";
   platform->options.setArgs("LS" + sid + " CHECKPOINTING", upperCase("false"));
@@ -94,21 +99,17 @@ void LS::setup()
   platform->options.setArgs("LS" + sid + " SOLVER TOLERANCE", to_string_f(1.0e-08));
   platform->options.setArgs("LS" + sid + " TRANSPORTCOEFF", to_string_f(1.0));
 
-  // add in the TLSR boundary condition per boundary --> TODO: handle multiple boundaries and multiple ls solvers
+  // add in the TLSR boundary condition per boundary
   std::string field = "ls00";
-  std::vector<int> bcTypes = { bdryBase::bcType_zeroNeumann };
+  int nBCs = platform->app->bc->size("scalar00");
+  std::vector<int> bcTypes(nBCs, bdryBase::bcType_zeroNeumann);
   platform->app->bc->setBcMap(field, false, bcTypes);
-  //auto bcMap = platform->app->bc->bIdToTypeId();
-  // for (const auto& [key, value] : bcMap) {
-  //   std::cout
-  //     << "(" << key.first << ", " << key.second << ") -> "
-  //     << value
-  //     << '\n';
-  // }
-
-  nrs = dynamic_cast<nrs_t *>(platform->app);
-  if (!nrs || !nrs->meshV || !nrs->scalar) {
-    throw std::runtime_error("LS::setup: nrs/nrs->meshV and/or nrs->scalar is null (mesh not initialized)");
+  auto bcMap = platform->app->bc->bIdToTypeId();
+  for (const auto& [key, value] : bcMap) {
+    std::cout
+      << "(" << key.first << ", " << key.second << ") -> "
+      << value
+      << '\n';
   }
 
   // currently just holds TLSR solver --> TODO: add in CLSR solver (separate object or hold both in one LS object?)
