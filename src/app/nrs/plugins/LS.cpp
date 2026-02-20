@@ -96,7 +96,7 @@ void LS::setup()
   platform->options.setArgs("LS" + sid + " REGULARIZATION SVV FILTER POWER", to_string_f(6.0));
   platform->options.setArgs("LS" + sid + " REGULARIZATION SVV SCALING COEFF", to_string_f(2.0));
   platform->options.setArgs("LS" + sid + " SOLVER", "CG");
-  platform->options.setArgs("LS" + sid + " SOLVER TOLERANCE", to_string_f(1.0e-08));
+  platform->options.setArgs("LS" + sid + " SOLVER TOLERANCE", to_string_f(1.0e-14));
   platform->options.setArgs("LS" + sid + " TRANSPORTCOEFF", to_string_f(1.0));
 
   // add in the TLSR boundary condition per boundary
@@ -129,7 +129,7 @@ void LS::setup()
   tlsr->setupEllipticSolver();
 }
 
-void LS::solveLSR()
+void LS::solveLSR(bool matchUDFCallOrder)
 {
   auto mesh = tlsr->meshV;
 
@@ -148,30 +148,47 @@ void LS::solveLSR()
   }
   tlsr->o_S.copyFrom(nrs->scalar->o_S);
 
-  while(outerIter < outerIterMax) {
-    std::cout << "ITER: " << outerIter << std::endl;
-    tlsr->setTimeIntegrationCoeffs(outerIter);
-    tlsr->extrapolateSolution();
-    if (tlsr->anyEllipticSolver) { platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT); }
-    tlsr->computeAdvectionCoeff();
-    tlsr->computeWrst();
-    tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
-    tlsr->makeExplicit(0, time, outerIter);
-    tlsr->makeForcing();
-    tlsr->mueSVV();
-    int innerIter = 1;
-    bool stepConverged = false;
-    while(!stepConverged) {
-      if (innerIter == 1) { tlsr->lagSolution(); }
+  if (matchUDFCallOrder) {
+    // Enforces the same function call ordering as the UDF source-term
+    // implementation (see initInnerStep() and runInnerStep() in nrs.cpp).
+    while(outerIter <= outerIterMax) {
+      std::cout << "ITER: " << outerIter << std::endl;
+      time += tlsr->dt[0];
+      tlsr->setTimeIntegrationCoeffs(outerIter);
+      tlsr->extrapolateSolution();
+      tlsr->computeWrst();
+      if (tlsr->anyEllipticSolver) { platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT); }
+      tlsr->computeAdvectionCoeff();
+      tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
+      tlsr->makeExplicit(0, time, outerIter);
+      tlsr->makeForcing();
+      tlsr->lagSolution();
       // tlsr->applyDirichlet(time);
-      tlsr->solve(time, innerIter);
-      stepConverged = true;
+      tlsr->solve(time, 1);
+      tlsr->mueSVV();
+      tlsr->writeFile(time);
+      outerIter += 1;
     }
-    tlsr->writeFile(time);
-    outerIter += 1;
-    time += tlsr->dt[0];
+  } else {
+    while(outerIter <= outerIterMax) {
+      std::cout << "ITER: " << outerIter << std::endl;
+      time += tlsr->dt[0];
+      tlsr->setTimeIntegrationCoeffs(outerIter);
+      tlsr->extrapolateSolution();
+      if (tlsr->anyEllipticSolver) { platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT); }
+      tlsr->computeAdvectionCoeff();
+      tlsr->computeWrst();
+      tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
+      tlsr->makeExplicit(0, time, outerIter);
+      tlsr->makeForcing();
+      tlsr->mueSVV();
+      tlsr->lagSolution();
+      // tlsr->applyDirichlet(time);
+      tlsr->solve(time, 1);
+      tlsr->writeFile(time);
+      outerIter += 1;
+    }
   }
-
   // copy the TLSR solution back to the scalar S00
   //nrs->scalar->o_S.copyFrom(tlsr->o_S);
 }

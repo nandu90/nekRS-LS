@@ -12,7 +12,7 @@ namespace LS
 {
 void buildKernel(occa::properties kernelInfo);
 void setup();
-void solveLSR();
+void solveLSR(bool matchUDFCallOrder = false);
 ls_t* getLS();
 }
 
