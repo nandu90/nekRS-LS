@@ -152,7 +152,7 @@ void LS::solveLSR(bool matchUDFCallOrder)
     // Enforces the same function call ordering as the UDF source-term
     // implementation (see initInnerStep() and runInnerStep() in nrs.cpp).
     while(outerIter <= outerIterMax) {
-      std::cout << "ITER: " << outerIter << std::endl;
+      std::cout << "Matching UDF... ITER: " << outerIter << std::endl;
       time += tlsr->dt[0];
       tlsr->setTimeIntegrationCoeffs(outerIter);
       tlsr->extrapolateSolution();
