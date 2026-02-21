@@ -1,5 +1,5 @@
-#if !defined(nekrs_LS_hpp_)
-#define nekrs_LS_hpp_
+#if !defined(nekrs_lvlSet_hpp_)
+#define nekrs_lvlSet_hpp_
 
 #include "platform.hpp"
 #include "solver.hpp"

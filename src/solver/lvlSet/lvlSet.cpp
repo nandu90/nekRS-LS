@@ -1,4 +1,4 @@
-#include "LS.hpp"
+#include "lvlSet.hpp"
 #include "nrs.hpp"
 #include "platform.hpp"
 #include "linAlg.hpp"
@@ -53,7 +53,7 @@ void LS::buildKernel(occa::properties _kernelInfo)
   kernelInfo += _kernelInfo;
 
   auto buildKernel = [&kernelInfo](const std::string &kernelName) {
-    const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/app/nrs/plugins/");
+    const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/solver/lvlSet/");
     const auto fileName = path + "LS.okl";
     const auto reqName = "LS::";
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
