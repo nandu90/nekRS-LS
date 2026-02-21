@@ -6,17 +6,17 @@
 #include "geomSolver.hpp"
 #include "iofldFactory.hpp"
 
-class ls_t;
+class lvlSet_t;
 
-namespace LS
+namespace lvlSet
 {
 void buildKernel(occa::properties kernelInfo);
 void setup();
 void solveLSR();
-ls_t* getLS();
+lvlSet_t* getLS();
 }
 
-struct lsConfig_t : public solverCfg_t {
+struct lvlSetConfig_t : public solverCfg_t {
 public:
   std::vector<mesh_t *> mesh;
   mesh_t *meshV;
@@ -27,11 +27,11 @@ public:
   dfloat *dt;
 };
 
-class ls_t : public solver_t
+class lvlSet_t : public solver_t
 {
 public:
 
-  ls_t(lsConfig_t &cfg);
+  lvlSet_t(lvlSetConfig_t &cfg);
 
   void computeAdvectionCoeff();
   void makeExplicit(int is, double time, int tstep);

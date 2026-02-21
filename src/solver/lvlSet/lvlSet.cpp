@@ -44,18 +44,18 @@ nrs_t *nrs;
 occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
 bool buildKernelCalled = false;
-std::unique_ptr<ls_t> tlsr = nullptr;
+std::unique_ptr<lvlSet_t> tlsr = nullptr;
 } // namespace
 
-void LS::buildKernel(occa::properties _kernelInfo)
+void lvlSet::buildKernel(occa::properties _kernelInfo)
 {
   occa::properties kernelInfo;
   kernelInfo += _kernelInfo;
 
   auto buildKernel = [&kernelInfo](const std::string &kernelName) {
     const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/solver/lvlSet/");
-    const auto fileName = path + "LS.okl";
-    const auto reqName = "LS::";
+    const auto fileName = path + "lvlSet.okl";
+    const auto reqName = "lvlSet::";
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
@@ -69,7 +69,7 @@ void LS::buildKernel(occa::properties _kernelInfo)
   normalVectorKernel = buildKernel("normalVector");
 }
 
-void LS::setup()
+void lvlSet::setup()
 {
   static bool isInitialized = false;
   if (isInitialized) {
@@ -79,7 +79,7 @@ void LS::setup()
 
   nrs = dynamic_cast<nrs_t *>(platform->app);
   if (!nrs || !nrs->meshV || !nrs->scalar) {
-    throw std::runtime_error("LS::setup: nrs/nrs->meshV and/or nrs->scalar is null (mesh not initialized)");
+    throw std::runtime_error("lvlSet::setup: nrs/nrs->meshV and/or nrs->scalar is null (mesh not initialized)");
   }
 
   // we hard-code these options here for now --> TODO: add LEVELSET section in par file
@@ -114,7 +114,7 @@ void LS::setup()
 
   // currently just holds TLSR solver --> TODO: add in CLSR solver (separate object or hold both in one LS object?)
   tlsr = [&]() {
-    lsConfig_t cfg;
+    lvlSetConfig_t cfg;
     cfg.g0 = &nrs->g0;
     cfg.dt = nrs->dt;
     cfg.fieldOffset = nrs->meshV->fieldOffset;
@@ -123,13 +123,13 @@ void LS::setup()
     cfg.mesh.resize(1); // currently hard-coded for one equation (e.g. TLSR) --> TODO: handle TLSR and CLSR
     cfg.mesh[0] = nrs->meshV;
     cfg.meshV = nrs->meshV;
-    return std::make_unique<ls_t>(cfg);
+    return std::make_unique<lvlSet_t>(cfg);
   }();
   tlsr->mueSVV(); // needs to be called before setupEllipticSolver() otherwise o_svvmue in elliptic solver will not be initialized --> TODO: handle AVM?
   tlsr->setupEllipticSolver();
 }
 
-void LS::solveLSR()
+void lvlSet::solveLSR()
 {
   auto mesh = tlsr->meshV;
 
@@ -172,12 +172,12 @@ void LS::solveLSR()
 }
 
 
-ls_t* LS::getLS()
+lvlSet_t* lvlSet::getLS()
 {
   return tlsr.get();
 }
 
-ls_t::ls_t(lsConfig_t &cfg)
+lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
 {
   if (platform->comm.mpiRank() == 0) {
     std::cout << "================ " << "SETUP LEVEL-SET" << " ===============\n";
@@ -375,7 +375,7 @@ ls_t::ls_t(lsConfig_t &cfg)
   verifyBC();
 }
 
-void ls_t::setTimeIntegrationCoeffs(int tstep)
+void lvlSet_t::setTimeIntegrationCoeffs(int tstep)
 {
   const auto bdfOrder = std::min(tstep, static_cast<int>(o_coeffBDF.size()));
   const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
@@ -399,7 +399,7 @@ void ls_t::setTimeIntegrationCoeffs(int tstep)
   }
 }
 
-void ls_t::computeAdvectionCoeff()
+void lvlSet_t::computeAdvectionCoeff()
 {
   // a. compute interface normals
   launchKernel("core-gradientVolumeHex3D",
@@ -417,7 +417,7 @@ void ls_t::computeAdvectionCoeff()
   normalVectorKernel(meshV->Nlocal, vFieldOffset, o_signls, o_W);
 }
 
-void ls_t::makeAdvection(int is, double time, int tstep)
+void lvlSet_t::makeAdvection(int is, double time, int tstep)
 {
   if (Nsubsteps) {
     advectionSubcycling(std::min(tstep, static_cast<int>(o_coeffEXT.size())), time, is);
@@ -460,7 +460,7 @@ void ls_t::makeAdvection(int is, double time, int tstep)
   }
 }
 
-void ls_t::advectionSubcycling(int nEXT, double time, int is)
+void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
 {
   const auto mesh = this->_mesh[is];
 
@@ -512,7 +512,7 @@ void ls_t::advectionSubcycling(int nEXT, double time, int is)
   }
 }
 
-void ls_t::makeExplicit(int is, double time, int tstep)
+void lvlSet_t::makeExplicit(int is, double time, int tstep)
 {
   const std::string sid = scalarDigitStr(is);
 
@@ -522,7 +522,7 @@ void ls_t::makeExplicit(int is, double time, int tstep)
   o_explicitTerms("tlsr").copyFrom(o_signls); // TODO: shouldn't use tlsr here but will use this hack for now
 }
 
-void ls_t::makeForcing()
+void lvlSet_t::makeForcing()
 {
   for (int is = 0; is < this->NSfields; is++) {
     if (!compute[is]) {
@@ -554,7 +554,7 @@ void ls_t::makeForcing()
   }
 }
 
-void ls_t::solve(double time, int stage)
+void lvlSet_t::solve(double time, int stage)
 {
   for (int is = 0; is < NSfields; is++) {
     if (!compute[is]) {
@@ -634,11 +634,11 @@ void ls_t::solve(double time, int stage)
   }
 }
 
-void ls_t::saveSolutionState() {}
+void lvlSet_t::saveSolutionState() {}
 
-void ls_t::restoreSolutionState() {}
+void lvlSet_t::restoreSolutionState() {}
 
-void ls_t::lagSolution()
+void lvlSet_t::lagSolution()
 {
   if (!anyEllipticSolver) {
     return;
@@ -650,7 +650,7 @@ void ls_t::lagSolution()
   }
 }
 
-void ls_t::extrapolateSolution()
+void lvlSet_t::extrapolateSolution()
 {
   if (!o_Se.isInitialized()) {
     return;
@@ -666,9 +666,9 @@ void ls_t::extrapolateSolution()
                o_Se);
 }
 
-void ls_t::applyDirichlet(double time) {}
+void lvlSet_t::applyDirichlet(double time) {}
 
-void ls_t::setupEllipticSolver()
+void lvlSet_t::setupEllipticSolver()
 {
   for (int is = 0; is < NSfields; is++) {
     std::string sid = scalarDigitStr(is);
@@ -692,9 +692,9 @@ void ls_t::setupEllipticSolver()
   }
 }
 
-void ls_t::finalize() {}
+void lvlSet_t::finalize() {}
 
-void ls_t::mueSVV()
+void lvlSet_t::mueSVV()
 {
   auto mesh = this->meshV;
 
@@ -735,7 +735,7 @@ void ls_t::mueSVV()
   }
 }
 
-void ls_t::computeWrst()
+void lvlSet_t::computeWrst()
 {
   auto mesh = meshV;
 
@@ -772,7 +772,7 @@ void ls_t::computeWrst()
   }
 }
 
-void ls_t::writeFile(double time)
+void lvlSet_t::writeFile(double time)
 {
   if(!fieldWriter) {
     fieldWriter = iofldFactory::create();
