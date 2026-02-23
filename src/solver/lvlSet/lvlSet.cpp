@@ -9,6 +9,7 @@
 #include "iofldFactory.hpp"
 #include <stdexcept>
 #include <algorithm>
+#include "par.hpp"
 
 static void printOccaArray(const occa::memory &o_mem, const std::string &name, size_t maxPrint = 0)
 {
@@ -40,11 +41,64 @@ static void printOccaArray(const occa::memory &o_mem, const std::string &name, s
 // private members
 namespace
 {
+static std::ostringstream errorLogger;
+static std::ostringstream valueErrorLogger;
 nrs_t *nrs;
 occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
 bool buildKernelCalled = false;
 std::unique_ptr<lvlSet_t> tlsr = nullptr;
+
+static std::vector<std::string> lvlSetKeys = {
+  {"solver"},
+  {"residualTol"},
+  {"initialGuess"},
+  {"preconditioner"},
+  {"pMGSchedule"},
+  {"smootherType"},
+  {"coarseSolver"},
+  {"semfemSolver"},
+  {"coarseGridDiscretization"},
+  {"boundaryTypeMap"},
+  {"mesh"},
+  {"absoluteTol"},
+};
+
+static std::vector<std::string> validSections = {
+  {"lvlset"},
+  {"tlsr"},
+  {"clsr"},
+};
+
+template <typename Printable> void append_error(Printable message)
+{
+  errorLogger << "\t" << message << "\n";
+}
+
+template <typename Printable> void append_value_error(Printable message)
+{
+  valueErrorLogger << "\t" << message << "\n";
+}
+
+void processError()
+{
+  const std::string valueErrors = valueErrorLogger.str();
+  errorLogger << valueErrors;
+  const std::string errorMessage = errorLogger.str();
+  int length = errorMessage.size();
+  MPI_Bcast(&length, 1, MPI_INT, 0, platform->comm.mpiComm());
+
+  auto errTxt = [&]() {
+    std::stringstream txt;
+    txt << std::endl;
+    txt << errorMessage;
+    txt << "\nrun with `--help par` for more details\n";
+
+    return txt.str();
+  };
+
+  nekrsCheck(length > 0, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", errTxt().c_str());
+}
 } // namespace
 
 void lvlSet::buildKernel(occa::properties _kernelInfo)
@@ -69,6 +123,36 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
   normalVectorKernel = buildKernel("normalVector");
 }
 
+void validate()
+{
+  auto sections = platform->par->ini->sections;
+
+  for (auto const &sec : sections) {
+    if (std::find(validSections.begin(), validSections.end(), sec.first) != validSections.end()) {
+      auto validKeys = lvlSetKeys;
+
+      for (auto const &val : sec.second) {
+        const auto &key = val.first;
+
+        if (std::find(validKeys.begin(), validKeys.end(), key) == validKeys.end()) {
+          std::ostringstream error;
+          error << "unknown key: " << sec.first << "::" << key << "\n";
+          append_error(error.str());
+        }
+      }
+    }
+  }
+
+}
+
+void parseLvlSetSection()
+{
+  if (platform->comm.mpiRank() == 0) 
+    validate();
+
+  processError();
+}
+
 void lvlSet::setup()
 {
   static bool isInitialized = false;
@@ -81,6 +165,8 @@ void lvlSet::setup()
   if (!nrs || !nrs->meshV || !nrs->scalar) {
     throw std::runtime_error("lvlSet::setup: nrs/nrs->meshV and/or nrs->scalar is null (mesh not initialized)");
   }
+
+  parseLvlSetSection();
 
   // we hard-code these options here for now --> TODO: add LEVELSET section in par file
   std::string sid = "00";
@@ -136,6 +222,7 @@ void lvlSet::solveLSR()
   double time = 0.0;
   int outerIter = 1;
   int outerIterMax = 1000;
+  platform->options.getArgs("NUMBER TIMESTEPS",outerIterMax);
   int innerIterMax = 100;
 
   // set constant dt --> TODO: need to change this if we want variable dt
