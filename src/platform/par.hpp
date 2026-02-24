@@ -27,4 +27,12 @@ private:
 
 };
 
+void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, std::string parSection);
+void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope);
+void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope);
+void parseInitialGuess(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope);
+void parseCoarseGridDiscretization(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope);
+void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope);
+void parseSmoother(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope);
+void parsePreconditioner(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope);
 #endif

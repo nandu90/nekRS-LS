@@ -543,9 +543,6 @@ void parseCheckpointing(const int rank, setupAide &options, inipp::Ini *ini, std
 
 #include "parseOcca.hpp"
 
-#include "parsePreconditioner.hpp"
-#include "parseLinearSolve.cpp"
-#include "parseRegularization.cpp"
 #include "parseBoomerAmg.cpp"
 #include "parseCvode.hpp"
 
@@ -634,6 +631,10 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *ini)
 
 
 } // namespace
+
+#include "parseRegularization.cpp"
+#include "parseLinearSolve.cpp"
+#include "parsePreconditioner.hpp"
 
 Par::Par(MPI_Comm comm_)
 {
