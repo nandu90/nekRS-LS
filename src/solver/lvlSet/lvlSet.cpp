@@ -49,18 +49,34 @@ occa::kernel normalVectorKernel;
 bool buildKernelCalled = false;
 std::unique_ptr<lvlSet_t> tlsr = nullptr;
 
+// common keys
+static std::vector<std::string> commonKeys = {
+    {"solver"},
+    {"residualTol"},
+    {"initialGuess"},
+    {"preconditioner"},
+    {"pMGSchedule"},
+    {"smootherType"},
+    {"coarseSolver"},
+    {"semfemSolver"},
+    {"coarseGridDiscretization"},
+    {"boundaryTypeMap"},
+    {"regularization"},
+    {"checkpointing"},
+
+    // deprecated filter params
+    {"filterWeight"},
+    {"filterModes"},
+    {"filterCutoffRatio"},
+};
+
 static std::vector<std::string> lvlSetKeys = {
-  {"solver"},
-  {"residualTol"},
-  {"initialGuess"},
-  {"preconditioner"},
-  {"pMGSchedule"},
-  {"smootherType"},
-  {"coarseSolver"},
-  {"semfemSolver"},
-  {"coarseGridDiscretization"},
+  {"freqTLSR"},
+  {"freqCLSR"},
+};
+
+static std::vector<std::string> scalarKeys = {
   {"boundaryTypeMap"},
-  {"mesh"},
   {"absoluteTol"},
 };
 
@@ -99,6 +115,7 @@ void processError()
 
   nekrsCheck(length > 0, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", errTxt().c_str());
 }
+
 } // namespace
 
 void lvlSet::buildKernel(occa::properties _kernelInfo)
@@ -123,34 +140,145 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
   normalVectorKernel = buildKernel("normalVector");
 }
 
-void validate()
+void validateLvlSetSections()
 {
   auto sections = platform->par->ini->sections;
 
   for (auto const &sec : sections) {
     if (std::find(validSections.begin(), validSections.end(), sec.first) != validSections.end()) {
-      auto validKeys = lvlSetKeys;
+      std::vector<std::string> validKeys;
+      if(sec.first == "lvlset") {
+        validKeys = lvlSetKeys;
+      } else {
+        validKeys = scalarKeys;
+      }
 
       for (auto const &val : sec.second) {
         const auto &key = val.first;
 
         if (std::find(validKeys.begin(), validKeys.end(), key) == validKeys.end()) {
-          std::ostringstream error;
-          error << "unknown key: " << sec.first << "::" << key << "\n";
-          append_error(error.str());
+          if (std::find(commonKeys.begin(), commonKeys.end(), key) == commonKeys.end()) {
+            std::ostringstream error;
+            error << "unknown key: " << sec.first << "::" << key << "\n";
+            append_error(error.str());
+          }
         }
       }
     }
   }
-
 }
 
-void parseLvlSetSection()
+void parseLvlSetSections()
 {
-  if (platform->comm.mpiRank() == 0) 
-    validate();
+  const auto &ini = platform->par->ini;
+  const auto &sections = ini->sections;
+  const auto &rank = platform->comm.mpiRank();
+  auto &options = platform->options;
 
-  processError();
+  auto parseLvlSetSection = [&](const auto &sec) {
+    std::istringstream stream(sec.first);
+    std::string firstWord;
+    stream >> firstWord;
+    if (firstWord != "default" && firstWord != "tlsr" && firstWord != "clsr") {
+      return;
+    }
+
+    auto parScope = "lvlset " + sec.first;
+    auto parPrefix = upperCase(parScope) + " ";
+
+    {
+      std::string val = "false";
+      if (ini->extract(parScope, "checkpointing", val)) {
+        if(val == "true") {
+          val = "true";
+        } else {
+          val = "false";
+        }
+      }
+      options.setArgs(parPrefix + "CHECKPOINTING", upperCase(val));
+    }
+
+    parseRegularization(rank, options, ini, parScope);
+    if(options.compareArgs(parPrefix + "REGULARIZATION METHOD","NONE")) {
+      if(firstWord == "default") {
+        options.setArgs("LVLSET TLSR REGULARIZATION METHOD","SVV");
+        options.setArgs("LVLSET TLSR REGULARIZATION SVV SCALING COEFF", "2.0");
+        options.setArgs("LVLSET TLSR REGULARIZATION SVV FILTER POWER", "6.0");
+        options.setArgs("LVLSET CLSR REGULARIZATION METHOD","SVV");
+        options.setArgs("LVLSET CLSR REGULARIZATION SVV SCALING COEFF", "1.0");
+        options.setArgs("LVLSET CLSR REGULARIZATION SVV FILTER POWER", "4.0");
+      }
+    }
+
+    std::string solver;
+    ini->extract(parScope, "solver", solver);
+
+    if (solver == "cvode") {
+      options.setArgs(parPrefix + "SOLVER", "CVODE");
+    }
+
+    options.setArgs(parPrefix + "ELLIPTIC COEFF FIELD", "TRUE");
+
+    parseInitialGuess(rank, options, ini, parScope);
+
+    parsePreconditioner(rank, options, ini, parScope);
+
+    parseLinearSolver(rank, options, ini, parScope);
+
+    parseSolverTolerance(rank, options, ini, parScope);
+
+    std::string sbuf;
+
+    //lvlset works only on fluid mesh
+    options.setArgs(parPrefix + "MESH", "FLUID");
+
+    if(firstWord == "default") {
+      options.setArgs("LVLSET TLSR DIFFUSIONCOEFF", to_string_f(1e-12));
+      options.setArgs("LVLSET CLSR DIFFUSIONCOEFF", to_string_f(1.0));
+    }
+
+    std::string s_bcMap;
+    if (ini->extract(parScope, "boundarytypemap", s_bcMap)) {
+      options.setArgs(parPrefix + "BOUNDARY TYPE MAP", s_bcMap);
+    }
+  };
+
+  // apply default lvlSet section arguments
+  auto defaultSection = std::make_pair(std::string("default"), sections.at("scalar"));
+  parseLvlSetSection(defaultSection);
+
+  // initialize with default settings
+  const std::string defaultSettingStr = "LVLSET DEFAULT";
+  const auto options_ = options;
+  for (auto [keyWord, value] : options_) {
+    auto delPos = keyWord.find(defaultSettingStr);
+    if (delPos != std::string::npos) {
+      auto newKey = keyWord;
+      newKey.erase(delPos, defaultSettingStr.size());
+      options.setArgs("LVLSET TLSR" + newKey, value);
+      options.setArgs("LVLSET CLSR" + newKey, value);
+    }
+  }
+
+  // override default settings if specified explicitly
+  for (auto &&sec : sections) {
+    parseLvlSetSection(sec);
+  }
+
+  // set boundarytypemap if not specified explicitly
+  /* if (sections.count("scalar") != 0) { */
+  /*   std::string s_bcMapDefault; */
+  /*   ini->extract("scalar", "boundarytypemap", s_bcMapDefault); */
+  /*   for (int is = 0; is < nscal; ++is) { */
+  /*     std::string sid = scalarDigitStr(is); */
+  /*     std::string dummy; */
+  /*     if (!ini->extract("scalar" + sid, "boundarytypemap", dummy)) { */
+  /*       if (s_bcMapDefault.size() > 0) { */
+  /*         options.setArgs("SCALAR" + sid + " BOUNDARY TYPE MAP", s_bcMapDefault); */
+  /*       } */
+  /*     } */
+  /*   } */
+  /* } */
 }
 
 void lvlSet::setup()
@@ -166,7 +294,11 @@ void lvlSet::setup()
     throw std::runtime_error("lvlSet::setup: nrs/nrs->meshV and/or nrs->scalar is null (mesh not initialized)");
   }
 
-  parseLvlSetSection();
+  if(platform->comm.mpiRank() == 0)
+    validateLvlSetSections();
+  processError();
+
+  parseLvlSetSections();
 
   // we hard-code these options here for now --> TODO: add LEVELSET section in par file
   std::string sid = "00";
