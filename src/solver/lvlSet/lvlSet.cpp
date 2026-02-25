@@ -348,7 +348,16 @@ void parseLvlSetSections()
   if(!ini->extract("tlsr", "boundarytypemap", s_bcMap)){
     ini->extract("scalar tls", "boundarytypemap", s_bcMap);
     if(s_bcMap.size() > 0) {
-      options.setArgs("TLSR BOUNDARY TYPE MAP", s_bcMap);
+      const auto list = serializeString(s_bcMap, ',');
+
+      std::string s_newMap = "";
+      for (int i = 0; i < list.size(); i++) {
+        if (i > 0) 
+          s_newMap = s_newMap + ", ";
+        s_newMap = s_newMap + "zeroNeumann";
+      }
+
+      options.setArgs("TLSR BOUNDARY TYPE MAP", s_newMap);
     }
   }
 
