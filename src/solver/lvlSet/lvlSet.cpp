@@ -352,9 +352,53 @@ void parseLvlSetSections()
     }
   }
 
+  //TODO: remove this
+  options.setArgs("CLSR SOLVER","NONE");
+
   cleanupStaleKeys(rank, options, ini);
 }
 
+void bdrySetupFromPar()
+{
+  std::vector<std::string> sectionsPar = {"TLSR","CLSR"};
+
+  int count = 0;
+  int expectedCount = 0;
+
+  auto process = [&](const std::string &sectionPar) {
+    std::vector<std::string> staleOptions;
+    for (auto const &option : platform->options) {
+      if (option.first.find(sectionPar) != std::string::npos) {
+        if (option.first.compare(sectionPar + " SOLVER") == 0 &&
+            option.second.find("NONE") == std::string::npos) {
+          expectedCount++;
+        }
+
+        if (option.first.find("BOUNDARY TYPE MAP") != std::string::npos) {
+          count++;
+
+          platform->app->bc->setupField(serializeString(option.second, ','), sectionPar, false);
+
+          staleOptions.push_back(option.first);
+        }
+      }
+    }
+    for (auto const &key : staleOptions) {
+      platform->options.removeArgs(key);
+    }
+  };
+
+  for (auto &sectionPar : sectionsPar) {
+    process(sectionPar);
+  }
+
+  nekrsCheck(count > 0 && count != expectedCount,
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "boundaryTypeMap specfied for %d fields but not all %d fields!",
+             count,
+             expectedCount);
+}
 
 void lvlSet::setup()
 {
@@ -375,6 +419,8 @@ void lvlSet::setup()
 
   parseLvlSetSections();
   processError();
+
+  bdrySetupFromPar();
 
   // we hard-code these options here for now --> TODO: add LEVELSET section in par file
   std::string sid = "00";
