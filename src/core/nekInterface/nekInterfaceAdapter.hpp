@@ -133,7 +133,7 @@ bool usrFile();
 
 void restartFromFile(const std::string& fileName);
 void userchk(void);
-int bcmap(int bid, int ifld);
+int bcmap(int bid, int ifld, int isMesh);
 
 int globalElementIdToRank(long long id);
 int globalElementIdToLocal(long long id);

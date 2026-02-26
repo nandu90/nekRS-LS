@@ -431,6 +431,18 @@ void lvlSet::setup()
 
   bdrySetupFromPar();
 
+  //bc from nek. TODO - need to check this. Also add CLSR
+  if(platform->app->bc->useNek()) {
+    int nIDs = nekData.NboundaryID; //cannot be Tmesh
+    std::vector<int> map(nIDs);
+
+    auto sIndex = nrs->scalar->nameToIndex.find("tls")->second;
+    for (int id = 0; id < map.size(); id++) {
+      map[id] = nek::bcmap(id + 1, sIndex + 2, 0);
+    }
+    platform->app->bc->setBcMap("tlsr", false, map);
+  }
+
   // we hard-code these options here for now --> TODO: add LEVELSET section in par file
   std::string sid = "00";
   platform->options.setArgs("LS" + sid + " CHECKPOINTING", upperCase("false"));
