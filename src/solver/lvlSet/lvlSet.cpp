@@ -439,6 +439,7 @@ void lvlSet::setup()
     auto sIndex = nrs->scalar->nameToIndex.find("tls")->second;
     for (int id = 0; id < map.size(); id++) {
       map[id] = nek::bcmap(id + 1, sIndex + 2, 0);
+      map[id] = bdryBase::bcType_zeroNeumann;      //all zero flux BCs
     }
     platform->app->bc->setBcMap("tlsr", false, map);
   }
