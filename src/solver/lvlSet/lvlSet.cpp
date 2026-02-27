@@ -312,6 +312,7 @@ void parseLvlSetSections()
 
     if(firstWord == "default") {
       options.setArgs("TLSR DIFFUSIONCOEFF", to_string_f(1e-12));
+      options.setArgs("TLSR TRANSPORTCOEFF", to_string_f(1.0));
       options.setArgs("CLSR DIFFUSIONCOEFF", to_string_f(1.0));
     }
 
@@ -444,35 +445,35 @@ void lvlSet::setup()
     platform->app->bc->setBcMap("tlsr", false, map);
   }
 
-  // we hard-code these options here for now --> TODO: add LEVELSET section in par file
-  std::string sid = "00";
-  platform->options.setArgs("LS" + sid + " CHECKPOINTING", upperCase("false"));
-  platform->options.setArgs("LS" + sid + " DIFFUSIONCOEFF", to_string_f(1.0e-14));
-  platform->options.setArgs("LS" + sid + " ELLIPTIC COEFF FIELD", upperCase("true"));
-  platform->options.setArgs("LS" + sid + " ELLIPTIC PRECO COEFF FIELD", upperCase("true"));
-  platform->options.setArgs("LS" + sid + " INITIAL GUESS", "EXTRAPOLATION");
-  platform->options.setArgs("LS" + sid + " MESH", "FLUID");
-  platform->options.setArgs("LS" + sid + " NAME", "TLSR");
-  platform->options.setArgs("LS" + sid + " PRECONDITIONER", "JACOBI");
-  platform->options.setArgs("LS" + sid + " REGULARIZATION METHOD", "SVV");
-  platform->options.setArgs("LS" + sid + " REGULARIZATION SVV FILTER POWER", to_string_f(6.0));
-  platform->options.setArgs("LS" + sid + " REGULARIZATION SVV SCALING COEFF", to_string_f(2.0));
-  platform->options.setArgs("LS" + sid + " SOLVER", "CG");
-  platform->options.setArgs("LS" + sid + " SOLVER TOLERANCE", to_string_f(1.0e-14));
-  platform->options.setArgs("LS" + sid + " TRANSPORTCOEFF", to_string_f(1.0));
+  /* // we hard-code these options here for now --> TODO: add LEVELSET section in par file */
+  /* std::string sid = "00"; */
+  platform->options.setArgs("TLSR CHECKPOINTING", upperCase("false"));
+  platform->options.setArgs("TLSR DIFFUSIONCOEFF", to_string_f(1.0e-14));
+  platform->options.setArgs("TLSR ELLIPTIC COEFF FIELD", upperCase("true"));
+  platform->options.setArgs("TLSR ELLIPTIC PRECO COEFF FIELD", upperCase("true"));
+  platform->options.setArgs("TLSR INITIAL GUESS", "EXTRAPOLATION");
+  platform->options.setArgs("TLSR MESH", "FLUID");
+  platform->options.setArgs("TLSR NAME", "TLSR");
+  platform->options.setArgs("TLSR PRECONDITIONER", "JACOBI");
+  platform->options.setArgs("TLSR REGULARIZATION METHOD", "SVV");
+  platform->options.setArgs("TLSR REGULARIZATION SVV FILTER POWER", to_string_f(6.0));
+  platform->options.setArgs("TLSR REGULARIZATION SVV SCALING COEFF", to_string_f(2.0));
+  platform->options.setArgs("TLSR SOLVER", "CG");
+  platform->options.setArgs("TLSR SOLVER TOLERANCE", to_string_f(1.0e-14));
+  platform->options.setArgs("TLSR TRANSPORTCOEFF", to_string_f(1.0));
 
-  // add in the TLSR boundary condition per boundary
-  std::string field = "ls00";
-  int nBCs = platform->app->bc->size("scalar00");
-  std::vector<int> bcTypes(nBCs, bdryBase::bcType_zeroNeumann);
-  platform->app->bc->setBcMap(field, false, bcTypes);
-  //auto bcMap = platform->app->bc->bIdToTypeId();
-  // for (const auto& [key, value] : bcMap) {
-  //   std::cout
-  //     << "(" << key.first << ", " << key.second << ") -> "
-  //     << value
-  //     << '\n';
-  // }
+  /* // add in the TLSR boundary condition per boundary */
+  /* std::string field = "ls00"; */
+  /* int nBCs = platform->app->bc->size("scalar00"); */
+  /* std::vector<int> bcTypes(nBCs, bdryBase::bcType_zeroNeumann); */
+  /* platform->app->bc->setBcMap(field, false, bcTypes); */
+  /* //auto bcMap = platform->app->bc->bIdToTypeId(); */
+  /* // for (const auto& [key, value] : bcMap) { */
+  /* //   std::cout */
+  /* //     << "(" << key.first << ", " << key.second << ") -> " */
+  /* //     << value */
+  /* //     << '\n'; */
+  /* // } */
 
   // currently just holds TLSR solver --> TODO: add in CLSR solver (separate object or hold both in one LS object?)
   tlsr = [&]() {
@@ -578,6 +579,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
              "%s\n",
              "EXT order needs to be >= BDF order!");
 
+  printf("here\n");
   o_coeffBDF = platform->device.malloc<dfloat>(nBDF);
   o_coeffEXT = platform->device.malloc<dfloat>(nEXT);
 
@@ -599,15 +601,16 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   o_diff = o_prop.slice(0 * fieldOffsetSum, fieldOffsetSum);
   o_rho = o_prop.slice(1 * fieldOffsetSum, fieldOffsetSum);
   
+  printf("here\n");
   for (int is = 0; is < NSfields; is++) {
     const std::string sid = scalarDigitStr(is);
 
-    const auto _name = lowerCase(options.getArgs("LS" + sid + " NAME"));
+    const auto _name = "tlsr" ;//lowerCase(options.getArgs("LS" + sid + " NAME"));
     name.push_back(_name);
     nameToIndex[_name] = is;
 
     auto o_tmp = [&]() {
-      const auto prefixedName = "ls " + _name;
+      const std::string prefixedName = _name;
       auto tmp = platform->device.malloc<char>(prefixedName.size() + 1);
       tmp.copyFrom(prefixedName.data());
       const char nullChar[] = {'\0'};
@@ -616,11 +619,11 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
     }();
     o_name.push_back(o_tmp);
 
-    if (options.compareArgs("LS" + sid + " SOLVER", "NONE")) {
+    if (options.compareArgs("TLSR SOLVER", "NONE")) {
       continue;
     }
 
-    nekrsCheck(options.compareArgs("LS" + sid + " SOLVER", "BLOCK"),
+    nekrsCheck(options.compareArgs("TLSR SOLVER", "BLOCK"),
                platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
@@ -629,15 +632,15 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
     if (platform->comm.mpiRank() == 0) {
       std::cout << "LS" << sid << ": " << name[is] << std::endl;
     }
-    platform->app->bc->printBcTypeMapping("ls" + sid);
+    platform->app->bc->printBcTypeMapping("tlsr");
     if (platform->comm.mpiRank() == 0) {
       std::cout << std::endl;
     }
 
     dfloat diff = 1;
     dfloat rho = 1;
-    options.getArgs("LS" + sid + " DIFFUSIONCOEFF", diff);
-    options.getArgs("LS" + sid + " TRANSPORTCOEFF", rho);
+    options.getArgs("TLSR DIFFUSIONCOEFF", diff);
+    options.getArgs("TLSR TRANSPORTCOEFF", rho);
 
     auto o_diff_i = o_diff + fieldOffsetScan[is];
     auto o_rho_i = o_rho + fieldOffsetScan[is];
@@ -645,19 +648,20 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
     std::vector<dfloat> diffTmp(this->_mesh[is]->Nlocal, diff);
     std::vector<dfloat> rhoTmp(this->_mesh[is]->Nlocal, rho);
 
-    dfloat diffSolid = diff;
-    dfloat rhoSolid = rho;
-    options.getArgs("LS" + sid + " DIFFUSIONCOEFF SOLID", diffSolid);
-    options.getArgs("LS" + sid + " TRANSPORTCOEFF SOLID", rhoSolid);
-    for (int i = meshV->Nlocal; i < this->_mesh[is]->Nlocal; i++) {
-      diffTmp[i] = diffSolid;
-      rhoTmp[i] = rhoSolid;
-    }
+    /* dfloat diffSolid = diff; */
+    /* dfloat rhoSolid = rho; */
+    /* options.getArgs("LS" + sid + " DIFFUSIONCOEFF SOLID", diffSolid); */
+    /* options.getArgs("LS" + sid + " TRANSPORTCOEFF SOLID", rhoSolid); */
+    /* for (int i = meshV->Nlocal; i < this->_mesh[is]->Nlocal; i++) { */
+    /*   diffTmp[i] = diffSolid; */
+    /*   rhoTmp[i] = rhoSolid; */
+    /* } */
 
     o_diff_i.copyFrom(diffTmp.data(), diffTmp.size());
     o_rho_i.copyFrom(rhoTmp.data(), rhoTmp.size());
   }
 
+  printf("here3\n");
   anyEllipticSolver = false;
 
   EToBOffset = [&]() {
@@ -674,7 +678,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
     std::string sid = scalarDigitStr(is);
 
     compute[is] = 1;
-    if (options.compareArgs("LS" + sid + " SOLVER", "NONE")) {
+    if (options.compareArgs("TLSR SOLVER", "NONE")) {
       compute[is] = 0;
       continue;
     }
@@ -686,7 +690,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
     for (int e = 0; e < mesh->Nelements; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
         EToB[cnt + EToBOffset * is] =
-            platform->app->bc->typeId(mesh->EToB[f + e * mesh->Nfaces], "ls" + sid);
+            platform->app->bc->typeId(mesh->EToB[f + e * mesh->Nfaces], "tlsr");
         cnt++;
       }
     }
@@ -718,13 +722,15 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   bool filteringEnabled = false;
   bool avmEnabled = false;
 
+  printf("here\n");
+
   auto verifyBC = [&]() {
     for (int is = 0; is < NSfields; is++) {
       if (!compute[is]) {
         continue;
       }
 
-      const std::string field = "ls" + scalarDigitStr(is);
+      const std::string field = "tlsr";//"ls" + scalarDigitStr(is);
       nekrsCheck(_mesh[is]->Nbid != platform->app->bc->size(field),
                  platform->comm.mpiComm(),
                  EXIT_FAILURE,
@@ -870,7 +876,7 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
                                                                  o_JwFi,
                                                                  platform->comm.mpiComm());
     if (platform->comm.mpiRank() == 0) {
-      printf("%s%s advSub norm: %.15e\n", "scalar", scalarDigitStr(is).c_str(), debugNorm);
+      printf("%s%s advSub norm: %.15e\n", "tlsr", scalarDigitStr(is).c_str(), debugNorm);
     }
   }
 }
@@ -981,7 +987,7 @@ void lvlSet_t::solve(double time, int stage)
 
     auto o_Si = [&]() {
       auto o_S0 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-      if (platform->options.compareArgs("LS" + sid + " INITIAL GUESS", "EXTRAPOLATION") && stage == 1) {
+      if (platform->options.compareArgs("TLSR INITIAL GUESS", "EXTRAPOLATION") && stage == 1) {
         o_S0.copyFrom(o_Se, o_S0.size(), 0, fieldOffsetScan[is]);
       } else {
         o_S0.copyFrom(o_S, o_S0.size(), 0, fieldOffsetScan[is]);
@@ -1045,9 +1051,9 @@ void lvlSet_t::setupEllipticSolver()
     auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(_mesh[is]->Nlocal);
     platform->linAlg->axpby(_mesh[is]->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_lambda1);
 
-    ellipticSolver[is] = new elliptic("ls" + sid, _mesh[is], _fieldOffset, o_lambda0, o_lambda1);
+    ellipticSolver[is] = new elliptic("tlsr", _mesh[is], _fieldOffset, o_lambda0, o_lambda1);
 
-    if (platform->options.compareArgs("LS" + sid + " REGULARIZATION METHOD", "SVV")) {
+    if (platform->options.compareArgs("TLSR REGULARIZATION METHOD", "SVV")) {
       auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
       ellipticSolver[is]->mueSVV(o_svvmu);
       ellipticSolver[is]->setupSVV();
@@ -1070,7 +1076,7 @@ void lvlSet_t::mueSVV()
   for (int is = 0; is < NSfields; is++) {
     const auto sid = scalarDigitStr(is);
 
-    if(platform->options.compareArgs("LS" + sid + " REGULARIZATION METHOD", "SVV")) {
+    if(platform->options.compareArgs("TLSR REGULARIZATION METHOD", "SVV")) {
       if(!initialized) {
         this->o_svvf = platform->device.malloc<dfloat>(_fieldOffset);
         this->o_svvmu = platform->device.malloc<dfloat>(NSfields * _fieldOffset);
@@ -1090,7 +1096,7 @@ void lvlSet_t::mueSVV()
       }
 
       dfloat scale = 0.1;
-      platform->options.getArgs("LS" + sid + " REGULARIZATION SVV SCALING COEFF", scale);
+      platform->options.getArgs("TLSR REGULARIZATION SVV SCALING COEFF", scale);
 
       auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
       platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
