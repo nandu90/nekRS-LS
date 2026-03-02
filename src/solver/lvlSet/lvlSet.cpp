@@ -449,6 +449,7 @@ void lvlSet::setup()
   // currently just holds TLSR solver --> TODO: add in CLSR solver (separate object or hold both in one LS object?)
   tlsr = [&]() {
     lvlSetConfig_t cfg;
+    cfg.name = "tlsr";
     cfg.g0 = &nrs->g0;
     cfg.dt = nrs->dt;
     cfg.fieldOffset = nrs->meshV->fieldOffset;
@@ -520,6 +521,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
 
   ellipticSolver.resize(1);
 
+  this->name = cfg.name;
   this->meshV = cfg.meshV;
 
   this->g0 = cfg.g0;
@@ -556,23 +558,20 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   this->o_diff = this->o_prop.slice(0 * this->_fieldOffset, this->_fieldOffset);
   this->o_rho = this->o_prop.slice(1 * this->_fieldOffset, this->_fieldOffset);
   
-  printf("here\n");
   for (int is = 0; is < 1; is++) {
     const std::string sid = scalarDigitStr(is);
 
-    const auto _name = "tlsr" ;//lowerCase(options.getArgs("LS" + sid + " NAME"));
-    name.push_back(_name);
-    nameToIndex[_name] = is;
+    nameToIndex[this->name] = is;
 
     auto o_tmp = [&]() {
-      const std::string prefixedName = _name;
+      const std::string prefixedName = this->name;
       auto tmp = platform->device.malloc<char>(prefixedName.size() + 1);
       tmp.copyFrom(prefixedName.data());
       const char nullChar[] = {'\0'};
       tmp.copyFrom(nullChar, 1, prefixedName.size());
       return tmp;
     }();
-    o_name.push_back(o_tmp);
+    this->o_name = o_tmp;
 
     if (options.compareArgs("TLSR SOLVER", "NONE")) {
       continue;
@@ -585,7 +584,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
                "level-set does not support BLOCK solver!");
 
     if (platform->comm.mpiRank() == 0) {
-      std::cout << "LS" << sid << ": " << name[is] << std::endl;
+      std::cout << "LS" << sid << ": " << this->name << std::endl;
     }
     platform->app->bc->printBcTypeMapping("tlsr");
     if (platform->comm.mpiRank() == 0) {
@@ -645,7 +644,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
     for (int e = 0; e < mesh->Nelements; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
         EToB[cnt + EToBOffset * is] =
-            platform->app->bc->typeId(mesh->EToB[f + e * mesh->Nfaces], "tlsr");
+            platform->app->bc->typeId(mesh->EToB[f + e * mesh->Nfaces], this->name);
         cnt++;
       }
     }
@@ -685,7 +684,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
         continue;
       }
 
-      const std::string field = "tlsr";//"ls" + scalarDigitStr(is);
+      const std::string field = this->name;//"ls" + scalarDigitStr(is);
       nekrsCheck(_mesh->Nbid != platform->app->bc->size(field),
                  platform->comm.mpiComm(),
                  EXIT_FAILURE,
@@ -896,7 +895,7 @@ void lvlSet_t::solve(double time, int stage)
     auto o_lhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
     launchKernel("scalar_t::neumannBCHex3D",
-                 o_name[is],
+                 this->o_name,
                  mesh->Nelements,
                  1,
                  mesh->o_sgeo,

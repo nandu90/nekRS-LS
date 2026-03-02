@@ -134,7 +134,7 @@ public:
   occa::memory o_rho;
   occa::memory o_diff;
 
-  std::vector<std::string> name;
+  std::string name;
 
   void writeFile(double time);
   std::unique_ptr<iofld> fieldWriter;
@@ -144,7 +144,7 @@ private:
   void advectionSubcycling(int nEXT, double time, int scalarIdx);
   mesh_t * _mesh;
 
-  std::vector<occa::memory> o_name;
+  occa::memory o_name;
 
   dlong _fieldOffset = -1; // all scalar fields share the same offset
 
