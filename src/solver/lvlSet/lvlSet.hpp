@@ -111,7 +111,7 @@ public:
 
   bool anyEllipticSolver = false;
 
-  std::vector<int> compute;
+  int compute;
   occa::memory o_compute;
 
   //occa::memory o_applyFilterRT;

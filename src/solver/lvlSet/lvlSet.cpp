@@ -514,24 +514,22 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   }
 
   auto &options = platform->options;
-  platform_t *platform = platform_t::getInstance();
 
-  Nsubsteps = 0;
+  this->Nsubsteps = 0;
   platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
 
   ellipticSolver.resize(1);
-  compute.resize(1);
 
-  meshV = cfg.meshV;
+  this->meshV = cfg.meshV;
 
-  g0 = cfg.g0;
-  dt = cfg.dt;
+  this->g0 = cfg.g0;
+  this->dt = cfg.dt;
 
   int nBDF;
   int nEXT;
-  platform->options.getArgs("BDF ORDER", nBDF);
-  platform->options.getArgs("EXT ORDER", nEXT);
-  if (Nsubsteps) {
+  options.getArgs("BDF ORDER", nBDF);
+  options.getArgs("EXT ORDER", nEXT);
+  if (this->Nsubsteps) {
     nEXT = nBDF;
     platform->options.setArgs("EXT ORDER", std::to_string(nEXT));
   }
@@ -541,8 +539,8 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
              "%s\n",
              "EXT order needs to be >= BDF order!");
 
-  o_coeffBDF = platform->device.malloc<dfloat>(nBDF);
-  o_coeffEXT = platform->device.malloc<dfloat>(nEXT);
+  this->o_coeffBDF = platform->device.malloc<dfloat>(nBDF);
+  this->o_coeffEXT = platform->device.malloc<dfloat>(nEXT);
 
   this->_fieldOffset = cfg.fieldOffset; // for now same for all scalars
   this->vFieldOffset = cfg.vFieldOffset; // TODO: check if this is correct
@@ -554,9 +552,9 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
 
   this->o_fieldOffsetScan = platform->device.malloc<dlong>(1, &fieldOffsetScan);
 
-  o_prop = platform->device.malloc<dfloat>(2 * this->_fieldOffset);
-  o_diff = o_prop.slice(0 * this->_fieldOffset, this->_fieldOffset);
-  o_rho = o_prop.slice(1 * this->_fieldOffset, this->_fieldOffset);
+  this->o_prop = platform->device.malloc<dfloat>(2 * this->_fieldOffset);
+  this->o_diff = this->o_prop.slice(0 * this->_fieldOffset, this->_fieldOffset);
+  this->o_rho = this->o_prop.slice(1 * this->_fieldOffset, this->_fieldOffset);
   
   printf("here\n");
   for (int is = 0; is < 1; is++) {
@@ -634,13 +632,13 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   for (int is = 0; is < 1; is++) {
     std::string sid = scalarDigitStr(is);
 
-    compute[is] = 1;
+    this->compute = 1;
     if (options.compareArgs("TLSR SOLVER", "NONE")) {
-      compute[is] = 0;
+      this->compute = 0;
       continue;
     }
 
-    anyEllipticSolver |= (compute[is]);
+    anyEllipticSolver |= (this->compute);
 
     auto mesh = this->_mesh;
     int cnt = 0;
@@ -656,7 +654,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   o_EToB = platform->device.malloc<int>(EToB.size());
   o_EToB.copyFrom(EToB.data());
 
-  o_compute = platform->device.malloc<dlong>(1, compute.data());
+  this->o_compute = platform->device.malloc<dlong>(1, &compute);
 
   int nFieldsAlloc = anyEllipticSolver ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
   o_S = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
@@ -683,7 +681,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
 
   auto verifyBC = [&]() {
     for (int is = 0; is < 1; is++) {
-      if (!compute[is]) {
+      if (!compute) {
         continue;
       }
 
@@ -853,7 +851,7 @@ void lvlSet_t::makeForcing()
   auto mesh = this->_mesh;
 
   for (int is = 0; is < 1; is++) {
-    if (!compute[is]) {
+    if (!compute) {
       continue;
     }
 
@@ -885,7 +883,7 @@ void lvlSet_t::makeForcing()
 void lvlSet_t::solve(double time, int stage)
 {
   for (int is = 0; is < 1; is++) {
-    if (!compute[is]) {
+    if (!compute) {
       continue;
     }
 
@@ -1003,7 +1001,7 @@ void lvlSet_t::setupEllipticSolver()
   for (int is = 0; is < 1; is++) {
     std::string sid = scalarDigitStr(is);
 
-    if (!compute[is]) {
+    if (!compute) {
       continue;
     }
 
