@@ -519,7 +519,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   this->Nsubsteps = 0;
   platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
 
-  ellipticSolver.resize(1);
+  this->ellipticSolver.resize(1);
 
   this->name = cfg.name;
   this->meshV = cfg.meshV;
@@ -661,52 +661,54 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
 
 void lvlSet_t::setTimeIntegrationCoeffs(int tstep)
 {
-  const auto bdfOrder = std::min(tstep, static_cast<int>(o_coeffBDF.size()));
-  const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
+  const auto bdfOrder = std::min(tstep, static_cast<int>(this->o_coeffBDF.size()));
+  const auto extOrder = std::min(tstep, static_cast<int>(this->o_coeffEXT.size()));
 
   {
-    std::vector<dfloat> coeff(o_coeffBDF.size());
-    nek::bdfCoeff(g0, coeff.data(), dt, bdfOrder);
+    std::vector<dfloat> coeff(this->o_coeffBDF.size());
+    nek::bdfCoeff(this->g0, coeff.data(), this->dt, bdfOrder);
     for (int i = coeff.size(); i > bdfOrder; i--) {
       coeff[i - 1] = 0;
     }
-    o_coeffBDF.copyFrom(coeff.data());
+    this->o_coeffBDF.copyFrom(coeff.data());
   }
 
   {
-    std::vector<dfloat> coeff(o_coeffEXT.size());
-    nek::extCoeff(coeff.data(), dt, extOrder, bdfOrder);
+    std::vector<dfloat> coeff(this->o_coeffEXT.size());
+    nek::extCoeff(coeff.data(), this->dt, extOrder, bdfOrder);
     for (int i = coeff.size(); i > extOrder; i--) {
       coeff[i - 1] = 0;
     }
-    o_coeffEXT.copyFrom(coeff.data());
+    this->o_coeffEXT.copyFrom(coeff.data());
   }
 }
 
 void lvlSet_t::computeAdvectionCoeff()
 {
+  auto meshV = this->meshV;
   // a. compute interface normals
   launchKernel("core-gradientVolumeHex3D",
                meshV->Nelements,
                meshV->o_vgeo,
                meshV->o_D,
                this->vFieldOffset,
-               o_solution("tlsr"),
-               o_W);
-  oogs::startFinish(o_W, meshV->dim, this->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
-  platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, meshV->o_invLMM, o_W);
-  // b. compute sign function
-  signlsKernel(meshV->Nlocal, o_solution("tlsr"), o_signls);
-  // c. compute w = sign(phi) * n
-  normalVectorKernel(meshV->Nlocal, this->vFieldOffset, o_signls, o_W);
+               this->o_S,
+               this->o_W);
+
+  oogs::startFinish(this->o_W, meshV->dim, this->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
+  platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, meshV->o_invLMM, this->o_W);
+
+  signlsKernel(meshV->Nlocal, this->o_S, this->o_signls);
+
+  normalVectorKernel(meshV->Nlocal, this->vFieldOffset, this->o_signls, this->o_W);
 }
 
 void lvlSet_t::makeAdvection(int is, double time, int tstep)
 {
-  if (Nsubsteps) {
-    advectionSubcycling(std::min(tstep, static_cast<int>(o_coeffEXT.size())), time, is);
+  if (this->Nsubsteps) {
+    advectionSubcycling(std::min(tstep, static_cast<int>(this->o_coeffEXT.size())), time, is);
   } else {
-    auto mesh = meshV;
+    auto mesh = this->meshV;
 
     if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
       launchKernel("core-strongAdvectionCubatureVolumeScalarHex3D",
@@ -718,14 +720,14 @@ void lvlSet_t::makeAdvection(int is, double time, int tstep)
                    mesh->o_cubDiffInterpT,
                    mesh->o_cubInterpT,
                    mesh->o_cubProjectT,
-                   o_compute + is,
+                   this->o_compute,
                    this->o_fieldOffsetScan,
                    this->vFieldOffset,
                    this->vCubatureOffset,
-                   o_S,
-                   o_relWrst,   // --> TODO change to w
-                   o_rho, // --> set to 1
-                   o_ADV);
+                   this->o_S,
+                   this->o_relWrst,   // --> TODO change to w
+                   this->o_rho, // --> set to 1
+                   this->o_ADV);
     } else {
       launchKernel("core-strongAdvectionVolumeScalarHex3D",
                    mesh->Nelements,
@@ -733,13 +735,13 @@ void lvlSet_t::makeAdvection(int is, double time, int tstep)
                    0, /* weighted */
                    mesh->o_vgeo,
                    mesh->o_D,
-                   o_compute + is,
+                   this->o_compute,
                    this->o_fieldOffsetScan,
                    this->vFieldOffset,
-                   o_S,
-                   o_relWrst, // --> TODO change to w
-                   o_rho, // --> set to 1
-                   o_ADV);
+                   this->o_S,
+                   this->o_relWrst, // --> TODO change to w
+                   this->o_rho, // --> set to 1
+                   this->o_ADV);
     }
   }
 }
@@ -747,11 +749,12 @@ void lvlSet_t::makeAdvection(int is, double time, int tstep)
 void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
 {
   const auto mesh = this->_mesh;
+  const auto meshV = this->meshV;
 
-  const auto nFields = 1;
+  const dlong nFields = 1;
   
-  auto o_Si = o_S.slice(fieldOffsetScan, mesh->Nlocal);
-  auto o_JwFi = o_JwF.slice(fieldOffsetScan, mesh->Nlocal);
+  auto o_Si = o_S.slice(this->fieldOffsetScan, mesh->Nlocal);
+  auto o_JwFi = o_JwF.slice(this->fieldOffsetScan, mesh->Nlocal);
 
   static occa::kernel kernel;
   if (!kernel.isInitialized()) {
@@ -767,9 +770,9 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
   advectionSubcyclingRK(mesh,
                         meshV,
                         time,
-                        dt,
-                        Nsubsteps,
-                        o_coeffBDF,
+                        this->dt,
+                        this->Nsubsteps,
+                        this->o_coeffBDF,
                         nEXT,
                         nFields,
                         kernel,
@@ -779,7 +782,7 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
                         this->vCubatureOffset,
                         this->_fieldOffset,
                         o_NULL, // (geom) ? geom->o_div : o_NULL,
-                        o_W,
+                        this->o_W,
                         o_Si,
                         o_JwFi);
 
@@ -791,133 +794,119 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
                                                                  o_JwFi,
                                                                  platform->comm.mpiComm());
     if (platform->comm.mpiRank() == 0) {
-      printf("%s%s advSub norm: %.15e\n", "tlsr", scalarDigitStr(is).c_str(), debugNorm);
+      printf("%s advSub norm: %.15e\n", this->name.c_str(), debugNorm);
     }
   }
 }
 
 void lvlSet_t::makeExplicit(int is, double time, int tstep)
 {
-  const std::string sid = scalarDigitStr(is);
-
   auto mesh = this->_mesh;
-  const dlong isOffset = fieldOffsetScan;
 
-  o_explicitTerms("tlsr").copyFrom(o_signls); // TODO: shouldn't use tlsr here but will use this hack for now
+  o_explicitTerms(this->name).copyFrom(this->o_signls); // TODO: shouldn't use tlsr here but will use this hack for now
 }
 
 void lvlSet_t::makeForcing()
 {
   auto mesh = this->_mesh;
 
-  for (int is = 0; is < 1; is++) {
-    if (!compute) {
-      continue;
-    }
-
+  if (this->compute) {
     launchKernel("scalar_t::sumMakef",
                  mesh->Nlocal,
                  mesh->o_LMM,
-                 1 / dt[0],
-                 o_coeffEXT,
-                 o_coeffBDF,
-                 fieldOffsetScan,
+                 1 / this->dt[0],
+                 this->o_coeffEXT,
+                 this->o_coeffBDF,
+                 this->fieldOffsetScan,
                  this->_fieldOffset,  //offset sum
                  mesh->fieldOffset,
-                 o_rho,
-                 o_S,
-                 o_ADV,
-                 o_EXT,
-                 o_JwF);
+                 this->o_rho,
+                 this->o_S,
+                 this->o_ADV,
+                 this->o_EXT,
+                 this->o_JwF);
   }
 
-  const auto n = std::max(o_coeffEXT.size(), o_coeffBDF.size());
+  const auto n = std::max(this->o_coeffEXT.size(), this->o_coeffBDF.size());
   for (int s = n; s > 1; s--) {
-    o_EXT.copyFrom(o_EXT, this->_fieldOffset, (s - 1) * this->_fieldOffset, (s - 2) * this->_fieldOffset);
-    if (o_ADV.isInitialized()) {
-      o_ADV.copyFrom(o_ADV, this->_fieldOffset, (s - 1) * this->_fieldOffset, (s - 2) * this->_fieldOffset);
+    this->o_EXT.copyFrom(this->o_EXT, this->_fieldOffset, (s - 1) * this->_fieldOffset, (s - 2) * this->_fieldOffset);
+    if (this->o_ADV.isInitialized()) {
+      this->o_ADV.copyFrom(this->o_ADV, this->_fieldOffset, (s - 1) * this->_fieldOffset, (s - 2) * this->_fieldOffset);
     }
   }
 }
 
 void lvlSet_t::solve(double time, int stage)
 {
-  for (int is = 0; is < 1; is++) {
-    if (!compute) {
-      continue;
+  if (!this->compute) {
+    return;
+  }
+
+  auto mesh = this->_mesh;
+
+  auto o_rhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+  o_rhs.copyFrom(this->o_JwF, mesh->Nlocal, 0, this->fieldOffsetScan);
+
+  auto o_lhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+
+  launchKernel("scalar_t::neumannBCHex3D",
+      this->o_name,
+      mesh->Nelements,
+      1,
+      mesh->o_sgeo,
+      mesh->o_vmapM,
+      mesh->o_EToB,
+      0, //scalar index
+      time,
+      this->vFieldOffset,
+      this->_fieldOffset,
+      0,
+      this->EToBOffset,
+      mesh->o_x,
+      mesh->o_y,
+      mesh->o_z,
+      this->o_W, // changed from o_Ue --> TODO: think about this
+      this->o_S,
+      this->o_EToB,
+      this->o_diff,
+      this->o_rho,
+      platform->app->bc->o_usrwrk,
+      o_lhs,
+      o_rhs);
+
+  const auto o_diff_i = o_diff.slice(this->fieldOffsetScan, mesh->Nlocal);
+
+  const auto o_lambda0 = o_diff_i;
+  const auto o_lambda1 = [&]() {
+    const auto o_rho_i = o_rho.slice(this->fieldOffsetScan, mesh->Nlocal);
+    auto o_l = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 0.0, o_l);
+
+    if (this->userImplicitLinearTerm) {
+      auto o_implicitLT = this->userImplicitLinearTerm(time, 0);
+      if (o_implicitLT.isInitialized()) {
+        platform->linAlg->axpby(mesh->Nlocal, 1.0, o_implicitLT, 1.0, o_l);
+      }
     }
 
-    const std::string sid = scalarDigitStr(is);
-    auto mesh = this->_mesh;
+    return o_l;
+  }();
 
-    auto o_rhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    o_rhs.copyFrom(o_JwF, mesh->Nlocal, 0, fieldOffsetScan);
+  auto o_Si = [&]() {
+    auto o_S0 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    if (platform->options.compareArgs(upperCase(this->name) + " INITIAL GUESS", "EXTRAPOLATION") && stage == 1) {
+      o_S0.copyFrom(this->o_Se, o_S0.size(), 0, this->fieldOffsetScan);
+    } else {
+      o_S0.copyFrom(this->o_S, o_S0.size(), 0, this->fieldOffsetScan);
+    }
 
-    auto o_lhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    return o_S0;
+  }();
 
-    launchKernel("scalar_t::neumannBCHex3D",
-                 this->o_name,
-                 mesh->Nelements,
-                 1,
-                 mesh->o_sgeo,
-                 mesh->o_vmapM,
-                 mesh->o_EToB,
-                 is,
-                 time,
-                 this->vFieldOffset,
-                 this->_fieldOffset,
-                 0,
-                 EToBOffset,
-                 mesh->o_x,
-                 mesh->o_y,
-                 mesh->o_z,
-                 o_W, // changed from o_Ue --> TODO: think about this
-                 o_S,
-                 o_EToB,
-                 o_diff,
-                 o_rho,
-                 platform->app->bc->o_usrwrk,
-                 o_lhs,
-                 o_rhs);
-
-    const auto o_diff_i = o_diff.slice(fieldOffsetScan, mesh->Nlocal);
-
-    const auto o_lambda0 = o_diff_i;
-    const auto o_lambda1 = [&]() {
-      const auto o_rho_i = o_rho.slice(fieldOffsetScan, mesh->Nlocal);
-      auto o_l = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-      platform->linAlg->axpby(mesh->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_l);
-
-      if (userImplicitLinearTerm) {
-        auto o_implicitLT = userImplicitLinearTerm(time, is);
-        if (o_implicitLT.isInitialized()) {
-          platform->linAlg->axpby(mesh->Nlocal, 1.0, o_implicitLT, 1.0, o_l);
-        }
-      }
-
-      //if (platform->app->bc->hasRobin("SCALAR" + sid)) {
-      //  platform->linAlg->axpby(mesh->Nlocal, 1.0, o_lhs, 1.0, o_l);
-      //}
-
-      return o_l;
-    }();
-
-    auto o_Si = [&]() {
-      auto o_S0 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-      if (platform->options.compareArgs("TLSR INITIAL GUESS", "EXTRAPOLATION") && stage == 1) {
-        o_S0.copyFrom(o_Se, o_S0.size(), 0, fieldOffsetScan);
-      } else {
-        o_S0.copyFrom(o_S, o_S0.size(), 0, fieldOffsetScan);
-      }
-
-      return o_S0;
-    }();
-
-    this->ellipticSolver[is]->coeff0HLM(o_lambda0);
-    this->ellipticSolver[is]->coeff1HLM(o_lambda1);
-    this->ellipticSolver[is]->solve(o_rhs, o_Si);
-    o_Si.copyTo(o_S, o_Si.size(), fieldOffsetScan);
-  }
+  this->ellipticSolver[0]->coeff0HLM(o_lambda0);
+  this->ellipticSolver[0]->coeff1HLM(o_lambda1);
+  this->ellipticSolver[0]->solve(o_rhs, o_Si);
+  o_Si.copyTo(this->o_S, o_Si.size(), this->fieldOffsetScan);
 }
 
 void lvlSet_t::saveSolutionState() {}
@@ -926,7 +915,7 @@ void lvlSet_t::restoreSolutionState() {}
 
 void lvlSet_t::lagSolution()
 {
-  const auto n = std::max(o_coeffEXT.size(), o_coeffBDF.size());
+  const auto n = std::max(this->o_coeffEXT.size(), this->o_coeffBDF.size());
   for (int s = n; s > 1; s--) {
     o_S.copyFrom(o_S, this->_fieldOffset, (s - 1) * this->_fieldOffset, (s - 2) * this->_fieldOffset);
   }
@@ -934,7 +923,7 @@ void lvlSet_t::lagSolution()
 
 void lvlSet_t::extrapolateSolution()
 {
-  if (!o_Se.isInitialized()) {
+  if (!this->o_Se.isInitialized()) {
     return;
   }
   const auto Nlocal = this->_fieldOffset; // assumed to be the same for all fields
@@ -943,9 +932,9 @@ void lvlSet_t::extrapolateSolution()
                1,       //only 1 field
                static_cast<int>(o_coeffEXT.size()),
                this->_fieldOffset,
-               o_coeffEXT,
-               o_S,
-               o_Se);
+               this->o_coeffEXT,
+               this->o_S,
+               this->o_Se);
 }
 
 void lvlSet_t::applyDirichlet(double time) {}
@@ -954,24 +943,18 @@ void lvlSet_t::setupEllipticSolver()
 {
   auto mesh = this->_mesh;
   
-  for (int is = 0; is < 1; is++) {
-    std::string sid = scalarDigitStr(is);
-
-    if (!compute) {
-      continue;
-    }
-
-    auto o_rho_i = o_rho.slice(fieldOffsetScan, mesh->Nlocal);
-    auto o_lambda0 = o_diff.slice(fieldOffsetScan, mesh->Nlocal);
+  if (this->compute) {
+    auto o_rho_i = this->o_rho.slice(this->fieldOffsetScan, mesh->Nlocal);
+    auto o_lambda0 = this->o_diff.slice(this->fieldOffsetScan, mesh->Nlocal);
     auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->axpby(mesh->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_lambda1);
+    platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 0.0, o_lambda1);
 
-    ellipticSolver[is] = new elliptic("tlsr", mesh, this->_fieldOffset, o_lambda0, o_lambda1);
+    ellipticSolver[0] = new elliptic(this->name, mesh, this->_fieldOffset, o_lambda0, o_lambda1);
 
-    if (platform->options.compareArgs("TLSR REGULARIZATION METHOD", "SVV")) {
-      auto o_svvmu = this->o_svvmu.slice(is * this->_fieldOffset, this->_fieldOffset);
-      ellipticSolver[is]->mueSVV(o_svvmu);
-      ellipticSolver[is]->setupSVV();
+    if (platform->options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "SVV")) {
+      auto o_svvmu = this->o_svvmu.slice(0 * this->_fieldOffset, this->_fieldOffset);
+      ellipticSolver[0]->mueSVV(o_svvmu);
+      ellipticSolver[0]->setupSVV();
     }
   }
 }
@@ -988,49 +971,45 @@ void lvlSet_t::mueSVV()
 
   auto o_umag = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
-  for (int is = 0; is < 1; is++) {
-    const auto sid = scalarDigitStr(is);
+  if(platform->options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "SVV")) {
+    if(!initialized) {
+      this->o_svvf = platform->device.malloc<dfloat>(this->_fieldOffset);
+      this->o_svvmu = platform->device.malloc<dfloat>(this->_fieldOffset);
 
-    if(platform->options.compareArgs("TLSR REGULARIZATION METHOD", "SVV")) {
-      if(!initialized) {
-        this->o_svvf = platform->device.malloc<dfloat>(this->_fieldOffset);
-        this->o_svvmu = platform->device.malloc<dfloat>(this->_fieldOffset);
-
-        if(!platform->options.compareArgs("MOVING MESH","TRUE"))
-          launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
-
-        initialized = true;
-      }
-
-      if(platform->options.compareArgs("MOVING MESH","TRUE"))
+      if(!platform->options.compareArgs("MOVING MESH","TRUE"))
         launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
 
-      if(!umagInitialized) {
-        platform->linAlg->magVector(mesh->Nlocal, this->vFieldOffset, o_W, o_umag); // changed o_U to o_W --> TODO: think if this is the right thing to do
-        umagInitialized = true;
-      }
-
-      dfloat scale = 0.1;
-      platform->options.getArgs("TLSR REGULARIZATION SVV SCALING COEFF", scale);
-
-      auto o_svvmu = this->o_svvmu.slice(is * this->_fieldOffset, this->_fieldOffset);
-      platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
+      initialized = true;
     }
+
+    if(platform->options.compareArgs("MOVING MESH","TRUE"))
+      launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
+
+    if(!umagInitialized) {
+      platform->linAlg->magVector(mesh->Nlocal, this->vFieldOffset, this->o_W, o_umag); // changed o_U to o_W --> TODO: think if this is the right thing to do
+      umagInitialized = true;
+    }
+
+    dfloat scale = 0.1;
+    platform->options.getArgs(upperCase(this->name) + " REGULARIZATION SVV SCALING COEFF", scale);
+
+    auto o_svvmu = this->o_svvmu.slice(0 * this->_fieldOffset, this->_fieldOffset);
+    platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
   }
 }
 
 void lvlSet_t::computeWrst()
 {
-  auto mesh = meshV;
+  auto mesh = this->meshV;
 
-  if (Nsubsteps) {
-    for (int s = std::max(o_coeffBDF.size(), o_coeffEXT.size()); s > 1; s--) {
+  if (this->Nsubsteps) {
+    for (int s = std::max(this->o_coeffBDF.size(), this->o_coeffEXT.size()); s > 1; s--) {
       auto lagOffset = mesh->dim * this->vCubatureOffset;
-      o_relWrst.copyFrom(o_relWrst, lagOffset, (s - 1) * lagOffset, (s - 2) * lagOffset);
+      this->o_relWrst.copyFrom(this->o_relWrst, lagOffset, (s - 1) * lagOffset, (s - 2) * lagOffset);
     }
   }
 
-  const auto relative = Nsubsteps; // const auto relative = geom && Nsubsteps;
+  const auto relative = this->Nsubsteps; // const auto relative = geom && Nsubsteps;
   if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
     launchKernel("nrs-UrstCubatureHex3D",
                  mesh->Nelements,
@@ -1040,9 +1019,9 @@ void lvlSet_t::computeWrst()
                  this->vFieldOffset,
                  0, // (geom) ? geom->fieldOffset : 0,
                  this->vCubatureOffset,
-                 o_W,
+                 this->o_W,
                  o_NULL, // (geom) ? geom->o_U : o_NULL,
-                 o_relWrst);
+                 this->o_relWrst);
   } else {
     launchKernel("nrs-UrstHex3D",
                  mesh->Nelements,
@@ -1050,9 +1029,9 @@ void lvlSet_t::computeWrst()
                  mesh->o_vgeo,
                  this->vFieldOffset,
                  0, // (geom) ? geom->fieldOffset : 0,
-                 o_W,
+                 this->o_W,
                  o_NULL, // (geom) ? geom->o_U : o_NULL,
-                 o_relWrst);
+                 this->o_relWrst);
   }
 }
 
@@ -1061,7 +1040,7 @@ void lvlSet_t::writeFile(double time)
   if(!fieldWriter) {
     fieldWriter = iofldFactory::create();
 
-    fieldWriter->open(meshV, iofld::mode::write, "tlsr");
+    fieldWriter->open(this->meshV, iofld::mode::write, this->name);
 
     if (platform->options.compareArgs("CHECKPOINT PRECISION", "FP32")) {
       fieldWriter->writeAttribute("precision", "32");
@@ -1069,7 +1048,7 @@ void lvlSet_t::writeFile(double time)
       fieldWriter->writeAttribute("precision", "64");
     }
 
-    auto o_Si = o_S.slice(fieldOffsetScan, meshV->Nlocal);
+    auto o_Si = this->o_S.slice(fieldOffsetScan, this->meshV->Nlocal);
     fieldWriter->addVariable("scalar00", o_Si);
   }
 
