@@ -552,8 +552,8 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   o_coeffEXT = platform->device.malloc<dfloat>(nEXT);
 
   this->_fieldOffset = cfg.fieldOffset; // for now same for all scalars
-  vFieldOffset = cfg.vFieldOffset; // TODO: check if this is correct
-  vCubatureOffset = cfg.vCubatureOffset;
+  this->vFieldOffset = cfg.vFieldOffset; // TODO: check if this is correct
+  this->vCubatureOffset = cfg.vCubatureOffset;
 
   dlong sum = 0;
   for (int s = 0; s < 1; ++s) {
@@ -670,9 +670,9 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
 
   int nFieldsAlloc = anyEllipticSolver ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
   o_S = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
-  o_W = platform->device.malloc<dfloat>(meshV->dim * std::max(o_coeffBDF.size(), o_coeffEXT.size()) * vFieldOffset);
+  o_W = platform->device.malloc<dfloat>(meshV->dim * std::max(o_coeffBDF.size(), o_coeffEXT.size()) * this->vFieldOffset);
   const dlong Nstates = Nsubsteps ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
-  o_relWrst = platform->device.malloc<dfloat>(Nstates * meshV->dim * vCubatureOffset);
+  o_relWrst = platform->device.malloc<dfloat>(Nstates * meshV->dim * this->vCubatureOffset);
 
   o_signls = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
 
@@ -742,15 +742,15 @@ void lvlSet_t::computeAdvectionCoeff()
                meshV->Nelements,
                meshV->o_vgeo,
                meshV->o_D,
-               vFieldOffset,
+               this->vFieldOffset,
                o_solution("tlsr"),
                o_W);
-  oogs::startFinish(o_W, meshV->dim, vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
-  platform->linAlg->axmyVector(meshV->Nlocal, vFieldOffset, 0, 1.0, meshV->o_invLMM, o_W);
+  oogs::startFinish(o_W, meshV->dim, this->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
+  platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, meshV->o_invLMM, o_W);
   // b. compute sign function
   signlsKernel(meshV->Nlocal, o_solution("tlsr"), o_signls);
   // c. compute w = sign(phi) * n
-  normalVectorKernel(meshV->Nlocal, vFieldOffset, o_signls, o_W);
+  normalVectorKernel(meshV->Nlocal, this->vFieldOffset, o_signls, o_W);
 }
 
 void lvlSet_t::makeAdvection(int is, double time, int tstep)
@@ -772,8 +772,8 @@ void lvlSet_t::makeAdvection(int is, double time, int tstep)
                    mesh->o_cubProjectT,
                    o_compute + is,
                    o_fieldOffsetScan + is,
-                   vFieldOffset,
-                   vCubatureOffset,
+                   this->vFieldOffset,
+                   this->vCubatureOffset,
                    o_S,
                    o_relWrst,   // --> TODO change to w
                    o_rho, // --> set to 1
@@ -787,7 +787,7 @@ void lvlSet_t::makeAdvection(int is, double time, int tstep)
                    mesh->o_D,
                    o_compute + is,
                    o_fieldOffsetScan + is,
-                   vFieldOffset,
+                   this->vFieldOffset,
                    o_S,
                    o_relWrst, // --> TODO change to w
                    o_rho, // --> set to 1
@@ -827,8 +827,8 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
                         kernel,
                         meshV->oogs,
                         mesh->fieldOffset,
-                        fieldOffset(),
-                        vCubatureOffset,
+                        this->_fieldOffset,
+                        this->vCubatureOffset,
                         fieldOffsetSum,
                         o_NULL, // (geom) ? geom->o_div : o_NULL,
                         o_W,
@@ -914,7 +914,7 @@ void lvlSet_t::solve(double time, int stage)
                  mesh->o_EToB,
                  is,
                  time,
-                 vFieldOffset,
+                 this->vFieldOffset,
                  this->_fieldOffset,
                  0,
                  EToBOffset,
@@ -1058,7 +1058,7 @@ void lvlSet_t::mueSVV()
         launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
 
       if(!umagInitialized) {
-        platform->linAlg->magVector(mesh->Nlocal, vFieldOffset, o_W, o_umag); // changed o_U to o_W --> TODO: think if this is the right thing to do
+        platform->linAlg->magVector(mesh->Nlocal, this->vFieldOffset, o_W, o_umag); // changed o_U to o_W --> TODO: think if this is the right thing to do
         umagInitialized = true;
       }
 
@@ -1077,7 +1077,7 @@ void lvlSet_t::computeWrst()
 
   if (Nsubsteps) {
     for (int s = std::max(o_coeffBDF.size(), o_coeffEXT.size()); s > 1; s--) {
-      auto lagOffset = mesh->dim * vCubatureOffset;
+      auto lagOffset = mesh->dim * this->vCubatureOffset;
       o_relWrst.copyFrom(o_relWrst, lagOffset, (s - 1) * lagOffset, (s - 2) * lagOffset);
     }
   }
@@ -1089,9 +1089,9 @@ void lvlSet_t::computeWrst()
                  relative,
                  mesh->o_cubvgeo,
                  mesh->o_cubInterpT,
-                 vFieldOffset,
+                 this->vFieldOffset,
                  0, // (geom) ? geom->fieldOffset : 0,
-                 vCubatureOffset,
+                 this->vCubatureOffset,
                  o_W,
                  o_NULL, // (geom) ? geom->o_U : o_NULL,
                  o_relWrst);
@@ -1100,7 +1100,7 @@ void lvlSet_t::computeWrst()
                  mesh->Nelements,
                  relative,
                  mesh->o_vgeo,
-                 vFieldOffset,
+                 this->vFieldOffset,
                  0, // (geom) ? geom->fieldOffset : 0,
                  o_W,
                  o_NULL, // (geom) ? geom->o_U : o_NULL,
