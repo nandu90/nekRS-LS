@@ -279,10 +279,9 @@ void parseLvlSetSections()
     parseRegularization(rank, options, ini, parScope);
     if(options.compareArgs(parPrefix + "REGULARIZATION METHOD","NONE")) {
       if(firstWord == "default") {
-        options.setArgs("TLSR REGULARIZATION METHOD","SVV");
+        options.setArgs(parPrefix + "REGULARIZATION METHOD","SVV");
         options.setArgs("TLSR REGULARIZATION SVV SCALING COEFF", "2.0");
         options.setArgs("TLSR REGULARIZATION SVV FILTER POWER", "6.0");
-        options.setArgs("CLSR REGULARIZATION METHOD","SVV");
         options.setArgs("CLSR REGULARIZATION SVV SCALING COEFF", "1.0");
         options.setArgs("CLSR REGULARIZATION SVV FILTER POWER", "4.0");
       }
@@ -304,6 +303,8 @@ void parseLvlSetSections()
     parseLinearSolver(rank, options, ini, parScope);
 
     parseSolverTolerance(rank, options, ini, parScope);
+    if(firstWord == "default")
+      options.setArgs(parPrefix + "SOLVER TOLERANCE", to_string_f(1e-8));
 
     std::string sbuf;
 
@@ -444,36 +445,6 @@ void lvlSet::setup()
     }
     platform->app->bc->setBcMap("tlsr", false, map);
   }
-
-  /* // we hard-code these options here for now --> TODO: add LEVELSET section in par file */
-  /* std::string sid = "00"; */
-  platform->options.setArgs("TLSR CHECKPOINTING", upperCase("false"));
-  platform->options.setArgs("TLSR DIFFUSIONCOEFF", to_string_f(1.0e-14));
-  platform->options.setArgs("TLSR ELLIPTIC COEFF FIELD", upperCase("true"));
-  platform->options.setArgs("TLSR ELLIPTIC PRECO COEFF FIELD", upperCase("true"));
-  platform->options.setArgs("TLSR INITIAL GUESS", "EXTRAPOLATION");
-  platform->options.setArgs("TLSR MESH", "FLUID");
-  platform->options.setArgs("TLSR NAME", "TLSR");
-  platform->options.setArgs("TLSR PRECONDITIONER", "JACOBI");
-  platform->options.setArgs("TLSR REGULARIZATION METHOD", "SVV");
-  platform->options.setArgs("TLSR REGULARIZATION SVV FILTER POWER", to_string_f(6.0));
-  platform->options.setArgs("TLSR REGULARIZATION SVV SCALING COEFF", to_string_f(2.0));
-  platform->options.setArgs("TLSR SOLVER", "CG");
-  platform->options.setArgs("TLSR SOLVER TOLERANCE", to_string_f(1.0e-14));
-  platform->options.setArgs("TLSR TRANSPORTCOEFF", to_string_f(1.0));
-
-  /* // add in the TLSR boundary condition per boundary */
-  /* std::string field = "ls00"; */
-  /* int nBCs = platform->app->bc->size("scalar00"); */
-  /* std::vector<int> bcTypes(nBCs, bdryBase::bcType_zeroNeumann); */
-  /* platform->app->bc->setBcMap(field, false, bcTypes); */
-  /* //auto bcMap = platform->app->bc->bIdToTypeId(); */
-  /* // for (const auto& [key, value] : bcMap) { */
-  /* //   std::cout */
-  /* //     << "(" << key.first << ", " << key.second << ") -> " */
-  /* //     << value */
-  /* //     << '\n'; */
-  /* // } */
 
   // currently just holds TLSR solver --> TODO: add in CLSR solver (separate object or hold both in one LS object?)
   tlsr = [&]() {
