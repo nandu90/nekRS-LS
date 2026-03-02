@@ -573,46 +573,34 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
     }();
     this->o_name = o_tmp;
 
-    if (options.compareArgs("TLSR SOLVER", "NONE")) {
-      continue;
+    if (!options.compareArgs("TLSR SOLVER", "NONE")) {
+
+      nekrsCheck(options.compareArgs("TLSR SOLVER", "BLOCK"),
+                 platform->comm.mpiComm(),
+                 EXIT_FAILURE,
+                 "%s\n",
+                 "level-set does not support BLOCK solver!");
+
+      if (platform->comm.mpiRank() == 0) {
+        std::cout << "LS" << sid << ": " << this->name << std::endl;
+      }
+      platform->app->bc->printBcTypeMapping("tlsr");
+      if (platform->comm.mpiRank() == 0) {
+        std::cout << std::endl;
+      }
+
+      dfloat diff = 1;
+      dfloat rho = 1;
+      options.getArgs("TLSR DIFFUSIONCOEFF", diff);
+      options.getArgs("TLSR TRANSPORTCOEFF", rho);
+
+      std::vector<dfloat> diffTmp(this->_mesh->Nlocal, diff);
+      std::vector<dfloat> rhoTmp(this->_mesh->Nlocal, rho);
+
+
+      o_diff.copyFrom(diffTmp.data(), diffTmp.size());
+      o_rho.copyFrom(rhoTmp.data(), rhoTmp.size());
     }
-
-    nekrsCheck(options.compareArgs("TLSR SOLVER", "BLOCK"),
-               platform->comm.mpiComm(),
-               EXIT_FAILURE,
-               "%s\n",
-               "level-set does not support BLOCK solver!");
-
-    if (platform->comm.mpiRank() == 0) {
-      std::cout << "LS" << sid << ": " << this->name << std::endl;
-    }
-    platform->app->bc->printBcTypeMapping("tlsr");
-    if (platform->comm.mpiRank() == 0) {
-      std::cout << std::endl;
-    }
-
-    dfloat diff = 1;
-    dfloat rho = 1;
-    options.getArgs("TLSR DIFFUSIONCOEFF", diff);
-    options.getArgs("TLSR TRANSPORTCOEFF", rho);
-
-    auto o_diff_i = o_diff + fieldOffsetScan;
-    auto o_rho_i = o_rho + fieldOffsetScan;
-
-    std::vector<dfloat> diffTmp(this->_mesh->Nlocal, diff);
-    std::vector<dfloat> rhoTmp(this->_mesh->Nlocal, rho);
-
-    /* dfloat diffSolid = diff; */
-    /* dfloat rhoSolid = rho; */
-    /* options.getArgs("LS" + sid + " DIFFUSIONCOEFF SOLID", diffSolid); */
-    /* options.getArgs("LS" + sid + " TRANSPORTCOEFF SOLID", rhoSolid); */
-    /* for (int i = meshV->Nlocal; i < this->_mesh[is]->Nlocal; i++) { */
-    /*   diffTmp[i] = diffSolid; */
-    /*   rhoTmp[i] = rhoSolid; */
-    /* } */
-
-    o_diff_i.copyFrom(diffTmp.data(), diffTmp.size());
-    o_rho_i.copyFrom(rhoTmp.data(), rhoTmp.size());
   }
 
   printf("here3\n");
