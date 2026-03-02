@@ -80,7 +80,7 @@ public:
     if (key.empty()) return deviceMemory<dfloat>(o_S);
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? deviceMemory<dfloat>(o_S.slice(fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
+    return (idx >= 0) ? deviceMemory<dfloat>(o_S.slice(fieldOffsetScan, _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   };
 
   deviceMemory<dfloat> o_explicitTerms(std::string key = "") override
@@ -88,7 +88,7 @@ public:
     if (key.empty()) return deviceMemory<dfloat>(o_EXT);
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? deviceMemory<dfloat>(o_EXT.slice(fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
+    return (idx >= 0) ? deviceMemory<dfloat>(o_EXT.slice(fieldOffsetScan, _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   };
 
   deviceMemory<dfloat> o_diffusionCoeff(std::string key = "") override
@@ -96,7 +96,7 @@ public:
     if (key.empty()) return deviceMemory<dfloat>(o_prop.slice(0, _fieldOffset));
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
+    return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(fieldOffsetScan, _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   };
 
   deviceMemory<dfloat> o_transportCoeff(std::string key = "") override
@@ -104,17 +104,17 @@ public:
     if (key.empty()) return deviceMemory<dfloat>(o_prop.slice(_fieldOffset, _fieldOffset));
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(_fieldOffset + fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
+    return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(_fieldOffset + fieldOffsetScan, _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   }
 
   mesh_t *meshV;
 
   occa::memory o_fieldOffsetScan;
+  dlong fieldOffsetScan; /* exclusive */
 
   dlong vFieldOffset;
   dlong vCubatureOffset;
 
-  std::vector<dlong> fieldOffsetScan; /* exclusive */
 
   bool anyEllipticSolver = false;
 

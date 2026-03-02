@@ -520,7 +520,6 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   Nsubsteps = 0;
   platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
 
-  fieldOffsetScan.resize(1);
   ellipticSolver.resize(1);
   compute.resize(1);
 
@@ -543,7 +542,6 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
              "%s\n",
              "EXT order needs to be >= BDF order!");
 
-  printf("here\n");
   o_coeffBDF = platform->device.malloc<dfloat>(nBDF);
   o_coeffEXT = platform->device.malloc<dfloat>(nEXT);
 
@@ -551,13 +549,13 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   this->vFieldOffset = cfg.vFieldOffset; // TODO: check if this is correct
   this->vCubatureOffset = cfg.vCubatureOffset;
 
-  dlong sum = 0;
   for (int s = 0; s < 1; ++s) {
-    fieldOffsetScan[s] = (s > 0) ? sum : 0;
-    sum += this->_fieldOffset;
     this->_mesh.push_back(cfg.mesh[s]);
   }
-  o_fieldOffsetScan = platform->device.malloc<dlong>(1, fieldOffsetScan.data());
+
+  this->fieldOffsetScan = 0;
+
+  this->o_fieldOffsetScan = platform->device.malloc<dlong>(1, &fieldOffsetScan);
 
   o_prop = platform->device.malloc<dfloat>(2 * this->_fieldOffset);
   o_diff = o_prop.slice(0 * this->_fieldOffset, this->_fieldOffset);
@@ -604,8 +602,8 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
     options.getArgs("TLSR DIFFUSIONCOEFF", diff);
     options.getArgs("TLSR TRANSPORTCOEFF", rho);
 
-    auto o_diff_i = o_diff + fieldOffsetScan[is];
-    auto o_rho_i = o_rho + fieldOffsetScan[is];
+    auto o_diff_i = o_diff + fieldOffsetScan;
+    auto o_rho_i = o_rho + fieldOffsetScan;
 
     std::vector<dfloat> diffTmp(this->_mesh[is]->Nlocal, diff);
     std::vector<dfloat> rhoTmp(this->_mesh[is]->Nlocal, rho);
@@ -766,7 +764,7 @@ void lvlSet_t::makeAdvection(int is, double time, int tstep)
                    mesh->o_cubInterpT,
                    mesh->o_cubProjectT,
                    o_compute + is,
-                   o_fieldOffsetScan + is,
+                   this->o_fieldOffsetScan,
                    this->vFieldOffset,
                    this->vCubatureOffset,
                    o_S,
@@ -781,7 +779,7 @@ void lvlSet_t::makeAdvection(int is, double time, int tstep)
                    mesh->o_vgeo,
                    mesh->o_D,
                    o_compute + is,
-                   o_fieldOffsetScan + is,
+                   this->o_fieldOffsetScan,
                    this->vFieldOffset,
                    o_S,
                    o_relWrst, // --> TODO change to w
@@ -797,8 +795,8 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
 
   const auto nFields = 1;
   
-  auto o_Si = o_S.slice(fieldOffsetScan[is], mesh->Nlocal);
-  auto o_JwFi = o_JwF.slice(fieldOffsetScan[is], mesh->Nlocal);
+  auto o_Si = o_S.slice(fieldOffsetScan, mesh->Nlocal);
+  auto o_JwFi = o_JwF.slice(fieldOffsetScan, mesh->Nlocal);
 
   static occa::kernel kernel;
   if (!kernel.isInitialized()) {
@@ -848,7 +846,7 @@ void lvlSet_t::makeExplicit(int is, double time, int tstep)
   const std::string sid = scalarDigitStr(is);
 
   auto mesh = this->_mesh[is];
-  const dlong isOffset = fieldOffsetScan[is];
+  const dlong isOffset = fieldOffsetScan;
 
   o_explicitTerms("tlsr").copyFrom(o_signls); // TODO: shouldn't use tlsr here but will use this hack for now
 }
@@ -866,7 +864,7 @@ void lvlSet_t::makeForcing()
                  1 / dt[0],
                  o_coeffEXT,
                  o_coeffBDF,
-                 fieldOffsetScan[is],
+                 fieldOffsetScan,
                  this->_fieldOffset,  //offset sum
                  _mesh[is]->fieldOffset,
                  o_rho,
@@ -896,7 +894,7 @@ void lvlSet_t::solve(double time, int stage)
     auto mesh = this->_mesh[is];
 
     auto o_rhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    o_rhs.copyFrom(o_JwF, mesh->Nlocal, 0, fieldOffsetScan[is]);
+    o_rhs.copyFrom(o_JwF, mesh->Nlocal, 0, fieldOffsetScan);
 
     auto o_lhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
@@ -925,11 +923,11 @@ void lvlSet_t::solve(double time, int stage)
                  o_lhs,
                  o_rhs);
 
-    const auto o_diff_i = o_diff.slice(fieldOffsetScan[is], mesh->Nlocal);
+    const auto o_diff_i = o_diff.slice(fieldOffsetScan, mesh->Nlocal);
 
     const auto o_lambda0 = o_diff_i;
     const auto o_lambda1 = [&]() {
-      const auto o_rho_i = o_rho.slice(fieldOffsetScan[is], mesh->Nlocal);
+      const auto o_rho_i = o_rho.slice(fieldOffsetScan, mesh->Nlocal);
       auto o_l = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       platform->linAlg->axpby(mesh->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_l);
 
@@ -950,9 +948,9 @@ void lvlSet_t::solve(double time, int stage)
     auto o_Si = [&]() {
       auto o_S0 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       if (platform->options.compareArgs("TLSR INITIAL GUESS", "EXTRAPOLATION") && stage == 1) {
-        o_S0.copyFrom(o_Se, o_S0.size(), 0, fieldOffsetScan[is]);
+        o_S0.copyFrom(o_Se, o_S0.size(), 0, fieldOffsetScan);
       } else {
-        o_S0.copyFrom(o_S, o_S0.size(), 0, fieldOffsetScan[is]);
+        o_S0.copyFrom(o_S, o_S0.size(), 0, fieldOffsetScan);
       }
 
       return o_S0;
@@ -961,7 +959,7 @@ void lvlSet_t::solve(double time, int stage)
     this->ellipticSolver[is]->coeff0HLM(o_lambda0);
     this->ellipticSolver[is]->coeff1HLM(o_lambda1);
     this->ellipticSolver[is]->solve(o_rhs, o_Si);
-    o_Si.copyTo(o_S, o_Si.size(), fieldOffsetScan[is]);
+    o_Si.copyTo(o_S, o_Si.size(), fieldOffsetScan);
   }
 }
 
@@ -1008,8 +1006,8 @@ void lvlSet_t::setupEllipticSolver()
       continue;
     }
 
-    auto o_rho_i = o_rho.slice(fieldOffsetScan[is], _mesh[is]->Nlocal);
-    auto o_lambda0 = o_diff.slice(fieldOffsetScan[is], _mesh[is]->Nlocal);
+    auto o_rho_i = o_rho.slice(fieldOffsetScan, _mesh[is]->Nlocal);
+    auto o_lambda0 = o_diff.slice(fieldOffsetScan, _mesh[is]->Nlocal);
     auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(_mesh[is]->Nlocal);
     platform->linAlg->axpby(_mesh[is]->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_lambda1);
 
@@ -1116,7 +1114,7 @@ void lvlSet_t::writeFile(double time)
       fieldWriter->writeAttribute("precision", "64");
     }
 
-    auto o_Si = o_S.slice(fieldOffsetScan[0], meshV->Nlocal);
+    auto o_Si = o_S.slice(fieldOffsetScan, meshV->Nlocal);
     fieldWriter->addVariable("scalar00", o_Si);
   }
 
