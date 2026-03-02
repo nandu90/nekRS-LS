@@ -93,7 +93,7 @@ public:
 
   deviceMemory<dfloat> o_diffusionCoeff(std::string key = "") override
   {
-    if (key.empty()) return deviceMemory<dfloat>(o_prop.slice(0, fieldOffsetSum));
+    if (key.empty()) return deviceMemory<dfloat>(o_prop.slice(0, _fieldOffset));
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
     return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
@@ -101,10 +101,10 @@ public:
 
   deviceMemory<dfloat> o_transportCoeff(std::string key = "") override
   {
-    if (key.empty()) return deviceMemory<dfloat>(o_prop.slice(fieldOffsetSum, fieldOffsetSum));
+    if (key.empty()) return deviceMemory<dfloat>(o_prop.slice(_fieldOffset, _fieldOffset));
     auto it = nameToIndex.find(lowerCase(key));
     const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(fieldOffsetSum + fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
+    return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(_fieldOffset + fieldOffsetScan[idx], _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
   }
 
   mesh_t *meshV;

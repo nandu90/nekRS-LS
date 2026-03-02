@@ -477,10 +477,6 @@ void lvlSet::solveLSR()
   tlsr->dt[1] = tlsr->dt[0];
   tlsr->dt[2] = tlsr->dt[0];
 
-  // set the TLSR initial condition -- currently just copy the scalar S00 --> TODO: handle the correct initial condition
-  if (tlsr->fieldOffsetSum != nrs->scalar->fieldOffsetSum) {
-    throw std::runtime_error("LS::solveLSR: tlsr and nrs->scalar fieldOffsetSum are not equal.");
-  }
   tlsr->o_S.copyFrom(nrs->scalar->o_S);
 
   while(outerIter <= outerIterMax) {
@@ -488,7 +484,7 @@ void lvlSet::solveLSR()
     time += tlsr->dt[0];
     tlsr->setTimeIntegrationCoeffs(outerIter);
     tlsr->extrapolateSolution();
-    if (tlsr->anyEllipticSolver) { platform->linAlg->fill(tlsr->fieldOffsetSum, 0.0, tlsr->o_EXT); }
+    if (tlsr->anyEllipticSolver) { platform->linAlg->fill(tlsr->fieldOffset(), 0.0, tlsr->o_EXT); }
     tlsr->computeAdvectionCoeff();
     tlsr->computeWrst();
     tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
@@ -561,12 +557,11 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
     sum += this->_fieldOffset;
     this->_mesh.push_back(cfg.mesh[s]);
   }
-  fieldOffsetSum = sum;
   o_fieldOffsetScan = platform->device.malloc<dlong>(1, fieldOffsetScan.data());
 
-  o_prop = platform->device.malloc<dfloat>(2 * fieldOffsetSum);
-  o_diff = o_prop.slice(0 * fieldOffsetSum, fieldOffsetSum);
-  o_rho = o_prop.slice(1 * fieldOffsetSum, fieldOffsetSum);
+  o_prop = platform->device.malloc<dfloat>(2 * this->_fieldOffset);
+  o_diff = o_prop.slice(0 * this->_fieldOffset, this->_fieldOffset);
+  o_rho = o_prop.slice(1 * this->_fieldOffset, this->_fieldOffset);
   
   printf("here\n");
   for (int is = 0; is < 1; is++) {
@@ -669,20 +664,20 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   o_compute = platform->device.malloc<dlong>(1, compute.data());
 
   int nFieldsAlloc = anyEllipticSolver ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
-  o_S = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
+  o_S = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
   o_W = platform->device.malloc<dfloat>(meshV->dim * std::max(o_coeffBDF.size(), o_coeffEXT.size()) * this->vFieldOffset);
   const dlong Nstates = Nsubsteps ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
   o_relWrst = platform->device.malloc<dfloat>(Nstates * meshV->dim * this->vCubatureOffset);
 
-  o_signls = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
+  o_signls = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
 
   nFieldsAlloc = anyEllipticSolver ? o_coeffEXT.size() : 1;
-  o_ADV = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
-  o_EXT = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
+  o_ADV = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
+  o_EXT = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
 
   if (anyEllipticSolver) {
-    o_Se = platform->device.malloc<dfloat>(fieldOffsetSum);
-    o_JwF = platform->device.malloc<dfloat>(fieldOffsetSum);
+    o_Se = platform->device.malloc<dfloat>(this->_fieldOffset);
+    o_JwF = platform->device.malloc<dfloat>(this->_fieldOffset);
   }
 
   // TODO consider adding these options in later
@@ -829,7 +824,7 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
                         mesh->fieldOffset,
                         this->_fieldOffset,
                         this->vCubatureOffset,
-                        fieldOffsetSum,
+                        this->_fieldOffset,
                         o_NULL, // (geom) ? geom->o_div : o_NULL,
                         o_W,
                         o_Si,
@@ -872,7 +867,7 @@ void lvlSet_t::makeForcing()
                  o_coeffEXT,
                  o_coeffBDF,
                  fieldOffsetScan[is],
-                 fieldOffsetSum,
+                 this->_fieldOffset,  //offset sum
                  _mesh[is]->fieldOffset,
                  o_rho,
                  o_S,
@@ -883,9 +878,9 @@ void lvlSet_t::makeForcing()
 
   const auto n = std::max(o_coeffEXT.size(), o_coeffBDF.size());
   for (int s = n; s > 1; s--) {
-    o_EXT.copyFrom(o_EXT, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
+    o_EXT.copyFrom(o_EXT, this->_fieldOffset, (s - 1) * this->_fieldOffset, (s - 2) * this->_fieldOffset);
     if (o_ADV.isInitialized()) {
-      o_ADV.copyFrom(o_ADV, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
+      o_ADV.copyFrom(o_ADV, this->_fieldOffset, (s - 1) * this->_fieldOffset, (s - 2) * this->_fieldOffset);
     }
   }
 }
@@ -982,7 +977,7 @@ void lvlSet_t::lagSolution()
 
   const auto n = std::max(o_coeffEXT.size(), o_coeffBDF.size());
   for (int s = n; s > 1; s--) {
-    o_S.copyFrom(o_S, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
+    o_S.copyFrom(o_S, this->_fieldOffset, (s - 1) * this->_fieldOffset, (s - 2) * this->_fieldOffset);
   }
 }
 
