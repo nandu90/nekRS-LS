@@ -484,7 +484,7 @@ void lvlSet::solveLSR()
     time += tlsr->dt[0];
     tlsr->setTimeIntegrationCoeffs(outerIter);
     tlsr->extrapolateSolution();
-    if (tlsr->anyEllipticSolver) { platform->linAlg->fill(tlsr->fieldOffset(), 0.0, tlsr->o_EXT); }
+    platform->linAlg->fill(tlsr->fieldOffset(), 0.0, tlsr->o_EXT);
     tlsr->computeAdvectionCoeff();
     tlsr->computeWrst();
     tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
@@ -558,128 +558,101 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   this->o_diff = this->o_prop.slice(0 * this->_fieldOffset, this->_fieldOffset);
   this->o_rho = this->o_prop.slice(1 * this->_fieldOffset, this->_fieldOffset);
   
-  for (int is = 0; is < 1; is++) {
-    const std::string sid = scalarDigitStr(is);
 
-    nameToIndex[this->name] = is;
+  nameToIndex[this->name] = 0; //TODO
 
-    auto o_tmp = [&]() {
-      const std::string prefixedName = this->name;
-      auto tmp = platform->device.malloc<char>(prefixedName.size() + 1);
-      tmp.copyFrom(prefixedName.data());
-      const char nullChar[] = {'\0'};
-      tmp.copyFrom(nullChar, 1, prefixedName.size());
-      return tmp;
-    }();
-    this->o_name = o_tmp;
+  auto o_tmp = [&]() {
+    const std::string prefixedName = this->name;
+    auto tmp = platform->device.malloc<char>(prefixedName.size() + 1);
+    tmp.copyFrom(prefixedName.data());
+    const char nullChar[] = {'\0'};
+    tmp.copyFrom(nullChar, 1, prefixedName.size());
+    return tmp;
+  }();
+  this->o_name = o_tmp;
 
-    if (!options.compareArgs("TLSR SOLVER", "NONE")) {
+  if (!options.compareArgs("TLSR SOLVER", "NONE")) {
 
-      nekrsCheck(options.compareArgs("TLSR SOLVER", "BLOCK"),
-                 platform->comm.mpiComm(),
-                 EXIT_FAILURE,
-                 "%s\n",
-                 "level-set does not support BLOCK solver!");
+    nekrsCheck(options.compareArgs("TLSR SOLVER", "BLOCK"),
+        platform->comm.mpiComm(),
+        EXIT_FAILURE,
+        "%s\n",
+        "level-set does not support BLOCK solver!");
 
-      if (platform->comm.mpiRank() == 0) {
-        std::cout << "LS" << sid << ": " << this->name << std::endl;
-      }
-      platform->app->bc->printBcTypeMapping("tlsr");
-      if (platform->comm.mpiRank() == 0) {
-        std::cout << std::endl;
-      }
-
-      dfloat diff = 1;
-      dfloat rho = 1;
-      options.getArgs("TLSR DIFFUSIONCOEFF", diff);
-      options.getArgs("TLSR TRANSPORTCOEFF", rho);
-
-      std::vector<dfloat> diffTmp(this->_mesh->Nlocal, diff);
-      std::vector<dfloat> rhoTmp(this->_mesh->Nlocal, rho);
-
-
-      o_diff.copyFrom(diffTmp.data(), diffTmp.size());
-      o_rho.copyFrom(rhoTmp.data(), rhoTmp.size());
+    platform->app->bc->printBcTypeMapping(this->name);
+    if (platform->comm.mpiRank() == 0) {
+      std::cout << std::endl;
     }
+
+    dfloat diff = 1;
+    dfloat rho = 1;
+    options.getArgs(upperCase(this->name) + " DIFFUSIONCOEFF", diff);
+    options.getArgs(upperCase(this->name) + " TRANSPORTCOEFF", rho);
+
+    std::vector<dfloat> diffTmp(this->_mesh->Nlocal, diff);
+    std::vector<dfloat> rhoTmp(this->_mesh->Nlocal, rho);
+
+    this->o_diff.copyFrom(diffTmp.data(), diffTmp.size());
+    this->o_rho.copyFrom(rhoTmp.data(), rhoTmp.size());
   }
 
-  printf("here3\n");
-  anyEllipticSolver = false;
+  this->EToBOffset = this->_mesh->Nelements * this->_mesh->Nfaces;
 
-  EToBOffset = [&]() {
-    dlong NelementsMax = 0;
-    for (int is = 0; is < 1; is++) {
-      NelementsMax = std::max(this->_mesh->Nelements, NelementsMax);
-    }
-    return NelementsMax * meshV->Nfaces;
-  }();
-
-  std::vector<int> EToB(EToBOffset);
-
-  for (int is = 0; is < 1; is++) {
-    std::string sid = scalarDigitStr(is);
-
+  {
+    std::vector<int> EToB(EToBOffset);
     this->compute = 1;
     if (options.compareArgs("TLSR SOLVER", "NONE")) {
       this->compute = 0;
-      continue;
-    }
-
-    anyEllipticSolver |= (this->compute);
-
-    auto mesh = this->_mesh;
-    int cnt = 0;
-    for (int e = 0; e < mesh->Nelements; e++) {
-      for (int f = 0; f < mesh->Nfaces; f++) {
-        EToB[cnt + EToBOffset * is] =
+    } 
+    else {
+      auto mesh = this->_mesh;
+      int cnt = 0;
+      for (int e = 0; e < mesh->Nelements; e++) {
+        for (int f = 0; f < mesh->Nfaces; f++) {
+          EToB[cnt] =
             platform->app->bc->typeId(mesh->EToB[f + e * mesh->Nfaces], this->name);
-        cnt++;
+          cnt++;
+        }
       }
     }
-  }
 
-  o_EToB = platform->device.malloc<int>(EToB.size());
-  o_EToB.copyFrom(EToB.data());
+    this->o_EToB = platform->device.malloc<int>(EToB.size());
+    this->o_EToB.copyFrom(EToB.data());
+  }
 
   this->o_compute = platform->device.malloc<dlong>(1, &compute);
 
-  int nFieldsAlloc = anyEllipticSolver ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
-  o_S = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
-  o_W = platform->device.malloc<dfloat>(meshV->dim * std::max(o_coeffBDF.size(), o_coeffEXT.size()) * this->vFieldOffset);
-  const dlong Nstates = Nsubsteps ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
-  o_relWrst = platform->device.malloc<dfloat>(Nstates * meshV->dim * this->vCubatureOffset);
+  {
+    int nFieldsAlloc = std::max(this->o_coeffBDF.size(), this->o_coeffEXT.size());
+    this->o_S = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
+    this->o_W = platform->device.malloc<dfloat>(this->meshV->dim * std::max(this->o_coeffBDF.size(), this->o_coeffEXT.size()) * this->vFieldOffset);
+    const dlong Nstates = this->Nsubsteps ? std::max(this->o_coeffBDF.size(), this->o_coeffEXT.size()) : 1;
+    this->o_relWrst = platform->device.malloc<dfloat>(Nstates * this->meshV->dim * this->vCubatureOffset);
 
-  o_signls = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
+    this->o_signls = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
 
-  nFieldsAlloc = anyEllipticSolver ? o_coeffEXT.size() : 1;
-  o_ADV = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
-  o_EXT = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
+    nFieldsAlloc = this->o_coeffEXT.size();
+    this->o_ADV = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
+    this->o_EXT = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
 
-  if (anyEllipticSolver) {
-    o_Se = platform->device.malloc<dfloat>(this->_fieldOffset);
-    o_JwF = platform->device.malloc<dfloat>(this->_fieldOffset);
+    this->o_Se = platform->device.malloc<dfloat>(this->_fieldOffset);
+    this->o_JwF = platform->device.malloc<dfloat>(this->_fieldOffset);
   }
 
   // TODO consider adding these options in later
   bool filteringEnabled = false;
   bool avmEnabled = false;
 
-  printf("here\n");
-
   auto verifyBC = [&]() {
-    for (int is = 0; is < 1; is++) {
-      if (!compute) {
-        continue;
-      }
-
-      const std::string field = this->name;//"ls" + scalarDigitStr(is);
-      nekrsCheck(_mesh->Nbid != platform->app->bc->size(field),
+    if (this->compute) {
+      const std::string field = this->name;
+      nekrsCheck(this->_mesh->Nbid != platform->app->bc->size(field),
                  platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "Size of %s boundaryTypeMap (%d) does not match number of boundary IDs in mesh (%d)!\n",
                  field.c_str(),
                  platform->app->bc->size(field),
-                 _mesh->Nbid);
+                 this->_mesh->Nbid);
     }
   };
 
@@ -953,10 +926,6 @@ void lvlSet_t::restoreSolutionState() {}
 
 void lvlSet_t::lagSolution()
 {
-  if (!anyEllipticSolver) {
-    return;
-  }
-
   const auto n = std::max(o_coeffEXT.size(), o_coeffBDF.size());
   for (int s = n; s > 1; s--) {
     o_S.copyFrom(o_S, this->_fieldOffset, (s - 1) * this->_fieldOffset, (s - 2) * this->_fieldOffset);

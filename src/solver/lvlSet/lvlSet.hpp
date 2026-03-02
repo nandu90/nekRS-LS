@@ -108,9 +108,6 @@ public:
   dlong vFieldOffset;
   dlong vCubatureOffset;
 
-
-  bool anyEllipticSolver = false;
-
   int compute;
   occa::memory o_compute;
 
