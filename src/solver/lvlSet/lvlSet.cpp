@@ -524,7 +524,6 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   Nsubsteps = 0;
   platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
 
-  qqt.resize(1);
   fieldOffsetScan.resize(1);
   ellipticSolver.resize(1);
   compute.resize(1);
@@ -561,7 +560,6 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
     fieldOffsetScan[s] = (s > 0) ? sum : 0;
     sum += _fieldOffset;
     this->_mesh.push_back(cfg.mesh[s]);
-    qqt[s] = new QQt(this->_mesh[s]->oogs);
   }
   fieldOffsetSum = sum;
   o_fieldOffsetScan = platform->device.malloc<dlong>(1, fieldOffsetScan.data());

@@ -118,8 +118,6 @@ public:
 
   bool anyEllipticSolver = false;
 
-  std::vector<QQt *> qqt;
-
   std::vector<int> compute;
   occa::memory o_compute;
 
@@ -131,9 +129,6 @@ public:
   occa::memory o_svvf;
 
   int Nsubsteps = 0;
-
-  //dfloat *dp0thdt = nullptr;
-  //dfloat *alpha0Ref = nullptr;
 
   dlong EToBOffset = -1;
 
