@@ -11,33 +11,6 @@
 #include <algorithm>
 #include "par.hpp"
 
-static void printOccaArray(const occa::memory &o_mem, const std::string &name, size_t maxPrint = 0)
-{
-  const size_t N = o_mem.size();                  // element count (dtype entries)
-  const size_t elemBytes = o_mem.dtype().bytes(); // bytes per entry
-  const size_t bytes = N * elemBytes;
-
-  if (elemBytes != sizeof(dfloat)) {
-    std::cout << name << ": dtype bytes=" << elemBytes
-              << " but sizeof(dfloat)=" << sizeof(dfloat) << "\n";
-    return;
-  }
-
-  std::vector<dfloat> h(N);
-
-  // In datatype-aware OCCA, this is element count, not bytes.
-  o_mem.copyTo(h.data(), N);
-
-  std::cout << name << " (N=" << N << ", bytes=" << bytes << ")\n";
-  const size_t nOut = (maxPrint > 0) ? std::min(maxPrint, N) : N;
-
-  for (size_t i = 0; i < nOut; ++i)
-    std::cout << "  [" << i << "] " << h[i] << "\n";
-
-  if (nOut < N)
-    std::cout << "  ... (" << (N - nOut) << " more entries)\n";
-}
-
 // private members
 namespace
 {
