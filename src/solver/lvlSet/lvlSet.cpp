@@ -454,8 +454,7 @@ void lvlSet::setup()
     cfg.fieldOffset = nrs->meshV->fieldOffset;
     cfg.vFieldOffset = nrs->scalar->vFieldOffset;       // TODO: is it safe to assume nrs->scalar is always accessible?
     cfg.vCubatureOffset = nrs->scalar->vCubatureOffset; // TODO: is it safe to assume nrs->scalar is always accessible?
-    cfg.mesh.resize(1); // currently hard-coded for one equation (e.g. TLSR) --> TODO: handle TLSR and CLSR
-    cfg.mesh[0] = nrs->meshV;
+    cfg.mesh = nrs->meshV;
     cfg.meshV = nrs->meshV;
     return std::make_unique<lvlSet_t>(cfg);
   }();
@@ -549,9 +548,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   this->vFieldOffset = cfg.vFieldOffset; // TODO: check if this is correct
   this->vCubatureOffset = cfg.vCubatureOffset;
 
-  for (int s = 0; s < 1; ++s) {
-    this->_mesh.push_back(cfg.mesh[s]);
-  }
+  this->_mesh = cfg.mesh;
 
   this->fieldOffsetScan = 0;
 
@@ -605,8 +602,8 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
     auto o_diff_i = o_diff + fieldOffsetScan;
     auto o_rho_i = o_rho + fieldOffsetScan;
 
-    std::vector<dfloat> diffTmp(this->_mesh[is]->Nlocal, diff);
-    std::vector<dfloat> rhoTmp(this->_mesh[is]->Nlocal, rho);
+    std::vector<dfloat> diffTmp(this->_mesh->Nlocal, diff);
+    std::vector<dfloat> rhoTmp(this->_mesh->Nlocal, rho);
 
     /* dfloat diffSolid = diff; */
     /* dfloat rhoSolid = rho; */
@@ -627,7 +624,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   EToBOffset = [&]() {
     dlong NelementsMax = 0;
     for (int is = 0; is < 1; is++) {
-      NelementsMax = std::max(this->_mesh[is]->Nelements, NelementsMax);
+      NelementsMax = std::max(this->_mesh->Nelements, NelementsMax);
     }
     return NelementsMax * meshV->Nfaces;
   }();
@@ -645,7 +642,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
 
     anyEllipticSolver |= (compute[is]);
 
-    auto mesh = this->_mesh[is];
+    auto mesh = this->_mesh;
     int cnt = 0;
     for (int e = 0; e < mesh->Nelements; e++) {
       for (int f = 0; f < mesh->Nfaces; f++) {
@@ -691,13 +688,13 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
       }
 
       const std::string field = "tlsr";//"ls" + scalarDigitStr(is);
-      nekrsCheck(_mesh[is]->Nbid != platform->app->bc->size(field),
+      nekrsCheck(_mesh->Nbid != platform->app->bc->size(field),
                  platform->comm.mpiComm(),
                  EXIT_FAILURE,
                  "Size of %s boundaryTypeMap (%d) does not match number of boundary IDs in mesh (%d)!\n",
                  field.c_str(),
                  platform->app->bc->size(field),
-                 _mesh[is]->Nbid);
+                 _mesh->Nbid);
     }
   };
 
@@ -791,7 +788,7 @@ void lvlSet_t::makeAdvection(int is, double time, int tstep)
 
 void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
 {
-  const auto mesh = this->_mesh[is];
+  const auto mesh = this->_mesh;
 
   const auto nFields = 1;
   
@@ -845,7 +842,7 @@ void lvlSet_t::makeExplicit(int is, double time, int tstep)
 {
   const std::string sid = scalarDigitStr(is);
 
-  auto mesh = this->_mesh[is];
+  auto mesh = this->_mesh;
   const dlong isOffset = fieldOffsetScan;
 
   o_explicitTerms("tlsr").copyFrom(o_signls); // TODO: shouldn't use tlsr here but will use this hack for now
@@ -853,20 +850,22 @@ void lvlSet_t::makeExplicit(int is, double time, int tstep)
 
 void lvlSet_t::makeForcing()
 {
+  auto mesh = this->_mesh;
+
   for (int is = 0; is < 1; is++) {
     if (!compute[is]) {
       continue;
     }
 
     launchKernel("scalar_t::sumMakef",
-                 _mesh[is]->Nlocal,
-                 _mesh[is]->o_LMM,
+                 mesh->Nlocal,
+                 mesh->o_LMM,
                  1 / dt[0],
                  o_coeffEXT,
                  o_coeffBDF,
                  fieldOffsetScan,
                  this->_fieldOffset,  //offset sum
-                 _mesh[is]->fieldOffset,
+                 mesh->fieldOffset,
                  o_rho,
                  o_S,
                  o_ADV,
@@ -891,7 +890,7 @@ void lvlSet_t::solve(double time, int stage)
     }
 
     const std::string sid = scalarDigitStr(is);
-    auto mesh = this->_mesh[is];
+    auto mesh = this->_mesh;
 
     auto o_rhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
     o_rhs.copyFrom(o_JwF, mesh->Nlocal, 0, fieldOffsetScan);
@@ -999,6 +998,8 @@ void lvlSet_t::applyDirichlet(double time) {}
 
 void lvlSet_t::setupEllipticSolver()
 {
+  auto mesh = this->_mesh;
+  
   for (int is = 0; is < 1; is++) {
     std::string sid = scalarDigitStr(is);
 
@@ -1006,12 +1007,12 @@ void lvlSet_t::setupEllipticSolver()
       continue;
     }
 
-    auto o_rho_i = o_rho.slice(fieldOffsetScan, _mesh[is]->Nlocal);
-    auto o_lambda0 = o_diff.slice(fieldOffsetScan, _mesh[is]->Nlocal);
-    auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(_mesh[is]->Nlocal);
-    platform->linAlg->axpby(_mesh[is]->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_lambda1);
+    auto o_rho_i = o_rho.slice(fieldOffsetScan, mesh->Nlocal);
+    auto o_lambda0 = o_diff.slice(fieldOffsetScan, mesh->Nlocal);
+    auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    platform->linAlg->axpby(mesh->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_lambda1);
 
-    ellipticSolver[is] = new elliptic("tlsr", _mesh[is], this->_fieldOffset, o_lambda0, o_lambda1);
+    ellipticSolver[is] = new elliptic("tlsr", mesh, this->_fieldOffset, o_lambda0, o_lambda1);
 
     if (platform->options.compareArgs("TLSR REGULARIZATION METHOD", "SVV")) {
       auto o_svvmu = this->o_svvmu.slice(is * this->_fieldOffset, this->_fieldOffset);

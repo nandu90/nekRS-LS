@@ -18,7 +18,7 @@ lvlSet_t* getLS();
 
 struct lvlSetConfig_t : public solverCfg_t {
 public:
-  std::vector<mesh_t *> mesh;
+  mesh_t *mesh;
   mesh_t *meshV;
   dlong fieldOffset;
   dlong vFieldOffset;
@@ -63,16 +63,9 @@ public:
     return _fieldOffset;
   };
 
-  mesh_t* mesh(std::string key)
+  mesh_t* mesh()
   {
-    auto it = nameToIndex.find(lowerCase(key));
-    const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? _mesh[idx] : nullptr;
-  };
-
-  mesh_t* mesh(int idx)
-  {
-    return _mesh.at(idx);
+    return _mesh;
   };
 
   deviceMemory<dfloat> o_solution(std::string key = "") override
@@ -149,7 +142,7 @@ public:
 
 private:
   void advectionSubcycling(int nEXT, double time, int scalarIdx);
-  std::vector<mesh_t *> _mesh;
+  mesh_t * _mesh;
 
   std::vector<occa::memory> o_name;
 
