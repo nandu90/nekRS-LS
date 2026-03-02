@@ -118,8 +118,6 @@ public:
 
   bool anyEllipticSolver = false;
 
-  int NSfields = 0;
-
   std::vector<QQt *> qqt;
 
   std::vector<int> compute;

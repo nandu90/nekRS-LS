@@ -524,12 +524,10 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   Nsubsteps = 0;
   platform->options.getArgs("SUBCYCLING STEPS", Nsubsteps);
 
-  NSfields = 1; // currently hard-coded for TLSR only --> TODO: add in CLSR support
-
-  qqt.resize(NSfields);
-  fieldOffsetScan.resize(NSfields);
-  ellipticSolver.resize(NSfields);
-  compute.resize(NSfields);
+  qqt.resize(1);
+  fieldOffsetScan.resize(1);
+  ellipticSolver.resize(1);
+  compute.resize(1);
 
   meshV = cfg.meshV;
 
@@ -559,21 +557,21 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   vCubatureOffset = cfg.vCubatureOffset;
 
   dlong sum = 0;
-  for (int s = 0; s < NSfields; ++s) {
+  for (int s = 0; s < 1; ++s) {
     fieldOffsetScan[s] = (s > 0) ? sum : 0;
     sum += _fieldOffset;
     this->_mesh.push_back(cfg.mesh[s]);
     qqt[s] = new QQt(this->_mesh[s]->oogs);
   }
   fieldOffsetSum = sum;
-  o_fieldOffsetScan = platform->device.malloc<dlong>(NSfields, fieldOffsetScan.data());
+  o_fieldOffsetScan = platform->device.malloc<dlong>(1, fieldOffsetScan.data());
 
   o_prop = platform->device.malloc<dfloat>(2 * fieldOffsetSum);
   o_diff = o_prop.slice(0 * fieldOffsetSum, fieldOffsetSum);
   o_rho = o_prop.slice(1 * fieldOffsetSum, fieldOffsetSum);
   
   printf("here\n");
-  for (int is = 0; is < NSfields; is++) {
+  for (int is = 0; is < 1; is++) {
     const std::string sid = scalarDigitStr(is);
 
     const auto _name = "tlsr" ;//lowerCase(options.getArgs("LS" + sid + " NAME"));
@@ -637,15 +635,15 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
 
   EToBOffset = [&]() {
     dlong NelementsMax = 0;
-    for (int is = 0; is < NSfields; is++) {
+    for (int is = 0; is < 1; is++) {
       NelementsMax = std::max(this->_mesh[is]->Nelements, NelementsMax);
     }
     return NelementsMax * meshV->Nfaces;
   }();
 
-  std::vector<int> EToB(EToBOffset * NSfields);
+  std::vector<int> EToB(EToBOffset);
 
-  for (int is = 0; is < NSfields; is++) {
+  for (int is = 0; is < 1; is++) {
     std::string sid = scalarDigitStr(is);
 
     compute[is] = 1;
@@ -670,7 +668,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   o_EToB = platform->device.malloc<int>(EToB.size());
   o_EToB.copyFrom(EToB.data());
 
-  o_compute = platform->device.malloc<dlong>(NSfields, compute.data());
+  o_compute = platform->device.malloc<dlong>(1, compute.data());
 
   int nFieldsAlloc = anyEllipticSolver ? std::max(o_coeffBDF.size(), o_coeffEXT.size()) : 1;
   o_S = platform->device.malloc<dfloat>(nFieldsAlloc * fieldOffsetSum);
@@ -696,7 +694,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   printf("here\n");
 
   auto verifyBC = [&]() {
-    for (int is = 0; is < NSfields; is++) {
+    for (int is = 0; is < 1; is++) {
       if (!compute[is]) {
         continue;
       }
@@ -864,7 +862,7 @@ void lvlSet_t::makeExplicit(int is, double time, int tstep)
 
 void lvlSet_t::makeForcing()
 {
-  for (int is = 0; is < this->NSfields; is++) {
+  for (int is = 0; is < 1; is++) {
     if (!compute[is]) {
       continue;
     }
@@ -896,7 +894,7 @@ void lvlSet_t::makeForcing()
 
 void lvlSet_t::solve(double time, int stage)
 {
-  for (int is = 0; is < NSfields; is++) {
+  for (int is = 0; is < 1; is++) {
     if (!compute[is]) {
       continue;
     }
@@ -998,7 +996,7 @@ void lvlSet_t::extrapolateSolution()
   const auto Nlocal = _fieldOffset; // assumed to be the same for all fields
   launchKernel("core-extrapolate",
                Nlocal,
-               NSfields,
+               1,       //only 1 field
                static_cast<int>(o_coeffEXT.size()),
                _fieldOffset,
                o_coeffEXT,
@@ -1010,7 +1008,7 @@ void lvlSet_t::applyDirichlet(double time) {}
 
 void lvlSet_t::setupEllipticSolver()
 {
-  for (int is = 0; is < NSfields; is++) {
+  for (int is = 0; is < 1; is++) {
     std::string sid = scalarDigitStr(is);
 
     if (!compute[is]) {
@@ -1044,13 +1042,13 @@ void lvlSet_t::mueSVV()
 
   auto o_umag = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
-  for (int is = 0; is < NSfields; is++) {
+  for (int is = 0; is < 1; is++) {
     const auto sid = scalarDigitStr(is);
 
     if(platform->options.compareArgs("TLSR REGULARIZATION METHOD", "SVV")) {
       if(!initialized) {
         this->o_svvf = platform->device.malloc<dfloat>(_fieldOffset);
-        this->o_svvmu = platform->device.malloc<dfloat>(NSfields * _fieldOffset);
+        this->o_svvmu = platform->device.malloc<dfloat>(1 * _fieldOffset);
 
         if(!platform->options.compareArgs("MOVING MESH","TRUE"))
           launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
