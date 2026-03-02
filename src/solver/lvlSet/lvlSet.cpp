@@ -551,14 +551,14 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
   o_coeffBDF = platform->device.malloc<dfloat>(nBDF);
   o_coeffEXT = platform->device.malloc<dfloat>(nEXT);
 
-  _fieldOffset = cfg.fieldOffset; // for now same for all scalars
+  this->_fieldOffset = cfg.fieldOffset; // for now same for all scalars
   vFieldOffset = cfg.vFieldOffset; // TODO: check if this is correct
   vCubatureOffset = cfg.vCubatureOffset;
 
   dlong sum = 0;
   for (int s = 0; s < 1; ++s) {
     fieldOffsetScan[s] = (s > 0) ? sum : 0;
-    sum += _fieldOffset;
+    sum += this->_fieldOffset;
     this->_mesh.push_back(cfg.mesh[s]);
   }
   fieldOffsetSum = sum;
@@ -915,7 +915,7 @@ void lvlSet_t::solve(double time, int stage)
                  is,
                  time,
                  vFieldOffset,
-                 _fieldOffset,
+                 this->_fieldOffset,
                  0,
                  EToBOffset,
                  mesh->o_x,
@@ -991,12 +991,12 @@ void lvlSet_t::extrapolateSolution()
   if (!o_Se.isInitialized()) {
     return;
   }
-  const auto Nlocal = _fieldOffset; // assumed to be the same for all fields
+  const auto Nlocal = this->_fieldOffset; // assumed to be the same for all fields
   launchKernel("core-extrapolate",
                Nlocal,
                1,       //only 1 field
                static_cast<int>(o_coeffEXT.size()),
-               _fieldOffset,
+               this->_fieldOffset,
                o_coeffEXT,
                o_S,
                o_Se);
@@ -1018,10 +1018,10 @@ void lvlSet_t::setupEllipticSolver()
     auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(_mesh[is]->Nlocal);
     platform->linAlg->axpby(_mesh[is]->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_lambda1);
 
-    ellipticSolver[is] = new elliptic("tlsr", _mesh[is], _fieldOffset, o_lambda0, o_lambda1);
+    ellipticSolver[is] = new elliptic("tlsr", _mesh[is], this->_fieldOffset, o_lambda0, o_lambda1);
 
     if (platform->options.compareArgs("TLSR REGULARIZATION METHOD", "SVV")) {
-      auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
+      auto o_svvmu = this->o_svvmu.slice(is * this->_fieldOffset, this->_fieldOffset);
       ellipticSolver[is]->mueSVV(o_svvmu);
       ellipticSolver[is]->setupSVV();
     }
@@ -1045,8 +1045,8 @@ void lvlSet_t::mueSVV()
 
     if(platform->options.compareArgs("TLSR REGULARIZATION METHOD", "SVV")) {
       if(!initialized) {
-        this->o_svvf = platform->device.malloc<dfloat>(_fieldOffset);
-        this->o_svvmu = platform->device.malloc<dfloat>(1 * _fieldOffset);
+        this->o_svvf = platform->device.malloc<dfloat>(this->_fieldOffset);
+        this->o_svvmu = platform->device.malloc<dfloat>(this->_fieldOffset);
 
         if(!platform->options.compareArgs("MOVING MESH","TRUE"))
           launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
@@ -1065,7 +1065,7 @@ void lvlSet_t::mueSVV()
       dfloat scale = 0.1;
       platform->options.getArgs("TLSR REGULARIZATION SVV SCALING COEFF", scale);
 
-      auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
+      auto o_svvmu = this->o_svvmu.slice(is * this->_fieldOffset, this->_fieldOffset);
       platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
     }
   }
