@@ -754,8 +754,8 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
                         this->_fieldOffset,
                         this->vCubatureOffset,
                         this->_fieldOffset,
-                        o_NULL, // (geom) ? geom->o_div : o_NULL,
-                        this->o_W,
+                        (this->geom) ? this->geom->o_div : o_NULL,
+                        this->o_relWrst,
                         o_Si,
                         o_JwFi);
 
