@@ -23,15 +23,13 @@ public:
   dlong fieldOffset;
   dlong vFieldOffset;
   dlong vCubatureOffset;
-  dfloat *g0;
-  dfloat *dt;
 };
 
 class lvlSet_t : public solver_t
 {
 public:
 
-  lvlSet_t(lvlSetConfig_t &cfg);
+  lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &geom);
 
   void computeAdvectionCoeff();
   void makeExplicit(int is, double time, int tstep);
@@ -132,6 +130,8 @@ public:
   occa::memory o_diff;
 
   std::string name;
+
+  const std::unique_ptr<geomSolver_t> &geom;
 
   void writeFile(double time);
   std::unique_ptr<iofld> fieldWriter;

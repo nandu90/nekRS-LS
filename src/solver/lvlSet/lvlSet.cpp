@@ -430,7 +430,7 @@ void lvlSet::setup()
     cfg.vCubatureOffset = nrs->scalar->vCubatureOffset; // TODO: is it safe to assume nrs->scalar is always accessible?
     cfg.mesh = nrs->meshV;
     cfg.meshV = nrs->meshV;
-    return std::make_unique<lvlSet_t>(cfg);
+    return std::make_unique<lvlSet_t>(cfg, nrs->geom);
   }();
   tlsr->mueSVV(); // needs to be called before setupEllipticSolver() otherwise o_svvmue in elliptic solver will not be initialized --> TODO: handle AVM?
   tlsr->setupEllipticSolver();
@@ -481,7 +481,7 @@ lvlSet_t* lvlSet::getLS()
   return tlsr.get();
 }
 
-lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg)
+lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_geom) : geom(_geom)
 {
   if (platform->comm.mpiRank() == 0) {
     std::cout << "================ " << "SETUP LEVEL-SET" << " ===============\n";
