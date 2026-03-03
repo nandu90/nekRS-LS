@@ -982,28 +982,28 @@ void lvlSet_t::computeWrst()
     }
   }
 
-  const auto relative = this->Nsubsteps; // const auto relative = geom && Nsubsteps;
+  const auto relative = this->geom && this->Nsubsteps; // const auto relative = geom && Nsubsteps;
   if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
     launchKernel("nrs-UrstCubatureHex3D",
                  mesh->Nelements,
-                 relative,
+                 static_cast<int>(relative),
                  mesh->o_cubvgeo,
                  mesh->o_cubInterpT,
                  this->vFieldOffset,
-                 0, // (geom) ? geom->fieldOffset : 0,
+                 (this->geom) ? this->geom->fieldOffset : 0,
                  this->vCubatureOffset,
                  this->o_W,
-                 o_NULL, // (geom) ? geom->o_U : o_NULL,
+                 (this->geom) ? this->geom->o_U : o_NULL,
                  this->o_relWrst);
   } else {
     launchKernel("nrs-UrstHex3D",
                  mesh->Nelements,
-                 relative,
+                 static_cast<int>(relative),
                  mesh->o_vgeo,
                  this->vFieldOffset,
-                 0, // (geom) ? geom->fieldOffset : 0,
+                 (this->geom) ? this->geom->fieldOffset : 0,
                  this->o_W,
-                 o_NULL, // (geom) ? geom->o_U : o_NULL,
+                 (this->geom) ? this->geom->o_U : o_NULL,
                  this->o_relWrst);
   }
 }
