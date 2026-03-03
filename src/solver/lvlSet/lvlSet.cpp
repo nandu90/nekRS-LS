@@ -544,9 +544,9 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   }();
   this->o_name = o_tmp;
 
-  if (!options.compareArgs("TLSR SOLVER", "NONE")) {
+  if (!options.compareArgs(upperCase(this->name) + " SOLVER", "NONE")) {
 
-    nekrsCheck(options.compareArgs("TLSR SOLVER", "BLOCK"),
+    nekrsCheck(options.compareArgs(upperCase(this->name) + " SOLVER", "BLOCK"),
         platform->comm.mpiComm(),
         EXIT_FAILURE,
         "%s\n",
@@ -574,7 +574,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   {
     std::vector<int> EToB(EToBOffset);
     this->compute = 1;
-    if (options.compareArgs("TLSR SOLVER", "NONE")) {
+    if (options.compareArgs(upperCase(this->name) + " SOLVER", "NONE")) {
       this->compute = 0;
     } 
     else {
