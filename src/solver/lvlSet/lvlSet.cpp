@@ -932,7 +932,10 @@ void lvlSet_t::setupEllipticSolver()
   }
 }
 
-void lvlSet_t::finalize() {}
+void lvlSet_t::finalize() {
+  if(this->ellipticSolver[0])
+    delete this->ellipticSolver[0];
+}
 
 void lvlSet_t::mueSVV()
 {
