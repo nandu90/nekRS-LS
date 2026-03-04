@@ -10,6 +10,9 @@
 #include <stdexcept>
 #include <algorithm>
 #include "par.hpp"
+#include "avm.hpp"
+#include "lowPassFilter.hpp"
+#include "gjp.hpp"
 
 // private members
 namespace
@@ -464,6 +467,7 @@ void lvlSet::solveLSR()
     tlsr->makeExplicit(0, time, outerIter);
     tlsr->makeForcing();
     tlsr->mueSVV();
+    tlsr->mueAVM();
     tlsr->lagSolution();
     // tlsr->applyDirichlet(time);
     tlsr->solve(time, 1);
@@ -615,6 +619,40 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   // TODO consider adding these options in later
   bool filteringEnabled = false;
   bool avmEnabled = false;
+
+
+  if (options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "HPFRT")) {
+    filteringEnabled = true;
+  }
+
+  if (options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
+    avmEnabled = true;
+  }
+
+  if (filteringEnabled) {
+    dlong applyFilterRT = 0;
+    const dlong Nmodes = this->meshV->N + 1; // assumed to be the same for all fields
+    o_filterRT = platform->device.malloc<dfloat>(Nmodes * Nmodes);
+    dfloat filterS = 0;
+
+    if (this->compute) {
+      int filterNc = -1;
+      options.getArgs(upperCase(this->name) + " HPFRT MODES", filterNc);
+      dfloat strength = NAN;
+      options.getArgs(upperCase(this->name) + " HPFRT STRENGTH", strength);
+      filterS = strength;
+      this->o_filterRT.copyFrom(lowPassFilterSetup(this->_mesh, filterNc), Nmodes * Nmodes);
+
+      applyFilterRT = 1;
+    }
+
+    o_filterS = platform->device.malloc<dfloat>(1, &filterS);
+    o_applyFilterRT = platform->device.malloc<dlong>(1, &applyFilterRT);
+  }
+
+  if (avmEnabled) {
+    avm::setup(meshV);
+  }
 
   auto verifyBC = [&]() {
     if (this->compute) {
@@ -776,7 +814,45 @@ void lvlSet_t::makeExplicit(int is, double time, int tstep)
 {
   auto mesh = this->_mesh;
 
-  o_explicitTerms(this->name).copyFrom(this->o_signls); // TODO: shouldn't use tlsr here but will use this hack for now
+  const auto parPrefix = upperCase(this->name);
+
+  if(this->name == "tlsr")
+    this->o_EXT.copyFrom(this->o_signls); // TODO: shouldn't use tlsr here but will use this hack for now
+                                                          
+  if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "HPFRT")) {
+    launchKernel("core-filterRTHex3D",
+                 meshV->Nelements,
+                 0,
+                 1,
+                 o_fieldOffsetScan,
+                 o_applyFilterRT,
+                 o_filterRT,
+                 o_filterS,
+                 o_rho,
+                 o_S,
+                 o_EXT);
+  }
+
+  if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "GJP")) {
+    dfloat tauFactor;
+    platform->options.getArgs(parPrefix + " REGULARIZATION GJP SCALING COEFF", tauFactor);
+
+    addGJP(mesh, ellipticSolver[0]->o_EToB(), o_rho, vFieldOffset, o_W, o_S, o_EXT, tauFactor);
+  }
+
+  const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
+  if (movingMesh && !Nsubsteps) {
+    launchKernel("scalar_t::advectMeshVelocityHex3D",
+                 meshV->Nelements,
+                 mesh->o_vgeo,
+                 mesh->o_D,
+                 0,
+                 (geom) ? geom->fieldOffset : 0,
+                 o_rho,
+                 (geom) ? geom->o_U : o_NULL,
+                 o_S,
+                 o_EXT);
+  }
 }
 
 void lvlSet_t::makeForcing()
@@ -1008,6 +1084,81 @@ void lvlSet_t::computeWrst()
                  this->o_W,
                  (this->geom) ? this->geom->o_U : o_NULL,
                  this->o_relWrst);
+  }
+}
+
+void lvlSet_t::mueAVM()
+{
+  auto verbose = platform->verbose();
+  auto mesh = this->meshV; // assumes mesh is the same for all scalars
+  static occa::memory o_diff0;
+
+  static occa::memory o_nuAVM;
+  static auto initialized = false;
+
+  auto parPrefix = upperCase(this->name);
+
+  if (!initialized) {
+    if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
+      nekrsCheck(mesh->N < 5,
+          platform->comm.mpiComm(),
+          EXIT_FAILURE,
+          "%s\n",
+          "AVM requires polynomialOrder >= 5!");
+
+      o_diff0 = platform->device.malloc<dfloat>(mesh->Nlocal);
+      o_diff0.copyFrom(this->o_diff, mesh->Nlocal);
+    }
+    initialized = true;
+  }
+
+  if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
+    // restore inital viscosity
+    o_diff.copyFrom(o_diff0, mesh->Nlocal);
+
+    dfloat kappa = 1.0;
+    platform->options.getArgs(parPrefix + " REGULARIZATION AVM ACTIVATION WIDTH", kappa);
+
+    dfloat logS0 = 2.0; // threshold smoothness exponent (activate for logSk > logS0 - kappa)
+    platform->options.getArgs(parPrefix + " REGULARIZATION AVM DECAY THRESHOLD", logS0);
+
+    dfloat scalingCoeff = 1.0;
+    platform->options.getArgs(parPrefix + " REGULARIZATION AVM SCALING COEFF", scalingCoeff);
+
+    dfloat absTol = 0;
+    platform->options.getArgs(parPrefix + " REGULARIZATION AVM ABSOLUTE TOL", absTol);
+
+    const bool makeCont = platform->options.compareArgs(parPrefix + " REGULARIZATION AVM C0", "TRUE");
+
+    auto o_eps = avm::viscosity(vFieldOffset, this->o_W, this->o_S, absTol, scalingCoeff, logS0, kappa, makeCont);
+
+    if (verbose) {
+      const dfloat maxEps = platform->linAlg->max(mesh->Nlocal, o_eps, platform->comm.mpiComm());
+      const dfloat minEps = platform->linAlg->min(mesh->Nlocal, o_eps, platform->comm.mpiComm());
+
+      const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, o_diff, platform->comm.mpiComm());
+      const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, o_diff, platform->comm.mpiComm());
+
+      if (platform->comm.mpiRank() == 0) {
+        printf("applying a min/max artificial viscosity of (%f,%f) to %s with min/max visc (%f,%f)\n",
+               minEps,
+               maxEps,
+               this->name.c_str(),
+               minDiff,
+               maxDiff);
+      }
+    }
+
+    platform->linAlg->axpby(mesh->Nlocal, 1.0, o_eps, 1.0, o_diff, 0, 0);
+
+    if (verbose) {
+      const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, o_diff, platform->comm.mpiComm());
+      const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, o_diff, platform->comm.mpiComm());
+
+      if (platform->comm.mpiRank() == 0) {
+        printf("%s now has a min/max visc: (%f,%f)\n", this->name.c_str(), minDiff, maxDiff);
+      }
+    }
   }
 }
 

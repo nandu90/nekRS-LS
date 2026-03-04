@@ -109,9 +109,9 @@ public:
   int compute;
   occa::memory o_compute;
 
-  //occa::memory o_applyFilterRT;
-  //occa::memory o_filterS;
-  //occa::memory o_filterRT;
+  occa::memory o_applyFilterRT;
+  occa::memory o_filterS;
+  occa::memory o_filterRT;
 
   occa::memory o_svvmu;
   occa::memory o_svvf;
