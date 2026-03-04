@@ -535,9 +535,6 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   this->o_diff = this->o_prop.slice(0 * this->_fieldOffset, this->_fieldOffset);
   this->o_rho = this->o_prop.slice(1 * this->_fieldOffset, this->_fieldOffset);
   
-
-  nameToIndex[this->name] = 0; //TODO
-
   auto o_tmp = [&]() {
     const std::string prefixedName = this->name;
     auto tmp = platform->device.malloc<char>(prefixedName.size() + 1);

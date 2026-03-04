@@ -68,34 +68,22 @@ public:
 
   deviceMemory<dfloat> o_solution(std::string key = "") override
   {
-    if (key.empty()) return deviceMemory<dfloat>(o_S);
-    auto it = nameToIndex.find(lowerCase(key));
-    const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? deviceMemory<dfloat>(o_S.slice(fieldOffsetScan, _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
+    return deviceMemory<dfloat>(o_S);
   };
 
   deviceMemory<dfloat> o_explicitTerms(std::string key = "") override
   {
-    if (key.empty()) return deviceMemory<dfloat>(o_EXT);
-    auto it = nameToIndex.find(lowerCase(key));
-    const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? deviceMemory<dfloat>(o_EXT.slice(fieldOffsetScan, _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
+    return deviceMemory<dfloat>(o_EXT);
   };
 
   deviceMemory<dfloat> o_diffusionCoeff(std::string key = "") override
   {
-    if (key.empty()) return deviceMemory<dfloat>(o_prop.slice(0, _fieldOffset));
-    auto it = nameToIndex.find(lowerCase(key));
-    const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(fieldOffsetScan, _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
+    return deviceMemory<dfloat>(o_prop.slice(0, _fieldOffset));
   };
 
   deviceMemory<dfloat> o_transportCoeff(std::string key = "") override
   {
-    if (key.empty()) return deviceMemory<dfloat>(o_prop.slice(_fieldOffset, _fieldOffset));
-    auto it = nameToIndex.find(lowerCase(key));
-    const auto idx = (it != nameToIndex.end()) ? it->second : -1;
-    return (idx >= 0) ? deviceMemory<dfloat>(o_prop.slice(_fieldOffset + fieldOffsetScan, _fieldOffset)) : deviceMemory<dfloat>(o_NULL);
+    return deviceMemory<dfloat>(o_prop.slice(_fieldOffset, _fieldOffset));
   }
 
   mesh_t *meshV;
