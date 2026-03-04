@@ -32,8 +32,8 @@ public:
   lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &geom);
 
   void computeAdvectionCoeff();
-  void makeExplicit(int is, double time, int tstep);
-  void makeAdvection(int is, double time, int tstep);
+  void makeExplicit(double time, int tstep);
+  void makeAdvection(double time, int tstep);
   void makeForcing();
   void mueAVM();
   void mueSVV();
@@ -126,7 +126,7 @@ public:
   int outfldCounter = 0;
 
 private:
-  void advectionSubcycling(int nEXT, double time, int scalarIdx);
+  void advectionSubcycling(int nEXT, double time);
   mesh_t * _mesh;
 
   occa::memory o_name;

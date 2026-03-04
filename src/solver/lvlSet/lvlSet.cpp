@@ -463,8 +463,8 @@ void lvlSet::solveLSR()
     platform->linAlg->fill(tlsr->fieldOffset(), 0.0, tlsr->o_EXT);
     tlsr->computeAdvectionCoeff();
     tlsr->computeWrst();
-    tlsr->makeAdvection(0, time, outerIter); // currently assume 1 LS equation -->  is = 1
-    tlsr->makeExplicit(0, time, outerIter);
+    tlsr->makeAdvection(time, outerIter); // currently assume 1 LS equation -->  is = 1
+    tlsr->makeExplicit(time, outerIter);
     tlsr->makeForcing();
     tlsr->mueSVV();
     tlsr->mueAVM();
@@ -487,8 +487,10 @@ lvlSet_t* lvlSet::getLS()
 
 lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_geom) : geom(_geom)
 {
+  this->name = cfg.name;
+
   if (platform->comm.mpiRank() == 0) {
-    std::cout << "================ " << "SETUP LEVEL-SET" << " ===============\n";
+  std::cout << "================ " << "SETUP " << upperCase(this->name) << " ===============\n";
   }
 
   auto &options = platform->options;
@@ -498,7 +500,6 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
   this->ellipticSolver.resize(1);
 
-  this->name = cfg.name;
   this->meshV = cfg.meshV;
 
   this->g0 = cfg.g0;
@@ -521,8 +522,8 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   this->o_coeffBDF = platform->device.malloc<dfloat>(nBDF);
   this->o_coeffEXT = platform->device.malloc<dfloat>(nEXT);
 
-  this->_fieldOffset = cfg.fieldOffset; // for now same for all scalars
-  this->vFieldOffset = cfg.vFieldOffset; // TODO: check if this is correct
+  this->_fieldOffset = cfg.fieldOffset; 
+  this->vFieldOffset = cfg.vFieldOffset; // does not operate on solid mesh
   this->vCubatureOffset = cfg.vCubatureOffset;
 
   this->_mesh = cfg.mesh;
@@ -613,10 +614,8 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
     this->o_JwF = platform->device.malloc<dfloat>(this->_fieldOffset);
   }
 
-  // TODO consider adding these options in later
   bool filteringEnabled = false;
   bool avmEnabled = false;
-
 
   if (options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "HPFRT")) {
     filteringEnabled = true;
@@ -648,7 +647,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   }
 
   if (avmEnabled) {
-    avm::setup(meshV);
+    avm::setup(this->meshV);
   }
 
   auto verifyBC = [&]() {
@@ -711,10 +710,10 @@ void lvlSet_t::computeAdvectionCoeff()
   normalVectorKernel(meshV->Nlocal, this->vFieldOffset, this->o_signls, this->o_W);
 }
 
-void lvlSet_t::makeAdvection(int is, double time, int tstep)
+void lvlSet_t::makeAdvection(double time, int tstep)
 {
   if (this->Nsubsteps) {
-    advectionSubcycling(std::min(tstep, static_cast<int>(this->o_coeffEXT.size())), time, is);
+    advectionSubcycling(std::min(tstep, static_cast<int>(this->o_coeffEXT.size())), time);
   } else {
     auto mesh = this->meshV;
 
@@ -754,15 +753,10 @@ void lvlSet_t::makeAdvection(int is, double time, int tstep)
   }
 }
 
-void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
+void lvlSet_t::advectionSubcycling(int nEXT, double time)
 {
   const auto mesh = this->_mesh;
   const auto meshV = this->meshV;
-
-  const dlong nFields = 1;
-  
-  auto o_Si = o_S.slice(this->fieldOffsetScan, mesh->Nlocal);
-  auto o_JwFi = o_JwF.slice(this->fieldOffsetScan, mesh->Nlocal);
 
   static occa::kernel kernel;
   if (!kernel.isInitialized()) {
@@ -773,7 +767,7 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
     }
   }
 
-  platform->linAlg->fill(o_JwFi.size(), 0, o_JwFi);
+  platform->linAlg->fill(this->o_JwF.size(), 0, this->o_JwF);
 
   advectionSubcyclingRK(mesh,
                         meshV,
@@ -782,7 +776,7 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
                         this->Nsubsteps,
                         this->o_coeffBDF,
                         nEXT,
-                        nFields,
+                        1,    //nFields
                         kernel,
                         meshV->oogs,
                         mesh->fieldOffset,
@@ -791,15 +785,15 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
                         this->_fieldOffset,
                         (this->geom) ? this->geom->o_div : o_NULL,
                         this->o_relWrst,
-                        o_Si,
-                        o_JwFi);
+                        this->o_S,
+                        this->o_JwF);
 
   if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
                                                                  1,
                                                                  0,
                                                                  mesh->ogs->o_invDegree,
-                                                                 o_JwFi,
+                                                                 this->o_JwF,
                                                                  platform->comm.mpiComm());
     if (platform->comm.mpiRank() == 0) {
       printf("%s advSub norm: %.15e\n", this->name.c_str(), debugNorm);
@@ -807,7 +801,7 @@ void lvlSet_t::advectionSubcycling(int nEXT, double time, int is)
   }
 }
 
-void lvlSet_t::makeExplicit(int is, double time, int tstep)
+void lvlSet_t::makeExplicit(double time, int tstep)
 {
   auto mesh = this->_mesh;
 
@@ -818,16 +812,16 @@ void lvlSet_t::makeExplicit(int is, double time, int tstep)
                                                           
   if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "HPFRT")) {
     launchKernel("core-filterRTHex3D",
-                 meshV->Nelements,
+                 this->meshV->Nelements,
                  0,
                  1,
-                 o_fieldOffsetScan,
-                 o_applyFilterRT,
-                 o_filterRT,
-                 o_filterS,
-                 o_rho,
-                 o_S,
-                 o_EXT);
+                 this->o_fieldOffsetScan,
+                 this->o_applyFilterRT,
+                 this->o_filterRT,
+                 this->o_filterS,
+                 this->o_rho,
+                 this->o_S,
+                 this->o_EXT);
   }
 
   if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "GJP")) {
@@ -838,17 +832,17 @@ void lvlSet_t::makeExplicit(int is, double time, int tstep)
   }
 
   const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
-  if (movingMesh && !Nsubsteps) {
+  if (movingMesh && !this->Nsubsteps) {
     launchKernel("scalar_t::advectMeshVelocityHex3D",
-                 meshV->Nelements,
+                 this->meshV->Nelements,
                  mesh->o_vgeo,
                  mesh->o_D,
                  0,
-                 (geom) ? geom->fieldOffset : 0,
-                 o_rho,
-                 (geom) ? geom->o_U : o_NULL,
-                 o_S,
-                 o_EXT);
+                 (this->geom) ? this->geom->fieldOffset : 0,
+                 this->o_rho,
+                 (this->geom) ? this->geom->o_U : o_NULL,
+                 this->o_S,
+                 this->o_EXT);
   }
 }
 
@@ -1042,8 +1036,7 @@ void lvlSet_t::mueSVV()
     dfloat scale = 0.1;
     platform->options.getArgs(upperCase(this->name) + " REGULARIZATION SVV SCALING COEFF", scale);
 
-    auto o_svvmu = this->o_svvmu.slice(0 * this->_fieldOffset, this->_fieldOffset);
-    platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
+    platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, this->o_svvmu);
   }
 }
 
@@ -1111,7 +1104,7 @@ void lvlSet_t::mueAVM()
 
   if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
     // restore inital viscosity
-    o_diff.copyFrom(o_diff0, mesh->Nlocal);
+    this->o_diff.copyFrom(o_diff0, mesh->Nlocal);
 
     dfloat kappa = 1.0;
     platform->options.getArgs(parPrefix + " REGULARIZATION AVM ACTIVATION WIDTH", kappa);
@@ -1133,8 +1126,8 @@ void lvlSet_t::mueAVM()
       const dfloat maxEps = platform->linAlg->max(mesh->Nlocal, o_eps, platform->comm.mpiComm());
       const dfloat minEps = platform->linAlg->min(mesh->Nlocal, o_eps, platform->comm.mpiComm());
 
-      const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, o_diff, platform->comm.mpiComm());
-      const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, o_diff, platform->comm.mpiComm());
+      const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, this->o_diff, platform->comm.mpiComm());
+      const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, this->o_diff, platform->comm.mpiComm());
 
       if (platform->comm.mpiRank() == 0) {
         printf("applying a min/max artificial viscosity of (%f,%f) to %s with min/max visc (%f,%f)\n",
@@ -1146,11 +1139,11 @@ void lvlSet_t::mueAVM()
       }
     }
 
-    platform->linAlg->axpby(mesh->Nlocal, 1.0, o_eps, 1.0, o_diff, 0, 0);
+    platform->linAlg->axpby(mesh->Nlocal, 1.0, o_eps, 1.0, this->o_diff, 0, 0);
 
     if (verbose) {
-      const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, o_diff, platform->comm.mpiComm());
-      const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, o_diff, platform->comm.mpiComm());
+      const dfloat maxDiff = platform->linAlg->max(mesh->Nlocal, this->o_diff, platform->comm.mpiComm());
+      const dfloat minDiff = platform->linAlg->min(mesh->Nlocal, this->o_diff, platform->comm.mpiComm());
 
       if (platform->comm.mpiRank() == 0) {
         printf("%s now has a min/max visc: (%f,%f)\n", this->name.c_str(), minDiff, maxDiff);
