@@ -828,7 +828,7 @@ void lvlSet_t::makeExplicit(double time, int tstep)
     dfloat tauFactor;
     platform->options.getArgs(parPrefix + " REGULARIZATION GJP SCALING COEFF", tauFactor);
 
-    addGJP(mesh, ellipticSolver[0]->o_EToB(), o_rho, vFieldOffset, o_W, o_S, o_EXT, tauFactor);
+    addGJP(mesh, this->ellipticSolver[0]->o_EToB(), this->o_rho, this->vFieldOffset, this->o_W, this->o_S, this->o_EXT, tauFactor);
   }
 
   const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
@@ -914,13 +914,10 @@ void lvlSet_t::solve(double time, int stage)
       o_lhs,
       o_rhs);
 
-  const auto o_diff_i = o_diff.slice(this->fieldOffsetScan, mesh->Nlocal);
-
-  const auto o_lambda0 = o_diff_i;
+  const auto o_lambda0 = this->o_diff;
   const auto o_lambda1 = [&]() {
-    const auto o_rho_i = o_rho.slice(this->fieldOffsetScan, mesh->Nlocal);
     auto o_l = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 0.0, o_l);
+    platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], this->o_rho, 0.0, o_l);
 
     if (this->userImplicitLinearTerm) {
       auto o_implicitLT = this->userImplicitLinearTerm(time, 0);
@@ -949,9 +946,21 @@ void lvlSet_t::solve(double time, int stage)
   o_Si.copyTo(this->o_S, o_Si.size(), this->fieldOffsetScan);
 }
 
-void lvlSet_t::saveSolutionState() {}
+void lvlSet_t::saveSolutionState() { //dormant. needed for neknek
+  if(!this->o_S0.isInitialized()) {
+    this->o_S0 = platform->device.malloc<dfloat>(this->o_S.length());
+    this->o_EXT0 = platform->device.malloc<dfloat>(this->o_EXT.length());
+    this->o_ADV0 = platform->device.malloc<dfloat>(this->o_ADV.length());
+    this->o_prop0 = platform->device.malloc<dfloat>(this->o_prop.length());
+  }
+}
 
-void lvlSet_t::restoreSolutionState() {}
+void lvlSet_t::restoreSolutionState() {
+  this->o_S0.copyTo(this->o_S, this->o_S.length());
+  this->o_EXT0.copyTo(this->o_EXT, this->o_EXT.length());
+  this->o_ADV0.copyTo(this->o_ADV, this->o_ADV.length());
+  this->o_prop0.copyTo(this->o_prop, this->o_prop.length());
+}
 
 void lvlSet_t::lagSolution()
 {
@@ -1072,17 +1081,15 @@ void lvlSet_t::setupEllipticSolver()
   auto mesh = this->_mesh;
   
   if (this->compute) {
-    auto o_rho_i = this->o_rho.slice(this->fieldOffsetScan, mesh->Nlocal);
-    auto o_lambda0 = this->o_diff.slice(this->fieldOffsetScan, mesh->Nlocal);
+    auto o_lambda0 = this->o_diff;
     auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], o_rho_i, 0.0, o_lambda1);
+    platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], this->o_rho, 0.0, o_lambda1);
 
-    ellipticSolver[0] = new elliptic(this->name, mesh, this->_fieldOffset, o_lambda0, o_lambda1);
+    this->ellipticSolver[0] = new elliptic(this->name, mesh, this->_fieldOffset, o_lambda0, o_lambda1);
 
     if (platform->options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "SVV")) {
-      auto o_svvmu = this->o_svvmu.slice(0 * this->_fieldOffset, this->_fieldOffset);
-      ellipticSolver[0]->mueSVV(o_svvmu);
-      ellipticSolver[0]->setupSVV();
+      this->ellipticSolver[0]->mueSVV(this->o_svvmu);
+      this->ellipticSolver[0]->setupSVV();
     }
   }
 }
@@ -1117,7 +1124,7 @@ void lvlSet_t::mueSVV()
       launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
 
     if(!umagInitialized) {
-      platform->linAlg->magVector(mesh->Nlocal, this->vFieldOffset, this->o_W, o_umag); // changed o_U to o_W --> TODO: think if this is the right thing to do
+      platform->linAlg->magVector(mesh->Nlocal, this->vFieldOffset, this->o_W, o_umag); 
       umagInitialized = true;
     }
 
