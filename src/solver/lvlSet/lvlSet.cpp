@@ -647,7 +647,15 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   }
 
   if (avmEnabled) {
-    avm::setup(this->meshV);
+    bool avmEnabledScalar = false;
+    for (int is = 0; is < nrs->scalar->NSfields; is++) {
+      const auto sid = scalarDigitStr(is);
+
+      if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
+        avmEnabledScalar = true;
+      }
+    }
+    if(!avmEnabledScalar) avm::setup(this->meshV);  //only initialize if not done in scalar
   }
 
   auto verifyBC = [&]() {
