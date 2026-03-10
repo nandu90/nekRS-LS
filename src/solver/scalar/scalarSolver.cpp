@@ -273,6 +273,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
   bool filteringEnabled = false;
   bool avmEnabled = false;
+  bool svvEnabled = false;
   for (int is = 0; is < NSfields; is++) {
     const auto sid = scalarDigitStr(is);
 
@@ -282,6 +283,10 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
     if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
       avmEnabled = true;
+    }
+
+    if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV")) {
+      svvEnabled = true;
     }
   }
 
@@ -322,6 +327,11 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
   if (avmEnabled) {
     avm::setup(meshV);
+  }
+
+  if (svvEnabled) {
+    this->o_svvf = platform->device.malloc<dfloat>(_fieldOffset);
+    this->o_svvmu = platform->device.malloc<dfloat>(NSfields * _fieldOffset);
   }
 
   if (anyCvodeSolver) {
@@ -570,12 +580,8 @@ void scalar_t::mueSVV()
 
     if(platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV")) {
       if(!initialized) {
-        this->o_svvf = platform->device.malloc<dfloat>(_fieldOffset);
-        this->o_svvmu = platform->device.malloc<dfloat>(NSfields * _fieldOffset);
-
         if(!platform->options.compareArgs("MOVING MESH","TRUE"))
           launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
-
         initialized = true;
       }
 

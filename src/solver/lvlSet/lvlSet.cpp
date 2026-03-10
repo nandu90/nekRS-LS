@@ -435,7 +435,6 @@ void lvlSet::setup()
     cfg.meshV = nrs->meshV;
     return std::make_unique<lvlSet_t>(cfg, nrs->geom);
   }();
-  tlsr->mueSVV(); // needs to be called before setupEllipticSolver() otherwise o_svvmue in elliptic solver will not be initialized --> TODO: handle AVM?
   tlsr->setupEllipticSolver();
 }
 
@@ -616,6 +615,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
   bool filteringEnabled = false;
   bool avmEnabled = false;
+  bool svvEnabled = false;
 
   if (options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "HPFRT")) {
     filteringEnabled = true;
@@ -623,6 +623,10 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
   if (options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
     avmEnabled = true;
+  }
+
+  if (options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "SVV")) {
+    svvEnabled = true;
   }
 
   if (filteringEnabled) {
@@ -656,6 +660,11 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
       }
     }
     if(!avmEnabledScalar) avm::setup(this->meshV);  //only initialize if not done in scalar
+  }
+
+  if(svvEnabled) {
+    this->o_svvf = platform->device.malloc<dfloat>(this->_fieldOffset);
+    this->o_svvmu = platform->device.malloc<dfloat>(this->_fieldOffset);
   }
 
   auto verifyBC = [&]() {
@@ -1119,12 +1128,8 @@ void lvlSet_t::mueSVV()
 
   if(platform->options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "SVV")) {
     if(!initialized) {
-      this->o_svvf = platform->device.malloc<dfloat>(this->_fieldOffset);
-      this->o_svvmu = platform->device.malloc<dfloat>(this->_fieldOffset);
-
       if(!platform->options.compareArgs("MOVING MESH","TRUE"))
         launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
-
       initialized = true;
     }
 
