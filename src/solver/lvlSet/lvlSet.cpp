@@ -469,7 +469,7 @@ void lvlSet::solveLSR()
     tlsr->mueSVV();
     tlsr->mueAVM();
     tlsr->lagSolution();
-    // tlsr->applyDirichlet(time);
+    tlsr->applyDirichlet(time);
     tlsr->solve(time, 1);
     tlsr->writeFile(time);
     outerIter += 1;
@@ -977,7 +977,95 @@ void lvlSet_t::extrapolateSolution()
                this->o_Se);
 }
 
-void lvlSet_t::applyDirichlet(double time) {}
+void lvlSet_t::applyDirichlet(double time) 
+{
+  if (this->compute) {
+    auto mesh = this->_mesh;
+
+    // lower than any other possible Dirichlet value
+    static constexpr dfloat TINY = -1e30;
+    occa::memory o_SiDirichlet = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    platform->linAlg->fill(o_SiDirichlet.size(), TINY, o_SiDirichlet);
+
+    auto &neknek = platform->app->neknek;
+
+    //TODO: check for neknek later
+    auto o_intValU = [&]() {
+      if (neknek) {
+        if (neknek->hasField("fluid velocity")) {
+          return neknek->getField("fluid velocity").o_intVal;
+        }
+      }
+      return o_NULL;
+    }();
+
+    auto o_intVal = [&]() {
+      if (neknek) {
+        if (neknek->hasField("tlsr")) {
+          return neknek->getField("tlsr").o_intVal;
+        }
+      }
+      return o_NULL;
+    }();
+
+    for (int sweep = 0; sweep < 2; sweep++) {
+      launchKernel("scalar_t::dirichletBC",
+                   this->o_name,
+                   mesh->Nelements,
+                   this->_fieldOffset,
+                   0,
+                   time,
+                   mesh->o_sgeo,
+                   mesh->o_x,
+                   mesh->o_y,
+                   mesh->o_z,
+                   mesh->o_vmapM,
+                   mesh->o_EToB,
+                   this->o_EToB,
+                   this->o_W,
+                   this->o_diff,
+                   this->o_rho,
+                   neknek ? neknek->intValOffset() : 0,
+                   neknek ? neknek->o_pointMap() : o_NULL,
+                   static_cast<int>(o_intValU.isInitialized()),
+                   o_intValU,
+                   o_intVal,
+                   0,
+                   platform->app->bc->o_usrwrk,
+                   o_SiDirichlet);
+
+      oogs::startFinish(o_SiDirichlet,
+                        1,
+                        this->_fieldOffset,
+                        ogsDfloat,
+                        (sweep == 0) ? ogsMax : ogsMin,
+                        mesh->oogs);
+    }
+
+    if (this->o_Se.isInitialized()) {
+      if (this->ellipticSolver[0]->Nmasked()) {
+        launchKernel("core-maskCopy2",
+                     ellipticSolver[0]->Nmasked(),
+                     0,
+                     0,
+                     ellipticSolver[0]->o_maskIds(),
+                     o_SiDirichlet,
+                     this->o_S,
+                     this->o_Se);
+      }
+    } else {
+      if (this->ellipticSolver[0]->Nmasked()) {
+        launchKernel("core-maskCopy",
+                     this->ellipticSolver[0]->Nmasked(),
+                     0,
+                     0,
+                     this->ellipticSolver[0]->o_maskIds(),
+                     o_SiDirichlet,
+                     this->o_S);
+      }
+    }
+  }
+}
 
 void lvlSet_t::setupEllipticSolver()
 {
