@@ -455,12 +455,23 @@ void lvlSet::setup()
     int nIDs = nekData.NboundaryID; //cannot be Tmesh
     std::vector<int> map(nIDs);
 
-    auto sIndex = nrs->scalar->nameToIndex.find("tls")->second;
-    for (int id = 0; id < map.size(); id++) {
-      map[id] = nek::bcmap(id + 1, sIndex + 2, 0);
-      map[id] = bdryBase::bcType_zeroNeumann;      //all zero flux BCs
+    {
+      auto sIndex = nrs->scalar->nameToIndex.find("tls")->second;
+      for (int id = 0; id < map.size(); id++) {
+        map[id] = nek::bcmap(id + 1, sIndex + 2, 0);
+        map[id] = bdryBase::bcType_zeroNeumann;      //all zero flux BCs
+      }
+      platform->app->bc->setBcMap("tlsr", false, map);
     }
-    platform->app->bc->setBcMap("tlsr", false, map);
+    {
+      auto sIndex = nrs->scalar->nameToIndex.find("cls")->second;
+      for (int id = 0; id < map.size(); id++) {
+        map[id] = nek::bcmap(id + 1, sIndex + 2, 0);
+        if(map[id] != bdryBase::bcType_udfDirichlet) 
+          map[id] = bdryBase::bcType_zeroNeumann;      //zero flux BC on all non-Dirichlet faces
+      }
+      platform->app->bc->setBcMap("clsr", false, map);
+    }
   }
 
   // currently just holds TLSR solver --> TODO: add in CLSR solver (separate object or hold both in one LS object?)
