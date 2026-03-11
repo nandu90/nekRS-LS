@@ -12,7 +12,7 @@ namespace lvlSet
 {
 void buildKernel(occa::properties kernelInfo);
 void setup();
-void solveLSR();
+void solveLSR(double fluidTime);
 lvlSet_t* getLS();
 }
 
@@ -123,7 +123,7 @@ public:
 
   const std::unique_ptr<geomSolver_t> &geom;
 
-  void writeFile(double time);
+  void writeFile(double fluidTime, int tstep);
   std::unique_ptr<iofld> fieldWriter;
   int outfldCounter = 0;
 

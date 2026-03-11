@@ -25,6 +25,9 @@ occa::kernel normalVectorKernel;
 bool buildKernelCalled = false;
 std::unique_ptr<lvlSet_t> tlsr = nullptr;
 
+double elapsedTime;
+int stepsMax;
+
 // common keys
 static std::vector<std::string> commonKeys = {
     {"solver"},
@@ -241,7 +244,7 @@ void parseLvlSetSections()
     auto parPrefix = upperCase(parScope) + " ";
 
     {
-      std::string val = "false";
+      std::string val = "true";
       if (ini->extract(parScope, "checkpointing", val)) {
         if(val == "true") {
           val = "true";
@@ -438,14 +441,13 @@ void lvlSet::setup()
   tlsr->setupEllipticSolver();
 }
 
-void lvlSet::solveLSR()
+void lvlSet::solveLSR(const double fluidTime)
 {
   auto mesh = tlsr->meshV;
 
   double time = 0.0;
-  int outerIter = 1;
-  int outerIterMax = 1000;
-  platform->options.getArgs("NUMBER TIMESTEPS",outerIterMax);
+  int tstep = 1;
+  stepsMax = 1000;
   int innerIterMax = 100;
 
   // set constant dt --> TODO: need to change this if we want variable dt
@@ -454,25 +456,34 @@ void lvlSet::solveLSR()
 
   tlsr->o_S.copyFrom(nrs->scalar->o_S);
 
-  while(outerIter <= outerIterMax) {
-    std::cout << "ITER: " << outerIter << std::endl;
+  elapsedTime = 0.0;
+
+  while(tstep <= stepsMax) {
+    MPI_Barrier(platform->comm.mpiComm());
+    const double timeStartStep = MPI_Wtime();
+
     time += tlsr->dt[0];
-    tlsr->setTimeIntegrationCoeffs(outerIter);
+    tlsr->setTimeIntegrationCoeffs(tstep);
     tlsr->extrapolateSolution();
     platform->linAlg->fill(tlsr->fieldOffset(), 0.0, tlsr->o_EXT);
     tlsr->computeAdvectionCoeff();
     tlsr->computeWrst();
-    tlsr->makeAdvection(time, outerIter); // currently assume 1 LS equation -->  is = 1
-    tlsr->makeExplicit(time, outerIter);
+    tlsr->makeAdvection(time, tstep);
+    tlsr->makeExplicit(time, tstep);
     tlsr->makeForcing();
     tlsr->mueSVV();
     tlsr->mueAVM();
     tlsr->lagSolution();
     tlsr->applyDirichlet(time);
     tlsr->solve(time, 1);
-    tlsr->printStepInfo(time, outerIter, true, true);
-    tlsr->writeFile(time);
-    outerIter += 1;
+
+    MPI_Barrier(platform->comm.mpiComm());
+    const double elapsedStep = MPI_Wtime() - timeStartStep;
+    elapsedTime += elapsedStep;
+
+    tlsr->printStepInfo(time, tstep, true, true);
+    tlsr->writeFile(fluidTime, tstep);
+    tstep += 1;
   }
 
   // copy the TLSR solution back to the scalar S00
@@ -1261,33 +1272,39 @@ void lvlSet_t::mueAVM()
   }
 }
 
-void lvlSet_t::writeFile(double time)
+void lvlSet_t::writeFile(double time, int tstep)
 {
-  if(!fieldWriter) {
-    fieldWriter = iofldFactory::create();
+  if(platform->options.compareArgs(upperCase(this->name) + " CHECKPOINTING", "TRUE")) {
+    if(!this->fieldWriter) {
+      this->fieldWriter = iofldFactory::create();
 
-    fieldWriter->open(this->meshV, iofld::mode::write, this->name);
+      this->fieldWriter->open(this->meshV, iofld::mode::write, this->name);
 
-    if (platform->options.compareArgs("CHECKPOINT PRECISION", "FP32")) {
-      fieldWriter->writeAttribute("precision", "32");
-    } else {
-      fieldWriter->writeAttribute("precision", "64");
+      if (platform->options.compareArgs("CHECKPOINT PRECISION", "FP32")) {
+        this->fieldWriter->writeAttribute("precision", "32");
+      } else {
+        this->fieldWriter->writeAttribute("precision", "64");
+      }
+
+      auto o_Si = this->o_S.slice(this->fieldOffsetScan, this->meshV->Nlocal);
+      this->fieldWriter->addVariable("scalar00", o_Si);
+
+      int N;
+      platform->options.getArgs("POLYNOMIAL DEGREE", N);
+      this->fieldWriter->writeAttribute("polynomialOrder", std::to_string(N));
     }
 
-    auto o_Si = this->o_S.slice(fieldOffsetScan, this->meshV->Nlocal);
-    fieldWriter->addVariable("scalar00", o_Si);
+    if(tstep == stepsMax) {
+      this->fieldWriter->writeAttribute("outputmesh", (!outfldCounter) ? "true" : "false");
+      this->fieldWriter->addVariable("time", const_cast<double &>(time));
+      this->fieldWriter->process();
+      this->outfldCounter++;
+    }
   }
-
-  fieldWriter->writeAttribute("outputmesh", (!outfldCounter) ? "true" : "false");
-  fieldWriter->addVariable("time", const_cast<double &>(time));
-  fieldWriter->process();
-  outfldCounter++;
 }
 
 void lvlSet_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solverInfo)
 {
-  /* const double elapsedStep = platform->timer.query("elapsedStep", "DEVICE:MAX"); */
-  /* const double elapsedStepSum = platform->timer.query("elapsedStepSum", "DEVICE:MAX"); */
   const auto cfl = nrs->computeCFL(this->meshV, this->o_W, this->dt[0]);
 
   auto printSolverInfo = [tstep](elliptic *solver, const std::string &name) {
@@ -1322,14 +1339,12 @@ void lvlSet_t::printStepInfo(double time, int tstep, bool printStepInfo, bool so
       }
     }
 
-    /* const auto printTimers = printStepInfo; */
-
     if (printStepInfo) {
-      printf("Pseudo-step=%-8d t= %.8e  dt=%.1e  CFL= %.3f\n", tstep, time, this->dt[0], cfl);
+      printf("Pseudo-step=%-8d tau= %.8e  dtau=%.1e  CFL= %.3f\n", tstep, time, this->dt[0], cfl);
     }
 
-    /* if (printTimers) { */
-    /*   printf("step=%-8d elapsedStep= %.2es  elapsedStepSum= %.5es\n", tstep, elapsedStep, elapsedStepSum); */
-    /* } */
+    if (tstep == stepsMax) {
+      printf("Pseudo-step=%-8d elapsedTime= %.2es  elapsedTimePerStep= %.5es\n", tstep, elapsedTime, elapsedTime/tstep);
+    }
   }
 }
