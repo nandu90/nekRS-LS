@@ -244,7 +244,7 @@ void parseLvlSetSections()
     auto parPrefix = upperCase(parScope) + " ";
 
     {
-      std::string val = "true";
+      std::string val = "false";
       if (ini->extract(parScope, "checkpointing", val)) {
         if(val == "true") {
           val = "true";
