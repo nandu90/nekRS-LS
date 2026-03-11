@@ -126,18 +126,19 @@ void validateLvlSetSections()
 {
   auto sections = platform->par->ini->sections;
 
-  bool tlsExists = false;
-  for (auto const &sec : sections) {
-    if(sec.first.find("scalar tls") != std::string::npos) {
-      tlsExists = true;
+  auto sectionExists = [&](const std::string& name) -> void {
+    for (const auto &sec : sections) {
+      if(sec.first.find(name) != std::string::npos) {
+        return;
+      }
     }
-  }
-
-  if(!tlsExists) {
     std::ostringstream error;
-    error << "mandatory section for Level-Set [SCALAR TLS] not found!\n";
+    error << "mandatory section for Level-Set ["<< upperCase(name) <<"] not found!\n";
     append_error(error.str());
-  }
+  };
+
+  sectionExists("scalar tls");
+  sectionExists("scalar cls");
 
   for (auto const &sec : sections) {
     if (std::find(validSections.begin(), validSections.end(), sec.first) != validSections.end()) {
@@ -358,8 +359,29 @@ void parseLvlSetSections()
     }
   }
 
+  if(!ini->extract("clsr", "boundarytypemap", s_bcMap)){
+    ini->extract("scalar cls", "boundarytypemap", s_bcMap);
+    if(s_bcMap.size() > 0) {
+      const auto list = serializeString(s_bcMap, ',');
+
+      std::string s_newMap = "";
+      for (int i = 0; i < list.size(); i++) {
+        if (i > 0) 
+          s_newMap = s_newMap + ", ";
+        if(list[i] == "inlet" || list[i] == "v" || list[i] == "udfDirichlet") {
+          s_newMap = s_newMap + list[i];
+        } 
+        else {
+          s_newMap = s_newMap + "zeroNeumann";
+        }
+      }
+
+      options.setArgs("CLSR BOUNDARY TYPE MAP", s_newMap);
+    }
+  }
+
   //TODO: remove this
-  options.setArgs("CLSR SOLVER","NONE");
+  options.setArgs("TLSR SOLVER","NONE");
 
   cleanupStaleKeys(rank, options, ini);
 }
