@@ -25,8 +25,12 @@ occa::kernel normalVectorKernel;
 bool buildKernelCalled = false;
 std::unique_ptr<lvlSet_t> tlsr = nullptr;
 
-double elapsedTime;
-int stepsMax;
+static double elapsedTime;
+static int stepsMax;
+
+static double tlsrTimer = 0.0;
+static double clsrTimer = 0.0;
+static double fluidStartTime = -1.0;
 
 // common keys
 static std::vector<std::string> commonKeys = {
@@ -50,8 +54,7 @@ static std::vector<std::string> commonKeys = {
 };
 
 static std::vector<std::string> lvlSetKeys = {
-  {"freqTLSR"},
-  {"freqCLSR"},
+  {"solveFrequency"},
 };
 
 static std::vector<std::string> scalarKeys = {
@@ -296,6 +299,19 @@ void parseLvlSetSections()
       options.setArgs("CLSR DIFFUSIONCOEFF", to_string_f(1.0));
     }
 
+    if(firstWord == "default") {
+      double dt = 0.0;
+      options.getArgs("DT", dt);
+      options.setArgs("TLSR FREQUENCY", to_string_f(dt * 100.0));
+      options.setArgs("CLSR FREQUENCY", to_string_f(dt * 10.0));
+    }
+
+    {
+      double freq;
+      if(ini->extract(parScope, "solveFrequency", freq))
+        options.setArgs(parPrefix + "FREQUENCY", to_string_f(freq));
+    }
+
     std::string s_bcMap;
     if (ini->extract(parScope, "boundarytypemap", s_bcMap)) {
       options.setArgs(parPrefix + "BOUNDARY TYPE MAP", s_bcMap);
@@ -441,9 +457,9 @@ void lvlSet::setup()
   tlsr->setupEllipticSolver();
 }
 
-void lvlSet::solveLSR(const double fluidTime)
+void lvlSet_t::pseudoStepper(const double &fluidTime)
 {
-  auto mesh = tlsr->meshV;
+  auto mesh = this->meshV;
 
   double time = 0.0;
   int tstep = 1;
@@ -451,10 +467,8 @@ void lvlSet::solveLSR(const double fluidTime)
   int innerIterMax = 100;
 
   // set constant dt --> TODO: need to change this if we want variable dt
-  tlsr->dt[1] = tlsr->dt[0];
-  tlsr->dt[2] = tlsr->dt[0];
-
-  tlsr->o_S.copyFrom(nrs->scalar->o_S);
+  this->dt[1] = this->dt[0];
+  this->dt[2] = this->dt[0];
 
   elapsedTime = 0.0;
 
@@ -462,32 +476,50 @@ void lvlSet::solveLSR(const double fluidTime)
     MPI_Barrier(platform->comm.mpiComm());
     const double timeStartStep = MPI_Wtime();
 
-    time += tlsr->dt[0];
-    tlsr->setTimeIntegrationCoeffs(tstep);
-    tlsr->extrapolateSolution();
-    platform->linAlg->fill(tlsr->fieldOffset(), 0.0, tlsr->o_EXT);
-    tlsr->computeAdvectionCoeff();
-    tlsr->computeWrst();
-    tlsr->makeAdvection(time, tstep);
-    tlsr->makeExplicit(time, tstep);
-    tlsr->makeForcing();
-    tlsr->mueSVV();
-    tlsr->mueAVM();
-    tlsr->lagSolution();
-    tlsr->applyDirichlet(time);
-    tlsr->solve(time, 1);
+    time += this->dt[0];
+    this->setTimeIntegrationCoeffs(tstep);
+    this->extrapolateSolution();
+    platform->linAlg->fill(this->fieldOffset(), 0.0, this->o_EXT);
+    this->computeAdvectionCoeff();
+    this->computeWrst();
+    this->makeAdvection(time, tstep);
+    this->makeExplicit(time, tstep);
+    this->makeForcing();
+    this->mueSVV();
+    this->mueAVM();
+    this->lagSolution();
+    this->applyDirichlet(time);
+    this->solve(time, 1);
 
     MPI_Barrier(platform->comm.mpiComm());
     const double elapsedStep = MPI_Wtime() - timeStartStep;
     elapsedTime += elapsedStep;
 
-    tlsr->printStepInfo(time, tstep, true, true);
-    tlsr->writeFile(fluidTime, tstep);
+    this->printStepInfo(time, tstep, true, true);
+    this->writeFile(fluidTime, tstep);
     tstep += 1;
   }
 
   // copy the TLSR solution back to the scalar S00
   //nrs->scalar->o_S.copyFrom(tlsr->o_S);
+}
+
+void lvlSet::solve(const double &fluidTime)
+{
+  if(fluidStartTime < 0.0) fluidStartTime = fluidTime;
+
+  double tlsrFreq;
+  platform->options.getArgs("TLSR FREQUENCY", tlsrFreq);
+
+  const double totalTime = fluidTime - fluidStartTime + 1e-12;
+
+  if(totalTime > tlsrTimer  && tlsrFreq > 1e-12) {
+    tlsrTimer += tlsrFreq;
+
+    tlsr->o_S.copyFrom(nrs->scalar->o_solution("tls"), tlsr->fieldOffset());
+
+    tlsr->pseudoStepper(fluidTime);
+  }
 }
 
 

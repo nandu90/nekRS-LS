@@ -12,7 +12,7 @@ namespace lvlSet
 {
 void buildKernel(occa::properties kernelInfo);
 void setup();
-void solveLSR(double fluidTime);
+void solve(const double &fluidTime);
 lvlSet_t* getLS();
 }
 
@@ -57,6 +57,8 @@ public:
   void printStepInfo(double time, int tstep, bool printStepInfo, bool solverInfo);
 
   std::function<occa::memory(double, int)> userImplicitLinearTerm = nullptr;
+
+  void pseudoStepper(const double &fluidTime);
 
   dlong fieldOffset() const
   {
