@@ -470,6 +470,7 @@ void lvlSet::solveLSR()
     tlsr->lagSolution();
     tlsr->applyDirichlet(time);
     tlsr->solve(time, 1);
+    tlsr->printStepInfo(time, outerIter, true, true);
     tlsr->writeFile(time);
     outerIter += 1;
   }
@@ -1281,4 +1282,54 @@ void lvlSet_t::writeFile(double time)
   fieldWriter->addVariable("time", const_cast<double &>(time));
   fieldWriter->process();
   outfldCounter++;
+}
+
+void lvlSet_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solverInfo)
+{
+  /* const double elapsedStep = platform->timer.query("elapsedStep", "DEVICE:MAX"); */
+  /* const double elapsedStepSum = platform->timer.query("elapsedStepSum", "DEVICE:MAX"); */
+  const auto cfl = nrs->computeCFL(this->meshV, this->o_W, this->dt[0]);
+
+  auto printSolverInfo = [tstep](elliptic *solver, const std::string &name) {
+    if (!solver) {
+      return;
+    }
+    const auto [prevProjVecs, nProjVecs] = solver->projectionCounters();
+    if (nProjVecs > 0) {
+      if (prevProjVecs > 0) {
+        printf("Pseudo-step=%-8d %-20s: resNorm0 %.2e  resNorm %.2e  ratio = %.3e  %d/%d\n",
+               tstep,
+               std::string("proj " + name).c_str(),
+               solver->initialResidual(),
+               solver->initialGuessResidual(),
+               solver->initialResidual() / solver->initialGuessResidual(),
+               prevProjVecs,
+               nProjVecs);
+      }
+    }
+    printf("Pseudo-step=%-8d %-20s: iter %03d  resNorm0 %.2e  resNorm %.2e\n",
+           tstep,
+           name.c_str(),
+           solver->Niter(),
+           solver->initialGuessResidual(),
+           solver->finalResidual());
+  };
+
+  if (platform->comm.mpiRank() == 0) {
+    if (solverInfo) {
+      if (this->compute) {
+        printSolverInfo(this->ellipticSolver.at(0), upperCase(this->name));
+      }
+    }
+
+    /* const auto printTimers = printStepInfo; */
+
+    if (printStepInfo) {
+      printf("Pseudo-step=%-8d t= %.8e  dt=%.1e  CFL= %.3f\n", tstep, time, this->dt[0], cfl);
+    }
+
+    /* if (printTimers) { */
+    /*   printf("step=%-8d elapsedStep= %.2es  elapsedStepSum= %.5es\n", tstep, elapsedStep, elapsedStepSum); */
+    /* } */
+  }
 }

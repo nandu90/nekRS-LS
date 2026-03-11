@@ -93,6 +93,8 @@ public:
     return std::find(fieldsToSolve().begin(), fieldsToSolve().end(), value) != fieldsToSolve().end();
   };
 
+  dfloat computeCFL(mesh_t *mesh, const occa::memory &o_U, dfloat dt);
+
   void saveSolutionState();
   void restoreSolutionState();
 
@@ -241,7 +243,6 @@ private:
 
   dfloat computeCFL();
   dfloat computeCFL(dfloat dt);
-  dfloat computeCFL(mesh_t *mesh, const occa::memory &o_U, dfloat dt);
 
   void setupNeknek();
 
