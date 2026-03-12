@@ -31,7 +31,7 @@ public:
 
   lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &geom);
 
-  void computeAdvectionCoeff();
+  void computeAdvectionCoeff(int tstep);
   void makeExplicit(double time, int tstep);
   void makeAdvection(double time, int tstep);
   void makeForcing();

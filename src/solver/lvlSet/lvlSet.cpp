@@ -24,6 +24,7 @@ occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
 bool buildKernelCalled = false;
 std::unique_ptr<lvlSet_t> tlsr = nullptr;
+std::unique_ptr<lvlSet_t> clsr = nullptr;
 
 static double elapsedTime;
 static int stepsMax;
@@ -380,9 +381,6 @@ void parseLvlSetSections()
     }
   }
 
-  //TODO: remove this
-  options.setArgs("TLSR SOLVER","NONE");
-
   cleanupStaleKeys(rank, options, ini);
 }
 
@@ -450,7 +448,7 @@ void lvlSet::setup()
 
   bdrySetupFromPar();
 
-  //bc from nek. TODO - need to check this. Also add CLSR
+  //bc from nek. TODO - need to check this
   if(platform->app->bc->useNek()) {
     int nIDs = nekData.NboundaryID; //cannot be Tmesh
     std::vector<int> map(nIDs);
@@ -474,10 +472,9 @@ void lvlSet::setup()
     }
   }
 
-  // currently just holds TLSR solver --> TODO: add in CLSR solver (separate object or hold both in one LS object?)
-  tlsr = [&]() {
+  auto ls = [&](const std::string& name) {
     lvlSetConfig_t cfg;
-    cfg.name = "tlsr";
+    cfg.name = name;
     cfg.g0 = &nrs->g0;
     cfg.dt = nrs->dt;
     cfg.fieldOffset = nrs->meshV->fieldOffset;
@@ -486,8 +483,13 @@ void lvlSet::setup()
     cfg.mesh = nrs->meshV;
     cfg.meshV = nrs->meshV;
     return std::make_unique<lvlSet_t>(cfg, nrs->geom);
-  }();
+  };
+
+  tlsr = ls("tlsr");
+  clsr = ls("clsr");
+
   tlsr->setupEllipticSolver();
+  clsr->setupEllipticSolver();
 }
 
 void lvlSet_t::pseudoStepper(const double &fluidTime)
@@ -513,7 +515,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     this->setTimeIntegrationCoeffs(tstep);
     this->extrapolateSolution();
     platform->linAlg->fill(this->fieldOffset(), 0.0, this->o_EXT);
-    this->computeAdvectionCoeff();
+    this->computeAdvectionCoeff(tstep);
     this->computeWrst();
     this->makeAdvection(time, tstep);
     this->makeExplicit(time, tstep);
@@ -541,18 +543,24 @@ void lvlSet::solve(const double &fluidTime)
 {
   if(fluidStartTime < 0.0) fluidStartTime = fluidTime;
 
-  double tlsrFreq;
-  platform->options.getArgs("TLSR FREQUENCY", tlsrFreq);
-
   const double totalTime = fluidTime - fluidStartTime + 1e-12;
 
-  if(totalTime > tlsrTimer  && tlsrFreq > 1e-12) {
-    tlsrTimer += tlsrFreq;
+  auto runPseudoStepper = [&] (auto &ls, double &timer, const std::string& scalarName) {
+    if(platform->options.compareArgs(upperCase(ls->name) + " SOLVER", "NONE"))
+        return;
 
-    tlsr->o_S.copyFrom(nrs->scalar->o_solution("tls"), tlsr->fieldOffset());
+    double freq;
+    platform->options.getArgs(upperCase(ls->name) + " FREQUENCY", freq);
 
-    tlsr->pseudoStepper(fluidTime);
-  }
+    if(totalTime > timer && freq > 1e-12) {
+      timer += freq;
+      ls->o_S.copyFrom(nrs->scalar->o_solution(scalarName), ls->fieldOffset());
+      ls->pseudoStepper(fluidTime);
+    }
+  };
+
+  runPseudoStepper(tlsr, tlsrTimer, "tls");
+  runPseudoStepper(clsr, clsrTimer, "cls");
 }
 
 
@@ -784,65 +792,80 @@ void lvlSet_t::setTimeIntegrationCoeffs(int tstep)
   }
 }
 
-void lvlSet_t::computeAdvectionCoeff()
+void lvlSet_t::computeAdvectionCoeff(int tstep)
 {
-  auto meshV = this->meshV;
-  // a. compute interface normals
-  launchKernel("core-gradientVolumeHex3D",
-               meshV->Nelements,
-               meshV->o_vgeo,
-               meshV->o_D,
-               this->vFieldOffset,
-               this->o_S,
-               this->o_W);
+  if(this->name == "tlsr" || (this->name == "clsr" && tstep == 1)) { //for clsr normals need to be computed only at first time step
+    auto meshV = this->meshV;
+    // a. compute interface normals
 
-  oogs::startFinish(this->o_W, meshV->dim, this->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
-  platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, meshV->o_invLMM, this->o_W);
+    auto o_Si = this->o_S;
 
-  signlsKernel(meshV->Nlocal, this->o_S, this->o_signls);
+    if(this->name == "clsr")
+      o_Si = nrs->scalar->o_solution("tls");
 
-  normalVectorKernel(meshV->Nlocal, this->vFieldOffset, this->o_signls, this->o_W);
+    launchKernel("core-gradientVolumeHex3D",
+        meshV->Nelements,
+        meshV->o_vgeo,
+        meshV->o_D,
+        this->vFieldOffset,
+        o_Si,
+        this->o_W);
+
+    oogs::startFinish(this->o_W, meshV->dim, this->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
+    platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, meshV->o_invLMM, this->o_W);
+
+    signlsKernel(meshV->Nlocal, o_Si, this->o_signls);
+
+    normalVectorKernel(meshV->Nlocal, this->vFieldOffset, this->o_signls, this->o_W);
+  }
 }
 
 void lvlSet_t::makeAdvection(double time, int tstep)
 {
-  if (this->Nsubsteps) {
-    advectionSubcycling(std::min(tstep, static_cast<int>(this->o_coeffEXT.size())), time);
-  } else {
-    auto mesh = this->meshV;
+  auto mesh = this->meshV;
 
-    if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
-      launchKernel("core-strongAdvectionCubatureVolumeScalarHex3D",
-                   mesh->Nelements,
-                   1, /* nScalars */
-                   0, /* weighted */
-                   0, /* sharedRho */
-                   mesh->o_vgeo,
-                   mesh->o_cubDiffInterpT,
-                   mesh->o_cubInterpT,
-                   mesh->o_cubProjectT,
-                   this->o_compute,
-                   this->o_fieldOffsetScan,
-                   this->vFieldOffset,
-                   this->vCubatureOffset,
-                   this->o_S,
-                   this->o_relWrst,   // --> TODO change to w
-                   this->o_rho, // --> set to 1
-                   this->o_ADV);
-    } else {
-      launchKernel("core-strongAdvectionVolumeScalarHex3D",
-                   mesh->Nelements,
-                   1, /* nScalars */
-                   0, /* weighted */
-                   mesh->o_vgeo,
-                   mesh->o_D,
-                   this->o_compute,
-                   this->o_fieldOffsetScan,
-                   this->vFieldOffset,
-                   this->o_S,
-                   this->o_relWrst, // --> TODO change to w
-                   this->o_rho, // --> set to 1
-                   this->o_ADV);
+  if(this->name == "clsr" && tstep == 1){
+    platform->linAlg->fill(mesh->Nlocal, 0.0, this->o_ADV);
+    platform->linAlg->fill(mesh->Nlocal, 0.0, this->o_JwF);
+  }
+  else {
+    if (this->Nsubsteps) {
+      advectionSubcycling(std::min(tstep, static_cast<int>(this->o_coeffEXT.size())), time);
+    }
+    else {
+      if (platform->options.compareArgs("ADVECTION TYPE", "CUBATURE")) {
+        launchKernel("core-strongAdvectionCubatureVolumeScalarHex3D",
+            mesh->Nelements,
+            1, /* nScalars */
+            0, /* weighted */
+            0, /* sharedRho */
+            mesh->o_vgeo,
+            mesh->o_cubDiffInterpT,
+            mesh->o_cubInterpT,
+            mesh->o_cubProjectT,
+            this->o_compute,
+            this->o_fieldOffsetScan,
+            this->vFieldOffset,
+            this->vCubatureOffset,
+            this->o_S,
+            this->o_relWrst,   // --> TODO change to w
+            this->o_rho, // --> set to 1
+            this->o_ADV);
+      } else {
+        launchKernel("core-strongAdvectionVolumeScalarHex3D",
+            mesh->Nelements,
+            1, /* nScalars */
+            0, /* weighted */
+            mesh->o_vgeo,
+            mesh->o_D,
+            this->o_compute,
+            this->o_fieldOffsetScan,
+            this->vFieldOffset,
+            this->o_S,
+            this->o_relWrst, // --> TODO change to w
+            this->o_rho, // --> set to 1
+            this->o_ADV);
+      }
     }
   }
 }
@@ -1228,6 +1251,9 @@ void lvlSet_t::mueSVV()
 void lvlSet_t::computeWrst()
 {
   auto mesh = this->meshV;
+
+  if(this->name == "clsr")
+    return;
 
   if (this->Nsubsteps) {
     for (int s = std::max(this->o_coeffBDF.size(), this->o_coeffEXT.size()); s > 1; s--) {
