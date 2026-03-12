@@ -321,7 +321,7 @@ void parseLvlSetSections()
   };
 
   // apply default lvlSet section arguments
-  auto defaultSection = std::make_pair(std::string("default"), sections.at("scalar"));
+  auto defaultSection = std::make_pair(std::string("default"), std::string("default"));
   parseLvlSetSection(defaultSection);
 
   // initialize with default settings
