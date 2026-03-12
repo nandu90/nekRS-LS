@@ -14,6 +14,14 @@ void buildKernel(occa::properties kernelInfo);
 void setup();
 void solve(const double &fluidTime);
 lvlSet_t* getLS();
+
+void clsrAx(elliptic_t* elliptic,
+            dlong NelementsList,
+            const occa::memory &o_elementsList,
+            const occa::memory &o_x,
+            occa::memory &o_Ax);
+
+void clsrPreconditioner(const occa::memory &o_r, occa::memory &o_z);
 }
 
 struct lvlSetConfig_t : public solverCfg_t {

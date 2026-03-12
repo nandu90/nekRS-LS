@@ -1208,6 +1208,22 @@ void lvlSet_t::setupEllipticSolver()
       this->ellipticSolver[0]->mueSVV(this->o_svvmu);
       this->ellipticSolver[0]->setupSVV();
     }
+
+    if(this->name == "clsr") {
+      this->ellipticSolver[0]->userAx ([] (elliptic_t *elliptic,
+                                            dlong NelementsList,
+                                            const occa::memory &o_elementsList,
+                                            const occa::memory &o_x,
+                                            occa::memory &o_Ax)
+          {
+          lvlSet::clsrAx(elliptic, NelementsList, o_elementsList, o_x, o_Ax);
+          });
+
+      this->ellipticSolver[0]->userPreconditioner ([] (const occa::memory &o_r, occa::memory &o_z)
+          {
+          lvlSet::clsrPreconditioner(o_r, o_z);
+          });
+    }
   }
 }
 
@@ -1438,4 +1454,19 @@ void lvlSet_t::printStepInfo(double time, int tstep, bool printStepInfo, bool so
       printf("Pseudo-step=%-8d elapsedTime= %.2es  elapsedTimePerStep= %.5es\n", tstep, elapsedTime, elapsedTime/tstep);
     }
   }
+}
+
+void lvlSet::clsrAx(elliptic_t* elliptic,
+                   dlong NelementsList,
+                   const occa::memory &o_elementsList,
+                   const occa::memory &o_x,
+                   occa::memory &o_Ax)
+{
+  //
+}
+
+void lvlSet::clsrPreconditioner(const occa::memory &o_r,
+                                occa::memory &o_z)
+{
+
 }
