@@ -27,6 +27,7 @@ private:
 
 };
 
+void checkValidity(const int rank, const std::vector<std::string> &validValues, const std::string &entry);
 void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, std::string parSection);
 void parseSolverTolerance(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope);
 void parseLinearSolver(const int rank, setupAide &options, inipp::Ini *ini, std::string parScope);

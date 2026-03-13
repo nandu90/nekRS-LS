@@ -646,10 +646,8 @@ void setInterfaceWidth()
   MPI_Allreduce(MPI_IN_PLACE, &emin, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm());
   MPI_Allreduce(MPI_IN_PLACE, &esum, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
 
-  dlong ecount = mesh->Nelements;
+  dlong ecount = mesh->Nlocal;
   MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
-
-  dlong eavg = esum / ecount;
 
   platform->options.getArgs("LVLSET INTERFACE WIDTH FACTOR", interfaceWidth);
 
@@ -660,7 +658,7 @@ void setInterfaceWidth()
     interfaceWidth *= emin;
   }
   else {
-    interfaceWidth *= eavg;
+    interfaceWidth *= dfloat(esum / ecount);
   }
 
   widthInitialized = true;
@@ -677,7 +675,6 @@ void lvlSet::solve(const double &fluidTime)
       printf("LVLSET INTERFACE WIDTH: %16.8e\n", interfaceWidth);
     }
   }
-
 
   const double totalTime = fluidTime - fluidStartTime + 1e-12;
 

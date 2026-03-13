@@ -507,23 +507,6 @@ std::string parPrefixFromParSection(const std::string &parSection)
 
 } // namespace
 
-void checkValidity(const int rank, const std::vector<std::string> &validValues, const std::string &entry)
-{
-  bool valid = false;
-  for (auto &&v : validValues) {
-    valid |= (entry.find(v) == 0);
-  }
-
-  if (!valid) {
-    std::ostringstream ss;
-    ss << "Value " << entry << " is not recognized!\n";
-    ss << "\t\tValid values are:\n";
-    for (auto &&v : validValues) {
-      ss << "\t\t\t" << v << "\n";
-    }
-    append_value_error(ss.str());
-  }
-}
 
 void parseCheckpointing(const int rank, setupAide &options, inipp::Ini *ini, std::string parSection)
 {
@@ -631,6 +614,24 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *ini)
 
 
 } // namespace
+
+void checkValidity(const int rank, const std::vector<std::string> &validValues, const std::string &entry)
+{
+  bool valid = false;
+  for (auto &&v : validValues) {
+    valid |= (entry.find(v) == 0);
+  }
+
+  if (!valid) {
+    std::ostringstream ss;
+    ss << "Value " << entry << " is not recognized!\n";
+    ss << "\t\tValid values are:\n";
+    for (auto &&v : validValues) {
+      ss << "\t\t\t" << v << "\n";
+    }
+    append_value_error(ss.str());
+  }
+}
 
 #include "parseRegularization.cpp"
 #include "parseLinearSolve.cpp"
