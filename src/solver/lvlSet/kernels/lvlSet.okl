@@ -36,3 +36,136 @@
     }
   }
 }
+
+void rmax(dfloat *s_max, const dlong t, const dlong bs) {
+  s_max[t] = (s_max[t] > s_max[t + bs]) ? s_max[t] : s_max[t + bs];
+}
+
+void rmin(dfloat *s_min, const dlong t, const dlong bs) {
+  s_min[t] = (s_min[t] < s_min[t + bs]) ? s_min[t] : s_min[t + bs];
+}
+
+void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
+  s_sum[t] = s_sum[t] + s_sum[t + bs];
+}
+
+@kernel void meshScales(const dlong Nelements,
+                       @ restrict const dfloat *vgeo,
+                       @ restrict dfloat *emin,
+                       @ restrict dfloat *emax,
+                       @ restrict dfloat *esum)
+{
+  for (dlong e = 0; e < Nelements; e++; @outer(0)) {
+    const dlong Nblocks = (p_Np + p_blockSize - 1)/p_blockSize;
+
+    emax[e] = -1e10;
+    emin[e] = 1e10;
+    esum[e] = 0.0;
+
+    for (dlong n = 0; n < Nblocks; n++) {
+      @shared dfloat s_max[p_blockSize];
+      @shared dfloat s_min[p_blockSize];
+      @shared dfloat s_sum[p_blockSize];
+
+      for (dlong t = 0; t < p_blockSize; ++t; @inner(0)) {
+        s_max[t] = -1e10;
+        s_min[t] = 1e10;
+        s_sum[t] = 0.0;
+        const dlong ide = n * p_blockSize + t;
+        if(ide < p_Np){
+          const dlong gid = e * p_Np * p_Nvgeo + ide;
+          const dfloat J = vgeo[gid + p_JID * p_Np];
+          const dfloat scale = pow(J, 1.0/3.0);
+          s_max[t] = scale;
+          s_min[t] = scale;
+          s_sum[t] = scale;
+        }
+      }
+      @barrier();
+
+#if p_blockSize > 512
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 512) {
+          rmax(s_max, t, 512);
+          rmin(s_min, t, 512);
+          rsum(s_sum, t, 512);
+        }
+      @barrier();
+#endif
+
+#if p_blockSize > 256
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 256) {
+          rmax(s_max, t, 256);
+          rmin(s_min, t, 256);
+          rsum(s_sum, t, 256);
+        }
+      @barrier();
+#endif
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 128) {
+          rmax(s_max, t, 128);
+          rmin(s_min, t, 128);
+          rsum(s_sum, t, 128);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 64) {
+          rmax(s_max, t, 64);
+          rmin(s_min, t, 64);
+          rsum(s_sum, t, 64);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 32) {
+          rmax(s_max, t, 32);
+          rmin(s_min, t, 32);
+          rsum(s_sum, t, 32);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 16) {
+          rmax(s_max, t, 16);
+          rmin(s_min, t, 16);
+          rsum(s_sum, t, 16);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 8) {
+          rmax(s_max, t, 8);
+          rmin(s_min, t, 8);
+          rsum(s_sum, t, 8);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 4) {
+          rmax(s_max, t, 4);
+          rmin(s_min, t, 4);
+          rsum(s_sum, t, 4);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 2) {
+          rmax(s_max, t, 2);
+          rmin(s_min, t, 2);
+          rsum(s_sum, t, 2);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 1) {
+          emax[e] = (s_max[0] > s_max[1]) ? s_max[0] : s_max[1];
+          emin[e] = (s_min[0] < s_min[1]) ? s_min[0] : s_min[1];
+          esum[e] = s_sum[0] + s_sum[1];
+        }
+      @barrier();
+    }
+  }
+}
