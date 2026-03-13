@@ -248,7 +248,7 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *ini)
 
 void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::string parSection)
 {
-  if (parSection == "lvlset" || parSection == "default")
+  if (parSection != "lvlset" && parSection != "lvlset default")
     return;
 
   std::string value;
@@ -365,9 +365,9 @@ void parseLvlSetSections()
     }
 
     {
-      double freq;
+      std::string freq;
       if(ini->extract(parScope, "solveFrequency", freq))
-        options.setArgs(parPrefix + "FREQUENCY", to_string_f(freq));
+        options.setArgs(parPrefix + "FREQUENCY", freq);
     }
 
     std::string s_bcMap;
