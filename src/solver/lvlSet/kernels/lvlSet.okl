@@ -39,12 +39,11 @@
 
 @kernel void initTlsFromCls(const dlong Ntotal,
                             const dfloat r_f,
-                            @restrict const dfloat *cls,
-                            @restrict dfloat *tls0)
+                            @restrict dfloat *phi)
 {
   for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
     if (n < Ntotal) {
-      tls0[n] = r_f * (cls[n] - 0.5);
+      phi[n] = r_f * (phi[n] - 0.5);
     }
   }
 }

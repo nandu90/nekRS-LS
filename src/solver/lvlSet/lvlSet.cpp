@@ -500,26 +500,69 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
 {
   auto mesh = this->meshV;
 
+  stepsMax = 1000; // TODO: make user configurable?
+  elapsedTime = 0.0;
   double time = 0.0;
   int tstep = 1;
-  stepsMax = 1000;
-  int innerIterMax = 100;
+  dfloat targetCFL = 0.9; // TODO: make user configurable?
+  int nfac = 25; // factor of mesh element lengths for fixed distance advection. TODO: make user configurable?
 
-  // set constant dt --> TODO: need to change this if we want variable dt
-  this->dt[1] = this->dt[0];
-  this->dt[2] = this->dt[0];
+  // determine fixed advection distance parameters
+  auto [dt, targetTime, targetSteps] = this->computeFixedDistanceAdvectionParams(stepsMax, nfac);
+  this->dt[0] = dt;
+  std::cout << std::scientific << std::setprecision(6)
+            << "dt=" << dt
+            << ", targetTime=" << targetTime
+            << std::defaultfloat
+            << ", targetSteps=" << targetSteps
+            << "\n";
 
-  elapsedTime = 0.0;
+  // Integration loop stopping condition
+  enum class StopMode { targetSteps, targetTime };
+  StopMode mode = StopMode::targetTime;
+  auto isFinished = [&]() -> bool {
+    switch (mode) {
+      case StopMode::targetSteps:
+        return tstep >= (targetSteps + 1);
+      case StopMode::targetTime: {
+        return time >= targetTime;
+      }
+    }
+    throw std::logic_error("Unhandled StopMode value");
+  };
 
-  while(tstep <= stepsMax) {
+  // write initial condition to file
+  this->writeFile(fluidTime, tstep);
+
+  while(!isFinished()) {
     MPI_Barrier(platform->comm.mpiComm());
     const double timeStartStep = MPI_Wtime();
 
+    // compute the advection coefficient
+    this->computeAdvectionCoeff(tstep);
+
+    // enforce CFL condition
+    auto cfl = nrs->computeCFL(this->meshV, this->o_W, this->dt[0]);
+    dfloat dtNew = this->dt[0];
+    if (cfl > targetCFL) { dtNew = this->dt[0] * targetCFL / cfl; }
+
+    // shuffle time-step history
+    this->dt[2] = this->dt[1];
+    this->dt[1] = this->dt[0];
+    this->dt[0] = dtNew;
+
+    if (mode == StopMode::targetTime) {
+      // make sure we don't overstep the targetTime
+      this->dt[0] = std::min(this->dt[0], static_cast<dfloat>(targetTime - time));
+    }
+
+    // advance time here for implicit update
     time += this->dt[0];
-    this->setTimeIntegrationCoeffs(tstep);
+    this->setTimeIntegrationCoeffs(tstep); // set after the time-step has been updated
+
+    // Assemble operators/RHS terms and advance one time step
     this->extrapolateSolution();
     platform->linAlg->fill(this->fieldOffset(), 0.0, this->o_EXT);
-    this->computeAdvectionCoeff(tstep);
     this->computeWrst();
     this->makeAdvection(time, tstep);
     this->makeExplicit(time, tstep);
@@ -534,17 +577,21 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     const double elapsedStep = MPI_Wtime() - timeStartStep;
     elapsedTime += elapsedStep;
 
-    this->printStepInfo(time, tstep, true, true);
+    this->printStepInfo(time, cfl, tstep, true, true);
     this->writeFile(fluidTime, tstep);
     tstep += 1;
   }
 
-  // copy the TLSR solution back to the scalar S00
-  //nrs->scalar->o_S.copyFrom(tlsr->o_S);
+  // copy the re-distanced solution back to the scalar
+  std::string scalarName = this->name;
+  scalarName.pop_back(); // remove "r"
+  nrs->scalar->o_solution(scalarName).copyFrom(this->o_S, this->fieldOffset());
 }
 
 void lvlSet::solve(const double &fluidTime)
 {
+  dfloat r_f = 0.1; // regularization factor we employ to decrease the gradients in the initial solution. TODO: make user configurable?
+
   if(fluidStartTime < 0.0) fluidStartTime = fluidTime;
 
   const double totalTime = fluidTime - fluidStartTime + 1e-12;
@@ -559,11 +606,12 @@ void lvlSet::solve(const double &fluidTime)
     if(totalTime > timer && freq > 1e-12) {
       timer += freq;
       ls->o_S.copyFrom(nrs->scalar->o_solution(scalarName), ls->fieldOffset());
+      if (ls->name == "tlsr") { initTlsFromClsKernel(ls->meshV->Nlocal, r_f, ls->o_S); }
       ls->pseudoStepper(fluidTime);
     }
   };
 
-  runPseudoStepper(tlsr, tlsrTimer, "tls");
+  runPseudoStepper(tlsr, tlsrTimer, "cls");
   runPseudoStepper(clsr, clsrTimer, "cls");
 }
 
@@ -1398,10 +1446,8 @@ void lvlSet_t::writeFile(double time, int tstep)
   }
 }
 
-void lvlSet_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solverInfo)
+void lvlSet_t::printStepInfo(double time, dfloat cfl, int tstep, bool printStepInfo, bool solverInfo)
 {
-  const auto cfl = nrs->computeCFL(this->meshV, this->o_W, this->dt[0]);
-
   auto printSolverInfo = [tstep](elliptic *solver, const std::string &name) {
     if (!solver) {
       return;
@@ -1489,59 +1535,7 @@ std::tuple<dfloat, dfloat, dfloat> lvlSet_t::computeMeshScale() {
   return {emin, emax, eavg};
 }
 
-dfloat lvlSet_t::computeCFL(dfloat dt)
-{
-  auto mesh = nrs->meshV;
-  auto o_invDxRst = [&]() {
-    static occa::memory o_dx;
-    if (o_dx.isInitialized()) {
-      return o_dx;
-    }
-
-    o_dx = platform->device.malloc<dfloat>(mesh->N + 1);
-
-    std::vector<dfloat> dx(mesh->N + 1);
-    for (int n = 0; n < (mesh->N + 1); n++) {
-      if (n == 0) {
-        dx[n] = mesh->gllz[n + 1] - mesh->gllz[n];
-      } else if (n == mesh->N) {
-        dx[n] = mesh->gllz[n] - mesh->gllz[n - 1];
-      } else {
-        dx[n] = 0.5 * (mesh->gllz[n + 1] - mesh->gllz[n - 1]);
-      }
-      dx[n] = 1.0 / dx[n];
-    }
-    o_dx.copyFrom(dx.data());
-
-    return o_dx;
-  }();
-
-  auto o_cfl = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
-  launchKernel("nrs-cflHex3D",
-               mesh->Nelements,
-               dt,
-               mesh->o_vgeo,
-               o_invDxRst,
-               this->_fieldOffset,
-               this->o_W,
-               o_NULL, // (geom) ? geom->o_U : o_NULL, -- TODO: does accounting for moving mesh make sense in the context of solving a the level-set equations?
-               o_cfl);
-
-  auto scratch = platform->memoryPool.reserve<dfloat>(o_cfl.size());
-  auto scratchPtr = scratch.ptr<dfloat>();
-
-  o_cfl.copyTo(scratchPtr);
-
-  dfloat cflMax = 0;
-  for (dlong n = 0; n < mesh->Nelements; ++n) {
-    cflMax = std::max(cflMax, scratchPtr[n]);
-  }
-
-  MPI_Allreduce(MPI_IN_PLACE, &cflMax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
-  return cflMax;
-}
-
-std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams(int maxSteps, int nfac) {
+std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams(int stepsMax, int nfac) {
 
   // Compute mesh element length scales
   auto [dxMin, dxMax, dxAvg] = computeMeshScale();
@@ -1553,7 +1547,7 @@ std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams(in
   dfloat dt = dxMin/(N+1); // TODO: this should be N --> currently setting to N+1 to match Nek5000 implementation
 
   // Number of fixed time steps to advect a distance of nfac x (average element size), capped at maxSteps
-  int nSteps = std::min(maxSteps, static_cast<int>(std::floor(dxAvg * nfac / dt)));
+  int nSteps = std::min(stepsMax, static_cast<int>(std::floor(dxAvg * nfac / dt)));
 
   // Determine target simulation time corresponding to the prescribed propagation distance (assuming unit speed advection)
   dfloat tTarget = dxAvg * nfac;

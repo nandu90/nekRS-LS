@@ -54,7 +54,7 @@ public:
 
   void setTimeIntegrationCoeffs(int tstep) override;
 
-  void printStepInfo(double time, int tstep, bool printStepInfo, bool solverInfo);
+  void printStepInfo(double time, dfloat cfl, int tstep, bool printStepInfo, bool solverInfo);
 
   std::function<occa::memory(double, int)> userImplicitLinearTerm = nullptr;
 
@@ -130,7 +130,6 @@ public:
   int outfldCounter = 0;
 
   std::tuple<dfloat, dfloat, int> computeFixedDistanceAdvectionParams(int maxSteps, int nfac);
-  dfloat computeCFL(dfloat dt);
 
 private:
   std::tuple<dfloat, dfloat, dfloat> computeMeshScale();
