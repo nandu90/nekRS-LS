@@ -129,7 +129,12 @@ public:
   std::unique_ptr<iofld> fieldWriter;
   int outfldCounter = 0;
 
+  std::tuple<dfloat, dfloat, int> computeFixedDistanceAdvectionParams(int maxSteps, int nfac);
+  dfloat computeCFL(dfloat dt);
+
 private:
+  std::tuple<dfloat, dfloat, dfloat> computeMeshScale();
+
   void advectionSubcycling(int nEXT, double time);
   mesh_t * _mesh;
 

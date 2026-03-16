@@ -22,6 +22,8 @@ static std::ostringstream valueErrorLogger;
 nrs_t *nrs;
 occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
+occa::kernel meshScalesKernel;
+occa::kernel initTlsFromClsKernel;
 bool buildKernelCalled = false;
 std::unique_ptr<lvlSet_t> tlsr = nullptr;
 std::unique_ptr<lvlSet_t> clsr = nullptr;
@@ -121,6 +123,8 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
 
   signlsKernel = buildKernel("signls");
   normalVectorKernel = buildKernel("normalVector");
+  meshScalesKernel = buildKernel("meshScales");
+  initTlsFromClsKernel = buildKernel("initTlsFromCls");
 }
 
 void validateLvlSetSections()
@@ -1438,4 +1442,121 @@ void lvlSet_t::printStepInfo(double time, int tstep, bool printStepInfo, bool so
       printf("Pseudo-step=%-8d elapsedTime= %.2es  elapsedTimePerStep= %.5es\n", tstep, elapsedTime, elapsedTime/tstep);
     }
   }
+}
+
+std::tuple<dfloat, dfloat, dfloat> lvlSet_t::computeMeshScale() {
+  auto mesh = nrs->meshV;
+
+  auto o_emax = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+  auto o_emin = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+  auto o_esum = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+
+  meshScalesKernel(mesh->Nelements,
+                   mesh->o_vgeo,
+                   o_emin,
+                   o_emax,
+                   o_esum);
+
+  std::vector<dfloat> etemp(mesh->Nelements);
+
+  o_emax.copyTo(etemp.data(), mesh->Nelements);
+  dfloat emax = -1e10;
+  for(dlong e=0; e < mesh->Nelements; e++) {
+    emax = (etemp[e] > emax) ? etemp[e] : emax;
+  }
+
+  o_emin.copyTo(etemp.data(), mesh->Nelements);
+  dfloat emin = 1e10;
+  for(dlong e=0; e < mesh->Nelements; e++) {
+    emin = (etemp[e] < emin) ? etemp[e] : emin;
+  }
+
+  o_esum.copyTo(etemp.data(), mesh->Nelements);
+  dfloat esum = 0.0;
+  for(dlong e=0; e < mesh->Nelements; e++) {
+    esum += etemp[e];
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &emax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, &emin, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, &esum, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
+
+  dlong ecount = mesh->Nelements;
+  MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
+
+  dlong eavg = esum / ecount;
+
+  return {emin, emax, eavg};
+}
+
+dfloat lvlSet_t::computeCFL(dfloat dt)
+{
+  auto mesh = nrs->meshV;
+  auto o_invDxRst = [&]() {
+    static occa::memory o_dx;
+    if (o_dx.isInitialized()) {
+      return o_dx;
+    }
+
+    o_dx = platform->device.malloc<dfloat>(mesh->N + 1);
+
+    std::vector<dfloat> dx(mesh->N + 1);
+    for (int n = 0; n < (mesh->N + 1); n++) {
+      if (n == 0) {
+        dx[n] = mesh->gllz[n + 1] - mesh->gllz[n];
+      } else if (n == mesh->N) {
+        dx[n] = mesh->gllz[n] - mesh->gllz[n - 1];
+      } else {
+        dx[n] = 0.5 * (mesh->gllz[n + 1] - mesh->gllz[n - 1]);
+      }
+      dx[n] = 1.0 / dx[n];
+    }
+    o_dx.copyFrom(dx.data());
+
+    return o_dx;
+  }();
+
+  auto o_cfl = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+  launchKernel("nrs-cflHex3D",
+               mesh->Nelements,
+               dt,
+               mesh->o_vgeo,
+               o_invDxRst,
+               this->_fieldOffset,
+               this->o_W,
+               o_NULL, // (geom) ? geom->o_U : o_NULL, -- TODO: does accounting for moving mesh make sense in the context of solving a the level-set equations?
+               o_cfl);
+
+  auto scratch = platform->memoryPool.reserve<dfloat>(o_cfl.size());
+  auto scratchPtr = scratch.ptr<dfloat>();
+
+  o_cfl.copyTo(scratchPtr);
+
+  dfloat cflMax = 0;
+  for (dlong n = 0; n < mesh->Nelements; ++n) {
+    cflMax = std::max(cflMax, scratchPtr[n]);
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &cflMax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
+  return cflMax;
+}
+
+std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams(int maxSteps, int nfac) {
+
+  // Compute mesh element length scales
+  auto [dxMin, dxMax, dxAvg] = computeMeshScale();
+  std::cout << "Element Length Scale (min, max, avg): " << dxMin << ", " << dxMax << ", " << dxAvg << std::endl;
+
+  // Determine time step assuming unit-speed advection based on the smallest element
+  int N;
+  platform->options.getArgs("POLYNOMIAL DEGREE", N);
+  dfloat dt = dxMin/(N+1); // TODO: this should be N --> currently setting to N+1 to match Nek5000 implementation
+
+  // Number of fixed time steps to advect a distance of nfac x (average element size), capped at maxSteps
+  int nSteps = std::min(maxSteps, static_cast<int>(std::floor(dxAvg * nfac / dt)));
+
+  // Determine target simulation time corresponding to the prescribed propagation distance (assuming unit speed advection)
+  dfloat tTarget = dxAvg * nfac;
+
+  return {dt, tTarget, nSteps};
 }
