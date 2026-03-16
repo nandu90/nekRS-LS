@@ -606,7 +606,7 @@ void lvlSet::solve(const double &fluidTime)
     if(totalTime > timer && freq > 1e-12) {
       timer += freq;
       ls->o_S.copyFrom(nrs->scalar->o_solution(scalarName), ls->fieldOffset());
-      if (ls->name == "tlsr") { initTlsFromClsKernel(ls->meshV->Nlocal, r_f, ls->o_S); }
+      if (ls->name == "tlsr" && fluidTime > 0.0) { initTlsFromClsKernel(ls->meshV->Nlocal, r_f, ls->o_S); }
       ls->pseudoStepper(fluidTime);
     }
   };
@@ -616,9 +616,14 @@ void lvlSet::solve(const double &fluidTime)
 }
 
 
-lvlSet_t* lvlSet::getLS()
+lvlSet_t* lvlSet::getTLSR()
 {
   return tlsr.get();
+}
+
+lvlSet_t* lvlSet::getCLSR()
+{
+  return clsr.get();
 }
 
 lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_geom) : geom(_geom)
@@ -1527,10 +1532,10 @@ std::tuple<dfloat, dfloat, dfloat> lvlSet_t::computeMeshScale() {
   MPI_Allreduce(MPI_IN_PLACE, &emin, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm());
   MPI_Allreduce(MPI_IN_PLACE, &esum, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
 
-  dlong ecount = mesh->Nelements;
+  dlong ecount = mesh->Nlocal;
   MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
 
-  dlong eavg = esum / ecount;
+  dfloat eavg = esum / ecount;
 
   return {emin, emax, eavg};
 }

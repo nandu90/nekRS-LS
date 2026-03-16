@@ -13,7 +13,8 @@ namespace lvlSet
 void buildKernel(occa::properties kernelInfo);
 void setup();
 void solve(const double &fluidTime);
-lvlSet_t* getLS();
+lvlSet_t* getTLSR();
+lvlSet_t* getCLSR();
 }
 
 struct lvlSetConfig_t : public solverCfg_t {
