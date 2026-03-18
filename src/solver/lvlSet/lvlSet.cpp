@@ -821,7 +821,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
     const dlong Nstates = this->Nsubsteps ? std::max(this->o_coeffBDF.size(), this->o_coeffEXT.size()) : 1;
     this->o_relWrst = platform->device.malloc<dfloat>(Nstates * this->meshV->dim * this->vCubatureOffset);
 
-    this->o_signls = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
+    this->o_signls = platform->device.malloc<dfloat>(this->_fieldOffset);
 
     nFieldsAlloc = this->o_coeffEXT.size();
     this->o_ADV = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
@@ -1058,7 +1058,7 @@ void lvlSet_t::makeExplicit(double time, int tstep)
   const auto parPrefix = upperCase(this->name);
 
   if(this->name == "tlsr")
-    this->o_EXT.copyFrom(this->o_signls); // TODO: shouldn't use tlsr here but will use this hack for now
+    this->o_EXT.copyFrom(this->o_signls, mesh->Nlocal); 
                                                           
   if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "HPFRT")) {
     launchKernel("core-filterRTHex3D",
