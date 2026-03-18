@@ -476,6 +476,9 @@ void lvlSet::setup()
     }
   }
 
+  platform->options.setArgs("TLSR DIFFUSIONCOEFF", to_string_f(1.0e-14));
+  platform->options.setArgs("TLSR SOLVER TOLERANCE", to_string_f(1.0e-14));
+
   auto ls = [&](const std::string& name) {
     lvlSetConfig_t cfg;
     cfg.name = name;
@@ -496,7 +499,7 @@ void lvlSet::setup()
   clsr->setupEllipticSolver();
 }
 
-void lvlSet_t::pseudoStepper(const double &fluidTime)
+void lvlSet_t::pseudoStepper(const double &fluidTime, int nfac)
 {
   auto mesh = this->meshV;
 
@@ -505,7 +508,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
   double time = 0.0;
   int tstep = 1;
   dfloat targetCFL = 0.9; // TODO: make user configurable?
-  int nfac = 25; // factor of mesh element lengths for fixed distance advection. TODO: make user configurable?
+  //int nfac = 25; // factor of mesh element lengths for fixed distance advection. TODO: make user configurable?
 
   // determine fixed advection distance parameters
   auto [dt, targetTime, targetSteps] = this->computeFixedDistanceAdvectionParams(stepsMax, nfac);
@@ -578,7 +581,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     elapsedTime += elapsedStep;
 
     this->printStepInfo(time, cfl, tstep, true, true);
-    this->writeFile(fluidTime, tstep);
+    this->writeFile(time, tstep);
     tstep += 1;
   }
 
@@ -588,7 +591,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
   nrs->scalar->o_solution(scalarName).copyFrom(this->o_S, this->fieldOffset());
 }
 
-void lvlSet::solve(const double &fluidTime)
+void lvlSet::solve(const double &fluidTime, int nfac=25)
 {
   dfloat r_f = 0.1; // regularization factor we employ to decrease the gradients in the initial solution. TODO: make user configurable?
 
@@ -607,10 +610,9 @@ void lvlSet::solve(const double &fluidTime)
       timer += freq;
       ls->o_S.copyFrom(nrs->scalar->o_solution(scalarName), ls->fieldOffset());
       if (ls->name == "tlsr" && fluidTime > 0.0) { initTlsFromClsKernel(ls->meshV->Nlocal, r_f, ls->o_S); }
-      ls->pseudoStepper(fluidTime);
+      ls->pseudoStepper(fluidTime, nfac);
     }
   };
-
   runPseudoStepper(tlsr, tlsrTimer, "cls");
   runPseudoStepper(clsr, clsrTimer, "cls");
 }
@@ -745,7 +747,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
     const dlong Nstates = this->Nsubsteps ? std::max(this->o_coeffBDF.size(), this->o_coeffEXT.size()) : 1;
     this->o_relWrst = platform->device.malloc<dfloat>(Nstates * this->meshV->dim * this->vCubatureOffset);
 
-    this->o_signls = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
+    this->o_signls = platform->device.malloc<dfloat>(this->_fieldOffset);
 
     nFieldsAlloc = this->o_coeffEXT.size();
     this->o_ADV = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
@@ -982,7 +984,7 @@ void lvlSet_t::makeExplicit(double time, int tstep)
   const auto parPrefix = upperCase(this->name);
 
   if(this->name == "tlsr")
-    this->o_EXT.copyFrom(this->o_signls); // TODO: shouldn't use tlsr here but will use this hack for now
+    this->o_EXT.copyFrom(this->o_signls, mesh->Nlocal);
                                                           
   if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "HPFRT")) {
     launchKernel("core-filterRTHex3D",
@@ -1042,6 +1044,7 @@ void lvlSet_t::makeForcing()
   }
 
   const auto n = std::max(this->o_coeffEXT.size(), this->o_coeffBDF.size());
+
   for (int s = n; s > 1; s--) {
     this->o_EXT.copyFrom(this->o_EXT, this->_fieldOffset, (s - 1) * this->_fieldOffset, (s - 2) * this->_fieldOffset);
     if (this->o_ADV.isInitialized()) {
@@ -1062,7 +1065,6 @@ void lvlSet_t::solve(double time, int stage)
   o_rhs.copyFrom(this->o_JwF, mesh->Nlocal, 0, this->fieldOffsetScan);
 
   auto o_lhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-
   launchKernel("scalar_t::neumannBCHex3D",
       this->o_name,
       mesh->Nelements,
@@ -1289,7 +1291,6 @@ void lvlSet_t::mueSVV()
         launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
       initialized = true;
     }
-
     if(platform->options.compareArgs("MOVING MESH","TRUE"))
       launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
 
@@ -1442,12 +1443,12 @@ void lvlSet_t::writeFile(double time, int tstep)
       this->fieldWriter->writeAttribute("polynomialOrder", std::to_string(N));
     }
 
-    if(tstep == stepsMax) {
-      this->fieldWriter->writeAttribute("outputmesh", (!outfldCounter) ? "true" : "false");
-      this->fieldWriter->addVariable("time", const_cast<double &>(time));
-      this->fieldWriter->process();
-      this->outfldCounter++;
-    }
+    //if(tstep == stepsMax) {
+    this->fieldWriter->writeAttribute("outputmesh", (!outfldCounter) ? "true" : "false");
+    this->fieldWriter->addVariable("time", const_cast<double &>(time));
+    this->fieldWriter->process();
+    this->outfldCounter++;
+    //}
   }
 }
 
