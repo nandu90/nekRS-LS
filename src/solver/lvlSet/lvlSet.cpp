@@ -945,7 +945,7 @@ void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normals)
 
   //uncomment both to run in usual manner
   /* oogs::startFinish(o_normals, meshV->dim, nrs->scalar->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs); */
-  /* normalVectorKernel(meshV->Nlocal, this->vFieldOffset, this->o_W); */
+  /* normalVectorKernel(meshV->Nlocal, nrs->scalar->vFieldOffset, o_normals); */
 }
 
 void lvlSet_t::computeAdvectionCoeff(int tstep)
