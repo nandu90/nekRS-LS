@@ -530,9 +530,6 @@ void lvlSet::setup()
     }
   }
 
-  platform->options.setArgs("TLSR DIFFUSIONCOEFF", to_string_f(1.0e-14));
-  platform->options.setArgs("TLSR SOLVER TOLERANCE", to_string_f(1.0e-14));
-
   auto ls = [&](const std::string& name) {
     lvlSetConfig_t cfg;
     cfg.name = name;
