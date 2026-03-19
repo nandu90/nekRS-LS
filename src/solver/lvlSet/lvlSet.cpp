@@ -65,12 +65,17 @@ static std::vector<std::string> lvlSetKeys = {
   {"interfacewidthmesh"},
   {"interfacewidthfactor"},
   {"interfacewidthvalue"},
+  {"maximumsteps"},
+  {"targetcfl"},
+  {"stoppingcondition"},
 };
 
 static std::vector<std::string> scalarKeys = {
   {"boundarytypemap"},
   {"absolutetol"},
   {"solvefrequency"},
+  {"distancefactor"},
+  {"regularizationfactor"},
 };
 
 static std::vector<std::string> validSections = {
@@ -285,6 +290,34 @@ void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::strin
   else {
     options.setArgs("LVLSET INTERFACE WIDTH VALUE", "-1.0");
   }
+
+  if (ini->extract(parSection, "maximumSteps", value)) {
+    options.setArgs("LVLSET MAXIMUM STEPS", value);
+  }
+  else {
+    options.setArgs("LVLSET MAXIMUM STEPS", "1000");
+  }
+
+  if (ini->extract(parSection, "targetCFL", value)) {
+    options.setArgs("LVLSET TARGET CFL", value);
+  }
+  else {
+    options.setArgs("LVLSET TARGET CFL", "0.5");
+  }
+
+  if (ini->extract(parSection, "stoppingCondition", value)) {
+    const std::vector<std::string> validValues = {
+      {"targetsteps"},
+      {"targettime"},
+    };
+    checkValidity(rank, validValues, value);
+
+    options.setArgs("LVLSET STOPPING CONDITION", upperCase(value));
+  }
+  else {
+    options.setArgs("LVLSET STOPPING CONDITION","TARGETSTEPS");
+  }
+
 }
 
 void parseLvlSetSections()
@@ -373,6 +406,39 @@ void parseLvlSetSections()
       std::string freq;
       if(ini->extract(parScope, "solveFrequency", freq))
         options.setArgs(parPrefix + "FREQUENCY", freq);
+    }
+
+    if (firstWord == "clsr") {
+      std::string value;
+
+      if (ini->extract(parScope, "distanceFactor", value)) {
+        std::ostringstream error;
+        error << "unknown key: clsr::distancefactor (TLSR only)\n";
+        append_error(error.str());
+      }
+
+      if (ini->extract(parScope, "regularizationFactor", value)) {
+        std::ostringstream error;
+        error << "unknown key: clsr::regularizationfactor (TLSR only)\n";
+        append_error(error.str());
+      }
+    }
+
+    if(firstWord == "default") {
+      options.setArgs("TLSR DISTANCE FACTOR", to_string_f(2.5));
+      options.setArgs("TLSR REGULARIZATION FACTOR", to_string_f(0.1));
+    }
+
+    if (firstWord == "tlsr") {
+      std::string value;
+      if (ini->extract(parScope, "distanceFactor", value))
+        options.setArgs("TLSR DISTANCE FACTOR", value);
+    }
+
+    if (firstWord == "tlsr") {
+      std::string value;
+      if (ini->extract(parScope, "regularizationFactor", value))
+        options.setArgs("TLSR REGULARIZATION FACTOR", value);
     }
 
     std::string s_bcMap;
