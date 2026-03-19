@@ -553,7 +553,7 @@ void lvlSet::setup()
   clsr->setupEllipticSolver();
 }
 
-void lvlSet_t::pseudoStepper(const double &fluidTime, int nfac)
+void lvlSet_t::pseudoStepper(const double &fluidTime)
 {
   auto mesh = this->meshV;
 
@@ -562,7 +562,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime, int nfac)
   double time = 0.0;
   int tstep = 1;
   dfloat targetCFL = 0.9; // TODO: make user configurable?
-  //int nfac = 25; // factor of mesh element lengths for fixed distance advection. TODO: make user configurable?
+  int nfac = 25; // factor of mesh element lengths for fixed distance advection. TODO: make user configurable?
 
   // determine fixed advection distance parameters
   auto [dt, targetTime, targetSteps] = this->computeFixedDistanceAdvectionParams(stepsMax, nfac);
@@ -729,7 +729,7 @@ void setInterfaceWidth()
   widthInitialized = true;
 }
 
-void lvlSet::solve(const double &fluidTime, int nfac=25)
+void lvlSet::solve(const double &fluidTime)
 {
   dfloat r_f = 0.1; // regularization factor we employ to decrease the gradients in the initial solution. TODO: make user configurable?
 
@@ -757,7 +757,7 @@ void lvlSet::solve(const double &fluidTime, int nfac=25)
       timer += freq;
       ls->o_S.copyFrom(nrs->scalar->o_solution(scalarName), ls->fieldOffset());
       if (ls->name == "tlsr" && fluidTime > 0.0) { initTlsFromClsKernel(ls->meshV->Nlocal, r_f, ls->o_S); }
-      ls->pseudoStepper(fluidTime, nfac);
+      ls->pseudoStepper(fluidTime);
     }
   };
   runPseudoStepper(tlsr, tlsrTimer, "cls");
