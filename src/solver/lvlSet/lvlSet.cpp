@@ -31,6 +31,8 @@ std::unique_ptr<lvlSet_t> clsr = nullptr;
 static double elapsedTime;
 static int stepsMax;
 
+static dfloat interfaceWidth;
+
 static double tlsrTimer = 0.0;
 static double clsrTimer = 0.0;
 static double fluidStartTime = -1.0;
@@ -38,31 +40,34 @@ static double fluidStartTime = -1.0;
 // common keys
 static std::vector<std::string> commonKeys = {
     {"solver"},
-    {"residualTol"},
-    {"initialGuess"},
+    {"residualtol"},
+    {"initialguess"},
     {"preconditioner"},
-    {"pMGSchedule"},
-    {"smootherType"},
-    {"coarseSolver"},
-    {"semfemSolver"},
-    {"coarseGridDiscretization"},
-    {"boundaryTypeMap"},
+    {"pmgschedule"},
+    {"smoothertype"},
+    {"coarsesolver"},
+    {"semfemsolver"},
+    {"coarsegriddiscretization"},
+    {"boundarytypemap"},
     {"regularization"},
     {"checkpointing"},
 
     // deprecated filter params
-    {"filterWeight"},
-    {"filterModes"},
-    {"filterCutoffRatio"},
+    {"filterweight"},
+    {"filtermodes"},
+    {"filtercutoffratio"},
 };
 
 static std::vector<std::string> lvlSetKeys = {
-  {"solveFrequency"},
+  {"interfacewidthmesh"},
+  {"interfacewidthfactor"},
+  {"interfacewidthvalue"},
 };
 
 static std::vector<std::string> scalarKeys = {
-  {"boundaryTypeMap"},
-  {"absoluteTol"},
+  {"boundarytypemap"},
+  {"absolutetol"},
+  {"solvefrequency"},
 };
 
 static std::vector<std::string> validSections = {
@@ -227,8 +232,55 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *ini)
       staleOptions.push_back(option.first);
     }
   }
+
+  double value;
+  options.getArgs("LVLSET INTERFACE WIDTH VALUE", value);
+  if(value > 0.0) {
+    staleOptions.push_back("LVLSET INTERFACE WIDTH MESH PARAM");
+    staleOptions.push_back("LVLSET INTERFACE WIDTH FACTOR");
+  }
+  else {
+    staleOptions.push_back("LVLSET INTERFACE WIDTH VALUE");
+  }
+
   for (auto const &key : staleOptions) {
     options.removeArgs(key);
+  }
+}
+
+void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::string parSection)
+{
+  if (parSection != "lvlset" && parSection != "lvlset default")
+    return;
+
+  std::string value;
+
+  if (ini->extract(parSection, "interfaceWidthMesh", value)) {
+    const std::vector<std::string> validValues = {
+      {"min"},
+      {"max"},
+      {"mean"},
+    };
+    checkValidity(rank, validValues, value);
+
+    options.setArgs("LVLSET INTERFACE WIDTH MESH PARAM", upperCase(value));  
+  } 
+  else {
+    options.setArgs("LVLSET INTERFACE WIDTH MESH PARAM","MEAN");  
+  }
+
+  if (ini->extract(parSection, "interfaceWidthFactor", value)) {
+    options.setArgs("LVLSET INTERFACE WIDTH FACTOR", value);
+  }
+  else {
+    options.setArgs("LVLSET INTERFACE WIDTH FACTOR", "1.0");
+  }
+
+  if (ini->extract(parSection, "interfaceWidthValue", value)) {
+    options.setArgs("LVLSET INTERFACE WIDTH VALUE", value);
+  }
+  else {
+    options.setArgs("LVLSET INTERFACE WIDTH VALUE", "-1.0");
   }
 }
 
@@ -243,14 +295,16 @@ void parseLvlSetSections()
     std::istringstream stream(sec.first);
     std::string firstWord;
     stream >> firstWord;
-    if (firstWord != "default" && firstWord != "tlsr" && firstWord != "clsr") {
+    if (firstWord != "default" && firstWord != "tlsr" && firstWord != "clsr" && firstWord != "lvlset") {
       return;
-    }
+    } 
 
     auto parScope = sec.first;
     if(firstWord == "default") 
       parScope = "lvlset " + parScope;
     auto parPrefix = upperCase(parScope) + " ";
+
+    parseLvlSet(rank, options, ini, parScope);
 
     {
       std::string val = "false";
@@ -313,9 +367,9 @@ void parseLvlSetSections()
     }
 
     {
-      double freq;
+      std::string freq;
       if(ini->extract(parScope, "solveFrequency", freq))
-        options.setArgs(parPrefix + "FREQUENCY", to_string_f(freq));
+        options.setArgs(parPrefix + "FREQUENCY", freq);
     }
 
     std::string s_bcMap;
@@ -591,11 +645,88 @@ void lvlSet_t::pseudoStepper(const double &fluidTime, int nfac)
   nrs->scalar->o_solution(scalarName).copyFrom(this->o_S, this->fieldOffset());
 }
 
+void setInterfaceWidth()
+{
+  if (!platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE").empty()) {
+    platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE", interfaceWidth);
+    return;
+  }
+
+  static bool widthInitialized = false;
+
+  const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
+
+  if(widthInitialized && !movingMesh) {
+    return;
+  }
+
+  auto mesh = nrs->meshV;
+
+  auto o_emax = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+  auto o_emin = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+  auto o_esum = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+
+  meshScalesKernel(mesh->Nelements,
+                   mesh->o_vgeo,
+                   o_emin,
+                   o_emax,
+                   o_esum);
+
+  std::vector<dfloat> etemp(mesh->Nelements);
+
+  o_emax.copyTo(etemp.data(), mesh->Nelements);
+  dfloat emax = -1e10;
+  for(dlong e=0; e < mesh->Nelements; e++) {
+    emax = (etemp[e] > emax) ? etemp[e] : emax; 
+  }
+
+  o_emin.copyTo(etemp.data(), mesh->Nelements);
+  dfloat emin = 1e10;
+  for(dlong e=0; e < mesh->Nelements; e++) {
+    emin = (etemp[e] < emin) ? etemp[e] : emin; 
+  }
+
+  o_esum.copyTo(etemp.data(), mesh->Nelements);
+  dfloat esum = 0.0;
+  for(dlong e=0; e < mesh->Nelements; e++) {
+    esum += etemp[e]; 
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &emax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, &emin, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, &esum, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
+
+  dlong ecount = mesh->Nlocal;
+  MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
+
+  platform->options.getArgs("LVLSET INTERFACE WIDTH FACTOR", interfaceWidth);
+
+  if(platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MAX")) {
+    interfaceWidth *= emax;
+  } 
+  else if (platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MIN")) {
+    interfaceWidth *= emin;
+  }
+  else {
+    interfaceWidth *= dfloat(esum / ecount);
+  }
+
+  widthInitialized = true;
+}
+
 void lvlSet::solve(const double &fluidTime, int nfac=25)
 {
   dfloat r_f = 0.1; // regularization factor we employ to decrease the gradients in the initial solution. TODO: make user configurable?
 
-  if(fluidStartTime < 0.0) fluidStartTime = fluidTime;
+  setInterfaceWidth();
+
+  if(fluidStartTime < 0.0){ //first call
+    fluidStartTime = fluidTime;
+
+    if(platform->comm.mpiRank() == 0) {
+      printf("LVLSET INTERFACE WIDTH: %16.8e\n", interfaceWidth);
+    }
+  }
 
   const double totalTime = fluidTime - fluidStartTime + 1e-12;
 
@@ -984,7 +1115,7 @@ void lvlSet_t::makeExplicit(double time, int tstep)
   const auto parPrefix = upperCase(this->name);
 
   if(this->name == "tlsr")
-    this->o_EXT.copyFrom(this->o_signls, mesh->Nlocal);
+    this->o_EXT.copyFrom(this->o_signls, mesh->Nlocal); 
                                                           
   if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "HPFRT")) {
     launchKernel("core-filterRTHex3D",
@@ -1266,6 +1397,22 @@ void lvlSet_t::setupEllipticSolver()
     if (platform->options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "SVV")) {
       this->ellipticSolver[0]->mueSVV(this->o_svvmu);
       this->ellipticSolver[0]->setupSVV();
+    }
+
+    if(this->name == "clsr") {
+      this->ellipticSolver[0]->userAx ([] (elliptic_t *elliptic,
+                                            dlong NelementsList,
+                                            const occa::memory &o_elementsList,
+                                            const occa::memory &o_x,
+                                            occa::memory &o_Ax)
+          {
+          lvlSet::clsrAx(elliptic, NelementsList, o_elementsList, o_x, o_Ax);
+          });
+
+      this->ellipticSolver[0]->userPreconditioner ([] (const occa::memory &o_r, occa::memory &o_z)
+          {
+          lvlSet::clsrPreconditioner(o_r, o_z);
+          });
     }
   }
 }
@@ -1559,4 +1706,19 @@ std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams(in
   dfloat tTarget = dxAvg * nfac;
 
   return {dt, tTarget, nSteps};
+}
+
+void lvlSet::clsrAx(elliptic_t* elliptic,
+                   dlong NelementsList,
+                   const occa::memory &o_elementsList,
+                   const occa::memory &o_x,
+                   occa::memory &o_Ax)
+{
+  //
+}
+
+void lvlSet::clsrPreconditioner(const occa::memory &o_r,
+                                occa::memory &o_z)
+{
+
 }
