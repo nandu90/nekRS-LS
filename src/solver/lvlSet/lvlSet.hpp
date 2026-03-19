@@ -23,7 +23,7 @@ void clsrAx(elliptic_t* elliptic,
 
 void clsrPreconditioner(const occa::memory &o_r, occa::memory &o_z);
 
-void getNormalVector(const occa::memory &o_phi, occa::memory &o_normals);
+void getNormalVector(const occa::memory &o_phi, occa::memory &o_normals, bool avg = true);
 }
 
 struct lvlSetConfig_t : public solverCfg_t {

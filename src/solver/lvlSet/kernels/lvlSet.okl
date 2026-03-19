@@ -228,7 +228,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
   }
 }
 
-@kernel void gradVector(const dlong Nelements,
+@kernel void normalVector(const dlong Nelements,
                           @ restrict const dfloat *vgeo,
                           @ restrict const dfloat *D,
                           const dlong offset,
@@ -302,12 +302,6 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
 
           const dlong id = e * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
 
-          /* NORMAL[id + 0 * offset] = nx / cmag; */
-          /* NORMAL[id + 1 * offset] = ny / cmag; */
-          /* NORMAL[id + 2 * offset] = nz / cmag; */
-
-
-
           if(cmag > 1e-12) {
             NORMAL[id + 0 * offset] = nx / cmag;
             NORMAL[id + 1 * offset] = ny / cmag;
@@ -325,9 +319,9 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
   }
 }
 
-@kernel void normalVector(const dlong Ntotal,
-                          const dlong offset,
-                          @ restrict dfloat *nvec)
+@kernel void normalizeVector(const dlong Ntotal,
+                             const dlong offset,
+                             @ restrict dfloat *nvec)
 {
   for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
     if (n < Ntotal) {

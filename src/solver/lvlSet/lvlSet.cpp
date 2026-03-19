@@ -23,7 +23,7 @@ nrs_t *nrs;
 occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
 occa::kernel meshScalesKernel;
-occa::kernel gradVectorKernel;
+occa::kernel normalizeVectorKernel;
 bool buildKernelCalled = false;
 std::unique_ptr<lvlSet_t> tlsr = nullptr;
 std::unique_ptr<lvlSet_t> clsr = nullptr;
@@ -132,7 +132,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
   signlsKernel = buildKernel("signls");
   normalVectorKernel = buildKernel("normalVector");
   meshScalesKernel = buildKernel("meshScales");
-  gradVectorKernel = buildKernel("gradVector");
+  normalizeVectorKernel = buildKernel("normalizeVector");
 }
 
 void validateLvlSetSections()
@@ -932,20 +932,23 @@ void lvlSet_t::setTimeIntegrationCoeffs(int tstep)
   }
 }
 
-void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normals)
+void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normals, bool avg)
 {
   auto meshV = nrs->meshV;
 
-  gradVectorKernel(meshV->Nelements,
+  normalVectorKernel(meshV->Nelements,
                      meshV->o_vgeo,
                      meshV->o_D,
                      nrs->scalar->vFieldOffset,
                      o_phi,
                      o_normals);
 
-  //uncomment both to run in usual manner
-  /* oogs::startFinish(o_normals, meshV->dim, nrs->scalar->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs); */
-  /* normalVectorKernel(meshV->Nlocal, nrs->scalar->vFieldOffset, o_normals); */
+  if(avg) {
+    oogs::startFinish(o_normals, meshV->dim, nrs->scalar->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
+
+    //normalization seems necessary after averaging for TLSR stability
+    normalizeVectorKernel(meshV->Nlocal, nrs->scalar->vFieldOffset, o_normals);
+  }
 }
 
 void lvlSet_t::computeAdvectionCoeff(int tstep)
@@ -953,14 +956,14 @@ void lvlSet_t::computeAdvectionCoeff(int tstep)
   if(this->name == "clsr" && tstep == 1) {
     auto o_phi = nrs->scalar->o_solution("tls");
 
-    lvlSet::getNormalVector(o_phi, o_normals);
+    lvlSet::getNormalVector(o_phi, o_normals, false);
   }
 
   if(this->name == "tlsr") { 
     auto o_phi = this->o_S;
     auto meshV = this->meshV;
 
-    lvlSet::getNormalVector(o_phi, this->o_W);
+    lvlSet::getNormalVector(o_phi, this->o_W, false);
 
     signlsKernel(meshV->Nlocal, o_phi, o_signls);
   
