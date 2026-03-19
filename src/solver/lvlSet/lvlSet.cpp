@@ -32,6 +32,9 @@ static double elapsedTime;
 static int stepsMax;
 
 static dfloat interfaceWidth;
+static dfloat emax;
+static dfloat emin;
+static dfloat eavg;
 
 static double tlsrTimer = 0.0;
 static double clsrTimer = 0.0;
@@ -642,18 +645,12 @@ void lvlSet_t::pseudoStepper(const double &fluidTime, int nfac)
   nrs->scalar->o_solution(scalarName).copyFrom(this->o_S, this->fieldOffset());
 }
 
-void setInterfaceWidth()
-{
-  if (!platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE").empty()) {
-    platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE", interfaceWidth);
-    return;
-  }
-
-  static bool widthInitialized = false;
+void computeMeshScale() {
+  static bool meshScaleInitialized = false;
 
   const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
 
-  if(widthInitialized && !movingMesh) {
+  if(meshScaleInitialized && !movingMesh) {
     return;
   }
 
@@ -672,21 +669,21 @@ void setInterfaceWidth()
   std::vector<dfloat> etemp(mesh->Nelements);
 
   o_emax.copyTo(etemp.data(), mesh->Nelements);
-  dfloat emax = -1e10;
+  emax = -1e10;
   for(dlong e=0; e < mesh->Nelements; e++) {
-    emax = (etemp[e] > emax) ? etemp[e] : emax; 
+    emax = (etemp[e] > emax) ? etemp[e] : emax;
   }
 
   o_emin.copyTo(etemp.data(), mesh->Nelements);
-  dfloat emin = 1e10;
+  emin = 1e10;
   for(dlong e=0; e < mesh->Nelements; e++) {
-    emin = (etemp[e] < emin) ? etemp[e] : emin; 
+    emin = (etemp[e] < emin) ? etemp[e] : emin;
   }
 
   o_esum.copyTo(etemp.data(), mesh->Nelements);
   dfloat esum = 0.0;
   for(dlong e=0; e < mesh->Nelements; e++) {
-    esum += etemp[e]; 
+    esum += etemp[e];
   }
 
   MPI_Allreduce(MPI_IN_PLACE, &emax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
@@ -695,6 +692,27 @@ void setInterfaceWidth()
 
   dlong ecount = mesh->Nlocal;
   MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
+
+  eavg = esum / ecount;
+  meshScaleInitialized = true;
+
+  std::cout << "Element Length Scale (min, max, avg): " << emin << ", " << emax << ", " << eavg << std::endl;
+}
+
+void setInterfaceWidth()
+{
+  if (!platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE").empty()) {
+    platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE", interfaceWidth);
+    return;
+  }
+
+  static bool widthInitialized = false;
+
+  const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
+
+  if(widthInitialized && !movingMesh) {
+    return;
+  }
 
   platform->options.getArgs("LVLSET INTERFACE WIDTH FACTOR", interfaceWidth);
 
@@ -705,7 +723,7 @@ void setInterfaceWidth()
     interfaceWidth *= emin;
   }
   else {
-    interfaceWidth *= dfloat(esum / ecount);
+    interfaceWidth *= eavg;
   }
 
   widthInitialized = true;
@@ -715,6 +733,7 @@ void lvlSet::solve(const double &fluidTime, int nfac=25)
 {
   dfloat r_f = 0.1; // regularization factor we employ to decrease the gradients in the initial solution. TODO: make user configurable?
 
+  computeMeshScale();
   setInterfaceWidth();
 
   if(fluidStartTime < 0.0){ //first call
@@ -1640,67 +1659,18 @@ void lvlSet_t::printStepInfo(double time, dfloat cfl, int tstep, bool printStepI
   }
 }
 
-std::tuple<dfloat, dfloat, dfloat> lvlSet_t::computeMeshScale() {
-  auto mesh = nrs->meshV;
-
-  auto o_emax = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
-  auto o_emin = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
-  auto o_esum = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
-
-  meshScalesKernel(mesh->Nelements,
-                   mesh->o_vgeo,
-                   o_emin,
-                   o_emax,
-                   o_esum);
-
-  std::vector<dfloat> etemp(mesh->Nelements);
-
-  o_emax.copyTo(etemp.data(), mesh->Nelements);
-  dfloat emax = -1e10;
-  for(dlong e=0; e < mesh->Nelements; e++) {
-    emax = (etemp[e] > emax) ? etemp[e] : emax;
-  }
-
-  o_emin.copyTo(etemp.data(), mesh->Nelements);
-  dfloat emin = 1e10;
-  for(dlong e=0; e < mesh->Nelements; e++) {
-    emin = (etemp[e] < emin) ? etemp[e] : emin;
-  }
-
-  o_esum.copyTo(etemp.data(), mesh->Nelements);
-  dfloat esum = 0.0;
-  for(dlong e=0; e < mesh->Nelements; e++) {
-    esum += etemp[e];
-  }
-
-  MPI_Allreduce(MPI_IN_PLACE, &emax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
-  MPI_Allreduce(MPI_IN_PLACE, &emin, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm());
-  MPI_Allreduce(MPI_IN_PLACE, &esum, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
-
-  dlong ecount = mesh->Nlocal;
-  MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
-
-  dfloat eavg = esum / ecount;
-
-  return {emin, emax, eavg};
-}
-
 std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams(int stepsMax, int nfac) {
-
-  // Compute mesh element length scales
-  auto [dxMin, dxMax, dxAvg] = computeMeshScale();
-  std::cout << "Element Length Scale (min, max, avg): " << dxMin << ", " << dxMax << ", " << dxAvg << std::endl;
 
   // Determine time step assuming unit-speed advection based on the smallest element
   int N;
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
-  dfloat dt = dxMin/(N+1); // TODO: this should be N --> currently setting to N+1 to match Nek5000 implementation
+  dfloat dt = emin/(N+1); // TODO: this should be N --> currently setting to N+1 to match Nek5000 implementation
 
   // Number of fixed time steps to advect a distance of nfac x (average element size), capped at maxSteps
-  int nSteps = std::min(stepsMax, static_cast<int>(std::floor(dxAvg * nfac / dt)));
+  int nSteps = std::min(stepsMax, static_cast<int>(std::floor(eavg * nfac / dt)));
 
   // Determine target simulation time corresponding to the prescribed propagation distance (assuming unit speed advection)
-  dfloat tTarget = dxAvg * nfac;
+  dfloat tTarget = eavg * nfac;
 
   return {dt, tTarget, nSteps};
 }
