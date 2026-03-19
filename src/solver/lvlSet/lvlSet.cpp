@@ -65,6 +65,7 @@ static std::vector<std::string> lvlSetKeys = {
   {"interfacewidthmesh"},
   {"interfacewidthfactor"},
   {"interfacewidthvalue"},
+  {"normalaveraging"},
 };
 
 static std::vector<std::string> scalarKeys = {
@@ -284,6 +285,18 @@ void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::strin
   }
   else {
     options.setArgs("LVLSET INTERFACE WIDTH VALUE", "-1.0");
+  }
+
+  if (ini->extract(parSection, "normalAveraging", value)) {
+    const std::vector<std::string> validValues = {
+      {"true"},
+      {"false"},
+    };
+    checkValidity(rank, validValues, value);
+    options.setArgs("LVLSET NORMAL AVERAGING", upperCase(value));
+  }
+  else {
+    options.setArgs("LVLSET NORMAL AVERAGING", "FALSE");
   }
 }
 
@@ -953,17 +966,23 @@ void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normals,
 
 void lvlSet_t::computeAdvectionCoeff(int tstep)
 {
+  bool avg = false;
+
+  if(platform->options.compareArgs("LVLSET NORMAL AVERAGING", "TRUE")) {
+    avg = true;
+  }
+
   if(this->name == "clsr" && tstep == 1) {
     auto o_phi = nrs->scalar->o_solution("tls");
 
-    lvlSet::getNormalVector(o_phi, o_normals, false);
+    lvlSet::getNormalVector(o_phi, o_normals, avg);
   }
 
   if(this->name == "tlsr") { 
     auto o_phi = this->o_S;
     auto meshV = this->meshV;
 
-    lvlSet::getNormalVector(o_phi, this->o_W, false);
+    lvlSet::getNormalVector(o_phi, this->o_W, avg);
 
     signlsKernel(meshV->Nlocal, o_phi, o_signls);
   
