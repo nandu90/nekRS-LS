@@ -645,12 +645,18 @@ void lvlSet_t::pseudoStepper(const double &fluidTime, int nfac)
   nrs->scalar->o_solution(scalarName).copyFrom(this->o_S, this->fieldOffset());
 }
 
-void computeMeshScale() {
-  static bool meshScaleInitialized = false;
+void setInterfaceWidth()
+{
+  if (!platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE").empty()) {
+    platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE", interfaceWidth);
+    return;
+  }
+
+  static bool widthInitialized = false;
 
   const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
 
-  if(meshScaleInitialized && !movingMesh) {
+  if(widthInitialized && !movingMesh) {
     return;
   }
 
@@ -694,25 +700,6 @@ void computeMeshScale() {
   MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
 
   eavg = esum / ecount;
-  meshScaleInitialized = true;
-
-  std::cout << "Element Length Scale (min, max, avg): " << emin << ", " << emax << ", " << eavg << std::endl;
-}
-
-void setInterfaceWidth()
-{
-  if (!platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE").empty()) {
-    platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE", interfaceWidth);
-    return;
-  }
-
-  static bool widthInitialized = false;
-
-  const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
-
-  if(widthInitialized && !movingMesh) {
-    return;
-  }
 
   platform->options.getArgs("LVLSET INTERFACE WIDTH FACTOR", interfaceWidth);
 
@@ -727,13 +714,14 @@ void setInterfaceWidth()
   }
 
   widthInitialized = true;
+
+  std::cout << "Element Length Scale (min, max, avg): " << emin << ", " << emax << ", " << eavg << std::endl;
 }
 
 void lvlSet::solve(const double &fluidTime, int nfac=25)
 {
   dfloat r_f = 0.1; // regularization factor we employ to decrease the gradients in the initial solution. TODO: make user configurable?
 
-  computeMeshScale();
   setInterfaceWidth();
 
   if(fluidStartTime < 0.0){ //first call
