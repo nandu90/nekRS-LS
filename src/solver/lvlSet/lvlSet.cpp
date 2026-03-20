@@ -945,7 +945,7 @@ void lvlSet_t::setTimeIntegrationCoeffs(int tstep)
   }
 }
 
-void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normals, bool avg)
+void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normal, bool avg)
 {
   auto meshV = nrs->meshV;
 
@@ -954,14 +954,20 @@ void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normals,
                      meshV->o_D,
                      nrs->scalar->vFieldOffset,
                      o_phi,
-                     o_normals);
+                     o_normal);
 
   if(avg) {
-    oogs::startFinish(o_normals, meshV->dim, nrs->scalar->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
+    oogs::startFinish(o_normal, meshV->dim, nrs->scalar->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
 
     //normalization seems necessary after averaging for TLSR stability
-    normalizeVectorKernel(meshV->Nlocal, nrs->scalar->vFieldOffset, o_normals);
+    normalizeVectorKernel(meshV->Nlocal, nrs->scalar->vFieldOffset, o_normal);
   }
+}
+
+void lvlSet::getSignField(const occa::memory& o_phi, occa::memory& o_sign)
+{
+  auto meshV = nrs->meshV;
+  signlsKernel(meshV->Nlocal, o_phi, o_sign);
 }
 
 void lvlSet_t::computeAdvectionCoeff(int tstep)
@@ -984,7 +990,7 @@ void lvlSet_t::computeAdvectionCoeff(int tstep)
 
     lvlSet::getNormalVector(o_phi, this->o_W, avg);
 
-    signlsKernel(meshV->Nlocal, o_phi, o_signls);
+    lvlSet::getSignField(o_phi, o_signls);
   
     platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, o_signls, this->o_W);
   }
