@@ -34,16 +34,16 @@ static occa::memory o_normals;
 
 static double elapsedTime;
 static int stepsMax;
-static dfloat nfac;
-static dfloat rf;
+static dfloat distanceFactor;
+static dfloat tlsrRegFactor;
 static dfloat targetCFL;
 enum class StopMode { targetSteps, targetTime };
 static StopMode stopMode;
 
 static dfloat interfaceWidth;
-static dfloat emax;
-static dfloat emin;
-static dfloat eavg;
+static dfloat maxScale;
+static dfloat minScale;
+static dfloat avgScale;
 
 static double tlsrTimer = 0.0;
 static double clsrTimer = 0.0;
@@ -74,9 +74,6 @@ static std::vector<std::string> lvlSetKeys = {
   {"interfacewidthmesh"},
   {"interfacewidthfactor"},
   {"interfacewidthvalue"},
-  {"maximumsteps"},
-  {"targetcfl"},
-  {"stoppingcondition"},
   {"normalaveraging"},
 };
 
@@ -86,6 +83,9 @@ static std::vector<std::string> scalarKeys = {
   {"solvefrequency"},
   {"distancefactor"},
   {"regularizationfactor"},
+  {"maximumsteps"},
+  {"targetcfl"},
+  {"stoppingcondition"},
 };
 
 static std::vector<std::string> validSections = {
@@ -302,33 +302,6 @@ void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::strin
     options.setArgs("LVLSET INTERFACE WIDTH VALUE", "-1.0");
   }
 
-  if (ini->extract(parSection, "maximumSteps", value)) {
-    options.setArgs("LVLSET MAXIMUM STEPS", value);
-  }
-  else {
-    options.setArgs("LVLSET MAXIMUM STEPS", "1000");
-  }
-
-  if (ini->extract(parSection, "targetCFL", value)) {
-    options.setArgs("LVLSET TARGET CFL", value);
-  }
-  else {
-    options.setArgs("LVLSET TARGET CFL", "0.5");
-  }
-
-  if (ini->extract(parSection, "stoppingCondition", value)) {
-    const std::vector<std::string> validValues = {
-      {"targetsteps"},
-      {"targettime"},
-    };
-    checkValidity(rank, validValues, value);
-
-    options.setArgs("LVLSET STOPPING CONDITION", upperCase(value));
-  }
-  else {
-    options.setArgs("LVLSET STOPPING CONDITION","TARGETSTEPS");
-  }
-
   if (ini->extract(parSection, "normalAveraging", value)) {
     const std::vector<std::string> validValues = {
       {"true"},
@@ -430,14 +403,62 @@ void parseLvlSetSections()
         options.setArgs(parPrefix + "FREQUENCY", freq);
     }
 
+
+    if(firstWord == "default") {
+      options.setArgs("TLSR MAXIMUM STEPS", to_string_f(1000));
+      options.setArgs("CLSR MAXIMUM STEPS", to_string_f(1000));
+    }
+
+    {
+      std::string value;
+      if (ini->extract(parScope, "maximumSteps", value)) {
+        options.setArgs(parPrefix + "MAXIMUM STEPS", value);
+      }
+    }
+
+    if(firstWord == "default") {
+      options.setArgs("TLSR TARGET CFL", to_string_f(0.5));
+      options.setArgs("CLSR TARGET CFL", to_string_f(0.5));
+    }
+
+    {
+      std::string value;
+      if (ini->extract(parScope, "targetCFL", value)) {
+        options.setArgs(parPrefix + "TARGET CFL", value);
+      }
+    }
+
+    if(firstWord == "default") {
+      options.setArgs("TLSR STOPPING CONDITION", "TARGETSTEPS");
+      options.setArgs("CLSR STOPPING CONDITION", "TARGETSTEPS");
+    }
+
+    {
+      std::string value;
+      if (ini->extract(parScope, "stoppingCondition", value)) {
+        const std::vector<std::string> validValues = {
+          {"targetsteps"},
+          {"targettime"},
+        };
+        checkValidity(rank, validValues, value);
+        options.setArgs(parPrefix + "STOPPING CONDITION", upperCase(value));
+      }
+    }
+
+    if(firstWord == "default") {
+      options.setArgs("TLSR DISTANCE FACTOR", to_string_f(2.5));
+      options.setArgs("CLSR DISTANCE FACTOR", to_string_f(2.5));
+    }
+
+    {
+      std::string value;
+      if (ini->extract(parScope, "distanceFactor", value)) {
+        options.setArgs(parPrefix + "DISTANCE FACTOR", value);
+      }
+    }
+
     if (firstWord == "clsr") {
       std::string value;
-
-      if (ini->extract(parScope, "distanceFactor", value)) {
-        std::ostringstream error;
-        error << "unknown key: clsr::distancefactor (TLSR only)\n";
-        append_error(error.str());
-      }
 
       if (ini->extract(parScope, "regularizationFactor", value)) {
         std::ostringstream error;
@@ -447,14 +468,7 @@ void parseLvlSetSections()
     }
 
     if(firstWord == "default") {
-      options.setArgs("TLSR DISTANCE FACTOR", to_string_f(25.0));
       options.setArgs("TLSR REGULARIZATION FACTOR", to_string_f(0.1));
-    }
-
-    if (firstWord == "tlsr") {
-      std::string value;
-      if (ini->extract(parScope, "distanceFactor", value))
-        options.setArgs("TLSR DISTANCE FACTOR", value);
     }
 
     if (firstWord == "tlsr") {
@@ -753,13 +767,13 @@ void setInterfaceWidth()
   std::vector<dfloat> etemp(mesh->Nelements);
 
   o_emax.copyTo(etemp.data(), mesh->Nelements);
-  emax = -1e10;
+  dfloat emax = -1e10;
   for(dlong e=0; e < mesh->Nelements; e++) {
     emax = (etemp[e] > emax) ? etemp[e] : emax;
   }
 
   o_emin.copyTo(etemp.data(), mesh->Nelements);
-  emin = 1e10;
+  dfloat emin = 1e10;
   for(dlong e=0; e < mesh->Nelements; e++) {
     emin = (etemp[e] < emin) ? etemp[e] : emin;
   }
@@ -777,7 +791,7 @@ void setInterfaceWidth()
   dlong ecount = mesh->Nlocal;
   MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
 
-  eavg = esum / ecount;
+  dfloat eavg = esum / ecount;
 
   platform->options.getArgs("LVLSET INTERFACE WIDTH FACTOR", interfaceWidth);
 
@@ -793,25 +807,15 @@ void setInterfaceWidth()
 
   widthInitialized = true;
 
-  std::cout << "Element Length Scale (min, max, avg): " << emin << ", " << emax << ", " << eavg << std::endl;
+  maxScale = emax;
+  minScale = emin;
+  avgScale = eavg;
+
+  std::cout << "Element Length Scale (min, max, avg): " << minScale << ", " << maxScale << ", " << avgScale << std::endl;
 }
 
 void lvlSet::solve(const double &fluidTime)
 {
-
-  platform->options.getArgs("LVLSET MAXIMUM STEPS", stepsMax);
-  platform->options.getArgs("LVLSET TARGET CFL", targetCFL);
-  std::string stopModeStr;
-  platform->options.getArgs("LVLSET STOPPING CONDITION", stopModeStr);
-  if (stopModeStr == "TARGETSTEPS") {
-    stopMode = StopMode::targetSteps;
-  } else if (stopModeStr == "TARGETTIME") {
-    stopMode = StopMode::targetTime;
-  } else {
-    nekrsCheck(true, platform->comm.mpiComm(), EXIT_FAILURE,
-               "Unknown LVLSET STOPPING CONDITION: %s\n", stopModeStr.c_str());
-  }
-
   setInterfaceWidth();
 
   if(fluidStartTime < 0.0){ //first call
@@ -828,6 +832,19 @@ void lvlSet::solve(const double &fluidTime)
     if(platform->options.compareArgs(upperCase(ls->name) + " SOLVER", "NONE"))
         return;
 
+    platform->options.getArgs(upperCase(ls->name) + " MAXIMUM STEPS", stepsMax);
+    platform->options.getArgs(upperCase(ls->name) + " TARGET CFL", targetCFL);
+    std::string stopModeStr;
+    platform->options.getArgs(upperCase(ls->name) + " STOPPING CONDITION", stopModeStr);
+    if (stopModeStr == "TARGETSTEPS") {
+      stopMode = StopMode::targetSteps;
+    } else if (stopModeStr == "TARGETTIME") {
+      stopMode = StopMode::targetTime;
+    } else {
+      nekrsCheck(true, platform->comm.mpiComm(), EXIT_FAILURE,
+                 "Unknown STOPPING CONDITION: %s\n", stopModeStr.c_str());
+    }
+
     double freq;
     platform->options.getArgs(upperCase(ls->name) + " FREQUENCY", freq);
 
@@ -835,8 +852,8 @@ void lvlSet::solve(const double &fluidTime)
       timer += freq;
       ls->o_S.copyFrom(nrs->scalar->o_solution(scalarName), ls->fieldOffset());
       if (ls->name == "tlsr") {
-        platform->options.getArgs("TLSR REGULARIZATION FACTOR", rf);
-        initTlsFromClsKernel(ls->meshV->Nlocal, rf, ls->o_S);
+        platform->options.getArgs("TLSR REGULARIZATION FACTOR", tlsrRegFactor);
+        initTlsFromClsKernel(ls->meshV->Nlocal, tlsrRegFactor, ls->o_S);
       }
       ls->pseudoStepper(fluidTime);
     }
@@ -1763,19 +1780,14 @@ std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams() 
   // TODO: The denominator should be N; currently using N+1 to match the Nek5000 implementation
   int N;
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
-  dfloat dt = emin/(N+1);
+  dfloat dt = minScale/(N+1);
   if (this->name == "clsr") {
     dt *= 0.1;
   }
-
   // Compute the target integration time for the prescribed propagation distance, assuming unit-speed advection
+  platform->options.getArgs(upperCase(this->name) + " DISTANCE FACTOR", distanceFactor);
   dfloat targetTime;
-  if (this->name == "tlsr") {
-    platform->options.getArgs("TLSR DISTANCE FACTOR", nfac);
-    targetTime = eavg * nfac;
-  } else { // this->name ==  "clsr"
-    targetTime = interfaceWidth;
-  }
+  targetTime = avgScale * distanceFactor;
 
   // Number of fixed time steps required to reach the target integration time (i.e. to advect the prescribed distance)
   int targetSteps = std::min(stepsMax, static_cast<int>(std::floor(targetTime / dt)));
