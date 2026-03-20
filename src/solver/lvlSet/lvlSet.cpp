@@ -667,7 +667,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
   };
 
   // write initial condition to file
-  this->writeFile(fluidTime, tstep);
+  //this->writeFile(fluidTime, tstep);
 
   while(!isFinished()) {
     MPI_Barrier(platform->comm.mpiComm());
@@ -1703,12 +1703,12 @@ void lvlSet_t::writeFile(double time, int tstep)
       this->fieldWriter->writeAttribute("polynomialOrder", std::to_string(N));
     }
 
-    //if(tstep == stepsMax) {
-    this->fieldWriter->writeAttribute("outputmesh", (!outfldCounter) ? "true" : "false");
-    this->fieldWriter->addVariable("time", const_cast<double &>(time));
-    this->fieldWriter->process();
-    this->outfldCounter++;
-    //}
+    if(tstep == stepsMax) {
+      this->fieldWriter->writeAttribute("outputmesh", (!outfldCounter) ? "true" : "false");
+      this->fieldWriter->addVariable("time", const_cast<double &>(time));
+      this->fieldWriter->process();
+      this->outfldCounter++;
+    }
   }
 }
 
