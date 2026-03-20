@@ -144,17 +144,21 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
 }
 
 @kernel void clsrDiffusionCoeff(const dlong Nelements,
+                                @ restrict const dlong *elementList,
                                 @ restrict const dfloat *vgeo,
                                 @ restrict const dfloat *D,
                                 const dlong offset,
+                                const dfloat epsilon,
                                 @ restrict const dfloat *PSI,
                                 @ restrict const dfloat *NORMAL,
                                 @ restrict dfloat *DIFF)
 {
-  for (dlong e = 0; e < Nelements; e++; @outer(0)) { // for all elements
+  for (dlong element = 0; element < Nelements; element++; @outer(0)) { // for all elements
     @shared dfloat s_psi[p_Nq][p_Nq];
     @exclusive dfloat s_psiloc[p_Nq];
     @shared dfloat s_D[p_Nq][p_Nq];
+
+    const dlong e = elementList[element];
 
 #if defined(smXX) || defined(XeHPC) 
 #pragma unroll p_Nq
@@ -220,7 +224,9 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
 
           const dfloat gradn = gradx * nx + grady * ny + gradz * nz;
 
-          DIFF[id] = gradn;
+          const dfloat psi = PSI[id];
+
+          DIFF[id] = epsilon * gradn - psi * (1.0 - psi);
         }
       }
       @barrier();
@@ -276,7 +282,6 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
           const dfloat dtdx = vgeo[gid + p_TXID * p_Np];
           const dfloat dtdy = vgeo[gid + p_TYID * p_Np];
           const dfloat dtdz = vgeo[gid + p_TZID * p_Np];
-          const dfloat JW = vgeo[gid + p_JWID * p_Np];
 
           // compute 'r' and 's' derivatives of (q_m) at node n
           dfloat dpdr = 0, dpds = 0, dpdt = 0;

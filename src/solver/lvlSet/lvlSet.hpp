@@ -21,7 +21,7 @@ void clsrAx(elliptic_t* elliptic,
             const occa::memory &o_x,
             occa::memory &o_Ax);
 
-void clsrPreconditioner(const occa::memory &o_r, occa::memory &o_z);
+void clsrPreconditioner(elliptic_t* elliptic, const occa::memory &o_r, occa::memory &o_z);
 
 void getNormalVector(const occa::memory &o_phi, occa::memory &o_normals, bool avg = true);
 void getSignField(const occa::memory &o_phi, occa::memory &o_sign);

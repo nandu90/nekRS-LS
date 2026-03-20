@@ -240,7 +240,7 @@ void elliptic::applyZeroNormalMask(
   solver->applyZeroNormalMask = f;
 };
 
-void elliptic::userPreconditioner(const std::function<void(const occa::memory &o_r, occa::memory &o_z)> &f)
+void elliptic::userPreconditioner(const std::function<void(elliptic_t * elliptic, const occa::memory &o_r, occa::memory &o_z)> &f)
 {
   solver->userPreconditioner = f;
 };
@@ -813,7 +813,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     platform->timer.tic(elliptic->timerName + " preconditioner");
 
     if (elliptic->userPreconditioner) {
-      elliptic->userPreconditioner(o_r, o_z);
+      elliptic->userPreconditioner(elliptic, o_r, o_z);
     } else {
       ellipticPreconditioner(elliptic, o_r, o_z);
     }

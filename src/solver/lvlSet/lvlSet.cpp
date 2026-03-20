@@ -13,6 +13,8 @@
 #include "avm.hpp"
 #include "lowPassFilter.hpp"
 #include "gjp.hpp"
+#include "elliptic.h"
+#include "ellipticPrecon.h"
 
 // private members
 namespace
@@ -24,6 +26,8 @@ occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
 occa::kernel meshScalesKernel;
 occa::kernel normalizeVectorKernel;
+occa::kernel clsrDiffusionCoeffKernel;
+
 bool buildKernelCalled = false;
 std::unique_ptr<lvlSet_t> tlsr = nullptr;
 std::unique_ptr<lvlSet_t> clsr = nullptr;
@@ -134,6 +138,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
   normalVectorKernel = buildKernel("normalVector");
   meshScalesKernel = buildKernel("meshScales");
   normalizeVectorKernel = buildKernel("normalizeVector");
+  clsrDiffusionCoeffKernel = buildKernel("clsrDiffusionCoeff");
 }
 
 void validateLvlSetSections()
@@ -372,7 +377,7 @@ void parseLvlSetSections()
     if(firstWord == "default") {
       options.setArgs("TLSR DIFFUSIONCOEFF", to_string_f(1e-12));
       options.setArgs("TLSR TRANSPORTCOEFF", to_string_f(1.0));
-      options.setArgs("CLSR DIFFUSIONCOEFF", to_string_f(1.0));
+      options.setArgs("CLSR TRANSPORTCOEFF", to_string_f(1.0));
     }
 
     if(firstWord == "default") {
@@ -1395,13 +1400,14 @@ void lvlSet_t::setupEllipticSolver()
           lvlSet::clsrAx(elliptic, NelementsList, o_elementsList, o_x, o_Ax);
           });
 
-      this->ellipticSolver[0]->userPreconditioner ([] (const occa::memory &o_r, occa::memory &o_z)
+      this->ellipticSolver[0]->userPreconditioner ([] (elliptic_t *elliptic, const occa::memory &o_r, occa::memory &o_z)
           {
-          lvlSet::clsrPreconditioner(o_r, o_z);
+          lvlSet::clsrPreconditioner(elliptic, o_r, o_z);
           });
     }
   }
 }
+
 
 void lvlSet_t::finalize() {
   if(this->ellipticSolver[0])
@@ -1635,14 +1641,117 @@ void lvlSet_t::printStepInfo(double time, int tstep, bool printStepInfo, bool so
 void lvlSet::clsrAx(elliptic_t* elliptic,
                    dlong NelementsList,
                    const occa::memory &o_elementsList,
-                   const occa::memory &o_x,
-                   occa::memory &o_Ax)
+                   const occa::memory &o_q,
+                   occa::memory &o_Aq)
 {
-  //
+  if (NelementsList == 0) {
+    return;
+  }
+
+  auto& mesh = elliptic->mesh;
+
+  auto& o_geom_factors = elliptic->stressForm ? mesh->o_vgeo : mesh->o_ggeo;
+  auto& o_D = mesh->o_D;
+  auto& o_DT = mesh->o_DT;
+  auto& o_lambda0 = elliptic->o_lambda0;
+  auto o_lambda1 = (elliptic->poisson) ? o_NULL : elliptic->o_lambda1;
+
+  auto loadKernel = [&](bool svv = false) {
+    std::string kernelNamePrefix = (elliptic->poisson) ? "poisson-" : "";
+    if(svv) kernelNamePrefix += "svv-";
+    kernelNamePrefix += "elliptic";
+    if (elliptic->Nfields > 1) {
+      kernelNamePrefix += (elliptic->stressForm) ? "Stress" : "Block";
+    }
+    std::string kernelName = "Ax";
+    if (elliptic->mgLevel) {
+      if (elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
+        kernelName += "Var";
+      }
+    } else {
+       if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE") && !svv) {
+         kernelName += "Var";
+       }
+    }
+    kernelName += "Coeff";
+    if (elliptic->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
+      kernelName += "Trilinear";
+    }
+
+    auto gen_suffix = [&](const int N) 
+    {      
+      std::string dataType;
+      if (o_Aq.dtype() == occa::dtype::get<double>()) {
+         dataType = "double";
+      } else if (o_Aq.dtype() == occa::dtype::get<float>()) {  
+        dataType = "float";
+      }
+ 
+      return std::string("_") + std::to_string(N) + dataType;
+    };
+
+    kernelName += "Hex3D" + gen_suffix(elliptic->mesh->N);
+
+#if 0
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+      std::cout << kernelNamePrefix + "Partial" + kernelName << std::endl;
+    }
+#endif 
+    return platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
+  };
+
+  clsrDiffusionCoeffKernel(NelementsList,
+                           o_elementsList,
+                           o_geom_factors,
+                           o_D,
+                           elliptic->fieldOffset,
+                           interfaceWidth,
+                           o_q,
+                           o_normals,
+                           o_lambda0);
+
+  auto o_divVector = platform->deviceMemoryPool.reserve<dfloat>(3 * elliptic->fieldOffset);
+  o_divVector.copyFrom(o_normals, 3 * elliptic->fieldOffset);
+
+  platform->linAlg->axmyVector(mesh->Nlocal, 
+                               elliptic->fieldOffset,
+                               0,
+                               1.0,
+                               o_lambda0,
+                               o_divVector);
+
+  opSEM::divergence(mesh, elliptic->fieldOffset, o_divVector, o_Aq);
+
+  if(elliptic->svv) {
+    if (!elliptic->AxSVVKernel.isInitialized()) elliptic->AxSVVKernel = loadKernel(true);
+    elliptic->AxSVVKernel(NelementsList,
+        elliptic->fieldOffset,
+        elliptic->loffset,
+        o_elementsList,
+        o_geom_factors,
+        elliptic->o_svvD,
+        elliptic->o_svvDT,
+        elliptic->o_svvmue,
+        o_NULL,
+        o_q,
+        o_Aq);
+  }
 }
 
-void lvlSet::clsrPreconditioner(const occa::memory &o_r,
+void lvlSet::clsrPreconditioner(elliptic_t* elliptic,
+                                const occa::memory &o_r,
                                 occa::memory &o_z)
 {
+  auto mesh = elliptic->mesh;
+  auto precon = elliptic->precon;
+  auto &options = elliptic->options;
 
+  if(options.compareArgs("PRECONDITIONER", "JACOBI")) {
+    platform->linAlg->axmyzMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_r, precon->o_invDiagA, o_z);
+  } else {
+    if(platform->comm.mpiRank() == 0) {
+      printf("ERROR: Unknown clsr preconditioner\n");
+    }
+    MPI_Abort(platform->comm.mpiComm(), 1);
+  }
 }
