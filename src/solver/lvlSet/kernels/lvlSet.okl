@@ -349,3 +349,17 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
     }
   }
 }
+
+@kernel void heaviside(const dlong Ntotal,
+                       const dfloat eps,
+                       @ restrict const dfloat *PHI,
+                       @ restrict dfloat *PSI)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    if (n < Ntotal) {
+      const dfloat phi = PHI[n];
+      const dfloat theta = phi / (2.0 * eps);
+      PSI[n] = 0.5 * (tanh(theta) + 1.0);
+    }
+  }
+}

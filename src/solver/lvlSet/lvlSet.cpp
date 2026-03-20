@@ -27,8 +27,11 @@ occa::kernel normalVectorKernel;
 occa::kernel meshScalesKernel;
 occa::kernel normalizeVectorKernel;
 occa::kernel clsrDiffusionCoeffKernel;
+occa::kernel heavisideKernel;
 
-bool buildKernelCalled = false;
+static bool buildKernelCalled = false;
+static bool setupCalled = false;
+
 std::unique_ptr<lvlSet_t> tlsr = nullptr;
 std::unique_ptr<lvlSet_t> clsr = nullptr;
 
@@ -37,6 +40,9 @@ static occa::memory o_normals;
 
 static double elapsedTime;
 static int stepsMax;
+static double maxMeshScale;
+static double minMeshScale;
+static double meanMeshScale;
 
 static dfloat interfaceWidth;
 
@@ -129,7 +135,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
     } else {
-      buildKernelCalled = 1;
+      buildKernelCalled = true;
       return platform->kernelRequests.load(reqName, kernelName);
     }
   };
@@ -139,6 +145,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
   meshScalesKernel = buildKernel("meshScales");
   normalizeVectorKernel = buildKernel("normalizeVector");
   clsrDiffusionCoeffKernel = buildKernel("clsrDiffusionCoeff");
+  heavisideKernel = buildKernel("heaviside");
 }
 
 void validateLvlSetSections()
@@ -507,11 +514,11 @@ void bdrySetupFromPar()
 
 void lvlSet::setup()
 {
-  static bool isInitialized = false;
-  if (isInitialized) {
-    return;
-  }
-  isInitialized = true;
+  nekrsCheck(setupCalled,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "LVLSET setup called more than once!");
 
   nrs = dynamic_cast<nrs_t *>(platform->app);
   if (!nrs || !nrs->meshV || !nrs->scalar) {
@@ -572,6 +579,8 @@ void lvlSet::setup()
 
   tlsr->setupEllipticSolver();
   clsr->setupEllipticSolver();
+
+  setupCalled = true;
 }
 
 void lvlSet_t::pseudoStepper(const double &fluidTime)
@@ -651,26 +660,26 @@ void setInterfaceWidth()
   std::vector<dfloat> etemp(mesh->Nelements);
 
   o_emax.copyTo(etemp.data(), mesh->Nelements);
-  dfloat emax = -1e10;
+  maxMeshScale = -1e10;
   for(dlong e=0; e < mesh->Nelements; e++) {
-    emax = (etemp[e] > emax) ? etemp[e] : emax; 
+    maxMeshScale = (etemp[e] > maxMeshScale) ? etemp[e] : maxMeshScale; 
   }
 
   o_emin.copyTo(etemp.data(), mesh->Nelements);
-  dfloat emin = 1e10;
+  dfloat minMeshScale = 1e10;
   for(dlong e=0; e < mesh->Nelements; e++) {
-    emin = (etemp[e] < emin) ? etemp[e] : emin; 
+    minMeshScale = (etemp[e] < minMeshScale) ? etemp[e] : minMeshScale; 
   }
 
   o_esum.copyTo(etemp.data(), mesh->Nelements);
-  dfloat esum = 0.0;
+  meanMeshScale = 0.0;
   for(dlong e=0; e < mesh->Nelements; e++) {
-    esum += etemp[e]; 
+    meanMeshScale += etemp[e]; 
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, &emax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
-  MPI_Allreduce(MPI_IN_PLACE, &emin, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm());
-  MPI_Allreduce(MPI_IN_PLACE, &esum, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, &maxMeshScale, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, &minMeshScale, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, &meanMeshScale, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
 
   dlong ecount = mesh->Nlocal;
   MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
@@ -678,13 +687,13 @@ void setInterfaceWidth()
   platform->options.getArgs("LVLSET INTERFACE WIDTH FACTOR", interfaceWidth);
 
   if(platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MAX")) {
-    interfaceWidth *= emax;
+    interfaceWidth *= maxMeshScale;
   } 
   else if (platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MIN")) {
-    interfaceWidth *= emin;
+    interfaceWidth *= minMeshScale;
   }
   else {
-    interfaceWidth *= dfloat(esum / ecount);
+    interfaceWidth *= dfloat(meanMeshScale / ecount);
   }
 
   widthInitialized = true;
@@ -1754,4 +1763,36 @@ void lvlSet::clsrPreconditioner(elliptic_t* elliptic,
     }
     MPI_Abort(platform->comm.mpiComm(), 1);
   }
+}
+
+void lvlSet::initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const dfloat epsin)
+{
+  nekrsCheck(!setupCalled || !buildKernelCalled,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "lvlSet::initHeaviside called prior to lvlSet::setup()!");
+
+  setInterfaceWidth();
+
+  dfloat eps = interfaceWidth;
+  if(epsin > 0.0) {
+    eps = epsin;
+    if(platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MAX")) {
+      eps *= maxMeshScale;
+    }
+    else if(platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MIN")) {
+      eps *= minMeshScale;
+    }
+    else {
+      eps *= meanMeshScale;
+    }
+  }
+
+  auto meshV = nrs->meshV;
+
+  heavisideKernel(meshV->Nlocal,
+                  eps,
+                  o_phi,
+                  o_psi);
 }
