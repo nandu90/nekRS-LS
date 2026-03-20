@@ -24,9 +24,13 @@ occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
 occa::kernel meshScalesKernel;
 occa::kernel initTlsFromClsKernel;
+occa::kernel normalizeVectorKernel;
 bool buildKernelCalled = false;
 std::unique_ptr<lvlSet_t> tlsr = nullptr;
 std::unique_ptr<lvlSet_t> clsr = nullptr;
+
+static occa::memory o_signls;
+static occa::memory o_normals;
 
 static double elapsedTime;
 static int stepsMax;
@@ -73,6 +77,7 @@ static std::vector<std::string> lvlSetKeys = {
   {"maximumsteps"},
   {"targetcfl"},
   {"stoppingcondition"},
+  {"normalaveraging"},
 };
 
 static std::vector<std::string> scalarKeys = {
@@ -143,6 +148,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
   normalVectorKernel = buildKernel("normalVector");
   meshScalesKernel = buildKernel("meshScales");
   initTlsFromClsKernel = buildKernel("initTlsFromCls");
+  normalizeVectorKernel = buildKernel("normalizeVector");
 }
 
 void validateLvlSetSections()
@@ -323,6 +329,17 @@ void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::strin
     options.setArgs("LVLSET STOPPING CONDITION","TARGETSTEPS");
   }
 
+  if (ini->extract(parSection, "normalAveraging", value)) {
+    const std::vector<std::string> validValues = {
+      {"true"},
+      {"false"},
+    };
+    checkValidity(rank, validValues, value);
+    options.setArgs("LVLSET NORMAL AVERAGING", upperCase(value));
+  }
+  else {
+    options.setArgs("LVLSET NORMAL AVERAGING", "FALSE");
+  }
 }
 
 void parseLvlSetSections()
@@ -603,6 +620,9 @@ void lvlSet::setup()
       platform->app->bc->setBcMap("clsr", false, map);
     }
   }
+
+  o_signls = platform->device.malloc<dfloat>(nrs->scalar->fieldOffset());
+  o_normals = platform->device.malloc<dfloat>(3 * nrs->scalar->fieldOffset());
 
   auto ls = [&](const std::string& name) {
     lvlSetConfig_t cfg;
@@ -955,7 +975,6 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
     const dlong Nstates = this->Nsubsteps ? std::max(this->o_coeffBDF.size(), this->o_coeffEXT.size()) : 1;
     this->o_relWrst = platform->device.malloc<dfloat>(Nstates * this->meshV->dim * this->vCubatureOffset);
 
-    this->o_signls = platform->device.malloc<dfloat>(this->_fieldOffset);
 
     nFieldsAlloc = this->o_coeffEXT.size();
     this->o_ADV = platform->device.malloc<dfloat>(nFieldsAlloc * this->_fieldOffset);
@@ -1059,31 +1078,48 @@ void lvlSet_t::setTimeIntegrationCoeffs(int tstep)
   }
 }
 
+void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normals, bool avg)
+{
+  auto meshV = nrs->meshV;
+
+  normalVectorKernel(meshV->Nelements,
+                     meshV->o_vgeo,
+                     meshV->o_D,
+                     nrs->scalar->vFieldOffset,
+                     o_phi,
+                     o_normals);
+
+  if(avg) {
+    oogs::startFinish(o_normals, meshV->dim, nrs->scalar->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
+
+    //normalization seems necessary after averaging for TLSR stability
+    normalizeVectorKernel(meshV->Nlocal, nrs->scalar->vFieldOffset, o_normals);
+  }
+}
+
 void lvlSet_t::computeAdvectionCoeff(int tstep)
 {
-  if(this->name == "tlsr" || (this->name == "clsr" && tstep == 1)) { //for clsr normals need to be computed only at first time step
+  bool avg = false;
+
+  if(platform->options.compareArgs("LVLSET NORMAL AVERAGING", "TRUE")) {
+    avg = true;
+  }
+
+  if(this->name == "clsr" && tstep == 1) {
+    auto o_phi = nrs->scalar->o_solution("tls");
+
+    lvlSet::getNormalVector(o_phi, o_normals, avg);
+  }
+
+  if(this->name == "tlsr") { 
+    auto o_phi = this->o_S;
     auto meshV = this->meshV;
-    // a. compute interface normals
 
-    auto o_Si = this->o_S;
+    lvlSet::getNormalVector(o_phi, this->o_W, avg);
 
-    if(this->name == "clsr")
-      o_Si = nrs->scalar->o_solution("tls");
-
-    launchKernel("core-gradientVolumeHex3D",
-        meshV->Nelements,
-        meshV->o_vgeo,
-        meshV->o_D,
-        this->vFieldOffset,
-        o_Si,
-        this->o_W);
-
-    oogs::startFinish(this->o_W, meshV->dim, this->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
-    platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, meshV->o_invLMM, this->o_W);
-
-    signlsKernel(meshV->Nlocal, o_Si, this->o_signls);
-
-    normalVectorKernel(meshV->Nlocal, this->vFieldOffset, this->o_signls, this->o_W);
+    signlsKernel(meshV->Nlocal, o_phi, o_signls);
+  
+    platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, o_signls, this->o_W);
   }
 }
 
@@ -1192,7 +1228,7 @@ void lvlSet_t::makeExplicit(double time, int tstep)
   const auto parPrefix = upperCase(this->name);
 
   if(this->name == "tlsr")
-    this->o_EXT.copyFrom(this->o_signls, mesh->Nlocal); 
+    this->o_EXT.copyFrom(o_signls, mesh->Nlocal); 
                                                           
   if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "HPFRT")) {
     launchKernel("core-filterRTHex3D",
