@@ -12,7 +12,7 @@ namespace lvlSet
 {
 void buildKernel(occa::properties kernelInfo);
 void setup();
-void solve(const double &fluidTime, int nfac);
+void solve(const double &fluidTime);
 lvlSet_t* getTLSR();
 lvlSet_t* getCLSR();
 void clsrAx(elliptic_t* elliptic,
@@ -66,7 +66,7 @@ public:
 
   std::function<occa::memory(double, int)> userImplicitLinearTerm = nullptr;
 
-  void pseudoStepper(const double &fluidTime, int nfac);
+  void pseudoStepper(const double &fluidTime);
 
   dlong fieldOffset() const
   {
@@ -137,7 +137,7 @@ public:
   std::unique_ptr<iofld> fieldWriter;
   int outfldCounter = 0;
 
-  std::tuple<dfloat, dfloat, int> computeFixedDistanceAdvectionParams(int maxSteps, int nfac);
+  std::tuple<dfloat, dfloat, int> computeFixedDistanceAdvectionParams();
 
 private:
   void advectionSubcycling(int nEXT, double time);

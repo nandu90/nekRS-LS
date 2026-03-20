@@ -30,6 +30,11 @@ std::unique_ptr<lvlSet_t> clsr = nullptr;
 
 static double elapsedTime;
 static int stepsMax;
+static dfloat nfac;
+static dfloat rf;
+static dfloat targetCFL;
+enum class StopMode { targetSteps, targetTime };
+static StopMode stopMode;
 
 static dfloat interfaceWidth;
 static dfloat emax;
@@ -425,7 +430,7 @@ void parseLvlSetSections()
     }
 
     if(firstWord == "default") {
-      options.setArgs("TLSR DISTANCE FACTOR", to_string_f(2.5));
+      options.setArgs("TLSR DISTANCE FACTOR", to_string_f(25.0));
       options.setArgs("TLSR REGULARIZATION FACTOR", to_string_f(0.1));
     }
 
@@ -619,32 +624,19 @@ void lvlSet::setup()
   clsr->setupEllipticSolver();
 }
 
-void lvlSet_t::pseudoStepper(const double &fluidTime, int nfac)
+void lvlSet_t::pseudoStepper(const double &fluidTime)
 {
   auto mesh = this->meshV;
 
-  stepsMax = 1000; // TODO: make user configurable?
   elapsedTime = 0.0;
   double time = 0.0;
   int tstep = 1;
-  dfloat targetCFL = 0.9; // TODO: make user configurable?
-  //int nfac = 25; // factor of mesh element lengths for fixed distance advection. TODO: make user configurable?
-
-  // determine fixed advection distance parameters
-  auto [dt, targetTime, targetSteps] = this->computeFixedDistanceAdvectionParams(stepsMax, nfac);
+  auto [dt, targetTime, targetSteps] = this->computeFixedDistanceAdvectionParams();
   this->dt[0] = dt;
-  std::cout << std::scientific << std::setprecision(6)
-            << "dt=" << dt
-            << ", targetTime=" << targetTime
-            << std::defaultfloat
-            << ", targetSteps=" << targetSteps
-            << "\n";
 
   // Integration loop stopping condition
-  enum class StopMode { targetSteps, targetTime };
-  StopMode mode = StopMode::targetTime;
   auto isFinished = [&]() -> bool {
-    switch (mode) {
+    switch (stopMode) {
       case StopMode::targetSteps:
         return tstep >= (targetSteps + 1);
       case StopMode::targetTime: {
@@ -674,7 +666,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime, int nfac)
     this->dt[1] = this->dt[0];
     this->dt[0] = dtNew;
 
-    if (mode == StopMode::targetTime) {
+    if (stopMode == StopMode::targetTime) {
       // make sure we don't overstep the targetTime
       this->dt[0] = std::min(this->dt[0], static_cast<dfloat>(targetTime - time));
     }
@@ -784,9 +776,21 @@ void setInterfaceWidth()
   std::cout << "Element Length Scale (min, max, avg): " << emin << ", " << emax << ", " << eavg << std::endl;
 }
 
-void lvlSet::solve(const double &fluidTime, int nfac=25)
+void lvlSet::solve(const double &fluidTime)
 {
-  dfloat r_f = 0.1; // regularization factor we employ to decrease the gradients in the initial solution. TODO: make user configurable?
+
+  platform->options.getArgs("LVLSET MAXIMUM STEPS", stepsMax);
+  platform->options.getArgs("LVLSET TARGET CFL", targetCFL);
+  std::string stopModeStr;
+  platform->options.getArgs("LVLSET STOPPING CONDITION", stopModeStr);
+  if (stopModeStr == "TARGETSTEPS") {
+    stopMode = StopMode::targetSteps;
+  } else if (stopModeStr == "TARGETTIME") {
+    stopMode = StopMode::targetTime;
+  } else {
+    nekrsCheck(true, platform->comm.mpiComm(), EXIT_FAILURE,
+               "Unknown LVLSET STOPPING CONDITION: %s\n", stopModeStr.c_str());
+  }
 
   setInterfaceWidth();
 
@@ -810,8 +814,11 @@ void lvlSet::solve(const double &fluidTime, int nfac=25)
     if(totalTime > timer && freq > 1e-12) {
       timer += freq;
       ls->o_S.copyFrom(nrs->scalar->o_solution(scalarName), ls->fieldOffset());
-      if (ls->name == "tlsr" && fluidTime > 0.0) { initTlsFromClsKernel(ls->meshV->Nlocal, r_f, ls->o_S); }
-      ls->pseudoStepper(fluidTime, nfac);
+      if (ls->name == "tlsr") {
+        platform->options.getArgs("TLSR REGULARIZATION FACTOR", rf);
+        if (fluidTime > 0.0) { initTlsFromClsKernel(ls->meshV->Nlocal, rf, ls->o_S); }
+      }
+      ls->pseudoStepper(fluidTime);
     }
   };
   runPseudoStepper(tlsr, tlsrTimer, "cls");
@@ -1713,7 +1720,9 @@ void lvlSet_t::printStepInfo(double time, dfloat cfl, int tstep, bool printStepI
   }
 }
 
-std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams(int stepsMax, int nfac) {
+std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams() {
+
+  platform->options.getArgs("TLSR DISTANCE FACTOR", nfac);
 
   // Determine time step assuming unit-speed advection based on the smallest element
   int N;
@@ -1725,6 +1734,13 @@ std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams(in
 
   // Determine target simulation time corresponding to the prescribed propagation distance (assuming unit speed advection)
   dfloat tTarget = eavg * nfac;
+
+  std::cout << std::scientific << std::setprecision(6)
+            << "dt=" << dt
+            << ", targetTime=" << tTarget
+            << std::defaultfloat
+            << ", targetSteps=" << nSteps
+            << "\n";
 
   return {dt, tTarget, nSteps};
 }
