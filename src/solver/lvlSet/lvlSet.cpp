@@ -713,7 +713,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     elapsedTime += elapsedStep;
 
     this->printStepInfo(time, cfl, tstep, true, true);
-    this->writeFile(time, tstep);
+    this->writeFile(fluidTime, tstep);
     tstep += 1;
   }
 
@@ -1288,7 +1288,6 @@ void lvlSet_t::makeForcing()
   }
 
   const auto n = std::max(this->o_coeffEXT.size(), this->o_coeffBDF.size());
-
   for (int s = n; s > 1; s--) {
     this->o_EXT.copyFrom(this->o_EXT, this->_fieldOffset, (s - 1) * this->_fieldOffset, (s - 2) * this->_fieldOffset);
     if (this->o_ADV.isInitialized()) {
@@ -1309,6 +1308,7 @@ void lvlSet_t::solve(double time, int stage)
   o_rhs.copyFrom(this->o_JwF, mesh->Nlocal, 0, this->fieldOffsetScan);
 
   auto o_lhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+
   launchKernel("scalar_t::neumannBCHex3D",
       this->o_name,
       mesh->Nelements,
@@ -1551,6 +1551,7 @@ void lvlSet_t::mueSVV()
         launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
       initialized = true;
     }
+
     if(platform->options.compareArgs("MOVING MESH","TRUE"))
       launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
 
