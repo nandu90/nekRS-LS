@@ -816,7 +816,7 @@ void lvlSet::solve(const double &fluidTime)
       ls->o_S.copyFrom(nrs->scalar->o_solution(scalarName), ls->fieldOffset());
       if (ls->name == "tlsr") {
         platform->options.getArgs("TLSR REGULARIZATION FACTOR", rf);
-        if (fluidTime > 0.0) { initTlsFromClsKernel(ls->meshV->Nlocal, rf, ls->o_S); }
+        initTlsFromClsKernel(ls->meshV->Nlocal, rf, ls->o_S);
       }
       ls->pseudoStepper(fluidTime);
     }
