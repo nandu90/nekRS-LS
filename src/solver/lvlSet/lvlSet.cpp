@@ -1722,27 +1722,35 @@ void lvlSet_t::printStepInfo(double time, dfloat cfl, int tstep, bool printStepI
 
 std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams() {
 
-  platform->options.getArgs("TLSR DISTANCE FACTOR", nfac);
-
-  // Determine time step assuming unit-speed advection based on the smallest element
+  // Compute the time step from the smallest mesh element, assuming unit-speed advection
+  // TODO: The denominator should be N; currently using N+1 to match the Nek5000 implementation
   int N;
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
-  dfloat dt = emin/(N+1); // TODO: this should be N --> currently setting to N+1 to match Nek5000 implementation
+  dfloat dt = emin/(N+1);
+  if (this->name == "clsr") {
+    dt *= 0.1;
+  }
 
-  // Number of fixed time steps to advect a distance of nfac x (average element size), capped at maxSteps
-  int nSteps = std::min(stepsMax, static_cast<int>(std::floor(eavg * nfac / dt)));
+  // Compute the target integration time for the prescribed propagation distance, assuming unit-speed advection
+  dfloat targetTime;
+  if (this->name == "tlsr") {
+    platform->options.getArgs("TLSR DISTANCE FACTOR", nfac);
+    targetTime = eavg * nfac;
+  } else { // this->name ==  "clsr"
+    targetTime = interfaceWidth;
+  }
 
-  // Determine target simulation time corresponding to the prescribed propagation distance (assuming unit speed advection)
-  dfloat tTarget = eavg * nfac;
+  // Number of fixed time steps required to reach the target integration time (i.e. to advect the prescribed distance)
+  int targetSteps = std::min(stepsMax, static_cast<int>(std::floor(targetTime / dt)));
 
   std::cout << std::scientific << std::setprecision(6)
             << "dt=" << dt
-            << ", targetTime=" << tTarget
+            << ", targetTime=" << targetTime
             << std::defaultfloat
-            << ", targetSteps=" << nSteps
+            << ", targetSteps=" << targetSteps
             << "\n";
 
-  return {dt, tTarget, nSteps};
+  return {dt, targetTime, targetSteps};
 }
 
 void lvlSet::clsrAx(elliptic_t* elliptic,
