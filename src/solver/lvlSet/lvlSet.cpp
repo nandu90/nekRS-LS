@@ -732,9 +732,14 @@ void lvlSet::solve(const double &fluidTime)
 }
 
 
-lvlSet_t* lvlSet::getLS()
+lvlSet_t* lvlSet::getTLSR()
 {
   return tlsr.get();
+}
+
+lvlSet_t* lvlSet::getCLSR()
+{
+  return clsr.get();
 }
 
 lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_geom) : geom(_geom)
