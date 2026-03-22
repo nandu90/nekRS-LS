@@ -1714,9 +1714,8 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
     return platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
   };
 
-  clsrDiffusionCoeffKernel(NelementsList,
-                           o_elementsList,
-                           o_geom_factors,
+  clsrDiffusionCoeffKernel(mesh->Nelements,
+                           mesh->o_vgeo,
                            o_D,
                            elliptic->fieldOffset,
                            interfaceWidth,

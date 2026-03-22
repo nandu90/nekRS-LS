@@ -144,7 +144,6 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
 }
 
 @kernel void clsrDiffusionCoeff(const dlong Nelements,
-                                @ restrict const dlong *elementList,
                                 @ restrict const dfloat *vgeo,
                                 @ restrict const dfloat *D,
                                 const dlong offset,
@@ -153,12 +152,10 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
                                 @ restrict const dfloat *NORMAL,
                                 @ restrict dfloat *DIFF)
 {
-  for (dlong element = 0; element < Nelements; element++; @outer(0)) { // for all elements
+  for (dlong e = 0; e < Nelements; e++; @outer(0)) { // for all elements
     @shared dfloat s_psi[p_Nq][p_Nq];
     @exclusive dfloat s_psiloc[p_Nq];
     @shared dfloat s_D[p_Nq][p_Nq];
-
-    const dlong e = elementList[element];
 
 #if defined(smXX) || defined(XeHPC) 
 #pragma unroll p_Nq
