@@ -683,6 +683,7 @@ void setInterfaceWidth()
 
   dlong ecount = mesh->Nlocal;
   MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
+  meanMeshScale /= dfloat(ecount);
 
   platform->options.getArgs("LVLSET INTERFACE WIDTH FACTOR", interfaceWidth);
 
@@ -693,7 +694,7 @@ void setInterfaceWidth()
     interfaceWidth *= minMeshScale;
   }
   else {
-    interfaceWidth *= dfloat(meanMeshScale / ecount);
+    interfaceWidth *= meanMeshScale;
   }
 
   widthInitialized = true;
@@ -1608,7 +1609,13 @@ void lvlSet_t::writeFile(double time, int tstep)
 
 void lvlSet_t::printStepInfo(double time, int tstep, bool printStepInfo, bool solverInfo)
 {
-  const auto cfl = nrs->computeCFL(this->meshV, this->o_W, this->dt[0]);
+  auto o_U = this->o_W;
+
+  if(this->name == "clsr") {
+    o_U = o_normals;
+  }
+
+  const auto cfl = nrs->computeCFL(this->meshV, o_U, this->dt[0]);
 
   auto printSolverInfo = [tstep](elliptic *solver, const std::string &name) {
     if (!solver) {
@@ -1714,6 +1721,21 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
     return platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
   };
 
+  platform->linAlg->fill(mesh->Nlocal, 0.0, o_lambda0);
+
+  if (!elliptic->AxKernel.isInitialized()) elliptic->AxKernel = loadKernel();
+  elliptic->AxKernel(NelementsList,
+                     elliptic->fieldOffset,
+                     elliptic->loffset,
+                     o_elementsList,
+                     o_geom_factors,
+                     o_D,
+                     o_DT,
+                     o_lambda0,
+                     o_lambda1,
+                     o_q,
+                     o_Aq);
+
   clsrDiffusionCoeffKernel(mesh->Nelements,
                            mesh->o_vgeo,
                            o_D,
@@ -1733,7 +1755,10 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
                                o_lambda0,
                                o_divVector);
 
-  opSEM::divergence(mesh, elliptic->fieldOffset, o_divVector, o_Aq);
+  auto o_div = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+  opSEM::divergence(mesh, elliptic->fieldOffset, o_divVector, o_div);
+
+  platform->linAlg->axpby(mesh->Nlocal, 1.0, o_div, 1.0, o_Aq);
 
   if(elliptic->svv) {
     if (!elliptic->AxSVVKernel.isInitialized()) elliptic->AxSVVKernel = loadKernel(true);
