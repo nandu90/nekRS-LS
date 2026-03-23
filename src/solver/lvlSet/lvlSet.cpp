@@ -39,13 +39,9 @@ static occa::memory o_signls;
 static occa::memory o_normals;
 
 static double elapsedTime;
-static int stepsMax;
 
-static dfloat distanceFactor;
-static dfloat tlsrRegFactor;
-static dfloat targetCFL;
-enum class StopMode { targetSteps, targetTime };
-static StopMode stopMode;
+enum class StopMode {targetSteps, targetTime};
+StopMode stopMode;
 
 static double maxMeshScale;
 static double minMeshScale;
@@ -672,6 +668,24 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
 {
   auto mesh = this->meshV;
 
+  {
+    double steps;
+    platform->options.getArgs(upperCase(this->name) + " MAXIMUM STEPS", steps);
+    this->stepsMax = static_cast<int>(steps);
+
+    platform->options.getArgs(upperCase(this->name) + " TARGET CFL", this->targetCFL);
+    std::string stopModeStr;
+    platform->options.getArgs(upperCase(this->name) + " STOPPING CONDITION", stopModeStr);
+    if (stopModeStr == "TARGETSTEPS") {
+      stopMode = StopMode::targetSteps;
+    } else if (stopModeStr == "TARGETTIME") {
+      stopMode = StopMode::targetTime;
+    } else {
+      nekrsCheck(true, platform->comm.mpiComm(), EXIT_FAILURE,
+          "Unknown STOPPING CONDITION: %s\n", stopModeStr.c_str());
+    }
+  }
+
   elapsedTime = 0.0;
   double time = 0.0;
   int tstep = 1;
@@ -703,8 +717,8 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
 
     auto cfl = nrs->computeCFL(this->meshV, o_U, this->dt[0]);
     dfloat dtNew = this->dt[0];
-    if (cfl > targetCFL) { 
-      dtNew = this->dt[0] * targetCFL / cfl; 
+    if (cfl > this->targetCFL) { 
+      dtNew = this->dt[0] * this->targetCFL / cfl; 
     }
 
     // shuffle time-step history
@@ -749,7 +763,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
   nrs->scalar->o_solution(scalarName).copyFrom(this->o_S, this->fieldOffset());
 }
 
-void setInterfaceWidth()
+void lvlSet::setInterfaceWidth()
 {
   if (!platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE").empty()) {
     platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE", interfaceWidth);
@@ -821,7 +835,7 @@ void setInterfaceWidth()
 
 void lvlSet::solve(const double &fluidTime)
 {
-  setInterfaceWidth();
+  lvlSet::setInterfaceWidth();
 
   if(fluidStartTime < 0.0){ //first call
     fluidStartTime = fluidTime;
@@ -837,22 +851,6 @@ void lvlSet::solve(const double &fluidTime)
     if(platform->options.compareArgs(upperCase(ls->name) + " SOLVER", "NONE"))
         return;
 
-    double steps;
-    platform->options.getArgs(upperCase(ls->name) + " MAXIMUM STEPS", steps);
-    stepsMax = int(steps);
-
-    platform->options.getArgs(upperCase(ls->name) + " TARGET CFL", targetCFL);
-    std::string stopModeStr;
-    platform->options.getArgs(upperCase(ls->name) + " STOPPING CONDITION", stopModeStr);
-    if (stopModeStr == "TARGETSTEPS") {
-      stopMode = StopMode::targetSteps;
-    } else if (stopModeStr == "TARGETTIME") {
-      stopMode = StopMode::targetTime;
-    } else {
-      nekrsCheck(true, platform->comm.mpiComm(), EXIT_FAILURE,
-                 "Unknown STOPPING CONDITION: %s\n", stopModeStr.c_str());
-    }
-
     double freq;
     platform->options.getArgs(upperCase(ls->name) + " FREQUENCY", freq);
 
@@ -865,6 +863,7 @@ void lvlSet::solve(const double &fluidTime)
       ls->o_S.copyFrom(o_psi, mesh->Nlocal);
 
       if (ls->name == "tlsr") {
+        double tlsrRegFactor;
         platform->options.getArgs("TLSR REGULARIZATION FACTOR", tlsrRegFactor);
 
         platform->linAlg->add(mesh->Nlocal, -0.5, ls->o_S);
@@ -1787,7 +1786,7 @@ void lvlSet_t::printStepInfo(double time, dfloat cfl, int tstep, bool printStepI
       printf("Pseudo-step=%-8d tau= %.8e  dtau=%.1e  CFL= %.3f\n", tstep, time, this->dt[0], cfl);
     }
 
-    if (tstep == stepsMax) {
+    if (tstep == this->stepsMax) {
       printf("Pseudo-step=%-8d elapsedTime= %.2es  elapsedTimePerStep= %.5es\n", tstep, elapsedTime, elapsedTime/tstep);
     }
   }
@@ -1804,12 +1803,12 @@ std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams()
     dt *= 0.1;
   }
   // Compute the target integration time for the prescribed propagation distance, assuming unit-speed advection
-  platform->options.getArgs(upperCase(this->name) + " DISTANCE FACTOR", distanceFactor);
+  platform->options.getArgs(upperCase(this->name) + " DISTANCE FACTOR", this->distanceFactor);
   dfloat targetTime;
-  targetTime = meanMeshScale * distanceFactor;
+  targetTime = meanMeshScale * this->distanceFactor;
 
   // Number of fixed time steps required to reach the target integration time (i.e. to advect the prescribed distance)
-  int targetSteps = std::min(stepsMax, static_cast<int>(std::floor(targetTime / dt)));
+  int targetSteps = std::min(this->stepsMax, static_cast<int>(std::floor(targetTime / dt)));
 
   if(platform->comm.mpiRank() == 0) {
     printf("%s targetSteps = %d targetTime = %.8e\n", upperCase(this->name).c_str(), targetSteps, targetTime);
@@ -1961,7 +1960,7 @@ void lvlSet::initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const
              "%s\n",
              "lvlSet::initHeaviside called prior to lvlSet::setup()!");
 
-  setInterfaceWidth();
+  lvlSet::setInterfaceWidth();
 
   dfloat eps = interfaceWidth;
   if(epsin > 0.0) {
