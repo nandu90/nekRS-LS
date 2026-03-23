@@ -536,7 +536,7 @@ void parseLvlSetSections()
       for (int i = 0; i < list.size(); i++) {
         if (i > 0) 
           s_newMap = s_newMap + ", ";
-        if(list[i] == "inlet" || list[i] == "v" || list[i] == "udfDirichlet") {
+        if(list[i] == "inlet" || list[i] == "v" || list[i] == "udfdirichlet") {
           s_newMap = s_newMap + list[i];
         } 
         else {
@@ -1806,6 +1806,8 @@ std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams()
   platform->options.getArgs(upperCase(this->name) + " DISTANCE FACTOR", this->distanceFactor);
   dfloat targetTime;
   targetTime = meanMeshScale * this->distanceFactor;
+
+  if(this->name == "clsr") targetTime = interfaceWidth;
 
   // Number of fixed time steps required to reach the target integration time (i.e. to advect the prescribed distance)
   int targetSteps = std::min(this->stepsMax, static_cast<int>(std::floor(targetTime / dt)));
