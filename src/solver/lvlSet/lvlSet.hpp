@@ -15,15 +15,18 @@ void setup();
 void solve(const double &fluidTime);
 lvlSet_t* getTLSR();
 lvlSet_t* getCLSR();
+
 void clsrAx(elliptic_t* elliptic,
             dlong NelementsList,
             const occa::memory &o_elementsList,
             const occa::memory &o_x,
             occa::memory &o_Ax);
 
-void clsrPreconditioner(const occa::memory &o_r, occa::memory &o_z);
+void clsrPreconditioner(elliptic_t* elliptic, const occa::memory &o_r, occa::memory &o_z);
 
 void getNormalVector(const occa::memory &o_phi, occa::memory &o_normals, bool avg = true);
+void getSignField(const occa::memory &o_phi, occa::memory &o_sign);
+void initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const dfloat epsin = -1.0);
 }
 
 struct lvlSetConfig_t : public solverCfg_t {

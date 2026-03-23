@@ -123,7 +123,7 @@ struct elliptic_t {
 
   std::function<void(dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x)>
       applyZeroNormalMask;
-  std::function<void(const occa::memory &o_r, occa::memory &o_z)> userPreconditioner;
+  std::function<void(elliptic_t *elliptic, const occa::memory &o_r, occa::memory &o_z)> userPreconditioner;
 
   std::function<void(elliptic_t *elliptic, dlong NelementsList, const occa::memory &o_elementsList, const occa::memory &o_x, occa::memory &o_Ax)> userAx;
 

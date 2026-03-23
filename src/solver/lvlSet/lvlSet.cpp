@@ -13,6 +13,8 @@
 #include "avm.hpp"
 #include "lowPassFilter.hpp"
 #include "gjp.hpp"
+#include "elliptic.h"
+#include "ellipticPrecon.h"
 
 // private members
 namespace
@@ -23,9 +25,13 @@ nrs_t *nrs;
 occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
 occa::kernel meshScalesKernel;
-occa::kernel initTlsFromClsKernel;
 occa::kernel normalizeVectorKernel;
-bool buildKernelCalled = false;
+occa::kernel clsrDiffusionCoeffKernel;
+occa::kernel heavisideKernel;
+
+static bool buildKernelCalled = false;
+static bool setupCalled = false;
+
 std::unique_ptr<lvlSet_t> tlsr = nullptr;
 std::unique_ptr<lvlSet_t> clsr = nullptr;
 
@@ -34,16 +40,18 @@ static occa::memory o_normals;
 
 static double elapsedTime;
 static int stepsMax;
+
 static dfloat distanceFactor;
 static dfloat tlsrRegFactor;
 static dfloat targetCFL;
 enum class StopMode { targetSteps, targetTime };
 static StopMode stopMode;
 
+static double maxMeshScale;
+static double minMeshScale;
+static double meanMeshScale;
+
 static dfloat interfaceWidth;
-static dfloat maxScale;
-static dfloat minScale;
-static dfloat avgScale;
 
 static double tlsrTimer = 0.0;
 static double clsrTimer = 0.0;
@@ -139,7 +147,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
     } else {
-      buildKernelCalled = 1;
+      buildKernelCalled = true;
       return platform->kernelRequests.load(reqName, kernelName);
     }
   };
@@ -147,8 +155,9 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
   signlsKernel = buildKernel("signls");
   normalVectorKernel = buildKernel("normalVector");
   meshScalesKernel = buildKernel("meshScales");
-  initTlsFromClsKernel = buildKernel("initTlsFromCls");
   normalizeVectorKernel = buildKernel("normalizeVector");
+  clsrDiffusionCoeffKernel = buildKernel("clsrDiffusionCoeff");
+  heavisideKernel = buildKernel("heaviside");
 }
 
 void validateLvlSetSections()
@@ -387,7 +396,7 @@ void parseLvlSetSections()
     if(firstWord == "default") {
       options.setArgs("TLSR DIFFUSIONCOEFF", to_string_f(1e-12));
       options.setArgs("TLSR TRANSPORTCOEFF", to_string_f(1.0));
-      options.setArgs("CLSR DIFFUSIONCOEFF", to_string_f(1.0));
+      options.setArgs("CLSR TRANSPORTCOEFF", to_string_f(1.0));
     }
 
     if(firstWord == "default") {
@@ -403,10 +412,9 @@ void parseLvlSetSections()
         options.setArgs(parPrefix + "FREQUENCY", freq);
     }
 
-
     if(firstWord == "default") {
-      options.setArgs("TLSR MAXIMUM STEPS", to_string_f(1000));
-      options.setArgs("CLSR MAXIMUM STEPS", to_string_f(1000));
+      options.setArgs("TLSR MAXIMUM STEPS", to_string_f(500));
+      options.setArgs("CLSR MAXIMUM STEPS", to_string_f(100));
     }
 
     {
@@ -447,7 +455,7 @@ void parseLvlSetSections()
 
     if(firstWord == "default") {
       options.setArgs("TLSR DISTANCE FACTOR", to_string_f(2.5));
-      options.setArgs("CLSR DISTANCE FACTOR", to_string_f(2.5));
+      options.setArgs("CLSR DISTANCE FACTOR", to_string_f(0.15));
     }
 
     {
@@ -591,11 +599,11 @@ void bdrySetupFromPar()
 
 void lvlSet::setup()
 {
-  static bool isInitialized = false;
-  if (isInitialized) {
-    return;
-  }
-  isInitialized = true;
+  nekrsCheck(setupCalled,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "LVLSET setup called more than once!");
 
   nrs = dynamic_cast<nrs_t *>(platform->app);
   if (!nrs || !nrs->meshV || !nrs->scalar) {
@@ -656,6 +664,8 @@ void lvlSet::setup()
 
   tlsr->setupEllipticSolver();
   clsr->setupEllipticSolver();
+
+  setupCalled = true;
 }
 
 void lvlSet_t::pseudoStepper(const double &fluidTime)
@@ -669,7 +679,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
   this->dt[0] = dt;
 
   // Integration loop stopping condition
-  auto isFinished = [&]() -> bool {
+  auto isFinalStep = [&]() -> bool {
     switch (stopMode) {
       case StopMode::targetSteps:
         return tstep >= (targetSteps + 1);
@@ -680,10 +690,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     throw std::logic_error("Unhandled StopMode value");
   };
 
-  // write initial condition to file
-  //this->writeFile(fluidTime, tstep);
-
-  while(!isFinished()) {
+  while(!isFinalStep()) {
     MPI_Barrier(platform->comm.mpiComm());
     const double timeStartStep = MPI_Wtime();
 
@@ -691,9 +698,14 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     this->computeAdvectionCoeff(tstep);
 
     // enforce CFL condition
-    auto cfl = nrs->computeCFL(this->meshV, this->o_W, this->dt[0]);
+    auto o_U = this->o_W;
+    if(this->name == "clsr") o_U = o_normals;
+
+    auto cfl = nrs->computeCFL(this->meshV, o_U, this->dt[0]);
     dfloat dtNew = this->dt[0];
-    if (cfl > targetCFL) { dtNew = this->dt[0] * targetCFL / cfl; }
+    if (cfl > targetCFL) { 
+      dtNew = this->dt[0] * targetCFL / cfl; 
+    }
 
     // shuffle time-step history
     this->dt[2] = this->dt[1];
@@ -727,9 +739,9 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     elapsedTime += elapsedStep;
 
     this->printStepInfo(time, cfl, tstep, true, true);
-    this->writeFile(fluidTime, tstep);
     tstep += 1;
   }
+  this->writeFile(fluidTime, tstep);
 
   // copy the re-distanced solution back to the scalar
   std::string scalarName = this->name;
@@ -767,51 +779,44 @@ void setInterfaceWidth()
   std::vector<dfloat> etemp(mesh->Nelements);
 
   o_emax.copyTo(etemp.data(), mesh->Nelements);
-  dfloat emax = -1e10;
+  maxMeshScale = -1e10;
   for(dlong e=0; e < mesh->Nelements; e++) {
-    emax = (etemp[e] > emax) ? etemp[e] : emax;
+    maxMeshScale = (etemp[e] > maxMeshScale) ? etemp[e] : maxMeshScale; 
   }
 
   o_emin.copyTo(etemp.data(), mesh->Nelements);
-  dfloat emin = 1e10;
+  minMeshScale = 1e10;
   for(dlong e=0; e < mesh->Nelements; e++) {
-    emin = (etemp[e] < emin) ? etemp[e] : emin;
+    minMeshScale = (etemp[e] < minMeshScale) ? etemp[e] : minMeshScale; 
   }
 
   o_esum.copyTo(etemp.data(), mesh->Nelements);
-  dfloat esum = 0.0;
+  meanMeshScale = 0.0;
   for(dlong e=0; e < mesh->Nelements; e++) {
-    esum += etemp[e];
+    meanMeshScale += etemp[e]; 
   }
 
-  MPI_Allreduce(MPI_IN_PLACE, &emax, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
-  MPI_Allreduce(MPI_IN_PLACE, &emin, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm());
-  MPI_Allreduce(MPI_IN_PLACE, &esum, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, &maxMeshScale, 1, MPI_DFLOAT, MPI_MAX, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, &minMeshScale, 1, MPI_DFLOAT, MPI_MIN, platform->comm.mpiComm());
+  MPI_Allreduce(MPI_IN_PLACE, &meanMeshScale, 1, MPI_DFLOAT, MPI_SUM, platform->comm.mpiComm());
 
   dlong ecount = mesh->Nlocal;
   MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
-
-  dfloat eavg = esum / ecount;
+  meanMeshScale /= dfloat(ecount);
 
   platform->options.getArgs("LVLSET INTERFACE WIDTH FACTOR", interfaceWidth);
 
   if(platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MAX")) {
-    interfaceWidth *= emax;
+    interfaceWidth *= maxMeshScale;
   } 
   else if (platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MIN")) {
-    interfaceWidth *= emin;
+    interfaceWidth *= minMeshScale;
   }
   else {
-    interfaceWidth *= eavg;
+    interfaceWidth *= meanMeshScale;
   }
 
   widthInitialized = true;
-
-  maxScale = emax;
-  minScale = emin;
-  avgScale = eavg;
-
-  std::cout << "Element Length Scale (min, max, avg): " << minScale << ", " << maxScale << ", " << avgScale << std::endl;
 }
 
 void lvlSet::solve(const double &fluidTime)
@@ -832,7 +837,10 @@ void lvlSet::solve(const double &fluidTime)
     if(platform->options.compareArgs(upperCase(ls->name) + " SOLVER", "NONE"))
         return;
 
-    platform->options.getArgs(upperCase(ls->name) + " MAXIMUM STEPS", stepsMax);
+    double steps;
+    platform->options.getArgs(upperCase(ls->name) + " MAXIMUM STEPS", steps);
+    stepsMax = int(steps);
+
     platform->options.getArgs(upperCase(ls->name) + " TARGET CFL", targetCFL);
     std::string stopModeStr;
     platform->options.getArgs(upperCase(ls->name) + " STOPPING CONDITION", stopModeStr);
@@ -850,10 +858,17 @@ void lvlSet::solve(const double &fluidTime)
 
     if(totalTime > timer && freq > 1e-12) {
       timer += freq;
-      ls->o_S.copyFrom(nrs->scalar->o_solution(scalarName), ls->fieldOffset());
+
+      auto mesh = ls->meshV;
+
+      auto o_psi = nrs->scalar->o_solution(scalarName);
+      ls->o_S.copyFrom(o_psi, mesh->Nlocal);
+
       if (ls->name == "tlsr") {
         platform->options.getArgs("TLSR REGULARIZATION FACTOR", tlsrRegFactor);
-        initTlsFromClsKernel(ls->meshV->Nlocal, tlsrRegFactor, ls->o_S);
+
+        platform->linAlg->add(mesh->Nlocal, -0.5, ls->o_S);
+        platform->linAlg->scale(mesh->Nlocal, tlsrRegFactor, ls->o_S);
       }
       ls->pseudoStepper(fluidTime);
     }
@@ -861,7 +876,6 @@ void lvlSet::solve(const double &fluidTime)
   runPseudoStepper(tlsr, tlsrTimer, "cls");
   runPseudoStepper(clsr, clsrTimer, "cls");
 }
-
 
 lvlSet_t* lvlSet::getTLSR()
 {
@@ -1095,7 +1109,7 @@ void lvlSet_t::setTimeIntegrationCoeffs(int tstep)
   }
 }
 
-void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normals, bool avg)
+void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normal, bool avg)
 {
   auto meshV = nrs->meshV;
 
@@ -1104,14 +1118,20 @@ void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normals,
                      meshV->o_D,
                      nrs->scalar->vFieldOffset,
                      o_phi,
-                     o_normals);
+                     o_normal);
 
   if(avg) {
-    oogs::startFinish(o_normals, meshV->dim, nrs->scalar->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
+    oogs::startFinish(o_normal, meshV->dim, nrs->scalar->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
 
     //normalization seems necessary after averaging for TLSR stability
-    normalizeVectorKernel(meshV->Nlocal, nrs->scalar->vFieldOffset, o_normals);
+    normalizeVectorKernel(meshV->Nlocal, nrs->scalar->vFieldOffset, o_normal);
   }
+}
+
+void lvlSet::getSignField(const occa::memory& o_phi, occa::memory& o_sign)
+{
+  auto meshV = nrs->meshV;
+  signlsKernel(meshV->Nlocal, o_phi, o_sign);
 }
 
 void lvlSet_t::computeAdvectionCoeff(int tstep)
@@ -1134,7 +1154,7 @@ void lvlSet_t::computeAdvectionCoeff(int tstep)
 
     lvlSet::getNormalVector(o_phi, this->o_W, avg);
 
-    signlsKernel(meshV->Nlocal, o_phi, o_signls);
+    lvlSet::getSignField(o_phi, o_signls);
   
     platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, o_signls, this->o_W);
   }
@@ -1539,13 +1559,14 @@ void lvlSet_t::setupEllipticSolver()
           lvlSet::clsrAx(elliptic, NelementsList, o_elementsList, o_x, o_Ax);
           });
 
-      this->ellipticSolver[0]->userPreconditioner ([] (const occa::memory &o_r, occa::memory &o_z)
+      this->ellipticSolver[0]->userPreconditioner ([] (elliptic_t *elliptic, const occa::memory &o_r, occa::memory &o_z)
           {
-          lvlSet::clsrPreconditioner(o_r, o_z);
+          lvlSet::clsrPreconditioner(elliptic, o_r, o_z);
           });
     }
   }
 }
+
 
 void lvlSet_t::finalize() {
   if(this->ellipticSolver[0])
@@ -1721,12 +1742,10 @@ void lvlSet_t::writeFile(double time, int tstep)
       this->fieldWriter->writeAttribute("polynomialOrder", std::to_string(N));
     }
 
-    if(tstep == stepsMax) {
-      this->fieldWriter->writeAttribute("outputmesh", (!outfldCounter) ? "true" : "false");
-      this->fieldWriter->addVariable("time", const_cast<double &>(time));
-      this->fieldWriter->process();
-      this->outfldCounter++;
-    }
+    this->fieldWriter->writeAttribute("outputmesh", (!outfldCounter) ? "true" : "false");
+    this->fieldWriter->addVariable("time", const_cast<double &>(time));
+    this->fieldWriter->process();
+    this->outfldCounter++;
   }
 }
 
@@ -1774,30 +1793,27 @@ void lvlSet_t::printStepInfo(double time, dfloat cfl, int tstep, bool printStepI
   }
 }
 
-std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams() {
-
+std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams() 
+{
   // Compute the time step from the smallest mesh element, assuming unit-speed advection
   // TODO: The denominator should be N; currently using N+1 to match the Nek5000 implementation
   int N;
   platform->options.getArgs("POLYNOMIAL DEGREE", N);
-  dfloat dt = minScale/(N+1);
+  dfloat dt = minMeshScale/(N+1);
   if (this->name == "clsr") {
     dt *= 0.1;
   }
   // Compute the target integration time for the prescribed propagation distance, assuming unit-speed advection
   platform->options.getArgs(upperCase(this->name) + " DISTANCE FACTOR", distanceFactor);
   dfloat targetTime;
-  targetTime = avgScale * distanceFactor;
+  targetTime = meanMeshScale * distanceFactor;
 
   // Number of fixed time steps required to reach the target integration time (i.e. to advect the prescribed distance)
   int targetSteps = std::min(stepsMax, static_cast<int>(std::floor(targetTime / dt)));
 
-  std::cout << std::scientific << std::setprecision(6)
-            << "dt=" << dt
-            << ", targetTime=" << targetTime
-            << std::defaultfloat
-            << ", targetSteps=" << targetSteps
-            << "\n";
+  if(platform->comm.mpiRank() == 0) {
+    printf("%s targetSteps = %d targetTime = %.8e\n", upperCase(this->name).c_str(), targetSteps, targetTime);
+  }
 
   return {dt, targetTime, targetSteps};
 }
@@ -1805,14 +1821,166 @@ std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams() 
 void lvlSet::clsrAx(elliptic_t* elliptic,
                    dlong NelementsList,
                    const occa::memory &o_elementsList,
-                   const occa::memory &o_x,
-                   occa::memory &o_Ax)
+                   const occa::memory &o_q,
+                   occa::memory &o_Aq)
 {
-  //
+  if (NelementsList == 0) {
+    return;
+  }
+
+  auto& mesh = elliptic->mesh;
+
+  auto& o_geom_factors = elliptic->stressForm ? mesh->o_vgeo : mesh->o_ggeo;
+  auto& o_D = mesh->o_D;
+  auto& o_DT = mesh->o_DT;
+  auto& o_lambda0 = elliptic->o_lambda0;
+  auto o_lambda1 = (elliptic->poisson) ? o_NULL : elliptic->o_lambda1;
+
+  auto loadKernel = [&](bool svv = false) {
+    std::string kernelNamePrefix = (elliptic->poisson) ? "poisson-" : "";
+    if(svv) kernelNamePrefix += "svv-";
+    kernelNamePrefix += "elliptic";
+    if (elliptic->Nfields > 1) {
+      kernelNamePrefix += (elliptic->stressForm) ? "Stress" : "Block";
+    }
+    std::string kernelName = "Ax";
+    if (elliptic->mgLevel) {
+      if (elliptic->options.compareArgs("ELLIPTIC PRECO COEFF FIELD", "TRUE")) {
+        kernelName += "Var";
+      }
+    } else {
+       if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE") && !svv) {
+         kernelName += "Var";
+       }
+    }
+    kernelName += "Coeff";
+    if (elliptic->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
+      kernelName += "Trilinear";
+    }
+
+    auto gen_suffix = [&](const int N) 
+    {      
+      std::string dataType;
+      if (o_Aq.dtype() == occa::dtype::get<double>()) {
+         dataType = "double";
+      } else if (o_Aq.dtype() == occa::dtype::get<float>()) {  
+        dataType = "float";
+      }
+ 
+      return std::string("_") + std::to_string(N) + dataType;
+    };
+
+    kernelName += "Hex3D" + gen_suffix(elliptic->mesh->N);
+
+#if 0
+    if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+      std::cout << kernelNamePrefix + "Partial" + kernelName << std::endl;
+    }
+#endif 
+    return platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
+  };
+
+  platform->linAlg->fill(mesh->Nlocal, 0.0, o_lambda0);
+
+  if (!elliptic->AxKernel.isInitialized()) elliptic->AxKernel = loadKernel();
+  elliptic->AxKernel(NelementsList,
+                     elliptic->fieldOffset,
+                     elliptic->loffset,
+                     o_elementsList,
+                     o_geom_factors,
+                     o_D,
+                     o_DT,
+                     o_lambda0,
+                     o_lambda1,
+                     o_q,
+                     o_Aq);
+
+  clsrDiffusionCoeffKernel(mesh->Nelements,
+                           mesh->o_vgeo,
+                           o_D,
+                           elliptic->fieldOffset,
+                           interfaceWidth,
+                           o_q,
+                           o_normals,
+                           o_lambda0);
+
+  auto o_divVector = platform->deviceMemoryPool.reserve<dfloat>(3 * elliptic->fieldOffset);
+  o_divVector.copyFrom(o_normals, 3 * elliptic->fieldOffset);
+
+  platform->linAlg->axmyVector(mesh->Nlocal, 
+                               elliptic->fieldOffset,
+                               0,
+                               1.0,
+                               o_lambda0,
+                               o_divVector);
+
+  auto o_div = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+  opSEM::divergence(mesh, elliptic->fieldOffset, o_divVector, o_div);
+
+  platform->linAlg->axpby(mesh->Nlocal, 1.0, o_div, 1.0, o_Aq);
+
+  if(elliptic->svv) {
+    if (!elliptic->AxSVVKernel.isInitialized()) elliptic->AxSVVKernel = loadKernel(true);
+    elliptic->AxSVVKernel(NelementsList,
+        elliptic->fieldOffset,
+        elliptic->loffset,
+        o_elementsList,
+        o_geom_factors,
+        elliptic->o_svvD,
+        elliptic->o_svvDT,
+        elliptic->o_svvmue,
+        o_NULL,
+        o_q,
+        o_Aq);
+  }
 }
 
-void lvlSet::clsrPreconditioner(const occa::memory &o_r,
+void lvlSet::clsrPreconditioner(elliptic_t* elliptic,
+                                const occa::memory &o_r,
                                 occa::memory &o_z)
 {
+  auto mesh = elliptic->mesh;
+  auto precon = elliptic->precon;
+  auto &options = elliptic->options;
 
+  if(options.compareArgs("PRECONDITIONER", "JACOBI")) {
+    platform->linAlg->axmyzMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_r, precon->o_invDiagA, o_z);
+  } else {
+    if(platform->comm.mpiRank() == 0) {
+      printf("ERROR: Unknown clsr preconditioner\n");
+    }
+    MPI_Abort(platform->comm.mpiComm(), 1);
+  }
+}
+
+void lvlSet::initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const dfloat epsin)
+{
+  nekrsCheck(!setupCalled || !buildKernelCalled,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "lvlSet::initHeaviside called prior to lvlSet::setup()!");
+
+  setInterfaceWidth();
+
+  dfloat eps = interfaceWidth;
+  if(epsin > 0.0) {
+    eps = epsin;
+    if(platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MAX")) {
+      eps *= maxMeshScale;
+    }
+    else if(platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MIN")) {
+      eps *= minMeshScale;
+    }
+    else {
+      eps *= meanMeshScale;
+    }
+  }
+
+  auto meshV = nrs->meshV;
+
+  heavisideKernel(meshV->Nlocal,
+                  eps,
+                  o_phi,
+                  o_psi);
 }

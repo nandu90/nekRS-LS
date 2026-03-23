@@ -10,17 +10,6 @@
   }
 }
 
-@kernel void initTlsFromCls(const dlong Ntotal,
-                            const dfloat r_f,
-                            @restrict dfloat *phi)
-{
-  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
-    if (n < Ntotal) {
-      phi[n] = r_f * (phi[n] - 0.5);
-    }
-  }
-}
-
 void rmax(dfloat *s_max, const dlong t, const dlong bs) {
   s_max[t] = (s_max[t] > s_max[t + bs]) ? s_max[t] : s_max[t + bs];
 }
@@ -158,6 +147,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
                                 @ restrict const dfloat *vgeo,
                                 @ restrict const dfloat *D,
                                 const dlong offset,
+                                const dfloat epsilon,
                                 @ restrict const dfloat *PSI,
                                 @ restrict const dfloat *NORMAL,
                                 @ restrict dfloat *DIFF)
@@ -231,7 +221,9 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
 
           const dfloat gradn = gradx * nx + grady * ny + gradz * nz;
 
-          DIFF[id] = gradn;
+          const dfloat psi = PSI[id];
+
+          DIFF[id] = epsilon * gradn - psi * (1.0 - psi);
         }
       }
       @barrier();
@@ -287,7 +279,6 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
           const dfloat dtdx = vgeo[gid + p_TXID * p_Np];
           const dfloat dtdy = vgeo[gid + p_TYID * p_Np];
           const dfloat dtdz = vgeo[gid + p_TZID * p_Np];
-          const dfloat JW = vgeo[gid + p_JWID * p_Np];
 
           // compute 'r' and 's' derivatives of (q_m) at node n
           dfloat dpdr = 0, dpds = 0, dpdt = 0;
@@ -352,6 +343,20 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
         nvec[n + 1 * offset] = 0.0;
         nvec[n + 2 * offset] = 0.0;
       }
+    }
+  }
+}
+
+@kernel void heaviside(const dlong Ntotal,
+                       const dfloat eps,
+                       @ restrict const dfloat *PHI,
+                       @ restrict dfloat *PSI)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    if (n < Ntotal) {
+      const dfloat phi = PHI[n];
+      const dfloat theta = phi / (2.0 * eps);
+      PSI[n] = 0.5 * (tanh(theta) + 1.0);
     }
   }
 }
