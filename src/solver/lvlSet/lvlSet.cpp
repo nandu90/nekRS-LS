@@ -718,10 +718,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     this->computeAdvectionCoeff(tstep);
 
     // enforce CFL condition
-    auto o_U = this->o_W;
-    if(this->name == "clsr") o_U = o_normals;
-
-    auto cfl = nrs->computeCFL(this->meshV, o_U, this->dt[0]);
+    auto cfl = nrs->computeCFL(this->meshV, this->o_W, this->dt[0]);
     dfloat dtNew = this->dt[0];
     if (cfl > this->targetCFL) { 
       dtNew = this->dt[0] * this->targetCFL / cfl; 
@@ -1154,6 +1151,7 @@ void lvlSet_t::computeAdvectionCoeff(int tstep)
     auto o_phi = nrs->scalar->o_solution("tls");
 
     lvlSet::getNormalVector(o_phi, o_normals, avg);
+    this->o_W.copyFrom(o_normals, 3 * this->vFieldOffset);
   }
 
   if(this->name == "tlsr") { 

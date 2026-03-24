@@ -48,7 +48,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
         if(ide < p_Np){
           const dlong gid = e * p_Np * p_Nvgeo + ide;
           const dfloat J = vgeo[gid + p_JID * p_Np];
-          const dfloat scale = pow(J, 1.0/3.0);
+          const dfloat scale = 2.0 * pow(J, 1.0/3.0);
           s_max[t] = scale;
           s_min[t] = scale;
           s_sum[t] = scale;
