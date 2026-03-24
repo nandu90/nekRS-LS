@@ -704,6 +704,12 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     throw std::logic_error("Unhandled StopMode value");
   };
 
+  //placed here for now. find a better place for this
+  //o_diff has to be filled for the preconditioner
+  if(this->name == "clsr") {
+    platform->linAlg->fill(this->_mesh->Nlocal, interfaceWidth, this->o_diff);
+  }
+
   while(!isFinalStep()) {
     MPI_Barrier(platform->comm.mpiComm());
     const double timeStartStep = MPI_Wtime();
@@ -1807,8 +1813,6 @@ std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams()
   dfloat targetTime;
   targetTime = meanMeshScale * this->distanceFactor;
 
-  if(this->name == "clsr") targetTime = interfaceWidth;
-
   // Number of fixed time steps required to reach the target integration time (i.e. to advect the prescribed distance)
   int targetSteps = std::min(this->stepsMax, static_cast<int>(std::floor(targetTime / dt)));
 
@@ -1881,7 +1885,9 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
     return platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
   };
 
-  platform->linAlg->fill(mesh->Nlocal, 0.0, o_lambda0);
+
+  auto o_wrk = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+  platform->linAlg->fill(mesh->Nlocal, 0.0, o_wrk);
 
   if (!elliptic->AxKernel.isInitialized()) elliptic->AxKernel = loadKernel();
   elliptic->AxKernel(NelementsList,
@@ -1891,7 +1897,7 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
                      o_geom_factors,
                      o_D,
                      o_DT,
-                     o_lambda0,
+                     o_wrk,
                      o_lambda1,
                      o_q,
                      o_Aq);
@@ -1903,7 +1909,7 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
                            interfaceWidth,
                            o_q,
                            o_normals,
-                           o_lambda0);
+                           o_wrk);
 
   auto o_divVector = platform->deviceMemoryPool.reserve<dfloat>(3 * elliptic->fieldOffset);
   o_divVector.copyFrom(o_normals, 3 * elliptic->fieldOffset);
@@ -1912,13 +1918,12 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
                                elliptic->fieldOffset,
                                0,
                                1.0,
-                               o_lambda0,
+                               o_wrk,
                                o_divVector);
 
-  auto o_div = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-  opSEM::divergence(mesh, elliptic->fieldOffset, o_divVector, o_div);
+  opSEM::divergence(mesh, elliptic->fieldOffset, o_divVector, o_wrk);
 
-  platform->linAlg->axpby(mesh->Nlocal, 1.0, o_div, 1.0, o_Aq);
+  platform->linAlg->axpby(mesh->Nlocal, 1.0, o_wrk, 1.0, o_Aq);
 
   if(elliptic->svv) {
     if (!elliptic->AxSVVKernel.isInitialized()) elliptic->AxSVVKernel = loadKernel(true);
