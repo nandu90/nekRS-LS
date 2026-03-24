@@ -771,11 +771,6 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
 
 void lvlSet::setInterfaceWidth()
 {
-  if (!platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE").empty()) {
-    platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE", interfaceWidth);
-    return;
-  }
-
   static bool widthInitialized = false;
 
   const auto movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
@@ -824,16 +819,24 @@ void lvlSet::setInterfaceWidth()
   MPI_Allreduce(MPI_IN_PLACE, &ecount, 1, MPI_DLONG, MPI_SUM, platform->comm.mpiComm());
   meanMeshScale /= dfloat(ecount);
 
-  platform->options.getArgs("LVLSET INTERFACE WIDTH FACTOR", interfaceWidth);
-
-  if(platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MAX")) {
-    interfaceWidth *= maxMeshScale;
-  } 
-  else if (platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MIN")) {
-    interfaceWidth *= minMeshScale;
+  if (!platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE").empty()) {
+    platform->options.getArgs("LVLSET INTERFACE WIDTH VALUE", interfaceWidth);
   }
   else {
-    interfaceWidth *= meanMeshScale;
+    int N;
+    platform->options.getArgs("POLYNOMIAL DEGREE", N);
+
+    platform->options.getArgs("LVLSET INTERFACE WIDTH FACTOR", interfaceWidth);
+
+    if(platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MAX")) {
+      interfaceWidth *= maxMeshScale / N;
+    } 
+    else if (platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MIN")) {
+      interfaceWidth *= minMeshScale / N;
+    }
+    else {
+      interfaceWidth *= meanMeshScale / N;
+    }
   }
 
   widthInitialized = true;
@@ -1971,7 +1974,10 @@ void lvlSet::initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const
 
   dfloat eps = interfaceWidth;
   if(epsin > 0.0) {
-    eps = epsin;
+    int N;
+    platform->options.getArgs("POLYNOMIAL DEGREE", N);
+
+    eps = epsin / N;
     if(platform->options.compareArgs("LVLSET INTERFACE WIDTH MESH PARAM", "MAX")) {
       eps *= maxMeshScale;
     }
