@@ -108,6 +108,7 @@ template <typename Printable> void append_value_error(Printable message)
   valueErrorLogger << "\t" << message << "\n";
 }
 
+
 void processError()
 {
   const std::string valueErrors = valueErrorLogger.str();
@@ -129,6 +130,8 @@ void processError()
 }
 
 } // namespace
+
+void setInterfaceWidth();
 
 void lvlSet::buildKernel(occa::properties _kernelInfo)
 {
@@ -606,6 +609,12 @@ void lvlSet::setup()
     throw std::runtime_error("lvlSet::setup: nrs/nrs->meshV and/or nrs->scalar is null (mesh not initialized)");
   }
 
+  nrs->meshT->update();
+  if(nrs->meshT != nrs->meshV) {
+    nrs->meshV->computeInvLMM();
+  }
+
+
   if(platform->comm.mpiRank() == 0)
     validateLvlSetSections();
   processError();
@@ -639,6 +648,8 @@ void lvlSet::setup()
     }
   }
 
+  setInterfaceWidth();
+  
   o_signls = platform->device.malloc<dfloat>(nrs->scalar->fieldOffset());
   o_normals = platform->device.malloc<dfloat>(3 * nrs->scalar->fieldOffset());
 
@@ -766,7 +777,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
   nrs->scalar->o_solution(scalarName).copyFrom(this->o_S, this->fieldOffset());
 }
 
-void lvlSet::setInterfaceWidth()
+void setInterfaceWidth()
 {
   static bool widthInitialized = false;
 
@@ -841,8 +852,6 @@ void lvlSet::setInterfaceWidth()
 
 void lvlSet::solve(const double &fluidTime)
 {
-  lvlSet::setInterfaceWidth();
-
   if(fluidStartTime < 0.0){ //first call
     fluidStartTime = fluidTime;
 
@@ -1814,6 +1823,8 @@ std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams()
   dfloat targetTime;
   targetTime = meanMeshScale * this->distanceFactor;
 
+  if(this->name == "clsr") targetTime = interfaceWidth;
+
   // Number of fixed time steps required to reach the target integration time (i.e. to advect the prescribed distance)
   int targetSteps = std::min(this->stepsMax, static_cast<int>(std::floor(targetTime / dt)));
 
@@ -1967,8 +1978,6 @@ void lvlSet::initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const
              EXIT_FAILURE,
              "%s\n",
              "lvlSet::initHeaviside called prior to lvlSet::setup()!");
-
-  lvlSet::setInterfaceWidth();
 
   dfloat eps = interfaceWidth;
   if(epsin > 0.0) {
