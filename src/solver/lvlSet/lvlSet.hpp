@@ -119,7 +119,6 @@ public:
   occa::memory o_filterRT;
 
   occa::memory o_svvmu;
-  occa::memory o_svvf;
 
   int Nsubsteps = 0;
 

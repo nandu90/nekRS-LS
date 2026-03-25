@@ -37,6 +37,7 @@ std::unique_ptr<lvlSet_t> clsr = nullptr;
 
 static occa::memory o_signls;
 static occa::memory o_normals;
+static occa::memory o_svvf;
 
 static double elapsedTime;
 
@@ -651,6 +652,7 @@ void lvlSet::setup()
   setInterfaceWidth();
   
   o_signls = platform->device.malloc<dfloat>(nrs->scalar->fieldOffset());
+  o_svvf = platform->device.malloc<dfloat>(nrs->scalar->fieldOffset());
   o_normals = platform->device.malloc<dfloat>(3 * nrs->scalar->fieldOffset());
 
   auto ls = [&](const std::string& name) {
@@ -1079,7 +1081,6 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   }
 
   if(svvEnabled) {
-    this->o_svvf = platform->device.malloc<dfloat>(this->_fieldOffset);
     this->o_svvmu = platform->device.malloc<dfloat>(this->_fieldOffset);
   }
 
@@ -1601,12 +1602,12 @@ void lvlSet_t::mueSVV()
   if(platform->options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "SVV")) {
     if(!initialized) {
       if(!platform->options.compareArgs("MOVING MESH","TRUE"))
-        launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
+        launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
       initialized = true;
     }
 
     if(platform->options.compareArgs("MOVING MESH","TRUE"))
-      launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
+      launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
 
     if(!umagInitialized) {
       platform->linAlg->magVector(mesh->Nlocal, this->vFieldOffset, this->o_W, o_umag); 
@@ -1616,7 +1617,7 @@ void lvlSet_t::mueSVV()
     dfloat scale = 0.1;
     platform->options.getArgs(upperCase(this->name) + " REGULARIZATION SVV SCALING COEFF", scale);
 
-    platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, this->o_svvmu);
+    platform->linAlg->axmyz(mesh->Nlocal, scale, o_svvf, o_umag, this->o_svvmu);
   }
 }
 
@@ -1937,6 +1938,7 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
 
   platform->linAlg->axpby(mesh->Nlocal, 1.0, o_wrk, 1.0, o_Aq);
 
+
   if(elliptic->svv) {
     if (!elliptic->AxSVVKernel.isInitialized()) elliptic->AxSVVKernel = loadKernel(true);
     elliptic->AxSVVKernel(NelementsList,
@@ -1951,6 +1953,7 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
         o_q,
         o_Aq);
   }
+
 }
 
 void lvlSet::clsrPreconditioner(elliptic_t* elliptic,
