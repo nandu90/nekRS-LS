@@ -40,7 +40,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
       @shared dfloat s_min[p_blockSize];
       @shared dfloat s_sum[p_blockSize];
 
-      for (dlong t = 0; t < p_blockSize; ++t; @inner(0)) {
+      for (dlong t = 0; t < p_blockSize; t++; @inner(0)) {
         s_max[t] = -1e10;
         s_min[t] = 1e10;
         s_sum[t] = 0.0;
@@ -57,7 +57,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
       @barrier();
 
 #if p_blockSize > 512
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+      for (int t = 0; t < p_blockSize; t++; @inner(0))
         if (t < 512) {
           rmax(s_max, t, 512);
           rmin(s_min, t, 512);
@@ -67,7 +67,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
 #endif
 
 #if p_blockSize > 256
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+      for (int t = 0; t < p_blockSize; t++; @inner(0))
         if (t < 256) {
           rmax(s_max, t, 256);
           rmin(s_min, t, 256);
@@ -76,7 +76,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
       @barrier();
 #endif
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+      for (int t = 0; t < p_blockSize; t++; @inner(0))
         if (t < 128) {
           rmax(s_max, t, 128);
           rmin(s_min, t, 128);
@@ -84,7 +84,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
         }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+      for (int t = 0; t < p_blockSize; t++; @inner(0))
         if (t < 64) {
           rmax(s_max, t, 64);
           rmin(s_min, t, 64);
@@ -92,7 +92,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
         }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+      for (int t = 0; t < p_blockSize; t++; @inner(0))
         if (t < 32) {
           rmax(s_max, t, 32);
           rmin(s_min, t, 32);
@@ -100,7 +100,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
         }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+      for (int t = 0; t < p_blockSize; t++; @inner(0))
         if (t < 16) {
           rmax(s_max, t, 16);
           rmin(s_min, t, 16);
@@ -108,7 +108,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
         }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+      for (int t = 0; t < p_blockSize; t++; @inner(0))
         if (t < 8) {
           rmax(s_max, t, 8);
           rmin(s_min, t, 8);
@@ -116,7 +116,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
         }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+      for (int t = 0; t < p_blockSize; t++; @inner(0))
         if (t < 4) {
           rmax(s_max, t, 4);
           rmin(s_min, t, 4);
@@ -124,7 +124,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
         }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+      for (int t = 0; t < p_blockSize; t++; @inner(0))
         if (t < 2) {
           rmax(s_max, t, 2);
           rmin(s_min, t, 2);
@@ -132,11 +132,15 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
         }
       @barrier();
 
-      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+      for (int t = 0; t < p_blockSize; t++; @inner(0))
         if (t < 1) {
-          emax[e] = (s_max[0] > s_max[1]) ? s_max[0] : s_max[1];
-          emin[e] = (s_min[0] < s_min[1]) ? s_min[0] : s_min[1];
-          esum[e] = s_sum[0] + s_sum[1];
+          const dfloat smax = (s_max[0] > s_max[1]) ? s_max[0] : s_max[1];
+          const dfloat smin = (s_min[0] < s_min[1]) ? s_min[0] : s_min[1];
+          const dfloat ssum = s_sum[0] + s_sum[1];
+
+          emax[e] = fmax(emax[e], smax);
+          emin[e] = fmin(emin[e], smin);
+          esum[e] += ssum;
         }
       @barrier();
     }

@@ -44,9 +44,9 @@ static double elapsedTime;
 enum class StopMode {targetSteps, targetTime};
 StopMode stopMode;
 
-static double maxMeshScale;
-static double minMeshScale;
-static double meanMeshScale;
+static dfloat maxMeshScale;
+static dfloat minMeshScale;
+static dfloat meanMeshScale;
 
 static dfloat interfaceWidth;
 
