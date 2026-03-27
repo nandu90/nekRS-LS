@@ -876,6 +876,7 @@ void lvlSet::solve(const double &fluidTime)
 
     if(platform->comm.mpiRank() == 0) {
       printf("LVLSET INTERFACE WIDTH: %16.8e\n", interfaceWidth);
+      printf("maxMeshScale: %.8e minMeshScale: %.8e meanMeshScale: %.8e\n", maxMeshScale, minMeshScale, meanMeshScale);
     }
   }
 
