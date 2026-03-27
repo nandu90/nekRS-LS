@@ -324,7 +324,7 @@ void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::strin
     options.setArgs("LVLSET NORMAL AVERAGING", upperCase(value));
   }
   else {
-    options.setArgs("LVLSET NORMAL AVERAGING", "FALSE");
+    options.setArgs("LVLSET NORMAL AVERAGING", "TRUE");
   }
 }
 
@@ -516,6 +516,9 @@ void parseLvlSetSections()
   for (auto &&sec : sections) {
     parseLvlSetSection(sec);
   }
+
+	platform->options.setArgs("TLSR SOLVER TOLERANCE", to_string_f(1e-8));
+	platform->options.setArgs("CLSR SOLVER TOLERANCE", to_string_f(1e-8));
 
   // set boundarytypemap from tls field if not specified explicitly
   std::string s_bcMap;
