@@ -23,6 +23,8 @@ public:
 class solver_t
 {
 public:
+  using userTimeIntegrationOrder_t = std::function<void(int &)>;
+
   virtual void solve(double time, int stage) = 0;
   virtual void lagSolution() = 0;
   virtual void extrapolateSolution() = 0;
@@ -37,6 +39,8 @@ public:
   virtual deviceMemory<dfloat> o_explicitTerms(std::string key = "") = 0;
   virtual deviceMemory<dfloat> o_diffusionCoeff(std::string key = "") = 0;
   virtual deviceMemory<dfloat> o_transportCoeff(std::string key = "") = 0;
+
+  userTimeIntegrationOrder_t userTimeIntegrationOrder = nullptr;
 
   std::string name;
 

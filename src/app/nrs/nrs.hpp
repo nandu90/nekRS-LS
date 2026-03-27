@@ -22,6 +22,7 @@ public:
   using preFluid_t = std::function<void(double, int)>;
   using postScalar_t = std::function<void(double, int)>;
   using userDivergence_t = std::function<void(double)>;
+  using userTimeIntegrationOrder_t = std::function<void(int &)>;
 
   void init() override;
 
@@ -114,6 +115,7 @@ public:
   };
 
   userDivergence_t userDivergence = nullptr;
+  userTimeIntegrationOrder_t userTimeIntegrationOrder = nullptr;
 
   mesh_t *meshV = nullptr;
   mesh_t *meshT = nullptr;

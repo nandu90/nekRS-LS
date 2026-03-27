@@ -337,7 +337,9 @@ void registerGeomSolverKernels(occa::properties kernelInfoBC)
 void geomSolver_t::setTimeIntegrationCoeffs(int tstep)
 {
   if (o_coeffAB.size()) {
-    const int meshOrder = std::min(tstep, static_cast<int>(o_coeffAB.size()));
+    int meshOrder = std::min(tstep, static_cast<int>(o_coeffAB.size()));
+    if(userTimeIntegrationOrder)
+      userTimeIntegrationOrder(meshOrder);
 
     std::vector<dfloat> coeff(o_coeffAB.size());
     nek::coeffAB(coeff.data(), dt, meshOrder);

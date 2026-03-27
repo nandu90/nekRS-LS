@@ -361,7 +361,10 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 void scalar_t::makeAdvection(int is, double time, int tstep)
 {
   if (Nsubsteps) {
-    advectionSubcycling(std::min(tstep, static_cast<int>(o_coeffEXT.size())), time, is);
+    auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
+    if(userTimeIntegrationOrder)
+      userTimeIntegrationOrder(extOrder);
+    advectionSubcycling(extOrder, time, is);
   } else {
     auto mesh = meshV;
 

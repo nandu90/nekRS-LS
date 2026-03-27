@@ -1470,8 +1470,13 @@ void nrs_t::getICFromNek()
 
 void nrs_t::setTimeIntegrationCoeffs(int tstep)
 {
-  const auto bdfOrder = std::min(tstep, static_cast<int>(o_coeffBDF.size()));
-  const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
+  auto bdfOrder = std::min(tstep, static_cast<int>(o_coeffBDF.size()));
+  auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
+
+  if(userTimeIntegrationOrder) {
+    userTimeIntegrationOrder(bdfOrder);
+    userTimeIntegrationOrder(extOrder);
+  }
 
   {
     std::vector<dfloat> coeff(o_coeffBDF.size());

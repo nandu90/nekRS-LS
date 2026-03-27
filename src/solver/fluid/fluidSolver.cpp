@@ -719,7 +719,10 @@ void fluidSolver_t::makeAdvection(double time, int tstep)
   }
 
   if (Nsubsteps) {
-    advectionSubcycling(std::min(tstep, static_cast<int>(o_coeffEXT.size())), time);
+    auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXT.size()));
+    if(userTimeIntegrationOrder) 
+      userTimeIntegrationOrder(extOrder);
+    advectionSubcycling(extOrder, time);
   } else {
     auto &o_Uconv = o_relUrst;
 
@@ -1024,7 +1027,9 @@ void fluidSolver_t::setTimeIntegrationCoeffs(int tstep)
 {
   if (o_coeffEXTP.size()) {
     std::vector<dfloat> coeff(o_coeffEXTP.size());
-    const auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXTP.size()));
+    auto extOrder = std::min(tstep, static_cast<int>(o_coeffEXTP.size()));
+    if(userTimeIntegrationOrder)
+      userTimeIntegrationOrder(extOrder);
     nek::extCoeff(coeff.data(), dt, extOrder, extOrder);
     for (int i = coeff.size(); i > extOrder; i--) {
       coeff[i - 1] = 0;

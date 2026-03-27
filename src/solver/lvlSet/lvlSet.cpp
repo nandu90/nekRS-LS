@@ -54,6 +54,8 @@ static double tlsrTimer = 0.0;
 static double clsrTimer = 0.0;
 static double fluidStartTime = -1.0;
 
+static int timeIntegrationOrder = 1;
+
 // common keys
 static std::vector<std::string> commonKeys = {
     {"solver"},
@@ -131,6 +133,8 @@ void processError()
 }
 
 } // namespace
+
+void setTimeIntegrationOrder (int &order);
 
 void setInterfaceWidth();
 
@@ -674,6 +678,19 @@ void lvlSet::setup()
   tlsr->setupEllipticSolver();
   clsr->setupEllipticSolver();
 
+  //setup custom hooks
+  nrs->userTimeIntegrationOrder = &setTimeIntegrationOrder;
+
+  if(nrs->fluid) {
+    nrs->fluid->userTimeIntegrationOrder = &setTimeIntegrationOrder;
+  }
+  if(nrs->scalar) {
+    nrs->scalar->userTimeIntegrationOrder = &setTimeIntegrationOrder;
+  }
+  if(nrs->geom) {
+    nrs->geom->userTimeIntegrationOrder = &setTimeIntegrationOrder;
+  }
+
   setupCalled = true;
 }
 
@@ -864,6 +881,8 @@ void lvlSet::solve(const double &fluidTime)
 
   const double totalTime = fluidTime - fluidStartTime + 1e-12;
 
+  bool resetOrder = false;
+
   auto runPseudoStepper = [&] (auto &ls, double &timer, const std::string& scalarName) {
     if(platform->options.compareArgs(upperCase(ls->name) + " SOLVER", "NONE"))
         return;
@@ -887,10 +906,17 @@ void lvlSet::solve(const double &fluidTime)
         platform->linAlg->scale(mesh->Nlocal, tlsrRegFactor, ls->o_S);
       }
       ls->pseudoStepper(fluidTime);
+      resetOrder = true;
     }
   };
   runPseudoStepper(tlsr, tlsrTimer, "cls");
   runPseudoStepper(clsr, clsrTimer, "cls");
+
+  if(resetOrder) {
+    timeIntegrationOrder = 1;
+  } else {
+    timeIntegrationOrder++;
+  }
 }
 
 lvlSet_t* lvlSet::getTLSR()
@@ -2005,4 +2031,9 @@ void lvlSet::initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const
                   eps,
                   o_phi,
                   o_psi);
+}
+
+void setTimeIntegrationOrder(int &order) 
+{
+  order = std::min(timeIntegrationOrder, order);
 }
