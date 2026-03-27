@@ -1957,8 +1957,6 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
                            o_normals,
                            o_wrk);
 
-  oogs::startFinish(o_wrk, 1, elliptic->fieldOffset, ogsDfloat, ogsAdd, mesh->oogs);
-
   auto o_divVector = platform->deviceMemoryPool.reserve<dfloat>(3 * elliptic->fieldOffset);
   o_divVector.copyFrom(o_normals, 3 * elliptic->fieldOffset);
 
