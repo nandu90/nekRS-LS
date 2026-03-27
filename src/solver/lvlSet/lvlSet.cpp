@@ -1851,6 +1851,12 @@ std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams()
   dfloat targetTime;
   targetTime = meanMeshScale * this->distanceFactor;
 
+  if(this->name == "tlsr") {
+    dfloat rf = 0.1;
+    platform->options.getArgs(upperCase(this->name) + " REGULARIZATION FACTOR", rf);
+    targetTime /= rf;
+  }
+
   if(this->name == "clsr") targetTime = interfaceWidth;
 
   // Number of fixed time steps required to reach the target integration time (i.e. to advect the prescribed distance)
@@ -1950,6 +1956,8 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
                            o_q,
                            o_normals,
                            o_wrk);
+
+  oogs::startFinish(o_wrk, 1, elliptic->fieldOffset, ogsDfloat, ogsAdd, mesh->oogs);
 
   auto o_divVector = platform->deviceMemoryPool.reserve<dfloat>(3 * elliptic->fieldOffset);
   o_divVector.copyFrom(o_normals, 3 * elliptic->fieldOffset);
