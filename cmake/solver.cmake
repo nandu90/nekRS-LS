@@ -7,7 +7,6 @@ set(SOLVER_SOURCES
     ${SOLVER_SOURCES_DIR}/scalar/cvode/registerCvodeKernels.cpp
     ${SOLVER_SOURCES_DIR}/scalar/cvode/cvode.cpp
     ${SOLVER_SOURCES_DIR}/scalar/cvode/cbGMRES.cpp
-    ${SOLVER_SOURCES_DIR}/lvlSet/lvlSet.cpp
 )
 
 set(SOLVER_INCLUDE
@@ -15,6 +14,5 @@ set(SOLVER_INCLUDE
     ${SOLVER_SOURCES_DIR}/fluid
     ${SOLVER_SOURCES_DIR}/geom
     ${SOLVER_SOURCES_DIR}/scalar
-    ${SOLVER_SOURCES_DIR}/lvlSet
     ${SOLVER_SOURCES_DIR}/scalar/cvode
 )

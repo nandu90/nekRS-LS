@@ -9,6 +9,7 @@ set(APP_SOURCES
     ${APP_SOURCES_DIR}/nrs/constantFlowRate.cpp
     ${APP_SOURCES_DIR}/nrs/plugins/RANSktau.cpp
     ${APP_SOURCES_DIR}/nrs/plugins/lowMach.cpp
+    ${APP_SOURCES_DIR}/nrs/plugins/lvlSet.cpp
     ${APP_SOURCES_DIR}/nrs/postProcessing/registerPostProcessingKernels.cpp
     ${APP_SOURCES_DIR}/nrs/postProcessing/strainRotationRate.cpp
     ${APP_SOURCES_DIR}/nrs/postProcessing/aeroForces.cpp

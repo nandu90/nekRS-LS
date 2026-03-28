@@ -144,7 +144,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
   kernelInfo += _kernelInfo;
 
   auto buildKernel = [&kernelInfo](const std::string &kernelName) {
-    const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/solver/lvlSet/");
+    const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/app/nrs/plugins/");
     const auto fileName = path + "lvlSet.okl";
     const auto reqName = "lvlSet::";
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
