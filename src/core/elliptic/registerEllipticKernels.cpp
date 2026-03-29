@@ -142,6 +142,5 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
       }
     }
   }
-
   registerEllipticPreconditionerKernels(section, svvForm);
 }

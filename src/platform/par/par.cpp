@@ -507,7 +507,6 @@ std::string parPrefixFromParSection(const std::string &parSection)
 
 } // namespace
 
-
 void parseCheckpointing(const int rank, setupAide &options, inipp::Ini *ini, std::string parSection)
 {
   std::string val = "true";
@@ -525,7 +524,6 @@ void parseCheckpointing(const int rank, setupAide &options, inipp::Ini *ini, std
 }
 
 #include "parseOcca.hpp"
-
 #include "parseBoomerAmg.cpp"
 #include "parseCvode.hpp"
 

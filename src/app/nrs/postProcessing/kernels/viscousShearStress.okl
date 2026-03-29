@@ -2,6 +2,7 @@
                                 const dlong offset,
                                 const int nbID,
                                 @ restrict int *bID,
+                                const dlong mode,
                                 @ restrict const dfloat *sgeo,
                                 @ restrict const dlong *vmapM,
                                 @ restrict const int *EToB,
@@ -9,7 +10,16 @@
                                 @ restrict const dfloat *SIJ,
                                 @ restrict dfloat *out)
 {
+  // Compute: a * (tau · n) + b * [ (tau · n) · n ] * n   on surface
+  // surface normal is opposite to mesh outward normal: n = (-n1, -n2, -n3)
+  // mode 0: tangential viscous traction   -> a =  1, b = -1  (shear stress vector)
+  // mode 1: normal viscous traction       -> a =  0, b =  1
+  // mode 2: viscous traction              -> a =  1, b =  0
+
   for (dlong e = 0; e < Nelements; e++; @outer(0)) {
+    const dfloat coef_a = (mode == 1) ? 0.0 : 1.0;                        //  1,0,1
+    const dfloat coef_b = (mode == 0) ? -1.0 : ((mode == 1) ? 1.0 : 0.0); // -1,1,0
+
     for (int f = 0; f < p_Nfaces; f++) {
       const dlong bcType = EToB[f + p_Nfaces * e];
 
@@ -45,9 +55,9 @@
 
             const dfloat tauDotN = tauX * n1 + tauY * n2 + tauZ * n3;
 
-            out[idM + 0*offset] = tauX - tauDotN * n1; 
-            out[idM + 1*offset] = tauY - tauDotN * n2; 
-            out[idM + 2*offset] = tauZ - tauDotN * n3; 
+            out[idM + 0*offset] = coef_a * tauX + coef_b * tauDotN * n1;
+            out[idM + 1*offset] = coef_a * tauY + coef_b * tauDotN * n2;
+            out[idM + 2*offset] = coef_a * tauZ + coef_b * tauDotN * n3;
           }
           @barrier();
         }

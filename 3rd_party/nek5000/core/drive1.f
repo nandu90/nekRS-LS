@@ -110,8 +110,9 @@ c      COMMON /SCRCG/ DUMM10(LX1,LY1,LZ1,LELT,1)
       call count_bdry   ! count the number of faces with assigned BCs
       call fix_geom
 
+      call chk_axis         ! verify axisymmetric mesh/BC requirements
       call vrdsmsh          ! verify mesh topology
-      call mesh_metrics     ! print some metrics
+      call mesh_check(ifjac0_abort,2,0) ! check mesh and print metrics
 
       call setlog(.true.)   ! Initalize logical flags
 
@@ -145,7 +146,7 @@ c      COMMON /SCRCG/ DUMM10(LX1,LY1,LZ1,LELT,1)
          call userchk
          if(nio.eq.0) write(6,'(A,/)') ' done :: userchk' 
       endif
-
+      call mesh_check(.true.,1,1) ! check mesh for possible changes from setics or userchk
       call setprop      ! call again because input has changed in userchk
 
       if (ifcvode .and. nsteps.gt.0) call cv_init

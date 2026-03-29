@@ -6,7 +6,7 @@
 
 /*
   unless noted otherwise, operators are based on weak formulation
-  strong operators are smoothed or weighted by Jw 
+  strong operators are smoothed acoss element boundaries by default (if avg == false weighted by Jw) 
 */
 
 namespace opSEM 

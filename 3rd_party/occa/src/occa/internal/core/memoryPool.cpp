@@ -115,7 +115,7 @@ namespace occa {
 
     /*If pool is too small, resize and put the new reservation at the end*/
     if (reserved + bytes > size) {
-      resize(reserved + alignedBytes);
+      resize(reserved + bytes);
       return slice(reserved, bytes);
     }
 
@@ -129,7 +129,7 @@ namespace occa {
     for (modeMemory_t* m : reservations) {
       const dim_t mlo = m->offset;
       const dim_t mhi = ((m->offset + m->size + alignment - 1)
-                        / alignment) * alignment; //Round up upper limit
+                        / alignment) * alignment;
       if (mlo >= static_cast<dim_t>(offset + bytes)) break; /*Found a suitable empty space*/
 
       offset = std::max(offset, mhi); /*Shift the potential region*/
@@ -138,8 +138,8 @@ namespace occa {
     if (offset + bytes <= size) {
       return slice(offset, bytes);
     } else {
-      resize(reserved + alignedBytes);
-      return slice(reserved, bytes);
+      resize(offset + bytes);
+      return slice(offset, bytes);
     }
   }
 

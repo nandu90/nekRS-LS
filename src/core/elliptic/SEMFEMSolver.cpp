@@ -15,7 +15,9 @@ SEMFEMSolver_t::SEMFEMSolver_t(elliptic_t *elliptic_)
   MPI_Barrier(platform->comm.mpiComm());
   double tStart = MPI_Wtime();
   if (platform->comm.mpiRank() == 0) {
-    printf("setup SEMFEM solver (lambdaAvg=%g) ... \n", lambda0);
+    printf("setup SEMFEM solver (lambdaAvg=%g) %s on %s ... \n", lambda0,
+      (useFP32) ? "FP32" : "FP64",
+      (useDevice) ? "device" : "host");
   }
   fflush(stdout);
 

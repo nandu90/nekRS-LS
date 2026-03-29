@@ -25,7 +25,6 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           {"decaythreshold"},
           {"noisethreshold"},
           {"filterpower"},
-
       };
       const std::vector<std::string> list = serializeString(regularization, '+');
       for (const std::string s : list) {

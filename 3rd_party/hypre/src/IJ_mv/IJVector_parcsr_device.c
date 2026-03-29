@@ -21,9 +21,9 @@
  * hypre_IJVectorAssembleFunctor
  *--------------------------------------------------------------------*/
 
-#if defined(HYPRE_USING_SYCL)
 template<typename T1, typename T2>
 struct hypre_IJVectorAssembleFunctor
+#if defined(HYPRE_USING_SYCL)
 {
    typedef std::tuple<T1, T2> Tuple;
 
@@ -34,9 +34,6 @@ struct hypre_IJVectorAssembleFunctor
    }
 };
 #else
-template<typename T1, typename T2>
-struct hypre_IJVectorAssembleFunctor : public
-   thrust::binary_function< thrust::tuple<T1, T2>, thrust::tuple<T1, T2>, thrust::tuple<T1, T2> >
 {
    typedef thrust::tuple<T1, T2> Tuple;
 

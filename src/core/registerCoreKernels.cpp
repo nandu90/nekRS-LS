@@ -367,7 +367,6 @@ void registerCoreKernels(occa::properties kernelInfoBC)
                  BLOCKSIZE,
                  Nq * Nq);
     }
-
     // register SVV kernels
     {
       kernelName = "svvMeshScale";

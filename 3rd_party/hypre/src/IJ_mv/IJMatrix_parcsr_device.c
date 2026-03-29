@@ -214,9 +214,9 @@ hypre_IJMatrixSetAddValuesParCSRDevice( hypre_IJMatrix       *matrix,
    return hypre_error_flag;
 }
 
-#if defined(HYPRE_USING_SYCL)
 template<typename T1, typename T2>
 struct hypre_IJMatrixAssembleFunctor
+#if defined(HYPRE_USING_SYCL)
 {
    typedef std::tuple<T1, T2> Tuple;
 
@@ -227,9 +227,6 @@ struct hypre_IJMatrixAssembleFunctor
    }
 };
 #else
-template<typename T1, typename T2>
-struct hypre_IJMatrixAssembleFunctor : public
-   thrust::binary_function< thrust::tuple<T1, T2>, thrust::tuple<T1, T2>, thrust::tuple<T1, T2> >
 {
    typedef thrust::tuple<T1, T2> Tuple;
 
@@ -315,15 +312,16 @@ hypre_IJMatrixAssembleSortAndReduce1(HYPRE_Int  N0, HYPRE_BigInt  *I0, HYPRE_Big
 
    *N1 = std::get<0>(new_end.first.base()) - I;
 #else
-   HYPRE_THRUST_CALL(
-      exclusive_scan_by_key,
-      make_reverse_iterator(thrust::make_zip_iterator(thrust::make_tuple(I0 + N0, J0 + N0))),
-      make_reverse_iterator(thrust::make_zip_iterator(thrust::make_tuple(I0,    J0))),
-      make_reverse_iterator(thrust::device_pointer_cast<char>(X0) + N0),
-      make_reverse_iterator(thrust::device_pointer_cast<char>(X) + N0),
-      char(0),
-      thrust::equal_to< thrust::tuple<HYPRE_BigInt, HYPRE_BigInt> >(),
-      thrust::maximum<char>() );
+  HYPRE_THRUST_CALL(
+    exclusive_scan_by_key,
+    thrust::make_reverse_iterator(thrust::make_zip_iterator(thrust::make_tuple(I0 + N0, J0 + N0))),
+    thrust::make_reverse_iterator(thrust::make_zip_iterator(thrust::make_tuple(I0,    J0))),
+    thrust::make_reverse_iterator(thrust::device_pointer_cast<char>(X0) + N0),
+    thrust::make_reverse_iterator(thrust::device_pointer_cast<char>(X) + N0),
+    char(0),
+    thrust::equal_to<thrust::tuple<HYPRE_BigInt, HYPRE_BigInt>>(),
+    thrust::maximum<char>()
+  );
 
    HYPRE_THRUST_CALL(replace_if, A0, A0 + N0, X, thrust::identity<char>(), 0.0);
 
@@ -347,9 +345,9 @@ hypre_IJMatrixAssembleSortAndReduce1(HYPRE_Int  N0, HYPRE_BigInt  *I0, HYPRE_Big
    return hypre_error_flag;
 }
 
-#if defined(HYPRE_USING_SYCL)
 template<typename T1, typename T2>
 struct hypre_IJMatrixAssembleFunctor2
+#if defined(HYPRE_USING_SYCL)
 {
    typedef std::tuple<T1, T2> Tuple;
 
@@ -364,9 +362,6 @@ struct hypre_IJMatrixAssembleFunctor2
    }
 };
 #else
-template<typename T1, typename T2>
-struct hypre_IJMatrixAssembleFunctor2 : public
-   thrust::binary_function< thrust::tuple<T1, T2>, thrust::tuple<T1, T2>, thrust::tuple<T1, T2> >
 {
    typedef thrust::tuple<T1, T2> Tuple;
 
@@ -484,13 +479,14 @@ hypre_IJMatrixAssembleSortAndReduce3(HYPRE_Int  N0, HYPRE_BigInt  *I0, HYPRE_Big
 #else
    /* output in X0: 0: keep, 1: zero-out */
    HYPRE_THRUST_CALL(
-      inclusive_scan_by_key,
-      make_reverse_iterator(thrust::make_zip_iterator(thrust::make_tuple(I0 + N0, J0 + N0))),
-      make_reverse_iterator(thrust::make_zip_iterator(thrust::make_tuple(I0,    J0))),
-      make_reverse_iterator(thrust::device_pointer_cast<char>(X0) + N0),
-      make_reverse_iterator(thrust::device_pointer_cast<char>(X0) + N0),
-      thrust::equal_to< thrust::tuple<HYPRE_BigInt, HYPRE_BigInt> >(),
-      thrust::maximum<char>() );
+     inclusive_scan_by_key,
+     thrust::make_reverse_iterator(thrust::make_zip_iterator(thrust::make_tuple(I0 + N0, J0 + N0))),
+     thrust::make_reverse_iterator(thrust::make_zip_iterator(thrust::make_tuple(I0,    J0))),
+     thrust::make_reverse_iterator(thrust::device_pointer_cast<char>(X0) + N0),
+     thrust::make_reverse_iterator(thrust::device_pointer_cast<char>(X0) + N0),
+     thrust::equal_to<thrust::tuple<HYPRE_BigInt, HYPRE_BigInt>>(),
+     thrust::maximum<char>()
+   );
 
    HYPRE_THRUST_CALL(replace_if, A0, A0 + N0, X0, thrust::identity<char>(), 0.0);
 

@@ -267,7 +267,6 @@ void elliptic::_solve(const occa::memory &o_rhs,
                       occa::memory o_x)
 {
   auto &elliptic = this->solver;
-
   auto& options = elliptic->options;
   auto& precon = elliptic->precon;
   auto& mesh = elliptic->mesh;
@@ -599,8 +598,12 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     }
   }
 
-  if (platform->device.mode() == "Serial" ||
-      elliptic->options.compareArgs("MULTIGRID COARSE SOLVER", "BOOMERAMG")) {
+  if (platform->device.mode() == "Serial") {
+    elliptic->options.setArgs("MULTIGRID COARSE SOLVER LOCATION", "CPU");
+  }
+
+  if (!elliptic->options.compareArgs("PRECONDITIONER", "SEMFEM") &&
+      !elliptic->options.compareArgs("MULTIGRID COARSE GRID DISCRETIZATION", "SEMFEM")) {
     elliptic->options.setArgs("MULTIGRID COARSE SOLVER LOCATION", "CPU");
   }
 

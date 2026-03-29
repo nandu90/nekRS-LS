@@ -54,7 +54,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
   auto mesh = nrs->meshV;
 
   std::vector<int> bidWall = {1};
-  occa::memory o_bidWall = platform->device.malloc<int>(bidWall.size(), bidWall.data());
+  auto o_bidWall = platform->device.malloc<int>(bidWall.size(), bidWall.data());
 
   auto o_Sij = nrs->strainRate();
 
@@ -67,7 +67,7 @@ void ciTestErrors(nrs_t *nrs, double time, int tstep)
 
   // https://turbulence.oden.utexas.edu/channel2015/data/LM_Channel_2000_mean_prof.dat
   const auto utauRef = 4.58794e-02;
-  const auto utau = sqrt(std::abs(forces->tangential()[0]) / areaWall);
+  const auto utau = sqrt(std::abs(forces->viscousFriction()[0]) / areaWall);
   const auto utauErr = std::abs((utau - utauRef) / utauRef);
 
   CiEvalTest("tau (LinfErr:" + to_string_f(utauErr) + ")", fabs(utauErr) < EPS);

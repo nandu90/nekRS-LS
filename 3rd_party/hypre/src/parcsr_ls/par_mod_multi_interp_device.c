@@ -51,8 +51,7 @@ struct globalC_functor
 };
 #else
 template<typename T>
-struct tuple_plus : public
-   thrust::binary_function<thrust::tuple<T, T>, thrust::tuple<T, T>, thrust::tuple<T, T> >
+struct tuple_plus
 {
    __host__ __device__
    thrust::tuple<T, T> operator()( const thrust::tuple<T, T> & x1, const thrust::tuple<T, T> & x2)
@@ -63,8 +62,7 @@ struct tuple_plus : public
 };
 
 template<typename T>
-struct tuple_minus : public
-   thrust::binary_function<thrust::tuple<T, T>, thrust::tuple<T, T>, thrust::tuple<T, T> >
+struct tuple_minus
 {
    __host__ __device__
    thrust::tuple<T, T> operator()( const thrust::tuple<T, T> & x1, const thrust::tuple<T, T> & x2)
@@ -74,8 +72,7 @@ struct tuple_minus : public
    }
 };
 
-struct local_equal_plus_constant : public
-   thrust::binary_function<HYPRE_BigInt, HYPRE_BigInt, HYPRE_BigInt>
+struct local_equal_plus_constant
 {
    HYPRE_BigInt _value;
 
@@ -86,7 +83,7 @@ struct local_equal_plus_constant : public
 };
 
 /* transform from local C index to global C index */
-struct globalC_functor : public thrust::unary_function<HYPRE_Int, HYPRE_BigInt>
+struct globalC_functor
 {
    HYPRE_BigInt C_first;
 

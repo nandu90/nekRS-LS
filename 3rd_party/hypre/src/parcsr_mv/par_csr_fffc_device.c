@@ -21,11 +21,7 @@ typedef thrust::tuple<HYPRE_Int, HYPRE_Int> Tuple;
 /* transform from local F/C index to global F/C index,
  * where F index "x" are saved as "-x-1"
  */
-#if defined(HYPRE_USING_SYCL)
 struct FFFC_functor
-#else
-struct FFFC_functor : public thrust::unary_function<Tuple, HYPRE_BigInt>
-#endif
 {
    HYPRE_BigInt CF_first[2];
 
@@ -48,11 +44,7 @@ struct FFFC_functor : public thrust::unary_function<Tuple, HYPRE_BigInt>
 
 /* this predicate selects A^s_{FF} */
 template<typename T>
-#if defined(HYPRE_USING_SYCL)
 struct FF_pred
-#else
-struct FF_pred : public thrust::unary_function<Tuple, bool>
-#endif
 {
    HYPRE_Int  option;
    HYPRE_Int *row_CF_marker;
@@ -86,11 +78,7 @@ struct FF_pred : public thrust::unary_function<Tuple, bool>
 
 /* this predicate selects A^s_{FC} */
 template<typename T>
-#if defined(HYPRE_USING_SYCL)
 struct FC_pred
-#else
-struct FC_pred : public thrust::unary_function<Tuple, bool>
-#endif
 {
    HYPRE_Int *row_CF_marker;
    T         *col_CF_marker;
@@ -113,11 +101,7 @@ struct FC_pred : public thrust::unary_function<Tuple, bool>
 
 /* this predicate selects A^s_{CF} */
 template<typename T>
-#if defined(HYPRE_USING_SYCL)
 struct CF_pred
-#else
-struct CF_pred : public thrust::unary_function<Tuple, bool>
-#endif
 {
    HYPRE_Int *row_CF_marker;
    T         *col_CF_marker;
@@ -140,11 +124,7 @@ struct CF_pred : public thrust::unary_function<Tuple, bool>
 
 /* this predicate selects A^s_{CC} */
 template<typename T>
-#if defined(HYPRE_USING_SYCL)
 struct CC_pred
-#else
-struct CC_pred : public thrust::unary_function<Tuple, bool>
-#endif
 {
    HYPRE_Int *row_CF_marker;
    T         *col_CF_marker;
@@ -166,11 +146,7 @@ struct CC_pred : public thrust::unary_function<Tuple, bool>
 };
 
 /* this predicate selects A^s_{C,:} */
-#if defined(HYPRE_USING_SYCL)
 struct CX_pred
-#else
-struct CX_pred : public thrust::unary_function<Tuple, bool>
-#endif
 {
    HYPRE_Int *row_CF_marker;
 
@@ -191,11 +167,7 @@ struct CX_pred : public thrust::unary_function<Tuple, bool>
 
 /* this predicate selects A^s_{:,C} */
 template<typename T>
-#if defined(HYPRE_USING_SYCL)
 struct XC_pred
-#else
-struct XC_pred : public thrust::unary_function<Tuple, bool>
-#endif
 {
    T         *col_CF_marker;
 

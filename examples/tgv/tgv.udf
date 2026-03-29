@@ -26,7 +26,7 @@ void printDiagnostics(nrs_t *nrs, double time, int tstep)
 
   const auto enstrophy = [&] () {
     const dfloat scale = 0.5 / mesh->volume;
-    auto o_curlU = opSEM::strongCurl(mesh, nrs->fieldOffset, nrs->fluid->o_U);
+    auto o_curlU = opSEM::strongCurl(mesh, nrs->fieldOffset, nrs->fluid->o_U, false);
 
     static poolDeviceMemory<dfloat> o_invJw;
     if (!o_invJw.isInitialized()) {

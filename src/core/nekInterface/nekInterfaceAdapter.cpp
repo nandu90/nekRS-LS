@@ -44,7 +44,7 @@ static void (*nek_outfld_ptr)(char *,
                               double *,
                               int *,
                               int);
-static void (*nek_openfld_ptr)(char *, double *, double *, int *, int *, int);
+static void (*nek_openfld_ptr)(char *, double *, double *, int *, int *, int *, int);
 static void (*nek_readfld_ptr)(int *,
                                double *,
                                double *,
@@ -163,7 +163,7 @@ fldData openFld(const std::string &filename, std::vector<std::string> &_availabl
   options->getArgs("CHECKPOINT READ BATCH SIZE", lbrst_);
   int icrrs_ = options->compareArgs("CHECKPOINT READ CRYSTAL ROUTER", "TRUE") ? 1 : 0;
 
-  (*nek_openfld_ptr)(fname, &time_, &p0th_, &icrrs_, &lbrst_, static_cast<int>(filename.size()));
+  (*nek_openfld_ptr)(fname, &time_, &p0th_, &nelgr_, &icrrs_, &lbrst_, static_cast<int>(filename.size()));
 
   if (*ptr<int>("getxr")) {
     _availableVariables.push_back("mesh");
@@ -742,7 +742,7 @@ void set_usr_handles(const char *session_in, int verbose)
                              int *,
                              int))dlsym(handle, fname("nekf_outfld"));
   check_error(dlerror());
-  nek_openfld_ptr = (void (*)(char *, double *, double *, int *, int*, int))dlsym(handle, fname("nekf_openfld"));
+  nek_openfld_ptr = (void (*)(char *, double *, double *, int *, int *, int *, int))dlsym(handle, fname("nekf_openfld"));
   check_error(dlerror());
   nek_readfld_ptr =
       (void (*)(int *, double *, double *, double *, double *, double *, double *, double *, double *, double *))
@@ -1004,7 +1004,24 @@ void buildNekInterface(int ldimt, int N, int np, setupAide &options)
       const int ndim = 3;
       const std::string meshFile = options.getArgs("MESH FILE");
       re2::nelg(meshFile, false, nelgt, nelgv, MPI_COMM_SELF);
-      int lelt = (nelgt / np) + 3;
+
+      int hRefineImbalance = 0; // extra load imbalance by h-refine
+      {
+        std::string hSchedule;
+        if (platform->options.getArgs("MESH HREFINEMENT SCHEDULE", hSchedule)) {
+          int ncut = 1;
+          for (auto &&s : serializeString(hSchedule, ',')) {
+            ncut *= std::stoi(s);
+          }
+
+          if (ncut > 1) {
+            constexpr int ndim = 3;
+            hRefineImbalance = static_cast<int>(std::pow(ncut, ndim)) - 1;
+          }
+        }
+      }
+      
+      int lelt = (nelgt / np) + 3 + hRefineImbalance;
 
       if (lelt > nelgt) {
         lelt = nelgt + 1; // preserve 1-extra in h-refine

@@ -698,6 +698,7 @@ hypre_CSRMatrixSplitDevice_core( HYPRE_Int      job,
                         std::not_fn(pred1) );
       hypre_assert( std::get<0>(new_end.base()) == B_ext_offd_ii + B_ext_offd_nnz );
 #else
+
       auto new_end = HYPRE_THRUST_CALL(
                         copy_if,
                         thrust::make_zip_iterator(thrust::make_tuple(B_ext_ii,      B_ext_bigj,
@@ -1865,7 +1866,7 @@ struct Int2Unequal
 };
 #else
 typedef thrust::tuple<HYPRE_Int, HYPRE_Int> Int2;
-struct Int2Unequal : public thrust::unary_function<Int2, bool>
+struct Int2Unequal
 {
    __host__ __device__
    bool operator()(const Int2& t) const
@@ -2086,8 +2087,7 @@ struct cabsfirst_greaterthan_second_pred
    }
 };
 #else
-struct cabsfirst_greaterthan_second_pred : public
-   thrust::unary_function<thrust::tuple<HYPRE_Complex, HYPRE_Real>, bool>
+struct cabsfirst_greaterthan_second_pred
 {
    __host__ __device__
    bool operator()(const thrust::tuple<HYPRE_Complex, HYPRE_Real>& t) const
@@ -2346,11 +2346,7 @@ hypre_CSRMatrixDiagMatrixFromMatrixDevice(hypre_CSRMatrix *A, HYPRE_Int type)
  * adj_functor (Used in hypre_CSRMatrixPermuteDevice)
  *--------------------------------------------------------------------------*/
 
-#if defined(HYPRE_USING_SYCL)
 struct adj_functor
-#else
-struct adj_functor : public thrust::unary_function<HYPRE_Int, HYPRE_Int>
-#endif
 {
    HYPRE_Int *ia_;
 

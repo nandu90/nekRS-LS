@@ -99,7 +99,7 @@ void parseCoarseSolver(const int rank, setupAide &options, inipp::Ini *ini, std:
     options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER PRECISION", "FP32");
 
     options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION", "CPU");
-    if (options.getArgs(parSectionName + "PRECONDITIONER") == "SEMFEM") {
+    if (options.compareArgs(parSectionName + "PRECONDITIONER", "SEMFEM")) {
       options.setArgs(parSectionName + "MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
     }
 

@@ -1,12 +1,12 @@
 #if !defined(nekrs_bctype_h_)
 #define nekrs_bctype_h_
 
-/*
+#if 0
     header file used in C++, Fortran and okl files
 
     boundary type IDs need to be index-1
     lower value have higher precedence  
-*/
+#endif
 
 #define p_bcType_interpolation 1
 #define p_bcType_zeroDirichlet 2

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(NekRS LANGUAGES C CXX Fortran VERSION 25.0.1)
+project(NekRS LANGUAGES C CXX Fortran VERSION 26.0.1)
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
@@ -90,14 +90,14 @@ string(COMPARE EQUAL "${CMAKE_CXX_COMPILER_ID}" "AppleClang" USING_APPLE_LLVM)
 string(COMPARE EQUAL "${CMAKE_CXX_COMPILER_ID}" "NVHPC" USING_NVHPC)
 
 if(USING_GNU OR USING_LLVM OR USING_APPLE_LLVM)
-  set(NEKRS_COMPILER_DEFAULT_FLAGS "-O2 -g -march=native -ftree-vectorize")
+  set(NEKRS_COMPILER_DEFAULT_FLAGS "-O3 -g -march=native")
   if (USING_GNU AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.1)
     message(FATAL_ERROR "GNU compiler version must be at least 9.1!")
   endif()
 elseif(USING_NVHPC)
   set(NEKRS_COMPILER_DEFAULT_FLAGS "-g -march=native -fast")
 else()
-  set(NEKRS_COMPILER_DEFAULT_FLAGS "-O2 -g")
+  set(NEKRS_COMPILER_DEFAULT_FLAGS "-O3 -g")
 endif()
 
 set(NEKRS_CXX_FLAGS "${NEKRS_COMPILER_DEFAULT_FLAGS}" CACHE STRING "C++ compiler flags")
@@ -161,7 +161,7 @@ set(ENABLE_CPPTRACE OFF CACHE BOOL "Enable cpptrace for stack tracing")
 ###############################################################################
 set(CMAKE_POSITION_INDEPENDENT_CODE on)
 
-if(NOT USING_APPLE_LLVM)
+if(NOT APPLE)
   find_package(OpenMP REQUIRED)
 endif()
 

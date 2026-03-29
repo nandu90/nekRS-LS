@@ -17,11 +17,7 @@
  * option == 2, T = HYPRE_Int,
  */
 template<HYPRE_Int option, typename T>
-#if defined(HYPRE_USING_SYCL)
 struct RAP_functor
-#else
-struct RAP_functor : public thrust::unary_function<HYPRE_Int, T>
-#endif
 {
    HYPRE_Int num_col;
    T         first_col;

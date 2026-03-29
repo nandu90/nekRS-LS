@@ -359,11 +359,7 @@ HYPRE_Int HashFunc(HYPRE_Int key, HYPRE_Int i, HYPRE_Int prev)
 }
 
 template<typename T>
-#if defined(HYPRE_USING_SYCL)
 struct spgemm_bin_op
-#else
-struct spgemm_bin_op : public thrust::unary_function<T, char>
-#endif
 {
    char s, t, u; /* s: base size of bins; t: lowest bin; u: highest bin */
 

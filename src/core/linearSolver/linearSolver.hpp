@@ -28,7 +28,7 @@ public:
   int nIter() const { return _nIter; }; 
   dfloat initialResidualNorm() const { return r0Norm; };
   dfloat finalResidualNorm() const { return rNorm; };
-  void relativeTolerance(dfloat val) { relTol = val; };
+  void relativeTolerance(bool val) { relTol = val; };
 
   void name(const std::string &val)
   {

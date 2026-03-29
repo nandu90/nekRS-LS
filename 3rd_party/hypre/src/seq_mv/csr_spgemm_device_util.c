@@ -11,11 +11,7 @@
 
 #if defined(HYPRE_USING_GPU)
 
-#if defined(HYPRE_USING_SYCL)
 struct row_size
-#else
-struct row_size : public thrust::unary_function<HYPRE_Int, HYPRE_Int>
-#endif
 {
    HYPRE_Int SHMEM_HASH_SIZE;
 

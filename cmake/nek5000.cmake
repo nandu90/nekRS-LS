@@ -8,8 +8,10 @@ string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "GNU" USING_Fortran_GNU)
 string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "IntelLLVM" USING_Fortran_INTEL_LLVM)
 string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "NVHPC" USING_Fortran_NVHPC)
 string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "Flang" USING_Fortran_FLANG)
+string(COMPARE EQUAL "${CMAKE_Fortran_COMPILER_ID}" "LLVMFlang" USING_Fortran_LLVM)
 
-if(USING_Fortran_GNU OR USING_Fortran_INTEL_LLVM OR USING_Fortran_NVHPC OR USING_Fortran_FLANG)
+
+if(USING_Fortran_GNU OR USING_Fortran_INTEL_LLVM OR USING_Fortran_NVHPC OR USING_Fortran_FLANG OR USING_Fortran_LLVM)
   message(CHECK_PASS "Found the ${CMAKE_Fortran_COMPILER_ID} Fortran compiler")
 else()
   message(FATAL_ERROR "Fortran compiler ${CMAKE_Fortran_COMPILER_ID} not supported to build Nek5000 interface!")
@@ -145,8 +147,12 @@ if(APPLE)
 endif()
 
 set(LDFLAGS_ "${BSYMBOLIC_FLAG} ${UNDEFINED_FLAG}")
-if(USING_Fortran_FLANG)
-  set(LDFLAGS_ " -fuse-ld=bfd -Wl,--no-relax")
+if(USING_Fortran_FLANG OR USING_Fortran_LLVM)
+  if(APPLE)
+    set(LDFLAGS_ " -Wl,-undefined,dynamic_lookup")
+  else()  
+    set(LDFLAGS_ " -fuse-ld=bfd -Wl,--no-relax")
+  endif()
 endif()
 
 ExternalProject_Add(

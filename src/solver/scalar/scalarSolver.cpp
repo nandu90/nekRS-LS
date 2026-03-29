@@ -482,7 +482,7 @@ void scalar_t::restoreSolutionState()
   o_prop0.copyTo(o_prop, o_prop.length());
 }
 
-void scalar_t::mueAVM()
+void scalar_t::applyAVM()
 {
   auto verbose = platform->verbose();
   auto mesh = this->meshV; // assumes mesh is the same for all scalars

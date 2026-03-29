@@ -70,10 +70,10 @@ void tavg::registerKernels(occa::properties &kernelInfo)
   buildKernelCalled = 1;
 }
 
-void tavg::reset()
+void tavg::reset(double atimeIn)
 {
   counter = 0;
-  atime = 0;
+  atime = atimeIn;
 }
 
 void tavg::run(double time)

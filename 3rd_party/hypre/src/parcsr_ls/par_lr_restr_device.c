@@ -455,7 +455,7 @@ hypre_BoomerAMGBuildRestrNeumannAIR_assembleRdiag( hypre_DeviceItem    &item,
 }
 
 #if !defined(HYPRE_USING_SYCL)
-struct setTo1minus1 : public thrust::unary_function<HYPRE_Int, HYPRE_Int>
+struct setTo1minus1
 {
    __host__ __device__ HYPRE_Int operator()(const HYPRE_Int &x) const
    {

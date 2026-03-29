@@ -48,8 +48,8 @@ public:
 
   void finalize() override;
 
-  void mueAVM();
   void mueSVV();
+  void applyAVM();
 
   std::function<occa::memory(double, int)> userImplicitLinearTerm = nullptr;
 

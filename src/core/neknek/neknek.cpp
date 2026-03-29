@@ -91,25 +91,28 @@ void neknek_t::setup()
 #endif
 
   npt_ = [&]() {
+    auto fieldName = fields_[0].name;
+    if (fieldName == "scalar") {
+      fieldName += scalarDigitStr(fields_[0].filter.at(0));
+    }
+
     dlong nFaces = 0;
     for (dlong e = 0; e < mesh->Nelements; ++e) {
       for (dlong f = 0; f < mesh->Nfaces; ++f) {
         auto bID = mesh->EToB[f + mesh->Nfaces * e];
-        auto fieldName = fields_[0].name;
-        if (fieldName == "scalar") {
-          fieldName += scalarDigitStr(fields_[0].filter.at(0));
-        }
-
         if (bID > 0 && platform->app->bc->typeId(bID, fieldName) == bdryBase::bcType_interpolation) {
           nFaces++;
         }
       }
     }
 
-    nekrsCheck(nFaces < 1,
+    dlong nFacesGlobal = nFaces;
+    MPI_Allreduce(MPI_IN_PLACE, &nFacesGlobal, 1, MPI_INT, MPI_SUM, platform->comm.mpiComm());
+
+    nekrsCheck(nFacesGlobal < 1,
                platform->comm.mpiCommParent(),
                EXIT_FAILURE,
-               "%s\n",
+               "%s: %s\n", fieldName.c_str(),
                "no interpolation boundaries found!");
 
     return nFaces * mesh->Nfp;

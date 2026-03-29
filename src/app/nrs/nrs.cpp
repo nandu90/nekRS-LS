@@ -15,7 +15,7 @@
 int nrs_t::numberActiveFields()
 {
   int fields = 0;
-  if (platform->options.compareArgs("FLUID", "TRUE")) {
+  if (!platform->options.compareArgs("FLUID VELOCITY SOLVER", "NONE")) {
     fields++;
   }
   for (int is = 0; is < Nscalar; ++is) {
@@ -641,7 +641,7 @@ void nrs_t::restartFromFiles(const std::vector<std::string> &fileList)
       for (int i = scalarStart; i < Nscalar; i++) {
         const auto sid = scalarDigitStr(i - scalarStart);
         if (checkOption("s" + sid) && isAvailable("scalar" + sid)) {
-          auto o_Si = scalar->o_S.slice(scalar->fieldOffsetScan[i], meshV->Nlocal);
+          auto o_Si = scalar->o_S.slice(scalar->fieldOffsetScan[i], scalar->mesh(i)->Nlocal);
           std::vector<occa::memory> o_iofldSi = {o_Si};
           iofld->addVariable("scalar" + sid, o_iofldSi);
         }
@@ -1953,8 +1953,8 @@ void nrs_t::evaluateProperties(const double timeNew)
     userProperties(timeNew);
   } else {
     if (Nscalar) {
-      scalar->mueAVM();
       scalar->mueSVV();
+      scalar->applyAVM();
     }
   }
 

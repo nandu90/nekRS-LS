@@ -495,11 +495,7 @@ HYPRE_Int hypre_ParCSRMatrixFixZeroRows(hypre_ParCSRMatrix *A)
  *--------------------------------------------------------------------------*/
 
 #if defined(HYPRE_USING_GPU)
-#if defined(HYPRE_USING_SYCL)
 struct l1_norm_op1
-#else
-struct l1_norm_op1 : public thrust::binary_function<HYPRE_Complex, HYPRE_Complex, HYPRE_Complex>
-#endif
 {
    __host__ __device__
    HYPRE_Complex operator()(const HYPRE_Complex &x, const HYPRE_Complex &y) const
@@ -510,11 +506,7 @@ struct l1_norm_op1 : public thrust::binary_function<HYPRE_Complex, HYPRE_Complex
 #endif
 
 #if defined(HYPRE_USING_GPU)
-#if defined(HYPRE_USING_SYCL)
 struct l1_norm_op6
-#else
-struct l1_norm_op6 : public thrust::binary_function<HYPRE_Complex, HYPRE_Complex, HYPRE_Complex>
-#endif
 {
    __host__ __device__
    HYPRE_Complex operator()(const HYPRE_Complex &d, const HYPRE_Complex &l) const

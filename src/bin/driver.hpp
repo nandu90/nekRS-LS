@@ -368,14 +368,14 @@ MPI_Comm setupSession(cmdOptions *cmdOpt, const MPI_Comm &comm)
     fflush(stdout);
     MPI_Barrier(comm);
 
-    if(rank == 0) {
-      const std::string outputFile = 
-        cmdOpt->setupFile.substr(0, cmdOpt->setupFile.rfind('/', cmdOpt->setupFile.length())) + "/logfile";
-      std::cout << "redirecting rank0 output to " << outputFile << " ...\n";
-      const int fd = open(outputFile.c_str(), O_WRONLY|O_CREAT|O_APPEND, S_IWUSR|S_IRUSR);
-      dup2(fd, fileno(stderr));
-      dup2(fd, fileno(stdout));
+    const std::string outputFile = 
+      cmdOpt->setupFile.substr(0, cmdOpt->setupFile.rfind('/', cmdOpt->setupFile.length())) + "/logfile";
+    if(rank == 0) {  
+      std::cout << "redirecting session" << cmdOpt->sessionID << " output to " << outputFile << " ...\n";
     }
+    const int fd = open(outputFile.c_str(), O_WRONLY|O_CREAT|O_APPEND, S_IWUSR|S_IRUSR);
+    dup2(fd, fileno(stderr));
+    dup2(fd, fileno(stdout));
   }
   return newComm;
 }

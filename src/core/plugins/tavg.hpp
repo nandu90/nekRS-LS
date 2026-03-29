@@ -24,7 +24,7 @@ tavg(dlong fieldOffset, const std::vector<tavg::field>& fields, std::string ioEn
 
 void run(double time);
 void writeToFile(mesh_t *mesh, bool resetAvergingTime = true);
-void reset();
+void reset(double atimeIn = 0);
 void free();
 const double& time() const { return atime; }
 dlong fieldOffset() const { return fieldOffset_; };

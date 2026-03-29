@@ -53,7 +53,7 @@ fi
 
 if [ $nsessions -gt 1 ]; then
   if [ $nodes -lt $nsessions ]; then
-    echo "ERROR: number of ranks in $case.sess is larger than job size"
+    echo "ERROR: number of nodes in $case is larger than job size"
     exit 1
   fi
 fi
@@ -144,46 +144,100 @@ fi
 
 }
 
-chk_case_re2() {
-  __case=$1
+# extract [SECTION] key = foo from a file
+read_par_key() {
+  if [[ $# -ne 3 ]]; then
+    echo "Error using function: read_par_key"
+    exit 1
+  fi
 
-  # search [MESH] file = foo.re2 in par
-  f=`awk '
-    /^\[MESH\]/     { in_mesh=1; next }
-    /^\[.*\]/       { in_mesh=0 }
-    in_mesh && /^[[:space:]]*file[[:space:]]*=/ && $0 !~ /^#/ {
-      # Remove comments after value
+  __file=$1     # file name
+  __section=$2  # section name
+  __key=$3      # key name
+
+  awk -v sec="$__section" -v key="$__key" '
+    # Enter the requested section
+    $0 ~ "^\\["sec"\\]" { in_sec = 1; next }
+
+    # Any other [SECTION] ends the current one
+    /^\[.*\]/           { in_sec = 0 }
+
+    # Inside section, match "key = ..."
+    in_sec && /^[[:space:]]*[^#]/ && $0 ~ "^[[:space:]]*"key"[[:space:]]*=" {
+      # strip trailing comment
       line = $0
       sub(/#.*/, "", line)
-      # Extract filename (quoted or unquoted), return first match
-      if (match(line, /file[[:space:]]*=[[:space:]]*"([^"]+)"/, m)) {
+
+      # quoted value
+      pat1 = key"[[:space:]]*=[[:space:]]*\"([^\"]+)\""
+      if (match(line, pat1, m)) {
         print m[1]; exit
-      } else if (match(line, /file[[:space:]]*=[[:space:]]*([^[:space:]]+)/, m)) {
+      }
+
+      # unquoted value
+      pat2 = key"[[:space:]]*=[[:space:]]*([^[:space:]]+)"
+      if (match(line, pat2, m)) {
         print m[1]; exit
       }
     }
-  ' $__case.par`
+  ' "$__file"
+}
 
-  if [[ -z "$f" ]]; then # use default if not found
-    f=$__case.re2
+# chk_case_file_with_ext <case> <ext> [<section> <key>]
+# - If <section> and <key> are given, try to read filename from <case>.par.
+# - Otherwise, use <case>.<ext>.
+# - Verifies the file exists and prints its full path.
+chk_case_file_with_ext() {
+  if [[ $# -ne 4 && $# -ne 2 ]]; then
+    echo "Error using function: chk_case_file_with_ext"
+    exit 1
   fi
+
+  __case=$1
+  __ext=$2
+  __par=$__case.par
+
+  __casename=${__case##*/}
+  __case_dir=${__case%/*}
+  # if there was no '/', use current dir
+  if [ "$__case_dir" = "$__case" ]; then
+    __case_dir="."
+  fi
+
+  f=""
+
+  # Optional: read from .par if section/key provided
+  if [ "$#" -eq 4 ]; then
+    __section=$3
+    __key=$4
+
+    if [[ -n "$__section" && -n "__key" ]]; then
+      f=$(read_par_key "${__par}" "${__section}" "${__key}")
+    fi
+  fi
+
+  # Fallback to default <case>.<ext>
+  if [[ -z "$f" ]]; then
+    f=$__casename.$__ext
+  fi
+
+  # add folder path if not absolute
+  if [ "$f" == "${f#/}" ]; then # abs path starts with '/'
+    f="${__case_dir}/${f}"
+  fi
+
+  # check file
   if [ ! -f $f ]; then
     echo "Cannot find" $f
     exit 1
-  fi
+  fi 
 }
 
 chk_case_files() {
   __case=$1
-  list=($__case.par $__case.udf)
-  for f in ${list[@]}; do
-    if [ ! -f $f ]; then
-      echo "Cannot find" $f
-      exit 1
-    fi
-  done
-
-  chk_case_re2 $__case
+  chk_case_file_with_ext "$__case" "par"
+  chk_case_file_with_ext "$__case" "udf" "GENERAL" "udf"
+  chk_case_file_with_ext "$__case" "re2" "MESH" "file"
 }
 
 chk_case() {

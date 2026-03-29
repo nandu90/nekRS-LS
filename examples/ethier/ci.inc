@@ -166,9 +166,9 @@ void ciSetup(MPI_Comm comm, setupAide &options)
     options.setArgs("FLUID PRESSURE INITIAL GUESS", "PROJECTION-ACONJ");
     options.setArgs("FLUID VELOCITY INITIAL GUESS", "PROJECTION-ACONJ");
     options.setArgs("FLUID PRESSURE PRECONDITIONER", "MULTIGRID+SEMFEM");
-    options.setArgs("FLUID PRESSURE COARSE SOLVER LOCATION", "DEVICE");
+    options.setArgs("FLUID PRESSURE MULTIGRID COARSE SOLVER LOCATION", "DEVICE");
     if (platform->serial()) { 
-      options.setArgs("FLUID PRESSURE COARSE SOLVER LOCATION", "CPU");
+      options.setArgs("FLUID PRESSURE MULTIGRID COARSE SOLVER LOCATION", "CPU");
     } 
   }
   if (ciMode == 4) {
@@ -1203,7 +1203,6 @@ void ciTestErrors(nrs_t *nrs,
     }
 
     if (nrs->timeStepConverged){
-      std::cout << nrs->scalar->ellipticSolver[1]->Niter() << std::endl; 
       auto sIterErr = abs(nrs->scalar->ellipticSolver[1]->Niter() - expectedNiterS01);
       CiEvalTest("scalar01 iter step=1 (sIterErr: " + to_string_f(sIterErr) + ")", sIterErr <= 1);
       nekrsCheck(sIterErr > 1, platform->comm.mpiComm(), EXIT_FAILURE, "%s", "");

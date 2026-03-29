@@ -1160,7 +1160,8 @@ c     Interpolate xm(m,m,m,...) to xn(n,n,n,...) (GLL-->GLL)
       return
       end
 c-----------------------------------------------------------------------
-      subroutine nekf_openfld(fname_in, time_, p0th_, icrrs, lbrst_)
+      subroutine nekf_openfld(fname_in, time_, p0th_, nelgr_
+     $                       ,icrrs_, lbrst_)
       include 'mpif.h'
       include 'SIZE'
       include 'TOTAL'
@@ -1171,7 +1172,7 @@ c-----------------------------------------------------------------------
       real time_
       real p0th_
 
-      integer nps_, icrrs_, lbrst_
+      integer nps_, icrrs_, lbrst_, nelgr_
 
       character*132  fname
       character*1    fnam1(132)
@@ -1221,8 +1222,17 @@ c-----------------------------------------------------------------------
         if (.not. ifgtpsr(i)) gtpsr(i) = 0
       enddo
 
+      ! for h-refine restart
+      ifgetx = .true.
+      ifgetu = .true.
+      ifgetp = .true.
+      ifgett = .true.
+      do i = 1,ldimt-1
+        ifgtps(i) = .true.
+      enddo
+
       ifcrrs = .true.
-      if (icrrs.eq.0) ifcrrs = .false.
+      if (icrrs_.eq.0) ifcrrs = .false.
 
       lbrst = min(1024,lelt)
       if (lbrst_.gt.0) lbrst = lbrst_
@@ -1253,6 +1263,8 @@ c-----------------------------------------------------------------------
 
       integer   disp_unit
       integer*8 win_size
+
+      real*8 etime0
 
       character*132  fname
       common /nekf_rfname/ fname 
@@ -1369,6 +1381,15 @@ c-----------------------------------------------------------------------
         if(nid.eq.pid0r) call byte_close(ierr)
       endif
       call err_chk(ierr,'Error closing restart file, in mfi.$')
+
+      if (ifcrrs) then
+        call fgslib_crystal_free(cr_mfi)
+      endif
+
+      etime0 = rst_etime(1)+rst_etime(2)+rst_etime(3)+rst_etime(4)
+      if(nio.eq.0) write(6,31) (rst_etime(i),i=1,4),etime0
+
+  31  format(3x,'mfi:rd/pk/xfer/unpk/tot:',5(1e9.2))
 
       return
       end

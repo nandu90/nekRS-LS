@@ -196,9 +196,6 @@ regularization
                               +noiseThreshold=<float>                  smaller values will be considered to be noise
                               +decayThreshold=<float>
                               +activationWidth=<float>                 half-width of activation function
-                            svv                                        spectrally vanishing viscosity (SVV)
-                              +scalingCoeff=<float>                    scaling factor for SVV
-                              +filterPower=<float>                     exponent of SVV high-pass filter
 ----------------------------------------------------------------------------------------------------------------------
 [MESH]
 

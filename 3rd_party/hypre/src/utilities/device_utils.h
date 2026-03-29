@@ -901,6 +901,53 @@ hypre_int next_power_of_2(hypre_int n)
 
 #if defined(HYPRE_USING_CUDA) || defined(HYPRE_USING_HIP)
 
+#if CUDA_VERSION >= 13000
+
+// adding removed methods to support newer CUDA versions
+namespace thrust
+{
+
+template <typename T>
+struct identity
+{
+    __host__ __device__ identity() {}
+
+    __host__ __device__
+    T operator()(const T &x) const
+    {
+        return x;
+    }
+};
+
+template <typename F>
+struct not1
+{
+    F f;
+
+    __host__ __device__
+    not1(F f_) : f(f_) {}
+
+    template <typename T>
+    __host__ __device__
+    bool operator()(const T &x) const
+    {
+        return !f(x);
+    }
+};
+
+template <typename T>
+using not_identity = not1<identity<T>>;
+
+template <typename T>
+__host__ __device__ inline not_identity<T> not_identity_fun()
+{
+    return not_identity<T>(identity<T>());
+}
+
+} // namespace thrust
+
+#endif
+
 /* return the number of threads in block */
 template <hypre_int dim>
 static __device__ __forceinline__
@@ -1305,7 +1352,7 @@ T warp_allreduce_min(hypre_DeviceItem &item, T in)
 }
 
 template<typename T1, typename T2>
-struct type_cast : public thrust::unary_function<T1, T2>
+struct type_cast
 {
    __host__ __device__ T2 operator()(const T1 &x) const
    {
@@ -1314,7 +1361,7 @@ struct type_cast : public thrust::unary_function<T1, T2>
 };
 
 template<typename T>
-struct absolute_value : public thrust::unary_function<T, T>
+struct absolute_value
 {
    __host__ __device__ T operator()(const T &x) const
    {
@@ -1365,7 +1412,7 @@ struct TupleComp3
 };
 
 template<typename T>
-struct is_negative : public thrust::unary_function<T, bool>
+struct is_negative
 {
    __host__ __device__ bool operator()(const T &x)
    {
@@ -1374,7 +1421,7 @@ struct is_negative : public thrust::unary_function<T, bool>
 };
 
 template<typename T>
-struct is_positive : public thrust::unary_function<T, bool>
+struct is_positive
 {
    __host__ __device__ bool operator()(const T &x)
    {
@@ -1383,7 +1430,7 @@ struct is_positive : public thrust::unary_function<T, bool>
 };
 
 template<typename T>
-struct is_nonnegative : public thrust::unary_function<T, bool>
+struct is_nonnegative
 {
    __host__ __device__ bool operator()(const T &x)
    {
@@ -1392,8 +1439,25 @@ struct is_nonnegative : public thrust::unary_function<T, bool>
 };
 
 template<typename T>
-struct in_range : public thrust::unary_function<T, bool>
+struct in_range
+#if CUDA_VERSION >= 13000 
 {
+    T low, up;
+
+    __host__ __device__ in_range(T low_, T up_) : low(low_), up(up_) {}
+
+    template<typename U>
+    __host__ __device__ bool operator()(U x) const
+    {
+        T y = static_cast<T>(x); // convert to T
+        return (y >= low && y <= up);
+    }
+};
+#else
+{
+  using argument_type = T;
+  using result_type   = bool;
+
    T low, up;
 
    in_range(T low_, T up_) { low = low_; up = up_; }
@@ -1403,9 +1467,10 @@ struct in_range : public thrust::unary_function<T, bool>
       return (x >= low && x <= up);
    }
 };
+#endif
 
 template<typename T>
-struct out_of_range : public thrust::unary_function<T, bool>
+struct out_of_range
 {
    T low, up;
 
@@ -1418,20 +1483,23 @@ struct out_of_range : public thrust::unary_function<T, bool>
 };
 
 template<typename T>
-struct less_than : public thrust::unary_function<T, bool>
+struct less_than
 {
+  using argument_type = T;
+  using result_type   = bool;
+
    T val;
 
-   less_than(T val_) { val = val_; }
+   __host__ __device__ less_than(T val_) { val = val_; }
 
-   __host__ __device__ bool operator()(const T &x)
+   __host__ __device__ bool operator()(const T &x) const
    {
       return (x < val);
    }
 };
 
 template<typename T>
-struct modulo : public thrust::unary_function<T, T>
+struct modulo
 {
    T val;
 
@@ -1444,17 +1512,36 @@ struct modulo : public thrust::unary_function<T, T>
 };
 
 template<typename T>
-struct equal : public thrust::unary_function<T, bool>
+struct equal
+#if CUDA_VERSION >= 13000 
 {
    T val;
 
-   equal(T val_) { val = val_; }
+   __host__ __device__
+   equal(T val_) : val(val_) {}
+
+   template <typename U>
+   __host__ __device__
+   bool operator()(const U &x) const
+   {
+      return static_cast<T>(x) == val;
+   }
+};
+#else
+{
+   using argument_type = T;
+   using result_type   = bool;
+
+   T val; 
+
+   equal(T val_) { val = val_; } 
 
    __host__ __device__ bool operator()(const T &x)
    {
       return (x == val);
    }
 };
+#endif
 
 struct print_functor
 {

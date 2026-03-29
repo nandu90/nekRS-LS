@@ -42,7 +42,7 @@ if(ENABLE_HYPRE_GPU AND (OCCA_CUDA_ENABLED OR OCCA_HIP_ENABLED))
 
 if(OCCA_CUDA_ENABLED)
   enable_language(CUDA)
-  find_package(CUDAToolkit 11.0 REQUIRED)
+  find_package(CUDAToolkit 12.0 REQUIRED)
 
   set(HYPRE_DEVICE_COMPILER "${CMAKE_CUDA_COMPILER} -ccbin=${CMAKE_CXX_COMPILER}")
   set(HYPRE_COMPILER_C_FLAGS ${HYPRE_FLAGS_EXTRA})
@@ -57,12 +57,14 @@ if(OCCA_CUDA_ENABLED)
 
   set(HYPRE_BACKEND "--with-cuda" "--with-cuda-home=${CUDAToolkit_LIBRARY_ROOT}")
 
-  if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "12.0.0")
-    set(HYPRE_DEVICE_ARCH "HYPRE_CUDA_SM=70 80 90")
+  if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0.0")
+    set(HYPRE_DEVICE_ARCH "HYPRE_CUDA_SM=80 90")
     #disable for now as it might not play well with all MPI implementations
     #set(HYPRE_CONFIGURE_FLAGS "--enable-device-malloc-async")
-  else()
+  elseif(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "12.0.0")
     set(HYPRE_DEVICE_ARCH "HYPRE_CUDA_SM=70 80")
+    #disable for now as it might not play well with all MPI implementations
+    #set(HYPRE_CONFIGURE_FLAGS "--enable-device-malloc-async")
   endif()
 
 elseif(OCCA_HIP_ENABLED)
@@ -87,7 +89,7 @@ elseif(OCCA_HIP_ENABLED)
 endif()
 
 if(NEKRS_GPU_MPI)
-  list(APPEND HYPRE_CONFIGURE_FLAGS --enable-gpu-aware-mpi)
+  list(APPEND HYPRE_CONFIGURE_FLAGS "--enable-gpu-aware-mpi --with-cxxstandard=17")
 endif()
 
   set(HYPRE_INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/HYPRE_BUILD_DEVICE-prefix)

@@ -8,7 +8,7 @@ std::cout << R"(███    ██ ███████ ██   ██ ██
           << R"(██ ██  ██ █████   █████   ██████  ███████)" << std::endl
           << R"(██  ██ ██ ██      ██  ██  ██   ██      ██)" << std::endl
           << R"(██   ████ ███████ ██   ██ ██   ██ ███████)" << std::endl
-            << "(c) 2019-2025 UCHICAGO ARGONNE, LLC" << std::endl
+            << "(c) 2019-2026 UCHICAGO ARGONNE, LLC" << std::endl
             << "v" << NEKRS_VERSION << "." << NEKRS_SUBVERSION << "." << NEKRS_PATCHVERSION 
 	    << " (sha:" << GITCOMMITHASH << ")" << std::endl
             << std::endl;

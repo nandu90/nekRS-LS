@@ -155,6 +155,8 @@ public:
 
   AeroForce *aeroForces(const occa::memory &o_bID, const occa::memory &o_Sij = o_NULL);
 
+  occa::memory viscousTraction(const occa::memory o_bID, occa::memory o_Sij_= o_NULL);
+  occa::memory viscousNormalStress(const occa::memory o_bID, occa::memory o_Sij_= o_NULL);
   occa::memory viscousShearStress(const occa::memory o_bID, occa::memory o_Sij_= o_NULL);
 
   // output in row-major order

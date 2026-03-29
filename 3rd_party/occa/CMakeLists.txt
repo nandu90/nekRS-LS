@@ -27,7 +27,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(OCCA_ENABLE_OPENMP "Build with OpenMP if available" ON)
+option(OCCA_ENABLE_OPENMP "Build with OpenMP if available" OFF)
 option(OCCA_ENABLE_CUDA   "Build with CUDA if available"   ON)
 option(OCCA_ENABLE_OPENCL "Build with OpenCL if available" ON)
 option(OCCA_ENABLE_HIP    "Build with HIP if available" ON)

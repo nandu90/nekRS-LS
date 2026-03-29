@@ -406,7 +406,7 @@ static void compute_1d_stiffness_matrix(dfloat *a,
     a(n + 2, n + 2) = 1.0;
   }
 
-#if 1
+#if 0
   {
     auto &mesh = elliptic->mesh;
     std::vector<pfloat> lambda0(mesh->Np);

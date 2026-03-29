@@ -46,6 +46,67 @@ occa::memory nrs_t::strainRate(dlong offset, const occa::memory &o_U, bool smoot
   return _strainRotationRate(meshV, false, offset, o_U, smooth);
 }
 
+// o_Sij dot n
+occa::memory nrs_t::viscousTraction(const occa::memory o_bID, occa::memory o_Sij_)
+{
+  auto mesh = meshV;
+
+  occa::memory o_Sij = o_Sij_;
+  if (!o_Sij.isInitialized()) {
+    o_Sij = this->strainRate();
+  }
+
+  const dlong offset = o_Sij.size() / (2 * mesh->dim);
+
+  auto o_tau = platform->deviceMemoryPool.reserve<dfloat>(mesh->dim * offset);
+  platform->linAlg->fill(o_tau.size(), 0, o_tau);
+  launchKernel("nrs-viscousShearStress",
+               mesh->Nelements,
+               offset,
+               static_cast<int>(o_bID.size()),
+               o_bID,
+               2,
+               mesh->o_sgeo,
+               mesh->o_vmapM,
+               mesh->o_EToB,
+               fluid->o_mue,
+               o_Sij,
+               o_tau);
+
+  return o_tau;
+}
+
+// ((o_Sij dot n) dot n ) n
+occa::memory nrs_t::viscousNormalStress(const occa::memory o_bID, occa::memory o_Sij_)
+{
+  auto mesh = meshV;
+
+  occa::memory o_Sij = o_Sij_;
+  if (!o_Sij.isInitialized()) {
+    o_Sij = this->strainRate();
+  }
+
+  const dlong offset = o_Sij.size() / (2 * mesh->dim);
+
+  auto o_tau = platform->deviceMemoryPool.reserve<dfloat>(mesh->dim * offset);
+  platform->linAlg->fill(o_tau.size(), 0, o_tau);
+  launchKernel("nrs-viscousShearStress",
+               mesh->Nelements,
+               offset,
+               static_cast<int>(o_bID.size()),
+               o_bID,
+               1,
+               mesh->o_sgeo,
+               mesh->o_vmapM,
+               mesh->o_EToB,
+               fluid->o_mue,
+               o_Sij,
+               o_tau);
+
+  return o_tau;
+}
+
+// o_Sij dot n - ((o_Sij dot n) dot n ) n
 occa::memory nrs_t::viscousShearStress(const occa::memory o_bID, occa::memory o_Sij_)
 {
   auto mesh = meshV;
@@ -64,6 +125,7 @@ occa::memory nrs_t::viscousShearStress(const occa::memory o_bID, occa::memory o_
                offset,
                static_cast<int>(o_bID.size()),
                o_bID,
+               0,
                mesh->o_sgeo,
                mesh->o_vmapM,
                mesh->o_EToB,

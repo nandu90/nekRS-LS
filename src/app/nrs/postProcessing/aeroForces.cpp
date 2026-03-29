@@ -10,18 +10,21 @@ AeroForce *nrs_t::aeroForces(const occa::memory &o_bID, const occa::memory &o_Si
   if (!o_Sij.isInitialized()) {
     o_Sij = this->strainRate();
   }
-  auto o_tauT = viscousShearStress(o_bID, o_Sij);
-  auto fT = mesh->surfaceAreaMultiplyIntegrate(mesh->dim, o_tauT.size() / mesh->dim, o_bID, o_tauT); 
-  af->tangential({fT[0], fT[1], fT[2]});
 
-  auto o_rhoP = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-  platform->linAlg->axmyz(o_rhoP.size(), 
-                          1.0, 
-                          af->rho().isInitialized() ? af->rho() : this->fluid->o_rho, 
-                          af->p().isInitialized() ? af->p() : this->fluid->o_P, 
-                          o_rhoP);
-  auto fN = mesh->surfaceAreaNormalMultiplyIntegrate(o_bID, o_rhoP);
-  af->normal({fN[0], fN[1], fN[2]});
+  auto o_tangentialViscousTraction = viscousShearStress(o_bID, o_Sij); // tau dot n - ((tau dot n) dot n) * n
+  auto o_normalViscousTraction = viscousNormalStress(o_bID, o_Sij); // ((tau dot n) dot n) * n
+
+  const dlong Ntotal = o_tangentialViscousTraction.size() / mesh->dim;
+  auto fvT = mesh->surfaceAreaMultiplyIntegrate(mesh->dim, Ntotal, o_bID, o_tangentialViscousTraction);
+  auto fvN = mesh->surfaceAreaMultiplyIntegrate(mesh->dim, Ntotal, o_bID, o_normalViscousTraction);
+
+  af->setViscousForce({fvT[0] + fvN[0], fvT[1] + fvN[1], fvT[2] + fvN[2]});
+  af->setViscousForceNormal({fvN[0], fvN[1], fvN[2]});
+  af->setViscousForceTangential({fvT[0], fvT[1], fvT[2]});
+
+  auto o_P = af->p().isInitialized() ? af->p() : this->fluid->o_P;
+  auto fp = mesh->surfaceAreaNormalMultiplyIntegrate(o_bID, o_P);
+  af->setPressureForce({fp[0], fp[1], fp[2]});
 
   return af;
 }
