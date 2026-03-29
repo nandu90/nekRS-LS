@@ -28,6 +28,7 @@ occa::kernel meshScalesKernel;
 occa::kernel normalizeVectorKernel;
 occa::kernel clsrDiffusionCoeffKernel;
 occa::kernel heavisideKernel;
+occa::kernel clampCLSKernel;
 
 static bool buildKernelCalled = false;
 static bool setupCalled = false;
@@ -171,6 +172,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
     normalizeVectorKernel = buildKernel(kernelInfo, "normalizeVector", oklPath, oklFile);
     clsrDiffusionCoeffKernel = buildKernel(kernelInfo, "clsrDiffusionCoeff", oklPath, oklFile);
     heavisideKernel = buildKernel(kernelInfo, "heaviside", oklPath, oklFile);
+    clampCLSKernel = buildKernel(kernelInfo, "clampCLS", oklPath, oklFile);
   }
   {
     occa::properties kernelInfo;
@@ -947,6 +949,8 @@ void lvlSet::solve(const double &fluidTime)
   };
   runPseudoStepper(tlsr, tlsrTimer, "cls");
   runPseudoStepper(clsr, clsrTimer, "cls");
+
+  clampCLSKernel(nrs->scalar->mesh(0), nrs->scalar->o_solution("cls"));
 
   if(resetOrder) {
     timeIntegrationOrder = 1;

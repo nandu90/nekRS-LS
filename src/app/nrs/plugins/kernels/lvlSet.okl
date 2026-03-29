@@ -10,6 +10,18 @@
   }
 }
 
+@kernel void clampCLS(const dlong Ntotal,
+                      @ restrict dfloat *PSI)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    if (n < Ntotal) {
+      const dfloat psi = PSI[n];
+      if(psi > 1.0) PSI[n] = 1.0;
+      if(psi < 0.0) PSI[n] = 0.0;
+    }
+  }
+}
+
 void rmax(dfloat *s_max, const dlong t, const dlong bs) {
   s_max[t] = (s_max[t] > s_max[t + bs]) ? s_max[t] : s_max[t + bs];
 }
