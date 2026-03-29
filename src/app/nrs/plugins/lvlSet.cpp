@@ -41,6 +41,8 @@ static occa::memory o_svvf;
 
 static double elapsedTime;
 
+static dfloat dt[3] = {0.0, 0.0, 0.0};
+
 enum class StopMode {targetSteps, targetTime};
 StopMode stopMode;
 
@@ -666,7 +668,7 @@ void lvlSet::setup()
     lvlSetConfig_t cfg;
     cfg.name = name;
     cfg.g0 = &nrs->g0;
-    cfg.dt = nrs->dt;
+    cfg.dt = dt;
     cfg.fieldOffset = nrs->meshV->fieldOffset;
     cfg.vFieldOffset = nrs->scalar->vFieldOffset;       // TODO: is it safe to assume nrs->scalar is always accessible?
     cfg.vCubatureOffset = nrs->scalar->vCubatureOffset; // TODO: is it safe to assume nrs->scalar is always accessible?
@@ -722,8 +724,10 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
   elapsedTime = 0.0;
   double time = 0.0;
   int tstep = 1;
-  auto [dt, targetTime, targetSteps] = this->computeFixedDistanceAdvectionParams();
-  this->dt[0] = dt;
+  auto [deltat, targetTime, targetSteps] = this->computeFixedDistanceAdvectionParams();
+  dt[0] = deltat;
+  dt[1] = 0.0;
+  dt[2] = 0.0;
 
   // Integration loop stopping condition
   auto isFinalStep = [&]() -> bool {
@@ -751,24 +755,24 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     this->computeAdvectionCoeff(tstep);
 
     // enforce CFL condition
-    auto cfl = nrs->computeCFL(this->meshV, this->o_W, this->dt[0]);
-    dfloat dtNew = this->dt[0];
+    auto cfl = nrs->computeCFL(this->meshV, this->o_W, dt[0]);
+    dfloat dtNew = dt[0];
     if (cfl > this->targetCFL) { 
-      dtNew = this->dt[0] * this->targetCFL / cfl; 
+      dtNew = dt[0] * this->targetCFL / cfl; 
     }
 
     // shuffle time-step history
-    this->dt[2] = this->dt[1];
-    this->dt[1] = this->dt[0];
-    this->dt[0] = dtNew;
+    dt[2] = dt[1];
+    dt[1] = dt[0];
+    dt[0] = dtNew;
 
     if (stopMode == StopMode::targetTime) {
       // make sure we don't overstep the targetTime
-      this->dt[0] = std::min(this->dt[0], static_cast<dfloat>(targetTime - time));
+      dt[0] = std::min(dt[0], static_cast<dfloat>(targetTime - time));
     }
 
     // advance time here for implicit update
-    time += this->dt[0];
+    time += dt[0];
     this->setTimeIntegrationCoeffs(tstep); // set after the time-step has been updated
 
     // Assemble operators/RHS terms and advance one time step
@@ -1210,9 +1214,12 @@ void lvlSet_t::makeAdvection(double time, int tstep)
 {
   auto mesh = this->meshV;
 
-  if(this->name == "clsr" && tstep == 1){
-    platform->linAlg->fill(mesh->Nlocal, 0.0, this->o_ADV);
-    platform->linAlg->fill(mesh->Nlocal, 0.0, this->o_JwF);
+  if(this->name == "clsr"){
+    if(tstep == 1) {
+      platform->linAlg->fill(mesh->Nlocal, 0.0, this->o_ADV);
+      platform->linAlg->fill(mesh->Nlocal, 0.0, this->o_JwF);
+    }
+    return;
   }
   else {
     if (this->Nsubsteps) {
@@ -1258,6 +1265,9 @@ void lvlSet_t::makeAdvection(double time, int tstep)
 
 void lvlSet_t::advectionSubcycling(int nEXT, double time)
 {
+  if(this->name == "clsr")
+    return;
+
   const auto mesh = this->_mesh;
   const auto meshV = this->meshV;
 
