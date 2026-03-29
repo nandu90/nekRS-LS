@@ -142,13 +142,13 @@ void setInterfaceWidth();
 
 void lvlSet::buildKernel(occa::properties _kernelInfo)
 {
-  occa::properties kernelInfo;
-  kernelInfo += _kernelInfo;
-
-  auto buildKernel = [&kernelInfo](const std::string &kernelName) {
-    const auto path = getenv("NEKRS_KERNEL_DIR") + std::string("/app/nrs/plugins/");
-    const auto fileName = path + "lvlSet.okl";
-    const auto reqName = "lvlSet::";
+  auto buildKernel = [](occa::properties &kernelInfo,
+                        const std::string &kernelName,
+                        const std::string &oklPath,
+                        const std::string &oklFile) {
+    const auto path = getenv("NEKRS_KERNEL_DIR") + oklPath;
+    const auto fileName = path + oklFile + ".okl";
+    const auto reqName = "lvlSet::" + oklFile;
     if (platform->options.compareArgs("REGISTER ONLY", "TRUE")) {
       platform->kernelRequests.add(reqName, fileName, kernelInfo);
       return occa::kernel();
@@ -158,12 +158,40 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
     }
   };
 
-  signlsKernel = buildKernel("signls");
-  normalVectorKernel = buildKernel("normalVector");
-  meshScalesKernel = buildKernel("meshScales");
-  normalizeVectorKernel = buildKernel("normalizeVector");
-  clsrDiffusionCoeffKernel = buildKernel("clsrDiffusionCoeff");
-  heavisideKernel = buildKernel("heaviside");
+  {
+    occa::properties kernelInfo;
+    kernelInfo += _kernelInfo;
+
+    std::string oklPath = "/app/nrs/plugins/";
+    std::string oklFile = "lvlSet";
+
+    signlsKernel = buildKernel(kernelInfo, "signls", oklPath, oklFile);
+    normalVectorKernel = buildKernel(kernelInfo, "normalVector", oklPath, oklFile);
+    meshScalesKernel = buildKernel(kernelInfo, "meshScales", oklPath, oklFile);
+    normalizeVectorKernel = buildKernel(kernelInfo, "normalizeVector", oklPath, oklFile);
+    clsrDiffusionCoeffKernel = buildKernel(kernelInfo, "clsrDiffusionCoeff", oklPath, oklFile);
+    heavisideKernel = buildKernel(kernelInfo, "heaviside", oklPath, oklFile);
+  }
+  {
+    occa::properties kernelInfo;
+    kernelInfo += _kernelInfo;
+
+    std::string oklPath = "/solver/scalar/";
+    std::string oklFile = "sumMakef";
+
+    int nBDF = 0;
+    int nEXT = 1;
+    platform->options.getArgs("BDF ORDER", nBDF);
+
+    const int movingMesh = platform->options.compareArgs("MOVING MESH", "TRUE");
+
+    kernelInfo["defines/p_MovingMesh"] = movingMesh;
+    kernelInfo["defines/p_nEXT"] = nEXT;
+    kernelInfo["defines/p_nBDF"] = nBDF;
+    kernelInfo["defines/p_SUBCYCLING"] = 0;
+    kernelInfo["defines/p_ADVECTION"] = 0;
+    buildKernel(kernelInfo, "sumMakef", oklPath, oklFile);
+  }
 }
 
 void validateLvlSetSections()
@@ -1137,7 +1165,8 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 void lvlSet_t::setTimeIntegrationCoeffs(int tstep)
 {
   const auto bdfOrder = std::min(tstep, static_cast<int>(this->o_coeffBDF.size()));
-  const auto extOrder = std::min(tstep, static_cast<int>(this->o_coeffEXT.size()));
+  auto extOrder = std::min(tstep, static_cast<int>(this->o_coeffEXT.size()));
+  if(this->name == "clsr") extOrder = 1;
 
   {
     std::vector<dfloat> coeff(this->o_coeffBDF.size());
@@ -1364,7 +1393,11 @@ void lvlSet_t::makeForcing()
   auto mesh = this->_mesh;
 
   if (this->compute) {
-    launchKernel("scalar_t::sumMakef",
+    std::string kernelName = "scalar_t::sumMakef";
+    if(this->name == "clsr")
+      kernelName = "lvlSet::sumMakef";
+
+    launchKernel(kernelName,
                  mesh->Nlocal,
                  mesh->o_LMM,
                  1 / this->dt[0],
