@@ -491,7 +491,7 @@ void parseLvlSetSections()
 
     if(firstWord == "default") {
       options.setArgs("TLSR DISTANCE FACTOR", to_string_f(2.5));
-      options.setArgs("CLSR DISTANCE FACTOR", to_string_f(0.15));
+      options.setArgs("CLSR DISTANCE FACTOR", to_string_f(1.0));
     }
 
     {
@@ -1907,7 +1907,7 @@ std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams()
     targetTime /= rf;
   }
 
-  if(this->name == "clsr") targetTime = interfaceWidth;
+  if(this->name == "clsr") targetTime = interfaceWidth * this->distanceFactor;
 
   // Number of fixed time steps required to reach the target integration time (i.e. to advect the prescribed distance)
   int targetSteps = std::min(this->stepsMax, static_cast<int>(std::floor(targetTime / dt)));
