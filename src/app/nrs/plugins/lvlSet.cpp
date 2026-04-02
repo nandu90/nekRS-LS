@@ -688,8 +688,6 @@ void lvlSet::setup()
     }
   }
 
-  setInterfaceWidth();
-  
   o_signls = platform->device.malloc<dfloat>(nrs->scalar->fieldOffset());
   o_svvf = platform->device.malloc<dfloat>(nrs->scalar->fieldOffset());
   o_normals = platform->device.malloc<dfloat>(3 * nrs->scalar->fieldOffset());
@@ -910,6 +908,8 @@ void lvlSet::solve(const double &fluidTime)
 {
   if(fluidStartTime < 0.0){ //first call
     fluidStartTime = fluidTime;
+
+    setInterfaceWidth();
 
     if(platform->comm.mpiRank() == 0) {
       printf("LVLSET INTERFACE WIDTH: %16.8e\n", interfaceWidth);
@@ -2064,6 +2064,8 @@ void lvlSet::initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const
              EXIT_FAILURE,
              "%s\n",
              "lvlSet::initHeaviside called prior to lvlSet::setup()!");
+
+  setInterfaceWidth();
 
   dfloat eps = interfaceWidth;
   if(epsin > 0.0) {
