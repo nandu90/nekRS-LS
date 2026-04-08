@@ -314,6 +314,16 @@ void fluidSolver_t::solveVelocity(double time, int stage)
 
     auto o_gradMueDiv = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
 
+#if 1
+    launchKernel("core-wGradientVolumeHex3D",
+                 mesh->Nelements,
+                 mesh->o_vgeo,
+                 mesh->o_D,
+                 fieldOffset,
+                 o_mueDiv,
+                 o_gradMueDiv);
+    platform->linAlg->scale(o_gradMueDiv.size(), -1.0, o_gradMueDiv);
+#else
     launchKernel("core-gradientVolumeHex3D",
                  mesh->Nelements,
                  mesh->o_vgeo,
@@ -321,6 +331,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                  fieldOffset,
                  o_mueDiv,
                  o_gradMueDiv);
+#endif
     flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
 
     return o_gradMueDiv;
@@ -333,6 +344,16 @@ void fluidSolver_t::solveVelocity(double time, int stage)
       auto o_delta = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
       platform->linAlg->axpbyz(mesh->Nlocal, 1.0, o_P, -1.0, o_Pe, o_delta);
+#if 1
+      launchKernel("core-wGradientVolumeHex3D",
+                   mesh->Nelements,
+                   mesh->o_vgeo,
+                   mesh->o_D,
+                   fieldOffset,
+                   o_delta,
+                   o_del);
+      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, -1 / rho0, o_rho, o_del);
+#else
       launchKernel("core-gradientVolumeHex3D",
                    mesh->Nelements,
                    mesh->o_vgeo,
@@ -340,11 +361,11 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                    fieldOffset,
                    o_delta,
                    o_del);
-
+      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1 / rho0, o_rho, o_del);
+#endif
       flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
 
       // o_del * rho / rho0
-      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1 / rho0, o_rho, o_del);
     }
     return o_del;
   }();
