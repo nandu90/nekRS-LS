@@ -376,3 +376,23 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
     }
   }
 }
+
+@kernel void delta(const dlong Ntotal,
+                   const dfloat eps,
+                   @ restrict const dfloat *PSI,
+                   @ restrict dfloat *delta)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    if (n < Ntotal) {
+      dfloat psi = 2.0 * PSI[n] - 1.0;
+      psi = fmax(-1.0, fmin(1.0, psi));
+
+      const dfloat htan = atanh(psi);
+      const dfloat chtan = cosh(htan);
+      const dfloat chtan2 = chtan * chtan;
+      const dfloat ichtan2 = 1.0 / chtan2;
+      const dfloat ieps = 0.25 / eps;
+      delta[n] = ieps * ichtan2;
+    }
+  }
+}

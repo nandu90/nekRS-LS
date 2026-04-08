@@ -24,9 +24,13 @@ void clsrAx(elliptic_t* elliptic,
 
 void clsrPreconditioner(elliptic_t* elliptic, const occa::memory &o_r, occa::memory &o_z);
 
-void getNormalVector(const occa::memory &o_phi, occa::memory &o_normals, bool avg = true);
-void getSignField(const occa::memory &o_phi, occa::memory &o_sign);
+void normalVector(const occa::memory &o_phi, occa::memory &o_normals, bool avg = true);
 void initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const dfloat epsin = -1.0);
+
+const occa::memory& getSurfaceTension(const dfloat& sigma);
+const occa::memory& getSignField(const occa::memory &o_phi);
+const occa::memory& getDeltaFunction();
+const occa::memory& getCurvature(const occa::memory &o_normals);
 }
 
 struct lvlSetConfig_t : public solverCfg_t {
@@ -49,7 +53,7 @@ public:
   void makeAdvection(double time, int tstep);
   void makeForcing();
   void mueAVM();
-  void mueSVV();
+  void mueSVV(int tstep);
   void computeWrst();
 
   void solve(double time, int stage) override;

@@ -29,6 +29,7 @@ occa::kernel normalizeVectorKernel;
 occa::kernel clsrDiffusionCoeffKernel;
 occa::kernel heavisideKernel;
 occa::kernel clampCLSKernel;
+occa::kernel deltaKernel;
 
 static bool buildKernelCalled = false;
 static bool setupCalled = false;
@@ -39,6 +40,9 @@ std::unique_ptr<lvlSet_t> clsr = nullptr;
 static occa::memory o_signls;
 static occa::memory o_normals;
 static occa::memory o_svvf;
+static occa::memory o_delta;
+static occa::memory o_curvature;
+static occa::memory o_sforce;
 
 static double elapsedTime;
 
@@ -173,6 +177,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
     clsrDiffusionCoeffKernel = buildKernel(kernelInfo, "clsrDiffusionCoeff", oklPath, oklFile);
     heavisideKernel = buildKernel(kernelInfo, "heaviside", oklPath, oklFile);
     clampCLSKernel = buildKernel(kernelInfo, "clampCLS", oklPath, oklFile);
+    deltaKernel = buildKernel(kernelInfo, "delta", oklPath, oklFile);
   }
   {
     occa::properties kernelInfo;
@@ -688,20 +693,22 @@ void lvlSet::setup()
     }
   }
 
-  o_signls = platform->device.malloc<dfloat>(nrs->scalar->fieldOffset());
-  o_svvf = platform->device.malloc<dfloat>(nrs->scalar->fieldOffset());
-  o_normals = platform->device.malloc<dfloat>(3 * nrs->scalar->fieldOffset());
+  o_normals = platform->device.malloc<dfloat>(nrs->meshV->dim * nrs->scalar->vFieldOffset);
 
   auto ls = [&](const std::string& name) {
     lvlSetConfig_t cfg;
     cfg.name = name;
     cfg.g0 = &nrs->g0;
     cfg.dt = dt;
-    cfg.fieldOffset = nrs->meshV->fieldOffset;
-    cfg.vFieldOffset = nrs->scalar->vFieldOffset;       // TODO: is it safe to assume nrs->scalar is always accessible?
-    cfg.vCubatureOffset = nrs->scalar->vCubatureOffset; // TODO: is it safe to assume nrs->scalar is always accessible?
-    cfg.mesh = nrs->meshV;
-    cfg.meshV = nrs->meshV;
+    cfg.fieldOffset = nrs->scalar->vFieldOffset;
+    cfg.vFieldOffset = nrs->scalar->vFieldOffset;       
+    cfg.vCubatureOffset = nrs->scalar->vCubatureOffset; 
+    if(name == "tlsr") {
+      cfg.mesh = nrs->scalar->mesh(nrs->scalar->nameToIndex.find("tls")->second); //TODO: add check to ensure tls is not CHT
+    } else if (name == "clsr") {
+      cfg.mesh = nrs->scalar->mesh(nrs->scalar->nameToIndex.find("cls")->second); //TODO: add check to ensure cls is not CHT
+    }
+    cfg.meshV = nrs->scalar->meshV;
     return std::make_unique<lvlSet_t>(cfg, nrs->geom);
   };
 
@@ -810,7 +817,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     this->makeAdvection(time, tstep);
     this->makeExplicit(time, tstep);
     this->makeForcing();
-    this->mueSVV();
+    this->mueSVV(tstep);
     this->mueAVM();
     this->lagSolution();
     this->applyDirichlet(time);
@@ -950,7 +957,10 @@ void lvlSet::solve(const double &fluidTime)
   runPseudoStepper(tlsr, tlsrTimer, "cls");
   runPseudoStepper(clsr, clsrTimer, "cls");
 
-  clampCLSKernel(nrs->scalar->mesh(0), nrs->scalar->o_solution("cls"));
+  {
+    auto mesh = nrs->scalar->mesh(nrs->scalar->nameToIndex.find("cls")->second);
+    clampCLSKernel(mesh->Nlocal, nrs->scalar->o_solution("cls"));
+  }
 
   if(resetOrder) {
     timeIntegrationOrder = 1;
@@ -1191,29 +1201,36 @@ void lvlSet_t::setTimeIntegrationCoeffs(int tstep)
   }
 }
 
-void lvlSet::getNormalVector(const occa::memory& o_phi, occa::memory& o_normal, bool avg)
+void lvlSet::normalVector(const occa::memory& o_phi, occa::memory& o_normal, bool avg)
 {
-  auto meshV = nrs->meshV;
+  auto mesh = nrs->scalar->mesh(nrs->scalar->nameToIndex.find("tls")->second);
 
-  normalVectorKernel(meshV->Nelements,
-                     meshV->o_vgeo,
-                     meshV->o_D,
+  normalVectorKernel(mesh->Nelements,
+                     mesh->o_vgeo,
+                     mesh->o_D,
                      nrs->scalar->vFieldOffset,
                      o_phi,
                      o_normal);
 
   if(avg) {
-    oogs::startFinish(o_normal, meshV->dim, nrs->scalar->vFieldOffset, ogsDfloat, ogsAdd, meshV->oogs);
+    oogs::startFinish(o_normal, mesh->dim, nrs->scalar->vFieldOffset, ogsDfloat, ogsAdd, mesh->oogs);
 
     //normalization seems necessary after averaging for TLSR stability
-    normalizeVectorKernel(meshV->Nlocal, nrs->scalar->vFieldOffset, o_normal);
+    normalizeVectorKernel(mesh->Nlocal, nrs->scalar->vFieldOffset, o_normal);
   }
 }
 
-void lvlSet::getSignField(const occa::memory& o_phi, occa::memory& o_sign)
+const occa::memory& lvlSet::getSignField(const occa::memory& o_phi)
 {
-  auto meshV = nrs->meshV;
-  signlsKernel(meshV->Nlocal, o_phi, o_sign);
+  auto mesh = nrs->scalar->mesh(nrs->scalar->nameToIndex.find("tls")->second);
+
+  if(!o_signls.isInitialized()) {
+    o_signls = platform->device.malloc<dfloat>(mesh->Nlocal);
+  }
+
+  signlsKernel(mesh->Nlocal, o_phi, o_signls);
+
+  return o_signls;
 }
 
 void lvlSet_t::computeAdvectionCoeff(int tstep)
@@ -1227,7 +1244,7 @@ void lvlSet_t::computeAdvectionCoeff(int tstep)
   if(this->name == "clsr" && tstep == 1) {
     auto o_phi = nrs->scalar->o_solution("tls");
 
-    lvlSet::getNormalVector(o_phi, o_normals, avg);
+    lvlSet::normalVector(o_phi, o_normals, avg);
     this->o_W.copyFrom(o_normals, 3 * this->vFieldOffset);
   }
 
@@ -1235,11 +1252,11 @@ void lvlSet_t::computeAdvectionCoeff(int tstep)
     auto o_phi = this->o_S;
     auto meshV = this->meshV;
 
-    lvlSet::getNormalVector(o_phi, this->o_W, avg);
+    lvlSet::normalVector(o_phi, this->o_W, avg);
 
-    lvlSet::getSignField(o_phi, o_signls);
+    auto o_sign = lvlSet::getSignField(o_phi);
   
-    platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, o_signls, this->o_W);
+    platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, o_sign, this->o_W);
   }
 }
 
@@ -1666,30 +1683,23 @@ void lvlSet_t::finalize() {
     delete this->ellipticSolver[0];
 }
 
-void lvlSet_t::mueSVV()
+void lvlSet_t::mueSVV(int tstep)
 {
   auto mesh = this->meshV;
-
-  static auto initialized = false;
-
-  auto umagInitialized = false;
 
   auto o_umag = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
   if(platform->options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "SVV")) {
-    if(!initialized) {
+    if(!o_svvf.isInitialized()) {
+      o_svvf = platform->device.malloc<dfloat>(mesh->Nlocal);
       if(!platform->options.compareArgs("MOVING MESH","TRUE"))
         launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
-      initialized = true;
     }
 
     if(platform->options.compareArgs("MOVING MESH","TRUE"))
       launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
 
-    if(!umagInitialized) {
-      platform->linAlg->magVector(mesh->Nlocal, this->vFieldOffset, this->o_W, o_umag); 
-      umagInitialized = true;
-    }
+    platform->linAlg->magVector(mesh->Nlocal, this->vFieldOffset, this->o_W, o_umag); 
 
     dfloat scale = 0.1;
     platform->options.getArgs(upperCase(this->name) + " REGULARIZATION SVV SCALING COEFF", scale);
@@ -2095,4 +2105,70 @@ void lvlSet::initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const
 void setTimeIntegrationOrder(int &order) 
 {
   order = std::min(timeIntegrationOrder, order);
+}
+
+const occa::memory& lvlSet::getDeltaFunction()
+{
+  auto mesh = nrs->scalar->mesh(nrs->scalar->nameToIndex.find("cls")->second);
+
+  if(!o_delta.isInitialized()) {
+    o_delta = platform->device.malloc<dfloat>(mesh->Nlocal);
+  }
+
+  auto o_psi = nrs->scalar->o_solution("cls");
+
+  deltaKernel(mesh->Nlocal,
+              interfaceWidth,
+              o_psi,
+              o_delta);
+
+  return o_delta;
+}
+
+const occa::memory& lvlSet::getCurvature(const occa::memory& o_normals)
+{
+  auto mesh = nrs->scalar->mesh(nrs->scalar->nameToIndex.find("tls")->second);
+
+  if(!o_curvature.isInitialized()) {
+    o_curvature = platform->device.malloc<dfloat>(mesh->Nlocal);
+  }
+
+  opSEM::strongDivergence(mesh, nrs->scalar->fieldOffset(), o_normals, o_curvature);
+
+  return o_curvature;
+}
+
+const occa::memory& lvlSet::getSurfaceTension(const dfloat& sigma)
+{
+  auto meshV = nrs->scalar->meshV;
+
+  if(!o_sforce.isInitialized()) {
+    o_sforce = platform->device.malloc<dfloat>(meshV->dim * nrs->scalar->vFieldOffset); //keep this for scalar for proper offset in normal compute 
+  }
+
+  auto o_delta = lvlSet::getDeltaFunction();
+
+  auto o_phi = nrs->scalar->o_solution("tls");
+  bool avg = false;
+  if(platform->options.compareArgs("LVLSET NORMAL AVERAGING", "TRUE")) {
+    avg = true;
+  }
+  lvlSet::normalVector(o_phi, o_sforce, avg);
+
+  auto o_curv = lvlSet::getCurvature(o_sforce);
+
+  platform->linAlg->axmyVector(meshV->Nlocal, 
+                               nrs->scalar->vFieldOffset,
+                               0,
+                               -1.0, //reverse sign (see Nek5000)
+                               o_delta,
+                               o_sforce);
+
+  platform->linAlg->axmyVector(meshV->Nlocal, 
+                               nrs->scalar->vFieldOffset,
+                               0,
+                               sigma, //1/We
+                               o_curv,
+                               o_sforce);
+  return o_sforce;
 }
