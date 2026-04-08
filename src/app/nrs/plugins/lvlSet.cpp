@@ -950,7 +950,10 @@ void lvlSet::solve(const double &fluidTime)
   runPseudoStepper(tlsr, tlsrTimer, "cls");
   runPseudoStepper(clsr, clsrTimer, "cls");
 
-  clampCLSKernel(nrs->scalar->mesh(0), nrs->scalar->o_solution("cls"));
+  {
+    auto mesh = nrs->scalar->mesh(nrs->scalar->nameToIndex.find("cls")->second);
+    clampCLSKernel(mesh->Nlocal, nrs->scalar->o_solution("cls"));
+  }
 
   if(resetOrder) {
     timeIntegrationOrder = 1;
