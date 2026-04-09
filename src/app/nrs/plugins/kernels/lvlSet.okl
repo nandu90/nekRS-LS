@@ -396,3 +396,21 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
     }
   }
 }
+
+@kernel void fluidProp(const dlong Ntotal,
+                       const dlong offset,
+                       const dfloat rhoRatio,
+                       const dfloat muRatio,
+                       const dfloat Re,
+                       @ restrict const dfloat *PSI,
+                       @ restrict dfloat *PROP)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    if (n < Ntotal) {
+      dfloat psi = PSI[n];
+      psi = fmax(0.0, fmin(1.0, psi));
+      PROP[n + 0 * offset] = (muRatio * psi + (1.0 - psi)) / Re;
+      PROP[n + 1 * offset] = rhoRatio * psi + (1.0 - psi);
+    }
+  }
+}

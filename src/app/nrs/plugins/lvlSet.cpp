@@ -30,6 +30,7 @@ occa::kernel clsrDiffusionCoeffKernel;
 occa::kernel heavisideKernel;
 occa::kernel clampCLSKernel;
 occa::kernel deltaKernel;
+occa::kernel fluidPropKernel;
 
 static bool buildKernelCalled = false;
 static bool setupCalled = false;
@@ -42,7 +43,6 @@ static occa::memory o_normals;
 static occa::memory o_svvf;
 static occa::memory o_delta;
 static occa::memory o_curvature;
-static occa::memory o_sforce;
 
 static double elapsedTime;
 
@@ -178,6 +178,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
     heavisideKernel = buildKernel(kernelInfo, "heaviside", oklPath, oklFile);
     clampCLSKernel = buildKernel(kernelInfo, "clampCLS", oklPath, oklFile);
     deltaKernel = buildKernel(kernelInfo, "delta", oklPath, oklFile);
+    fluidPropKernel = buildKernel(kernelInfo, "fluidProp", oklPath, oklFile);
   }
   {
     occa::properties kernelInfo;
@@ -2140,13 +2141,9 @@ const occa::memory& lvlSet::getCurvature(const occa::memory& o_normals)
   return o_curvature;
 }
 
-const occa::memory& lvlSet::getSurfaceTension(const dfloat& sigma)
+void lvlSet::applySurfaceTension(const dfloat& We, occa::memory &o_sforce)
 {
   auto meshV = nrs->scalar->meshV;
-
-  if(!o_sforce.isInitialized()) {
-    o_sforce = platform->device.malloc<dfloat>(meshV->dim * nrs->scalar->vFieldOffset); //keep this for scalar for proper offset in normal compute 
-  }
 
   auto o_delta = lvlSet::getDeltaFunction();
 
@@ -2169,8 +2166,22 @@ const occa::memory& lvlSet::getSurfaceTension(const dfloat& sigma)
   platform->linAlg->axmyVector(meshV->Nlocal, 
                                nrs->scalar->vFieldOffset,
                                0,
-                               sigma, //1/We
+                               1.0/We,
                                o_curv,
                                o_sforce);
-  return o_sforce;
+}
+
+void lvlSet::updateProperties(const dfloat &rhoRatio, const dfloat &muRatio, const dfloat &Re)
+{
+  auto o_psi = nrs->scalar->o_solution("cls");
+
+  auto mesh = nrs->scalar->meshV;
+
+  fluidPropKernel(mesh->Nlocal,
+                  nrs->fluid->fieldOffset,
+                  rhoRatio,
+                  muRatio,
+                  Re,
+                  o_psi,
+                  nrs->fluid->o_prop);
 }
