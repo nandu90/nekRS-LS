@@ -2141,7 +2141,7 @@ const occa::memory& lvlSet::getCurvature(const occa::memory& o_normals)
   return o_curvature;
 }
 
-void lvlSet::applySurfaceTension(const dfloat& We, occa::memory &o_sforce)
+void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
 {
   auto meshV = nrs->scalar->meshV;
 
@@ -2169,6 +2169,10 @@ void lvlSet::applySurfaceTension(const dfloat& We, occa::memory &o_sforce)
                                1.0/We,
                                o_curv,
                                o_sforce);
+
+  //Divide by density
+  auto o_rho = nrs->fluid->o_prop + 1 * nrs->fluid->fieldOffset;
+  platform->linAlg->aydx(meshV->Nlocal, 1.0, o_rho, o_sforce);
 }
 
 void lvlSet::updateProperties(const dfloat &rhoRatio, const dfloat &muRatio, const dfloat &Re)
