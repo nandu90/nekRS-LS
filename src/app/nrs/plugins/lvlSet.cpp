@@ -2154,25 +2154,19 @@ void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
   }
   lvlSet::normalVector(o_phi, o_sforce, avg);
 
-  auto o_curv = lvlSet::getCurvature(o_sforce);
-
-  platform->linAlg->axmyVector(meshV->Nlocal, 
-                               nrs->scalar->vFieldOffset,
-                               0,
-                               -1.0, //reverse sign (see Nek5000)
-                               o_delta,
-                               o_sforce);
-
-  platform->linAlg->axmyVector(meshV->Nlocal, 
-                               nrs->scalar->vFieldOffset,
-                               0,
-                               1.0/We,
-                               o_curv,
-                               o_sforce);
+  auto o_curvDeltabyRho = lvlSet::getCurvature(o_sforce);
+  platform->linAlg->axmy(meshV->Nlocal, 1.0, o_delta, o_curvDeltabyRho);
 
   //Divide by density
   auto o_rho = nrs->fluid->o_prop + 1 * nrs->fluid->fieldOffset;
-  platform->linAlg->aydx(meshV->Nlocal, 1.0, o_rho, o_sforce);
+  platform->linAlg->aydx(meshV->Nlocal, 1.0, o_rho, o_curvDeltabyRho);
+
+  platform->linAlg->axmyVector(meshV->Nlocal, 
+                               nrs->scalar->vFieldOffset,
+                               0,
+                               -1.0/We, //reverse sign (see Nek5000)
+                               o_curvDeltabyRho,
+                               o_sforce);
 }
 
 void lvlSet::updateProperties(const dfloat &rhoRatio, const dfloat &muRatio, const dfloat &Re)
