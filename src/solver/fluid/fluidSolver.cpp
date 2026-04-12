@@ -273,6 +273,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
   platform->flopCounter->add(pressureName + " rhs", flopCount);
 
   ellipticSolverP->coeff0HLM(o_lambda0(false));
+  ellipticSolverP->coeff1HLM(o_NULL);
   ellipticSolverP->solve(o_pRhs, o_P.slice(0, mesh->Nlocal));
 
   if (platform->verbose()) {
