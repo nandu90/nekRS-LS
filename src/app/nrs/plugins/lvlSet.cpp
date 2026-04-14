@@ -31,6 +31,7 @@ occa::kernel heavisideKernel;
 occa::kernel clampCLSKernel;
 occa::kernel deltaKernel;
 occa::kernel fluidPropKernel;
+occa::kernel tlsrBoundaryFixKernel;
 
 static bool buildKernelCalled = false;
 static bool setupCalled = false;
@@ -97,6 +98,7 @@ static std::vector<std::string> scalarKeys = {
   {"solvefrequency"},
   {"distancefactor"},
   {"regularizationfactor"},
+  {"boundaryfix"},
   {"maximumsteps"},
   {"targetcfl"},
   {"stoppingcondition"},
@@ -179,6 +181,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
     clampCLSKernel = buildKernel(kernelInfo, "clampCLS", oklPath, oklFile);
     deltaKernel = buildKernel(kernelInfo, "delta", oklPath, oklFile);
     fluidPropKernel = buildKernel(kernelInfo, "fluidProp", oklPath, oklFile);
+    tlsrBoundaryFixKernel = buildKernel(kernelInfo, "tlsrBoundaryFix", oklPath, oklFile);
   }
   {
     occa::properties kernelInfo;
@@ -525,6 +528,32 @@ void parseLvlSetSections()
       std::string value;
       if (ini->extract(parScope, "regularizationFactor", value))
         options.setArgs("TLSR REGULARIZATION FACTOR", value);
+    }
+
+    if (firstWord == "clsr") {
+      std::string value;
+
+      if (ini->extract(parScope, "boundaryFix", value)) {
+        std::ostringstream error;
+        error << "unknown key: clsr::boundaryfix (TLSR only)\n";
+        append_error(error.str());
+      }
+    }
+
+    if(firstWord == "default") {
+      options.setArgs("TLSR BOUNDARY FIX", "TRUE");
+    }
+
+    if (firstWord == "tlsr") {
+      std::string value;
+      if (ini->extract(parScope, "boundaryFix", value)) {
+        const std::vector<std::string> validValues = {
+          {"true"},
+          {"false"},
+        };
+        checkValidity(rank, validValues, value);
+        options.setArgs("TLSR BOUNDARY FIX", upperCase(value));
+      }
     }
 
     std::string s_bcMap;
@@ -1260,6 +1289,15 @@ void lvlSet_t::computeAdvectionCoeff(int tstep)
     auto o_sign = lvlSet::getSignField(o_phi);
   
     platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, o_sign, this->o_W);
+
+    if(platform->options.compareArgs("TLSR BOUNDARY FIX", "TRUE")) {
+      tlsrBoundaryFixKernel(meshV->Nelements,
+                            this->vFieldOffset,
+                            meshV->o_sgeo,
+                            meshV->o_vmapM,
+                            this->o_EToB,
+                            this->o_W);
+    }
   }
 }
 
