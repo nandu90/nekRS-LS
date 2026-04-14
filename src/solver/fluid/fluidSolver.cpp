@@ -5,6 +5,8 @@
 #include "registerKernels.hpp"
 #include "nekInterfaceAdapter.hpp"
 
+static occa::memory o_deltaP;
+
 fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<geomSolver_t> &_geom)
     : geom(_geom)
 {
@@ -151,14 +153,26 @@ void fluidSolver_t::solvePressure(double time, int stage)
       // 1/rho - 1/rho0
       auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
-      platform->linAlg->add(mesh->Nlocal, -1 / rho0, o_lambda);
 
-      o_del = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-
+      //o_delP = \nabla . (1/o_rho) \nabla P
+      auto o_delP = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       const auto valSave = ellipticSolverP->options().getArgs("ELLIPTIC COEFF FIELD");
       ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", "TRUE");
-      ellipticSolverP->Ax(o_lambda, o_NULL, o_Pe, o_del);
+      ellipticSolverP->Ax(o_lambda, o_NULL, o_P, o_delP);
+
+      // Pe - P
+      auto o_dP = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      platform->linAlg->axpbyz(mesh->Nlocal, 1.0, o_Pe, -1.0, o_P, o_dP);
+
+      platform->linAlg->add(mesh->Nlocal, -1 / rho0, o_lambda);
+      o_del = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+
+      ellipticSolverP->Ax(o_lambda, o_NULL, o_dP, o_del);
       ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", valSave);
+
+      //add all terms
+      //o_del = \nabla . [(1/o_rho) \nabla P] + \nabla . [(1/o_rho - 1/rho0) \nabla (Pe - P)]
+      platform->linAlg->axpby(mesh->Nlocal, 1.0, o_delP, 1.0, o_del);
     }
     return o_del;
   }();
@@ -274,7 +288,16 @@ void fluidSolver_t::solvePressure(double time, int stage)
 
   ellipticSolverP->coeff0HLM(o_lambda0(false));
   ellipticSolverP->coeff1HLM(o_NULL);
-  ellipticSolverP->solve(o_pRhs, o_P.slice(0, mesh->Nlocal));
+  if (o_rhoSplitTerm.isInitialized()) {
+    if(!o_deltaP.isInitialized()) {
+       o_deltaP = platform->device.malloc<dfloat>(mesh->Nlocal);
+       platform->linAlg->fill(mesh->Nlocal, 0.0, o_deltaP);
+    }
+    ellipticSolverP->solve(o_pRhs, o_deltaP);
+    platform->linAlg->axpby(mesh->Nlocal, 1.0, o_deltaP, 1.0, o_P);
+  } else {
+    ellipticSolverP->solve(o_pRhs, o_P.slice(0, mesh->Nlocal));
+  }
 
   if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
