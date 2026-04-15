@@ -136,7 +136,6 @@ occa::memory& fluidSolver_t::getLambda0(bool variable)
   } else {
     platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
   }
-  printf("rhoSplit %d\n", rhoSplit);
   return o_lambda;
 }
 
