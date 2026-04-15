@@ -135,6 +135,8 @@ public:
 
   occa::memory o_relUrst;
 
+  occa::memory& getLambda0(bool variable = true);
+
   void finalize() override
   {
     for (auto &entry : ellipticSolver) {
