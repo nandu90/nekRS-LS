@@ -2171,15 +2171,52 @@ void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
 
 void lvlSet::updateProperties(const dfloat &rhoRatio, const dfloat &muRatio, const dfloat &Re)
 {
+  //non-dimensional form
+  auto o_psi = nrs->scalar->o_solution("cls");
+
+  auto mesh = nrs->scalar->meshV;
+
+  //assumes characteristic density = rhol
+  dfloat rhol = 1.0;
+  dfloat mul = 1.0;
+
+  dfloat rhog, mug;
+  if(rhoRatio > 1.0) {
+    rhog = 1.0 / rhoRatio;
+    mug = 1.0 / muRatio;
+  } else {
+    rhog = rhoRatio;
+    mug = muRatio;
+  }
+  mul /= Re;
+  mug /= Re;
+
+  fluidPropKernel(mesh->Nlocal,
+                  nrs->fluid->fieldOffset,
+                  rhog,
+                  rhol,
+                  mug,
+                  mul,
+                  o_psi,
+                  nrs->fluid->o_prop);
+}
+
+void lvlSet::updateProperties(const dfloat &rhog, 
+                              const dfloat &rhol,
+                              const dfloat &mug,
+                              const dfloat &mul)
+{
+  //dimensional form
   auto o_psi = nrs->scalar->o_solution("cls");
 
   auto mesh = nrs->scalar->meshV;
 
   fluidPropKernel(mesh->Nlocal,
                   nrs->fluid->fieldOffset,
-                  rhoRatio,
-                  muRatio,
-                  Re,
+                  rhog,
+                  rhol,
+                  mug,
+                  mul,
                   o_psi,
                   nrs->fluid->o_prop);
 }

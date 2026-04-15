@@ -399,9 +399,10 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
 
 @kernel void fluidProp(const dlong Ntotal,
                        const dlong offset,
-                       const dfloat rhoRatio,
-                       const dfloat muRatio,
-                       const dfloat Re,
+                       const dfloat rhog,
+                       const dfloat rhol,
+                       const dfloat mug,
+                       const dfloat mul,
                        @ restrict const dfloat *PSI,
                        @ restrict dfloat *PROP)
 {
@@ -409,8 +410,8 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
     if (n < Ntotal) {
       dfloat psi = PSI[n];
       psi = fmax(0.0, fmin(1.0, psi));
-      PROP[n + 0 * offset] = (muRatio * psi + (1.0 - psi)) / Re;
-      PROP[n + 1 * offset] = rhoRatio * psi + (1.0 - psi);
+      PROP[n + 0 * offset] = psi * mul + (1.0 - psi) * mug;
+      PROP[n + 1 * offset] = psi * rhol + (1.0 - psi) * rhog;
     }
   }
 }

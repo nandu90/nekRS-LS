@@ -5,9 +5,6 @@
 #include "registerKernels.hpp"
 #include "nekInterfaceAdapter.hpp"
 
-static occa::memory o_deltaP;
-static int rhoSplit = 0;
-
 fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<geomSolver_t> &_geom)
     : geom(_geom)
 {
@@ -125,20 +122,6 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
   }
 }
 
-occa::memory& fluidSolver_t::getLambda0(bool variable)
-{
-  static occa::memory o_lambda;
-  if(!o_lambda.isInitialized()){
-    o_lambda = platform->device.malloc<dfloat>(mesh->Nlocal);
-  }
-  if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !variable && rhoSplit > 1) {
-    platform->linAlg->fill(mesh->Nlocal, 1 / rho0, o_lambda);
-  } else {
-    platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
-  }
-  return o_lambda;
-}
-
 void fluidSolver_t::solvePressure(double time, int stage)
 {
   if (!ellipticSolverP) {
@@ -152,36 +135,30 @@ void fluidSolver_t::solvePressure(double time, int stage)
   double flopCount = 0.0;
   platform->timer.tic(pressureName + " rhs");
 
+  auto o_lambda0 = [&](bool variable = true) {
+    auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !variable) {
+      platform->linAlg->fill(mesh->Nlocal, 1 / rho0, o_lambda);
+    } else {
+      platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
+    }
+    return o_lambda;
+  };
+
   const auto o_rhoSplitTerm = [&]() {
     occa::memory o_del;
     if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
-      o_del = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-      // 1/rho
+      // 1/rho - 1/rho0
       auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
+      platform->linAlg->add(mesh->Nlocal, -1 / rho0, o_lambda);
 
-      //o_delP = \nabla . (1/o_rho) \nabla P
-      auto o_delP = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      o_del = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+
       const auto valSave = ellipticSolverP->options().getArgs("ELLIPTIC COEFF FIELD");
       ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", "TRUE");
-      ellipticSolverP->Ax(o_lambda, o_NULL, o_P, o_delP);
-
-      // Pe - P
-      auto o_dP = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-      platform->linAlg->axpbyz(mesh->Nlocal, 1.0, o_Pe, -1.0, o_P, o_dP);
-
-      //1/rho0
-      auto o_lam0 = getLambda0(false);
-
-      //1/rho - 1/rho0
-      platform->linAlg->axpby(mesh->Nlocal, -1.0, o_lam0, 1.0, o_lambda);
-
-      ellipticSolverP->Ax(o_lambda, o_NULL, o_dP, o_del);
+      ellipticSolverP->Ax(o_lambda, o_NULL, o_Pe, o_del);
       ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", valSave);
-
-      //add all terms
-      //o_del = \nabla . [(1/rho) \nabla P] + \nabla . [(1/rho - 1/rho0) \nabla (Pe - P)]
-      platform->linAlg->axpby(mesh->Nlocal, 1.0, o_delP, 1.0, o_del);
     }
     return o_del;
   }();
@@ -242,7 +219,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
                  mesh->Nlocal,
                  fieldOffset,
                  o_mue,
-                 getLambda0(true),
+                 o_lambda0(),
                  o_JwF,
                  o_stressTerm,
                  o_gradDiv,
@@ -295,18 +272,9 @@ void fluidSolver_t::solvePressure(double time, int stage)
   platform->timer.toc(pressureName + " rhs");
   platform->flopCounter->add(pressureName + " rhs", flopCount);
 
-  ellipticSolverP->coeff0HLM(getLambda0(false));
+  ellipticSolverP->coeff0HLM(o_lambda0(false));
   ellipticSolverP->coeff1HLM(o_NULL);
-  if (o_rhoSplitTerm.isInitialized()) {
-    if(!o_deltaP.isInitialized()) {
-       o_deltaP = platform->device.malloc<dfloat>(mesh->Nlocal);
-       platform->linAlg->fill(mesh->Nlocal, 0.0, o_deltaP);
-    }
-    ellipticSolverP->solve(o_pRhs, o_deltaP);
-    platform->linAlg->axpby(mesh->Nlocal, 1.0, o_deltaP, 1.0, o_P);
-  } else {
-    ellipticSolverP->solve(o_pRhs, o_P.slice(0, mesh->Nlocal));
-  }
+  ellipticSolverP->solve(o_pRhs, o_P.slice(0, mesh->Nlocal));
 
   if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
@@ -347,7 +315,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
 
     auto o_gradMueDiv = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
 
-#if 1
+#if 0
     launchKernel("core-wGradientVolumeHex3D",
                  mesh->Nelements,
                  mesh->o_vgeo,
@@ -377,7 +345,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
       auto o_delta = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
       platform->linAlg->axpbyz(mesh->Nlocal, 1.0, o_P, -1.0, o_Pe, o_delta);
-#if 1
+#if 0
       launchKernel("core-wGradientVolumeHex3D",
                    mesh->Nelements,
                    mesh->o_vgeo,
@@ -385,9 +353,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                    fieldOffset,
                    o_delta,
                    o_del);
-      auto o_lam0 = getLambda0(false);
-      platform->linAlg->axmy(mesh->Nlocal, 1.0, o_rho, o_lam0);
-      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, -1.0, o_lam0, o_del);
+      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, -1 / rho0, o_rho, o_del);
 #else
       launchKernel("core-gradientVolumeHex3D",
                    mesh->Nelements,
@@ -396,11 +362,10 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                    fieldOffset,
                    o_delta,
                    o_del);
+      // o_del * rho / rho0
       platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1 / rho0, o_rho, o_del);
 #endif
       flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
-
-      // o_del * rho / rho0
     }
     return o_del;
   }();
@@ -515,11 +480,6 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     ellipticSolver.at(0)->solve(o_rhsX, o_U.slice(0 * fieldOffset, mesh->Nlocal));
     ellipticSolver.at(1)->solve(o_rhsY, o_U.slice(1 * fieldOffset, mesh->Nlocal));
     ellipticSolver.at(2)->solve(o_rhsZ, o_U.slice(2 * fieldOffset, mesh->Nlocal));
-  }
-
-  if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
-    if(rhoSplit < 2)
-      rhoSplit++; //turn on after one time step
   }
 
   if (platform->verbose()) {
