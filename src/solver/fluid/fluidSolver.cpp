@@ -131,7 +131,7 @@ occa::memory& fluidSolver_t::getLambda0(bool variable)
   if(!o_lambda.isInitialized()){
     o_lambda = platform->device.malloc<dfloat>(mesh->Nlocal);
   }
-  if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !variable && rhoSplit <= 1) {
+  if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !variable && rhoSplit > 1) {
     platform->linAlg->fill(mesh->Nlocal, 1 / rho0, o_lambda);
   } else {
     platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
