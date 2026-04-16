@@ -417,40 +417,39 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
 }
 
 @kernel void tlsrBoundaryFix(const dlong Nelements,
-                             const dlong vFieldOffset,
-                             @restrict const dfloat *o_sgeo,
-                             @restrict const dlong *o_vmapM,
-                             @restrict const int *o_EToB,
-                             @restrict dfloat *o_w)
+                             const dlong offset,
+                             @restrict const dfloat *sgeo,
+                             @restrict const dlong *vmapM,
+                             @restrict const int *EToB,
+                             @restrict dfloat *normal)
 {
   for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
     for (int f = 0; f < p_Nfaces; ++f) {
-      const dlong ef = f + e * p_Nfaces;
-      const int bcType = o_EToB[ef];
+      const int bcType = EToB[f + e * p_Nfaces];
 
       if (bcType == p_bcType_none) {
         continue;
       }
 
       for (int n = 0; n < p_Nfp; ++n; @inner(0)) {
-        const dlong fid = n + f * p_Nfp + e * p_Nfp * p_Nfaces;
-        const dlong id  = o_vmapM[fid];
+        const dlong sid = n + f * p_Nfp + e * p_Nfp * p_Nfaces;
+        const dlong idM  = vmapM[sid];
 
-        const dfloat nx = o_sgeo[p_NXID + fid * p_Nsgeo];
-        const dfloat ny = o_sgeo[p_NYID + fid * p_Nsgeo];
-        const dfloat nz = o_sgeo[p_NZID + fid * p_Nsgeo];
+        const dfloat nx = sgeo[p_NXID + sid * p_Nsgeo];
+        const dfloat ny = sgeo[p_NYID + sid * p_Nsgeo];
+        const dfloat nz = sgeo[p_NZID + sid * p_Nsgeo];
 
-        dfloat wx = o_w[id + 0 * vFieldOffset];
-        dfloat wy = o_w[id + 1 * vFieldOffset];
-        dfloat wz = o_w[id + 2 * vFieldOffset];
+        const dfloat wx = normal[idM + 0 * offset];
+        const dfloat wy = normal[idM + 1 * offset];
+        const dfloat wz = normal[idM + 2 * offset];
 
         const dfloat wdotn = wx * nx + wy * ny + wz * nz;
 
         if (wdotn < 0) {
           // reflect the normal component; leave the tangential component unchanged
-          o_w[id + 0 * vFieldOffset] = wx - 2.0 * wdotn * nx;
-          o_w[id + 1 * vFieldOffset] = wy - 2.0 * wdotn * ny;
-          o_w[id + 2 * vFieldOffset] = wz - 2.0 * wdotn * nz;
+          normal[idM + 0 * offset] = wx - 2.0 * wdotn * nx;
+          normal[idM + 1 * offset] = wy - 2.0 * wdotn * ny;
+          normal[idM + 2 * offset] = wz - 2.0 * wdotn * nz;
         }
       }
     }
