@@ -135,7 +135,7 @@ public:
 
   occa::memory o_relUrst;
 
-  int enableRhoSplit = -1;
+  int enableRhoSplit = -10;
 
   void finalize() override
   {
