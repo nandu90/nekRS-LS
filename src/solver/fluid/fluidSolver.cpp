@@ -179,6 +179,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
       opSEM::strongGrad(mesh, fieldOffset, o_Pe, o_Pegrad);
 
       o_flux = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      platform->linAlg->fill(mesh->Nlocal, 0.0, o_flux);
       launchKernel("fluidSolver_t::rhoSplitSurfaceHex3D",
                    mesh->Nelements,
                    mesh->o_sgeo,
