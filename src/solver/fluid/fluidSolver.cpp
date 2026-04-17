@@ -165,6 +165,34 @@ void fluidSolver_t::solvePressure(double time, int stage)
     return o_del;
   }();
 
+  const auto o_rhoSplitSurfaceTerm = [&]() {
+    occa::memory o_flux;
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+      // 1/rho - 1/rho0
+      auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
+
+      auto o_lam0 = o_lambda0(false);
+      platform->linAlg->axpby(mesh->Nlocal, -1.0, o_lam0, 1.0, o_lambda);
+
+      auto o_Pegrad = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
+      opSEM::strongGrad(mesh, fieldOffset, o_Pe, o_Pegrad);
+
+      o_flux = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      launchKernel("fluidSolver_t::rhoSplitSurfaceHex3D",
+                   mesh->Nelements,
+                   mesh->o_sgeo,
+                   mesh->o_vmapM,
+                   o_EToB,
+                   fieldOffset,
+                   o_Pegrad,
+                   o_flux);
+
+      platform->linAlg->axmy(mesh->Nlocal, 1.0, o_lambda, o_flux);
+    }
+    return o_flux;
+  }();
+
   const auto o_stressTerm = [&]() {
     auto o_curl = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
 
@@ -266,6 +294,9 @@ void fluidSolver_t::solvePressure(double time, int stage)
 
     if (o_rhoSplitTerm.isInitialized()) {
       platform->linAlg->axpby(mesh->Nlocal, -1.0, o_rhoSplitTerm, 1.0, o_pRhs);
+    }
+    if (o_rhoSplitSurfaceTerm.isInitialized()) {
+      platform->linAlg->axpby(mesh->Nlocal, -1.0, o_rhoSplitSurfaceTerm, 1.0, o_pRhs);
     }
 
     return o_pRhs;
@@ -1037,6 +1068,10 @@ void registerFluidSolverKernels(occa::properties kernelInfoBC)
   kernelName = "pressureAddQtl";
   fileName = oklpath + kernelName + ".okl";
   platform->kernelRequests.add(section + kernelName, fileName, meshProps);
+
+  kernelName = "rhoSplitSurface" + suffix;
+  fileName = oklpath + kernelName + ".okl";
+  platform->kernelRequests.add(section + kernelName, fileName, kernelInfoBC);
 }
 
 void fluidSolver_t::setTimeIntegrationCoeffs(int tstep)
