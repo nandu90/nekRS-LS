@@ -396,3 +396,62 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
     }
   }
 }
+
+@kernel void fluidProp(const dlong Ntotal,
+                       const dlong offset,
+                       const dfloat rhog,
+                       const dfloat rhol,
+                       const dfloat mug,
+                       const dfloat mul,
+                       @ restrict const dfloat *PSI,
+                       @ restrict dfloat *PROP)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    if (n < Ntotal) {
+      dfloat psi = PSI[n];
+      psi = fmax(0.0, fmin(1.0, psi));
+      PROP[n + 0 * offset] = psi * mul + (1.0 - psi) * mug;
+      PROP[n + 1 * offset] = psi * rhol + (1.0 - psi) * rhog;
+    }
+  }
+}
+
+@kernel void tlsrBoundaryFix(const dlong Nelements,
+                             const dlong offset,
+                             @restrict const dfloat *sgeo,
+                             @restrict const dlong *vmapM,
+                             @restrict const int *EToB,
+                             @restrict dfloat *normal)
+{
+  for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
+    for (int f = 0; f < p_Nfaces; ++f) {
+      const int bcType = EToB[f + e * p_Nfaces];
+
+      if (bcType == p_bcType_none) {
+        continue;
+      }
+
+      for (int n = 0; n < p_Nfp; ++n; @inner(0)) {
+        const dlong sid = n + f * p_Nfp + e * p_Nfp * p_Nfaces;
+        const dlong idM  = vmapM[sid];
+
+        const dfloat nx = sgeo[p_NXID + sid * p_Nsgeo];
+        const dfloat ny = sgeo[p_NYID + sid * p_Nsgeo];
+        const dfloat nz = sgeo[p_NZID + sid * p_Nsgeo];
+
+        const dfloat wx = normal[idM + 0 * offset];
+        const dfloat wy = normal[idM + 1 * offset];
+        const dfloat wz = normal[idM + 2 * offset];
+
+        const dfloat wdotn = wx * nx + wy * ny + wz * nz;
+
+        if (wdotn < 0) {
+          // reflect the normal component; leave the tangential component unchanged
+          normal[idM + 0 * offset] = wx - 2.0 * wdotn * nx;
+          normal[idM + 1 * offset] = wy - 2.0 * wdotn * ny;
+          normal[idM + 2 * offset] = wz - 2.0 * wdotn * nz;
+        }
+      }
+    }
+  }
+}

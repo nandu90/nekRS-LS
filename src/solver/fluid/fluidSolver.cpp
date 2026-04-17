@@ -137,7 +137,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
 
   auto o_lambda0 = [&](bool variable = true) {
     auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !variable) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !variable && enableRhoSplit > 0) {
       platform->linAlg->fill(mesh->Nlocal, 1 / rho0, o_lambda);
     } else {
       platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
@@ -151,7 +151,9 @@ void fluidSolver_t::solvePressure(double time, int stage)
       // 1/rho - 1/rho0
       auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
-      platform->linAlg->add(mesh->Nlocal, -1 / rho0, o_lambda);
+
+      auto o_lam0 = o_lambda0(false);
+      platform->linAlg->axpby(mesh->Nlocal, -1.0, o_lam0, 1.0, o_lambda);
 
       o_del = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
@@ -273,6 +275,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
   platform->flopCounter->add(pressureName + " rhs", flopCount);
 
   ellipticSolverP->coeff0HLM(o_lambda0(false));
+  ellipticSolverP->coeff1HLM(o_NULL);
   ellipticSolverP->solve(o_pRhs, o_P.slice(0, mesh->Nlocal));
 
   if (platform->verbose()) {
@@ -314,7 +317,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
 
     auto o_gradMueDiv = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
 
-#if 1
+#if 0
     launchKernel("core-wGradientVolumeHex3D",
                  mesh->Nelements,
                  mesh->o_vgeo,
@@ -344,16 +347,6 @@ void fluidSolver_t::solveVelocity(double time, int stage)
       auto o_delta = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
       platform->linAlg->axpbyz(mesh->Nlocal, 1.0, o_P, -1.0, o_Pe, o_delta);
-#if 1
-      launchKernel("core-wGradientVolumeHex3D",
-                   mesh->Nelements,
-                   mesh->o_vgeo,
-                   mesh->o_D,
-                   fieldOffset,
-                   o_delta,
-                   o_del);
-      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, -1 / rho0, o_rho, o_del);
-#else
       launchKernel("core-gradientVolumeHex3D",
                    mesh->Nelements,
                    mesh->o_vgeo,
@@ -361,11 +354,11 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                    fieldOffset,
                    o_delta,
                    o_del);
-      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1 / rho0, o_rho, o_del);
-#endif
-      flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
-
       // o_del * rho / rho0
+      if(enableRhoSplit > 0) {
+        platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1 / rho0, o_rho, o_del);
+      }
+      flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
     }
     return o_del;
   }();
@@ -481,6 +474,8 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     ellipticSolver.at(1)->solve(o_rhsY, o_U.slice(1 * fieldOffset, mesh->Nlocal));
     ellipticSolver.at(2)->solve(o_rhsZ, o_U.slice(2 * fieldOffset, mesh->Nlocal));
   }
+
+  enableRhoSplit = std::min(enableRhoSplit + 1, 1);
 
   if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,

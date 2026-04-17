@@ -135,6 +135,8 @@ public:
 
   occa::memory o_relUrst;
 
+  int enableRhoSplit = -10;
+
   void finalize() override
   {
     for (auto &entry : ellipticSolver) {
