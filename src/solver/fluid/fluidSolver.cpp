@@ -4,6 +4,7 @@
 #include "advectionSubCycling.hpp"
 #include "registerKernels.hpp"
 #include "nekInterfaceAdapter.hpp"
+#include "svv.hpp"
 
 fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<geomSolver_t> &_geom)
     : geom(_geom)
@@ -97,6 +98,14 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
       int nModes = -1;
       platform->options.getArgs(upperCase(velocityName) + " HPFRT MODES", nModes);
       o_filterRT = lowPassFilterSetup(mesh, nModes);
+    }
+
+    if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "SVV")) {
+      o_svvD = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq);
+      o_svvDT = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq);
+      dfloat NSVV = 2.0;
+      platform->options.getArgs(upperCase(velocityName) + " REGULARIZATION SVV FILTER POWER", NSVV);
+      svv::convoluteDerivative(mesh, NSVV, o_svvD, o_svvDT);
     }
 
     o_EToB = [&]() {
@@ -837,6 +846,74 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     for (int i = 0; i < mesh->dim; i++) {
       auto o_EXTi = o_EXT.slice(i * fieldOffset, mesh->Nlocal);
       addGJP(mesh, o_EToB, fieldOffset, o_U, o_U.slice(i * fieldOffset, mesh->Nlocal), o_EXTi, tauFactor);
+    }
+  }
+
+  if(platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "SVV")) {
+    if(!o_svvf.isInitialized()) {
+      o_svvf = platform->device.malloc<dfloat>(mesh->Nlocal);
+      if(!platform->options.compareArgs("MOVING MESH", "TRUE"))
+        launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
+    }
+
+    if(platform->options.compareArgs("MOVING MESH", "TRUE"))
+      launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
+
+    auto o_umag = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    platform->linAlg->magVector(mesh->Nlocal, fieldOffset, o_U, o_umag);
+
+    dfloat scale = 0.1;
+    platform->options.getArgs(upperCase(velocityName) + " REGULARIZATION SVV SCALING COEFF", scale);
+
+    auto o_svvmu = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    platform->linAlg->axmyz(mesh->Nlocal, scale, o_svvf, o_umag, o_svvmu);
+    
+    auto loadKernel = [&](bool svv = false) {
+      std::string kernelNamePrefix = "svv-";
+      kernelNamePrefix += "elliptic";
+
+      std::string kernelName = "Ax";
+      kernelName += "Coeff";
+
+      auto gen_suffix = [&](const int N) 
+      {      
+        std::string dataType;
+        if (o_EXT.dtype() == occa::dtype::get<double>()) {
+          dataType = "double";
+        } else if (o_EXT.dtype() == occa::dtype::get<float>()) {  
+          dataType = "float";
+        }
+
+        return std::string("_") + std::to_string(N) + dataType;
+      };
+
+      kernelName += "Hex3D" + gen_suffix(mesh->N);
+
+#if 0
+      if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+        std::cout << kernelNamePrefix + "Partial" + kernelName << std::endl;
+      }
+#endif 
+      return platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
+    };
+
+    if(!svvKernel.isInitialized()) svvKernel = loadKernel();
+
+    for (int i = 0; i < mesh->dim; i++) {
+      auto o_Ui = o_U.slice(i * fieldOffset, mesh->Nlocal);
+      auto o_EXTi = o_EXT.slice(i * fieldOffset, mesh->Nlocal);
+
+      svvKernel(mesh->Nelements,
+                fieldOffset,
+                0,
+                mesh->o_elementList,
+                mesh->o_ggeo,
+                o_svvD,
+                o_svvDT,
+                o_svvmu,
+                o_NULL,
+                o_Ui,
+                o_EXTi);
     }
   }
 
