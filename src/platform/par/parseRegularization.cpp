@@ -24,6 +24,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           {"activationwidth"},
           {"decaythreshold"},
           {"noisethreshold"},
+          {"svvcoeff"},
           {"filterpower"},
       };
       const std::vector<std::string> list = serializeString(regularization, '+');
@@ -67,7 +68,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         }
 
         for (std::string s : list) {
-          const auto scaleStr = parseValueForKey(s, "scalingcoeff");
+          const auto scaleStr = parseValueForKey(s, "svvcoeff");
           if (!scaleStr.empty()) {
             options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF", scaleStr);
           }
