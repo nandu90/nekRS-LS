@@ -989,7 +989,7 @@ void fluidSolver_t::extrapolateSolution()
     platform->options.getArgs(upperCase(pressureName) + " RHO SPLITTING FILTER MODES", nPeModes);
     if(nPeModes && o_coeffEXTP.size() > 1) {
       if(!o_filterPe.isInitialized())
-        o_filterPe = lowPassFilterSetup(mesh, nPeModes, true); //cut-off filter
+        o_filterPe = lowPassFilterSetup(mesh, nPeModes, true, true); //cut-off filter, C0
       launchKernel("fluidSolver_t::filterPeHex3D",
                    mesh->Nelements,
                    o_filterPe,

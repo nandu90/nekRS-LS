@@ -29,6 +29,11 @@ void filterFunctionRelaxation1D(int Nmodes, int Nc, double *A)
 
 void filterFunctionCutOff1D(int Nmodes, int Nc, double *A)
 {
+  // zero matrix
+  for (int n = 0; n < Nmodes*Nmodes; n++) {
+    A[n] = 0.0;
+  }
+
   // Set all diagonal to 1
   for (int n = 0; n < Nmodes; n++) {
     A[n * Nmodes + n] = 1.0;
@@ -97,9 +102,36 @@ void filterVandermonde1D(int N, int Np, double *r, double *V)
   }
 }
 
+void legendre_poly(double *L, const double x, const int N)
+{
+   L[0] = 1.0;
+   L[1] = x;
+   for (int j = 2; j <= N; j++) {
+      const double dj = j;
+      L[j] = ( (2*dj-1) * x * L[j-1] - (j-1) * L[j-2] ) / dj;
+   }
+}
+
+void filterBubbleFunc1D(int N, int Np, double *r, double *V)
+{
+  auto Lj = (double *)malloc(Np * sizeof(double));
+
+  for (int j = 0; j <= N; j++) {
+    const double z = r[j];
+    legendre_poly(Lj, z, N);
+
+    V[j * Np + 0] = Lj[0];
+    V[j * Np + 1] = Lj[1];
+    for (int i = 2; i < Np; i++) {
+      V[j * Np + i] = Lj[i] - Lj[i-2];
+    }
+  }
+  free(Lj);
+}
+
 } // namespace
 
-occa::memory lowPassFilterSetup(mesh_t *mesh, const dlong filterNc, bool cutOff)
+occa::memory lowPassFilterSetup(mesh_t *mesh, const dlong filterNc, bool cutOff, bool C0)
 {
   nekrsCheck(filterNc < 1,
              platform->comm.mpiComm(),
@@ -133,7 +165,11 @@ occa::memory lowPassFilterSetup(mesh_t *mesh, const dlong filterNc, bool cutOff)
     for (int i = 0; i < mesh->Np; i++) {
       r[i] = mesh->r[i];
     }
-    filterVandermonde1D(mesh->N, Nmodes, r, V);
+    if(C0) {
+      filterBubbleFunc1D(mesh->N, Nmodes, r, V);
+    } else {
+      filterVandermonde1D(mesh->N, Nmodes, r, V);
+    }
     free(r);
   }
 
