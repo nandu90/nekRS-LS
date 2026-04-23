@@ -985,6 +985,16 @@ void fluidSolver_t::extrapolateSolution()
                  o_coeffEXTP,
                  o_P,
                  o_Pe);
+    int nPeModes = 0;
+    platform->options.getArgs(upperCase(pressureName) + " RHO SPLITTING FILTER MODES", nPeModes);
+    if(nPeModes && o_coeffEXTP.size() > 1) {
+      if(!o_filterPe.isInitialized())
+        o_filterPe = lowPassFilterSetup(mesh, nPeModes, true); //cut-off filter
+      launchKernel("fluidSolver_t::filterPeHex3D",
+                   mesh->Nelements,
+                   o_filterPe,
+                   o_Pe);
+    }
   }
 }
 
@@ -1153,6 +1163,10 @@ void registerFluidSolverKernels(occa::properties kernelInfoBC)
   kernelName = "rhoSplitSurface" + suffix;
   fileName = oklpath + kernelName + ".okl";
   platform->kernelRequests.add(section + kernelName, fileName, kernelInfoBC);
+
+  kernelName = "filterPe" + suffix;
+  fileName = oklpath + kernelName + ".okl";
+  platform->kernelRequests.add(section + kernelName, fileName, meshProps);
 }
 
 void fluidSolver_t::setTimeIntegrationCoeffs(int tstep)

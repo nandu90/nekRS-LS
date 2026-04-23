@@ -23,6 +23,7 @@ private:
 
   occa::memory o_zeroNormalMask;
   occa::memory o_filterRT;
+  occa::memory o_filterPe;
   int Nsubsteps;
 
   occa::memory o_ADV;

@@ -27,6 +27,19 @@ void filterFunctionRelaxation1D(int Nmodes, int Nc, double *A)
   }
 }
 
+void filterFunctionCutOff1D(int Nmodes, int Nc, double *A)
+{
+  // Set all diagonal to 1
+  for (int n = 0; n < Nmodes; n++) {
+    A[n * Nmodes + n] = 1.0;
+  }
+
+  int k0 = Nmodes - Nc;
+  for (int k = k0; k < Nmodes; k++) {
+    A[k + Nmodes * k] = 0.0;
+  }
+}
+
 // jacobi polynomials at [-1,1] for GLL
 double filterJacobiP(double a, double alpha, double beta, int N)
 {
@@ -86,7 +99,7 @@ void filterVandermonde1D(int N, int Np, double *r, double *V)
 
 } // namespace
 
-occa::memory lowPassFilterSetup(mesh_t *mesh, const dlong filterNc)
+occa::memory lowPassFilterSetup(mesh_t *mesh, const dlong filterNc, bool cutOff)
 {
   nekrsCheck(filterNc < 1,
              platform->comm.mpiComm(),
@@ -107,7 +120,12 @@ occa::memory lowPassFilterSetup(mesh_t *mesh, const dlong filterNc)
   auto A = (double *)calloc(Nmodes * Nmodes, sizeof(double));
 
   // Construct Filter Function
-  filterFunctionRelaxation1D(Nmodes, filterNc, A);
+  if(cutOff) {
+    filterFunctionCutOff1D(Nmodes, filterNc, A);
+  } else {
+    //default
+    filterFunctionRelaxation1D(Nmodes, filterNc, A);
+  }
 
   // Construct Vandermonde Matrix
   {
