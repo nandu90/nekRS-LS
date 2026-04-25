@@ -62,6 +62,14 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
     platform->options.getArgs(key, nEXT);
     o_Pe = platform->device.malloc<dfloat>(fieldOffset);
     o_coeffEXTP = platform->device.malloc<dfloat>(std::min(nEXT, static_cast<int>(o_coeffBDF.size())));
+
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING FILTER", "TRUE")) {
+      int nModes = 2;
+      const auto key = upperCase(pressureName) + " RHO SPLITTING FILTER MODES";
+      if (platform->options.getArgs(key).empty()) {
+        platform->options.setArgs(key, std::to_string(nModes));
+      }
+    }
   }
   o_P = platform->device.malloc<dfloat>(fieldOffset * std::max(static_cast<int>(o_coeffEXTP.size()), 1));
 
@@ -985,11 +993,13 @@ void fluidSolver_t::extrapolateSolution()
                  o_coeffEXTP,
                  o_P,
                  o_Pe);
-    int nPeModes = 0;
-    platform->options.getArgs(upperCase(pressureName) + " RHO SPLITTING FILTER MODES", nPeModes);
-    if(nPeModes && o_coeffEXTP.size() > 1) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING FILTER", "TRUE")) {
+      int nModes = 2;
+      platform->options.getArgs(upperCase(pressureName) + " RHO SPLITTING FILTER MODES", nModes);
+
       if(!o_filterPe.isInitialized())
-        o_filterPe = lowPassFilterSetup(mesh, nPeModes, true, true); //cut-off filter, C0
+        o_filterPe = lowPassFilterSetup(mesh, nModes, true, true); //cut-off filter, C0
+                                                                   
       launchKernel("fluidSolver_t::filterPeHex3D",
                    mesh->Nelements,
                    o_filterPe,
