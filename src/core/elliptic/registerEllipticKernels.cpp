@@ -82,8 +82,11 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
       std::string kernelNamePrefix = (poisson) ? "poisson-" : "";
       if(svv) kernelNamePrefix += "svv-";
       kernelNamePrefix += "elliptic";
-      if (blockSolver) {
+      if (blockSolver && !svv) {
         kernelNamePrefix += (stressForm) ? "Stress" : "Block";
+      }
+      if(svv && section == "fluid velocity") {
+        kernelNamePrefix += "Fluid";
       }
       std::string kernelName = "Ax";
       if (coeffField && !svv) {
@@ -109,7 +112,7 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
           false,
           svv,
           Nfields,
-          stressForm,
+          (svv) ? false : stressForm,
           verbosity,
           targetTimeBenchmark,
           platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
