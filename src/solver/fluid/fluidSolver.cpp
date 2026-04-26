@@ -882,7 +882,7 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     
     auto loadKernel = [&](bool svv = false) {
       std::string kernelNamePrefix = "svv-";
-      kernelNamePrefix += "elliptic";
+      kernelNamePrefix += "ellipticFluid";
 
       std::string kernelName = "Ax";
       kernelName += "Coeff";

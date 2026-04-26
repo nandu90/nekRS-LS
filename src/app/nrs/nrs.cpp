@@ -2108,9 +2108,6 @@ void nrs_t::registerKernels(occa::properties kernelInfoBC)
   };
 
   const auto svvForm = [&](const std::string &field) {
-    if(field == "fluid velocity") {
-	return false;
-    }  
     const std::string optionsPrefix = createOptionsPrefix(field);
     if (platform->options.compareArgs(optionsPrefix + "REGULARIZATION METHOD", "SVV")) {
       return true;
