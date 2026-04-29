@@ -712,7 +712,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
       kernelName = "ellipticBlockBuildDiagonal" + suffix;
       elliptic->ellipticBlockBuildDiagonalKernel = platform->kernelRequests.load(poissonPrefix + kernelName);
 
-      if(options.compareArgs("REGULARIZATION METHOD","SVV")) {
+      if(options.compareArgs("REGULARIZATION METHOD","SVV") && elliptic->name != "fluid velocity") {
         kernelName = "svv-ellipticBlockBuildDiagonal" + suffix;
         elliptic->ellipticBlockBuildDiagonalSVVKernel = platform->kernelRequests.load(kernelName);
       }

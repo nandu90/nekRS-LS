@@ -24,6 +24,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           {"activationwidth"},
           {"decaythreshold"},
           {"noisethreshold"},
+          {"svvcoeff"},
           {"filterpower"},
       };
       const std::vector<std::string> list = serializeString(regularization, '+');
@@ -47,10 +48,6 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         append_error("avm regularization is only enabled for scalars!\n");
       }
 
-      if (usesSVV && isVelocity) {
-        append_error("svv regularization is only enabled for scalars!\n");
-      }
-
       if (usesGJP) {
         options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP");
         options.setArgs(parPrefix + "REGULARIZATION GJP SCALING COEFF", "0.8");
@@ -71,7 +68,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         }
 
         for (std::string s : list) {
-          const auto scaleStr = parseValueForKey(s, "scalingcoeff");
+          const auto scaleStr = parseValueForKey(s, "svvcoeff");
           if (!scaleStr.empty()) {
             options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF", scaleStr);
           }
@@ -88,6 +85,9 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPFRT");
         if (usesGJP) {
           options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP+HPFRT");
+        }
+        if (usesSVV) {
+          options.setArgs(parPrefix + "REGULARIZATION METHOD", "SVV+HPFRT");
         }
       }
 
@@ -214,10 +214,6 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
         }
 
         if (defaultSettings.find("svv") != std::string::npos) {
-          if (isVelocity) {
-            // Catch if the general block is using SVV + no [VELOCITY] specification
-            append_error("svv regularization is only enabled for scalars!\n");
-          }
           options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF",
                           options.getArgs("REGULARIZATION SVV SCALING COEFF"));
           options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER",

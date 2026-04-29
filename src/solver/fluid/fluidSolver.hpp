@@ -23,6 +23,7 @@ private:
 
   occa::memory o_zeroNormalMask;
   occa::memory o_filterRT;
+  occa::memory o_filterPe;
   int Nsubsteps;
 
   occa::memory o_ADV;
@@ -34,6 +35,11 @@ private:
   occa::memory o_EXT0;
 
   occa::memory o_coeffEXTP;
+
+  occa::memory o_svvD;
+  occa::memory o_svvDT;
+  occa::memory o_svvf;
+  occa::kernel svvKernel;
 
 public:
   fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<geomSolver_t> &geom);
