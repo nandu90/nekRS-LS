@@ -1294,7 +1294,6 @@ void lvlSet_t::computeAdvectionCoeff(int tstep)
       tlsrBoundaryFixKernel(meshV->Nelements,
                             this->vFieldOffset,
                             meshV->o_sgeo,
-                            meshV->o_vmapM,
                             this->o_EToB,
                             this->o_W);
     }
