@@ -164,6 +164,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
                                 @ restrict const dfloat *D,
                                 const dlong offset,
                                 const dfloat epsilon,
+                                @ restrict const dfloat *PSISTAR,
                                 @ restrict const dfloat *PSI,
                                 @ restrict const dfloat *NORMAL,
                                 @ restrict dfloat *DIFF)
@@ -238,8 +239,9 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
           const dfloat gradn = gradx * nx + grady * ny + gradz * nz;
 
           const dfloat psi = PSI[id];
+          const dfloat psiStar = PSISTAR[id];
 
-          DIFF[id] = epsilon * gradn - psi * (1.0 - psi);
+          DIFF[id] = epsilon * gradn - psi * (1.0 - psiStar);
         }
       }
       @barrier();
@@ -537,5 +539,190 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
         }
       }
     }
+  }
+}
+
+@kernel void clsrDiffusionJacobiDiagonal(const dlong Nelements,
+                                         const dlong offset,
+                                         @ restrict const dfloat *vgeo,
+                                         @ restrict const dfloat *D,
+                                         const dfloat epsilon,
+                                         @ restrict const dfloat *PSI,
+                                         @ restrict const dfloat *NORMAL,
+                                         @ restrict dfloat *diagA)
+{
+  for (dlong e = 0; e < Nelements; e++; @outer(0)) {
+    @shared dfloat s_D[p_Nq][p_Nq];
+
+#if defined(smXX) || defined(XeHPC)
+#pragma unroll p_Nq
+#endif
+    for (int k = 0; k < p_Nq; ++k) {
+
+      // Cache the 1D derivative matrix in shared memory.
+      for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+        for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+          // Load the derivative matrix into shared memory once
+          if (k == 0) {
+            s_D[j][i] = D[j * p_Nq + i];
+          }
+        }
+      }
+
+      @barrier();
+
+      for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+        for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+
+          const dlong id =
+            e * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
+
+          const dlong gid =
+            e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + j * p_Nq + i;
+
+          // Project the physical normal onto reference-space directions.
+          // These values are used for cross terms and the compression term
+          // at the diagonal node.
+          const dfloat nx0 = NORMAL[id + 0 * offset];
+          const dfloat ny0 = NORMAL[id + 1 * offset];
+          const dfloat nz0 = NORMAL[id + 2 * offset];
+
+          const dfloat drdx0 = vgeo[gid + p_RXID * p_Np];
+          const dfloat drdy0 = vgeo[gid + p_RYID * p_Np];
+          const dfloat drdz0 = vgeo[gid + p_RZID * p_Np];
+
+          const dfloat dsdx0 = vgeo[gid + p_SXID * p_Np];
+          const dfloat dsdy0 = vgeo[gid + p_SYID * p_Np];
+          const dfloat dsdz0 = vgeo[gid + p_SZID * p_Np];
+
+          const dfloat dtdx0 = vgeo[gid + p_TXID * p_Np];
+          const dfloat dtdy0 = vgeo[gid + p_TYID * p_Np];
+          const dfloat dtdz0 = vgeo[gid + p_TZID * p_Np];
+
+          const dfloat JW0 = vgeo[gid + p_JWID * p_Np];
+
+          const dfloat nr0 = nx0 * drdx0 + ny0 * drdy0 + nz0 * drdz0;
+          const dfloat ns0 = nx0 * dsdx0 + ny0 * dsdy0 + nz0 * dsdz0;
+          const dfloat nt0 = nx0 * dtdx0 + ny0 * dtdy0 + nz0 * dtdz0;
+
+          // Diagonal entries of the derivative matrix at this GLL node.
+          const dfloat Dii = s_D[i][i];
+          const dfloat Djj = s_D[j][j];
+          const dfloat Dkk = s_D[k][k];
+
+          const dfloat psi0 = PSI[id];
+          const dfloat picardCoeff = 1.0 - psi0;
+
+          dfloat diag = 0.0;
+
+          // Normal-diffusion diagonal contribution:
+          //
+          //   epsilon * div(n (n · grad(psi)))
+          //
+          // The r/s/t stencil sums compute the diagonal entries from the squared
+          // directional-derivative terms in the normal direction.
+#pragma unroll p_Nq
+          for (int m = 0; m < p_Nq; ++m) {
+
+            // Contribution from the r-direction derivative stencil.
+            {
+              const dlong mid =
+                e * p_Np + k * p_Nq * p_Nq + j * p_Nq + m;
+
+              const dlong mgid =
+                e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + j * p_Nq + m;
+
+              const dfloat nx = NORMAL[mid + 0 * offset];
+              const dfloat ny = NORMAL[mid + 1 * offset];
+              const dfloat nz = NORMAL[mid + 2 * offset];
+
+              const dfloat drdx = vgeo[mgid + p_RXID * p_Np];
+              const dfloat drdy = vgeo[mgid + p_RYID * p_Np];
+              const dfloat drdz = vgeo[mgid + p_RZID * p_Np];
+
+              const dfloat JW = vgeo[mgid + p_JWID * p_Np];
+
+              const dfloat nr = nx * drdx + ny * drdy + nz * drdz;
+              const dfloat Dmi = s_D[m][i];
+
+              diag += epsilon * JW * nr * nr * Dmi * Dmi;
+            }
+
+            // Contribution from the s-direction derivative stencil.
+            {
+              const dlong mid =
+                e * p_Np + k * p_Nq * p_Nq + m * p_Nq + i;
+
+              const dlong mgid =
+                e * p_Np * p_Nvgeo + k * p_Nq * p_Nq + m * p_Nq + i;
+
+              const dfloat nx = NORMAL[mid + 0 * offset];
+              const dfloat ny = NORMAL[mid + 1 * offset];
+              const dfloat nz = NORMAL[mid + 2 * offset];
+
+              const dfloat dsdx = vgeo[mgid + p_SXID * p_Np];
+              const dfloat dsdy = vgeo[mgid + p_SYID * p_Np];
+              const dfloat dsdz = vgeo[mgid + p_SZID * p_Np];
+
+              const dfloat JW = vgeo[mgid + p_JWID * p_Np];
+
+              const dfloat ns = nx * dsdx + ny * dsdy + nz * dsdz;
+              const dfloat Dmj = s_D[m][j];
+
+              diag += epsilon * JW * ns * ns * Dmj * Dmj;
+            }
+
+            // Contribution from the t-direction derivative stencil.
+            {
+              const dlong mid =
+                e * p_Np + m * p_Nq * p_Nq + j * p_Nq + i;
+
+              const dlong mgid =
+                e * p_Np * p_Nvgeo + m * p_Nq * p_Nq + j * p_Nq + i;
+
+              const dfloat nx = NORMAL[mid + 0 * offset];
+              const dfloat ny = NORMAL[mid + 1 * offset];
+              const dfloat nz = NORMAL[mid + 2 * offset];
+
+              const dfloat dtdx = vgeo[mgid + p_TXID * p_Np];
+              const dfloat dtdy = vgeo[mgid + p_TYID * p_Np];
+              const dfloat dtdz = vgeo[mgid + p_TZID * p_Np];
+
+              const dfloat JW = vgeo[mgid + p_JWID * p_Np];
+
+              const dfloat nt = nx * dtdx + ny * dtdy + nz * dtdz;
+              const dfloat Dmk = s_D[m][k];
+
+              diag += epsilon * JW * nt * nt * Dmk * Dmk;
+            }
+          }
+
+          // Cross derivative terms at the diagonal node.
+          diag += 2.0 * epsilon * JW0 *
+                  (nr0 * ns0 * Dii * Djj +
+                   nr0 * nt0 * Dii * Dkk +
+                   ns0 * nt0 * Djj * Dkk);
+
+          // Picard compression contribution:
+          //   -JW * (1 - psiStar) * (nr Dii + ns Djj + nt Dkk)
+          diag -= JW0 * picardCoeff *
+                  (nr0 * Dii + ns0 * Djj + nt0 * Dkk);
+
+          // write the single-field diagonal correction.
+          diagA[id] = diag;
+        }
+      }
+
+      @barrier();
+    }
+  }
+}
+
+@kernel void setBasis(const dlong N,
+                      const dlong index,
+                      @ restrict dfloat *q)
+{
+  for (dlong n = 0; n < N; ++n; @tile(p_blockSize, @outer, @inner)) {
+    q[n] = (n == index) ? 1.0 : 0.0;
   }
 }
