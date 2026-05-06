@@ -4,6 +4,7 @@
 #include "advectionSubCycling.hpp"
 #include "registerKernels.hpp"
 #include "nekInterfaceAdapter.hpp"
+#include "svv.hpp"
 
 fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<geomSolver_t> &_geom)
     : geom(_geom)
@@ -61,6 +62,14 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
     platform->options.getArgs(key, nEXT);
     o_Pe = platform->device.malloc<dfloat>(fieldOffset);
     o_coeffEXTP = platform->device.malloc<dfloat>(std::min(nEXT, static_cast<int>(o_coeffBDF.size())));
+
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING FILTER", "TRUE")) {
+      int nModes = 2;
+      const auto key = upperCase(pressureName) + " RHO SPLITTING FILTER MODES";
+      if (platform->options.getArgs(key).empty()) {
+        platform->options.setArgs(key, std::to_string(nModes));
+      }
+    }
   }
   o_P = platform->device.malloc<dfloat>(fieldOffset * std::max(static_cast<int>(o_coeffEXTP.size()), 1));
 
@@ -97,6 +106,14 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
       int nModes = -1;
       platform->options.getArgs(upperCase(velocityName) + " HPFRT MODES", nModes);
       o_filterRT = lowPassFilterSetup(mesh, nModes);
+    }
+
+    if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "SVV")) {
+      o_svvD = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq);
+      o_svvDT = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq);
+      dfloat NSVV = 2.0;
+      platform->options.getArgs(upperCase(velocityName) + " REGULARIZATION SVV FILTER POWER", NSVV);
+      svv::convoluteDerivative(mesh, NSVV, o_svvD, o_svvDT);
     }
 
     o_EToB = [&]() {
@@ -164,6 +181,37 @@ void fluidSolver_t::solvePressure(double time, int stage)
     }
     return o_del;
   }();
+
+  /*
+  const auto o_rhoSplitSurfaceTerm = [&]() {
+    occa::memory o_flux;
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+      // 1/rho - 1/rho0
+      auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
+
+      auto o_lam0 = o_lambda0(false);
+      platform->linAlg->axpby(mesh->Nlocal, -1.0, o_lam0, 1.0, o_lambda);
+
+      auto o_Pegrad = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
+      opSEM::strongGrad(mesh, fieldOffset, o_Pe, o_Pegrad);
+
+      o_flux = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      platform->linAlg->fill(mesh->Nlocal, 0.0, o_flux);
+      launchKernel("fluidSolver_t::rhoSplitSurfaceHex3D",
+                   mesh->Nelements,
+                   mesh->o_sgeo,
+                   mesh->o_vmapM,
+                   o_EToB,
+                   fieldOffset,
+                   o_Pegrad,
+                   o_flux);
+
+      platform->linAlg->axmy(mesh->Nlocal, 1.0, o_lambda, o_flux);
+    }
+    return o_flux;
+  }(); 
+  */
 
   const auto o_stressTerm = [&]() {
     auto o_curl = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
@@ -267,6 +315,10 @@ void fluidSolver_t::solvePressure(double time, int stage)
     if (o_rhoSplitTerm.isInitialized()) {
       platform->linAlg->axpby(mesh->Nlocal, -1.0, o_rhoSplitTerm, 1.0, o_pRhs);
     }
+    //TODO: test if this is needed
+    // if (o_rhoSplitSurfaceTerm.isInitialized()) {
+    //  platform->linAlg->axpby(mesh->Nlocal, -1.0, o_rhoSplitSurfaceTerm, 1.0, o_pRhs);
+    //}
 
     return o_pRhs;
   }();
@@ -809,6 +861,74 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     }
   }
 
+  if(platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "SVV")) {
+    if(!o_svvf.isInitialized()) {
+      o_svvf = platform->device.malloc<dfloat>(mesh->Nlocal);
+      if(!platform->options.compareArgs("MOVING MESH", "TRUE"))
+        launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
+    }
+
+    if(platform->options.compareArgs("MOVING MESH", "TRUE"))
+      launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
+
+    auto o_umag = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    platform->linAlg->magVector(mesh->Nlocal, fieldOffset, o_U, o_umag);
+
+    dfloat scale = 0.1;
+    platform->options.getArgs(upperCase(velocityName) + " REGULARIZATION SVV SCALING COEFF", scale);
+
+    auto o_svvmu = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    platform->linAlg->axmyz(mesh->Nlocal, scale, o_svvf, o_umag, o_svvmu);
+    
+    auto loadKernel = [&](bool svv = false) {
+      std::string kernelNamePrefix = "svv-";
+      kernelNamePrefix += "ellipticFluid";
+
+      std::string kernelName = "Ax";
+      kernelName += "Coeff";
+
+      auto gen_suffix = [&](const int N) 
+      {      
+        std::string dataType;
+        if (o_EXT.dtype() == occa::dtype::get<double>()) {
+          dataType = "double";
+        } else if (o_EXT.dtype() == occa::dtype::get<float>()) {  
+          dataType = "float";
+        }
+
+        return std::string("_") + std::to_string(N) + dataType;
+      };
+
+      kernelName += "Hex3D" + gen_suffix(mesh->N);
+
+#if 0
+      if (platform->comm.mpiRank() == 0 && platform->verbose()) {
+        std::cout << kernelNamePrefix + "Partial" + kernelName << std::endl;
+      }
+#endif 
+      return platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
+    };
+
+    if(!svvKernel.isInitialized()) svvKernel = loadKernel();
+
+    for (int i = 0; i < mesh->dim; i++) {
+      auto o_Ui = o_U.slice(i * fieldOffset, mesh->Nlocal);
+      auto o_EXTi = o_EXT.slice(i * fieldOffset, mesh->Nlocal);
+
+      svvKernel(mesh->Nelements,
+                fieldOffset,
+                0,
+                mesh->o_elementList,
+                mesh->o_ggeo,
+                o_svvD,
+                o_svvDT,
+                o_svvmu,
+                o_NULL,
+                o_Ui,
+                o_EXTi);
+    }
+  }
+
   if (geom && !Nsubsteps) {
     launchKernel("fluidSolver_t::advectMeshVelocityHex3D",
                  mesh->Nelements,
@@ -873,6 +993,18 @@ void fluidSolver_t::extrapolateSolution()
                  o_coeffEXTP,
                  o_P,
                  o_Pe);
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING FILTER", "TRUE")) {
+      int nModes = 2;
+      platform->options.getArgs(upperCase(pressureName) + " RHO SPLITTING FILTER MODES", nModes);
+
+      if(!o_filterPe.isInitialized())
+        o_filterPe = lowPassFilterSetup(mesh, nModes, true, true); //cut-off filter, C0
+                                                                   
+      launchKernel("fluidSolver_t::filterPeHex3D",
+                   mesh->Nelements,
+                   o_filterPe,
+                   o_Pe);
+    }
   }
 }
 
@@ -1035,6 +1167,14 @@ void registerFluidSolverKernels(occa::properties kernelInfoBC)
   platform->kernelRequests.add(section + kernelName, fileName, meshProps);
 
   kernelName = "pressureAddQtl";
+  fileName = oklpath + kernelName + ".okl";
+  platform->kernelRequests.add(section + kernelName, fileName, meshProps);
+
+  kernelName = "rhoSplitSurface" + suffix;
+  fileName = oklpath + kernelName + ".okl";
+  platform->kernelRequests.add(section + kernelName, fileName, kernelInfoBC);
+
+  kernelName = "filterPe" + suffix;
   fileName = oklpath + kernelName + ".okl";
   platform->kernelRequests.add(section + kernelName, fileName, meshProps);
 }

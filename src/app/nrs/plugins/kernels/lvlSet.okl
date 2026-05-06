@@ -419,37 +419,121 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
 @kernel void tlsrBoundaryFix(const dlong Nelements,
                              const dlong offset,
                              @restrict const dfloat *sgeo,
-                             @restrict const dlong *vmapM,
                              @restrict const int *EToB,
                              @restrict dfloat *normal)
 {
   for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
-    for (int f = 0; f < p_Nfaces; ++f) {
-      const int bcType = EToB[f + e * p_Nfaces];
+    for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+      for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+#pragma unroll p_Nq
+        for (int k = 0; k < p_Nq; ++k) {
+          const dlong id = e * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
 
-      if (bcType == p_bcType_none) {
-        continue;
-      }
+          dfloat wx = normal[id + 0 * offset];
+          dfloat wy = normal[id + 1 * offset];
+          dfloat wz = normal[id + 2 * offset];
 
-      for (int n = 0; n < p_Nfp; ++n; @inner(0)) {
-        const dlong sid = n + f * p_Nfp + e * p_Nfp * p_Nfaces;
-        const dlong idM  = vmapM[sid];
 
-        const dfloat nx = sgeo[p_NXID + sid * p_Nsgeo];
-        const dfloat ny = sgeo[p_NYID + sid * p_Nsgeo];
-        const dfloat nz = sgeo[p_NZID + sid * p_Nsgeo];
+          // face 0: k == 0
+          if (k == 0) {
+            const int bcType = EToB[0 + e * p_Nfaces];
+            if (bcType != p_bcType_none) {
+              const dlong sid = e * p_Nfp * p_Nfaces + 0 * p_Nfp + i + j * p_Nq;
+              const dfloat nx = sgeo[p_NXID + sid * p_Nsgeo];
+              const dfloat ny = sgeo[p_NYID + sid * p_Nsgeo];
+              const dfloat nz = sgeo[p_NZID + sid * p_Nsgeo];
+              const dfloat wdotn = wx * nx + wy * ny + wz * nz;
+              if (wdotn < 0) {
+                wx -= 2.0 * wdotn * nx;
+                wy -= 2.0 * wdotn * ny;
+                wz -= 2.0 * wdotn * nz;
+              }
+            }
+          }
+          // face 5: k == p_Nq - 1
+          if (k == p_Nq - 1) {
+            const int bcType = EToB[5 + e * p_Nfaces];
+            if (bcType != p_bcType_none) {
+              const dlong sid = e * p_Nfp * p_Nfaces + 5 * p_Nfp + i + j * p_Nq;
+              const dfloat nx = sgeo[p_NXID + sid * p_Nsgeo];
+              const dfloat ny = sgeo[p_NYID + sid * p_Nsgeo];
+              const dfloat nz = sgeo[p_NZID + sid * p_Nsgeo];
+              const dfloat wdotn = wx * nx + wy * ny + wz * nz;
+              if (wdotn < 0) {
+                wx -= 2.0 * wdotn * nx;
+                wy -= 2.0 * wdotn * ny;
+                wz -= 2.0 * wdotn * nz;
+              }
+            }
+          }
+          // face 1: j == 0
+          if (j == 0) {
+            const int bcType = EToB[1 + e * p_Nfaces];
+            if (bcType != p_bcType_none) {
+              const dlong sid = e * p_Nfp * p_Nfaces + 1 * p_Nfp + i + k * p_Nq;
+              const dfloat nx = sgeo[p_NXID + sid * p_Nsgeo];
+              const dfloat ny = sgeo[p_NYID + sid * p_Nsgeo];
+              const dfloat nz = sgeo[p_NZID + sid * p_Nsgeo];
+              const dfloat wdotn = wx * nx + wy * ny + wz * nz;
+              if (wdotn < 0) {
+                wx -= 2.0 * wdotn * nx;
+                wy -= 2.0 * wdotn * ny;
+                wz -= 2.0 * wdotn * nz;
+              }
+            }
+          }
+          // face 3: j == p_Nq - 1
+          if (j == p_Nq - 1) {
+            const int bcType = EToB[3 + e * p_Nfaces];
+            if (bcType != p_bcType_none) {
+              const dlong sid = e * p_Nfp * p_Nfaces + 3 * p_Nfp + i + k * p_Nq;
+              const dfloat nx = sgeo[p_NXID + sid * p_Nsgeo];
+              const dfloat ny = sgeo[p_NYID + sid * p_Nsgeo];
+              const dfloat nz = sgeo[p_NZID + sid * p_Nsgeo];
+              const dfloat wdotn = wx * nx + wy * ny + wz * nz;
+              if (wdotn < 0) {
+                wx -= 2.0 * wdotn * nx;
+                wy -= 2.0 * wdotn * ny;
+                wz -= 2.0 * wdotn * nz;
+              }
+            }
+          }
+          // face 2: i == p_Nq - 1
+          if (i == p_Nq - 1) {
+            const int bcType = EToB[2 + e * p_Nfaces];
+            if (bcType != p_bcType_none) {
+              const dlong sid = e * p_Nfp * p_Nfaces + 2 * p_Nfp + j + k * p_Nq;
+              const dfloat nx = sgeo[p_NXID + sid * p_Nsgeo];
+              const dfloat ny = sgeo[p_NYID + sid * p_Nsgeo];
+              const dfloat nz = sgeo[p_NZID + sid * p_Nsgeo];
+              const dfloat wdotn = wx * nx + wy * ny + wz * nz;
+              if (wdotn < 0) {
+                wx -= 2.0 * wdotn * nx;
+                wy -= 2.0 * wdotn * ny;
+                wz -= 2.0 * wdotn * nz;
+              }
+            }
+          }
+          // face 4: i == 0
+          if (i == 0) {
+            const int bcType = EToB[4 + e * p_Nfaces];
+            if (bcType != p_bcType_none) {
+              const dlong sid = e * p_Nfp * p_Nfaces + 4 * p_Nfp + j + k * p_Nq;
+              const dfloat nx = sgeo[p_NXID + sid * p_Nsgeo];
+              const dfloat ny = sgeo[p_NYID + sid * p_Nsgeo];
+              const dfloat nz = sgeo[p_NZID + sid * p_Nsgeo];
+              const dfloat wdotn = wx * nx + wy * ny + wz * nz;
+              if (wdotn < 0) {
+                wx -= 2.0 * wdotn * nx;
+                wy -= 2.0 * wdotn * ny;
+                wz -= 2.0 * wdotn * nz;
+              }
+            }
+          }
 
-        const dfloat wx = normal[idM + 0 * offset];
-        const dfloat wy = normal[idM + 1 * offset];
-        const dfloat wz = normal[idM + 2 * offset];
-
-        const dfloat wdotn = wx * nx + wy * ny + wz * nz;
-
-        if (wdotn < 0) {
-          // reflect the normal component; leave the tangential component unchanged
-          normal[idM + 0 * offset] = wx - 2.0 * wdotn * nx;
-          normal[idM + 1 * offset] = wy - 2.0 * wdotn * ny;
-          normal[idM + 2 * offset] = wz - 2.0 * wdotn * nz;
+          normal[id + 0 * offset] = wx;
+          normal[id + 1 * offset] = wy;
+          normal[id + 2 * offset] = wz;
         }
       }
     }

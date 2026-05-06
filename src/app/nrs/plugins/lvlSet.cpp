@@ -1237,18 +1237,18 @@ void lvlSet::normalVector(const occa::memory& o_phi, occa::memory& o_normal, boo
 {
   auto mesh = nrs->scalar->mesh(nrs->scalar->nameToIndex.find("tls")->second);
 
-  normalVectorKernel(mesh->Nelements,
+  if(avg) {
+    opSEM::strongGrad(mesh, nrs->scalar->vFieldOffset, o_phi, o_normal);
+
+    //normalization seems necessary after averaging for TLSR stability
+    normalizeVectorKernel(mesh->Nlocal, nrs->scalar->vFieldOffset, o_normal);
+  } else {
+    normalVectorKernel(mesh->Nelements,
                      mesh->o_vgeo,
                      mesh->o_D,
                      nrs->scalar->vFieldOffset,
                      o_phi,
                      o_normal);
-
-  if(avg) {
-    oogs::startFinish(o_normal, mesh->dim, nrs->scalar->vFieldOffset, ogsDfloat, ogsAdd, mesh->oogs);
-
-    //normalization seems necessary after averaging for TLSR stability
-    normalizeVectorKernel(mesh->Nlocal, nrs->scalar->vFieldOffset, o_normal);
   }
 }
 
@@ -1294,7 +1294,6 @@ void lvlSet_t::computeAdvectionCoeff(int tstep)
       tlsrBoundaryFixKernel(meshV->Nelements,
                             this->vFieldOffset,
                             meshV->o_sgeo,
-                            meshV->o_vmapM,
                             this->o_EToB,
                             this->o_W);
     }
