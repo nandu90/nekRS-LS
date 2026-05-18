@@ -151,7 +151,12 @@ public:
   std::unique_ptr<iofld> fieldWriter;
   int outfldCounter = 0;
 
-  std::tuple<dfloat, dfloat, int> computeFixedDistanceAdvectionParams();
+	struct fixedDistanceAdvectionParams {
+		dfloat deltat;
+		dfloat targetTime;
+		int targetSteps;
+	};
+  fixedDistanceAdvectionParams computeFixedDistanceAdvectionParams();
 
 private:
   void advectionSubcycling(int nEXT, double time);

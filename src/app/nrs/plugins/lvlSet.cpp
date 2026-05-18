@@ -791,8 +791,8 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
   elapsedTime = 0.0;
   double time = 0.0;
   int tstep = 1;
-  auto [deltat, targetTime, targetSteps] = this->computeFixedDistanceAdvectionParams();
-  dt[0] = deltat;
+  auto params = this->computeFixedDistanceAdvectionParams();
+  dt[0] = params.deltat;
   dt[1] = 0.0;
   dt[2] = 0.0;
 
@@ -800,9 +800,9 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
   auto isFinalStep = [&]() -> bool {
     switch (stopMode) {
       case StopMode::targetSteps:
-        return tstep >= (targetSteps + 1);
+        return tstep >= (params.targetSteps + 1);
       case StopMode::targetTime: {
-        return time >= targetTime;
+        return time >= params.targetTime;
       }
     }
     throw std::logic_error("Unhandled StopMode value");
@@ -835,7 +835,7 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
 
     if (stopMode == StopMode::targetTime) {
       // make sure we don't overstep the targetTime
-      dt[0] = std::min(dt[0], static_cast<dfloat>(targetTime - time));
+      dt[0] = std::min(dt[0], static_cast<dfloat>(params.targetTime - time));
     }
 
     // advance time here for implicit update
@@ -1936,7 +1936,7 @@ void lvlSet_t::printStepInfo(double time, dfloat cfl, int tstep, bool printStepI
   }
 }
 
-std::tuple<dfloat, dfloat, int> lvlSet_t::computeFixedDistanceAdvectionParams() 
+lvlSet_t::fixedDistanceAdvectionParams lvlSet_t::computeFixedDistanceAdvectionParams() 
 {
   // Compute the time step from the smallest mesh element, assuming unit-speed advection
   // TODO: The denominator should be N; currently using N+1 to match the Nek5000 implementation
