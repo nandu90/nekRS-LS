@@ -2000,7 +2000,7 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
         kernelName += "Var";
       }
     } else {
-       if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE") && !svv) {
+       if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE") || svv) {
          kernelName += "Var";
        }
     }
