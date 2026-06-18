@@ -89,7 +89,7 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
         kernelNamePrefix += "Fluid";
       }
       std::string kernelName = "Ax";
-      if (coeffField && !svv) {
+      if (coeffField) {
         kernelName += "Var";
       }
       kernelName += "Coeff";
@@ -107,12 +107,12 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
           NelemBenchmark,
           N + 1,
           N,
-          (svv) ? true : !coeffField,
-          (svv) ? false : poisson,
+          svv ? false : !coeffField,
+          svv ? false : poisson,
           false,
           svv,
-          (svv) ? 1 : Nfields,
-          (svv) ? false : stressForm,
+          svv ? 1 : Nfields,
+          svv ? false : stressForm,
           verbosity,
           targetTimeBenchmark,
           platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
@@ -125,10 +125,10 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
       }
     }
 
-    if(svvForm) {
-      auto kernel = axKernel(dfloat{}, dfloat{}, svvForm);
+    if(svvForm && coeffField) {
+      auto kernel = axKernel(dfloat{}, dfloat{}, true);
       if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
-        addRequest(dfloatString, kernel, svvForm);
+        addRequest(dfloatString, kernel, true);
       }
     }
 
@@ -136,12 +136,6 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
       auto kernel = axKernel(double{}, float{}); // required from GMRES-IR
       if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
         addRequest("double", kernel);
-      }
-      if(svvForm) {
-        auto kernel = axKernel(double{}, float{}, svvForm);
-        if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
-          addRequest("double", kernel, svvForm);
-        }
       }
     }
   }

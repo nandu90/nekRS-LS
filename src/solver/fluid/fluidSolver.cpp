@@ -885,7 +885,7 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
       kernelNamePrefix += "ellipticFluid";
 
       std::string kernelName = "Ax";
-      kernelName += "Coeff";
+      kernelName += "VarCoeff";
 
       auto gen_suffix = [&](const int N) 
       {      
