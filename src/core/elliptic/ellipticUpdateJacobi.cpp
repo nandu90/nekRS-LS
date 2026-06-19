@@ -35,9 +35,9 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
 
   if (!o_invDiagA.isInitialized()) {
     if (elliptic->mgLevel) {
-      o_invDiagA = platform->device.malloc<pfloat>(elliptic->Nfields * elliptic->fieldOffset);
+      o_invDiagA = platform->deviceMemoryPool.reserve<pfloat>(elliptic->Nfields * elliptic->fieldOffset);
     } else {
-      o_invDiagA = platform->device.malloc<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
+      o_invDiagA = platform->deviceMemoryPool.reserve<dfloat>(elliptic->Nfields * elliptic->fieldOffset);
     }
   }
 
@@ -52,21 +52,11 @@ void ellipticUpdateJacobi(elliptic_t *elliptic, occa::memory &o_invDiagA)
          mesh->o_ggeo,
          mesh->o_D,
          mesh->o_DT,
+         elliptic->o_svvD,
          elliptic->o_lambda0,
          elliptic->o_lambda1,
+         elliptic->o_lambdasvv,
          o_invDiagA);
-
-  if(elliptic->svv)
-    elliptic->ellipticBlockBuildDiagonalSVVKernel(mesh->Nelements,
-                                                  elliptic->Nfields,
-                                                  elliptic->fieldOffset,
-                                                  elliptic->loffset,
-                                                  mesh->o_ggeo,
-                                                  elliptic->o_svvD,
-                                                  elliptic->o_svvDT,
-                                                  elliptic->o_svvmue,
-                                                  o_NULL,
-                                                  o_invDiagA);
 
   dfloat flopCount = 0.0;
   flopCount += 12 * mesh->Nq + 12;

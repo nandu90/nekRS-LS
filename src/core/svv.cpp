@@ -4,24 +4,15 @@
 #include "svv.hpp"
 
 /**
- * Spectrally Vanishing Viscosity method (https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5397463) 
+ * Spectrally Vanishing Viscosity method (https://doi.org/10.1016/j.jcp.2026.114961) 
  **/
 
 namespace //private
 {
-  std::vector<dfloat> squareMatrixMultiply(int M, const std::vector<dfloat>& A_, const std::vector<dfloat>& B_)
-  {
-    double alpha = 1.0, beta = 0.0;
-    char trans = 'T';
-    std::vector<double> A(A_.begin(), A_.end());
-    std::vector<double> B(B_.begin(), B_.end());
-    std::vector<double> C(M * M, 0.0);
-    dgemm_(&trans, &trans, &M, &M, &M, &alpha, A.data(), &M, B.data(), &M, &beta, C.data(), &M);
+  occa::memory o_B;
+  occa::memory o_Binv;
 
-    std::vector<dfloat> C_(C.begin(), C.end());
-    auto out = platform->linAlg->matrixTranspose(M, C_);
-    return out;
-  }
+  bool setupCalled = false; 
 
   dfloat PNLEG(const dfloat Z, const int N)
   {
@@ -57,24 +48,23 @@ namespace //private
 
 } //namespace
 
-void svv::convoluteDerivative(mesh_t* mesh, const dfloat NSVV, occa::memory& o_svvD, occa::memory& o_svvDT)
+void svv::convoluteDerivative(mesh_t* mesh, occa::memory& o_filterPower, occa::memory& o_svvD)
 {
-  auto B = legendreBasis(mesh);
-  auto Binv = platform->linAlg->matrixInverse(mesh->Nq, B);
+  if(!setupCalled) {
+    auto B = legendreBasis(mesh);
+    auto Binv = platform->linAlg->matrixInverse(mesh->Nq, B);
 
-  std::vector<dfloat> Q(mesh->Nq * mesh->Nq, 0.0);
-  for (int i=0; i < mesh->Nq; i++){
-    Q[i * mesh->Nq + i] = pow(i/ dfloat(mesh->N), dfloat(mesh->N)/NSVV);
+    o_B = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq, B.data());
+    o_Binv = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq, Binv.data());
   }
 
-  auto tmp = squareMatrixMultiply(mesh->Nq, B, Q);
+  launchKernel("core-svv::convoluteDerivative",
+               mesh->Nelements,
+               o_B,
+               o_Binv,
+               mesh->o_D,
+               o_filterPower,
+               o_svvD);
 
-  auto cmat = squareMatrixMultiply(mesh->Nq, tmp, Binv);
-
-  std::vector<dfloat> D(mesh->D, mesh->D + mesh->Nq * mesh->Nq);
-  auto svvD = squareMatrixMultiply(mesh->Nq, cmat, D);
-  auto svvDT = platform->linAlg->matrixTranspose(mesh->Nq, svvD);
-
-  o_svvD.copyFrom(svvD.data());
-  o_svvDT.copyFrom(svvDT.data());
+  setupCalled = true;
 }

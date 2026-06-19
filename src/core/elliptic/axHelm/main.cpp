@@ -139,6 +139,7 @@ int main(int argc, char **argv)
   bool svv = false;
   if(SVVmode) {
     svv = true;
+    poisson = false;
   }
 
   platform = platform_t::getInstance(options, MPI_COMM_WORLD, MPI_COMM_WORLD);
@@ -151,8 +152,8 @@ int main(int argc, char **argv)
       benchmarkAx<decltype(T), decltype(Tgeo)>(Nelements,
                                                Nq,
                                                Ng,
-                                               poisson,
                                                constCoeff,
+                                               poisson,
                                                computeGeom,
                                                svv,
                                                Ndim,

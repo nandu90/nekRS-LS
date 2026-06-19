@@ -1,5 +1,20 @@
 #if p_knl == 0
 // original kernel
+//
+#if defined(FP32) && defined(gfxXX)
+  #define p_pad 0
+#elif (p_Nq % 2 == 0)
+  #define p_pad 1
+#else
+  #define p_pad 0
+#endif
+
+#ifdef p_svv
+#define DTERM(t,a,b) ((t) == 0 ? s_D[a][b] : s_Dsvv[a][b])
+#else
+#define DTERM(t,a,b) s_D[a][b]      
+#endif      
+
 @kernel void ellipticPartialAxCoeffHex3D_v0(const dlong Nelements,
                                        const dlong offset,
                                        const dlong loffset,
@@ -7,8 +22,10 @@
                                        @ restrict const gfloat *ggeo,
                                        @ restrict const dfloat *D,
                                        @ restrict const dfloat *S,
+                                       @ restrict const dfloat *Dsvv,
                                        @ restrict const dfloat *lambda0,
                                        @ restrict const dfloat *lambda1,
+                                       @ restrict const dfloat *lambdasvv,
                                        @ restrict const dfloat *q,
                                        @ restrict dfloat *Aq)
 {
@@ -17,13 +34,8 @@
 #endif
   for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
 
-#if defined(FP32) && defined(gfxXX)
-    @shared dfloat s_D[p_Nq][p_Nq];
-#elif (p_Nq % 2 == 0)
-    @shared dfloat s_D[p_Nq][p_Nq + 1];
-#else
-    @shared dfloat s_D[p_Nq][p_Nq];
-#endif
+    @shared dfloat s_D[p_Nq][p_Nq + p_pad];
+
     @shared dfloat s_q[p_Nq][p_Nq];
 
     @shared dfloat s_Gqr[p_Nq][p_Nq];
@@ -33,17 +45,24 @@
     @exclusive dfloat r_q[p_Nq];
     @exclusive dfloat r_Aq[p_Nq];
 
+#ifdef p_svv    
+    @shared dfloat s_Dsvv[p_Nq][p_Nq + p_pad];
+#endif
+
     @exclusive dlong element;
 
     @exclusive dfloat r_G00, r_G01, r_G02, r_G11, r_G12, r_G22;
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
     @exclusive dfloat r_GwJ;
 #endif
 
     for (int j = 0; j < p_Nq; ++j; @inner(1))
       for (int i = 0; i < p_Nq; ++i; @inner(0)) {
-        s_D[j][i] = D[p_Nq * j + i];
         element = elementList[e];
+        s_D[j][i] = D[p_Nq * j + i];
+#ifdef p_svv
+        s_Dsvv[j][i] = Dsvv[element * p_Nq * p_Nq + p_Nq * j + i];
+#endif        
       }
 
     @barrier();
@@ -61,6 +80,7 @@
 
     @barrier();
 
+
 #pragma unroll p_Nq
     for (int k = 0; k < p_Nq; k++) {
       @barrier();
@@ -76,87 +96,96 @@
           r_G12 = ggeo[gbase + p_G12ID * p_Np];
           r_G22 = ggeo[gbase + p_G22ID * p_Np];
 
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
           r_GwJ = ggeo[gbase + p_GWJID * p_Np];
 #endif
         }
 
       @barrier();
 
-      for (int j = 0; j < p_Nq; ++j; @inner(1)) {
-        for (int i = 0; i < p_Nq; ++i; @inner(0)) {
-          s_q[j][i] = r_q[k];
+      int dterms = 1;
+#ifdef p_svv
+      dterms += 1;
+#endif      
 
-          r_qt = 0;
+      for (int t = 0; t < dterms; t++) { //loop over all diffusion terms
+        for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+          for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+            s_q[j][i] = r_q[k];
+
+            r_qt = 0;
 
 #pragma unroll p_Nq
-          for (int m = 0; m < p_Nq; m++)
-            r_qt += s_D[k][m] * r_q[m];
+            for (int m = 0; m < p_Nq; m++) {
+              r_qt += DTERM(t,k,m) * r_q[m];
+            }
+          }
         }
+
+        @barrier();
+
+        for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+          for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+            dfloat qr = 0;
+            dfloat qs = 0;
+
+#pragma unroll p_Nq
+            for (int m = 0; m < p_Nq; m++) {
+              qr += DTERM(t,i,m) * s_q[j][m];
+              qs += DTERM(t,j,m) * s_q[m][i];
+            }
+
+            const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
+            const dfloat lbda0 = t == 0 ? lambda0[p_lambda*id + 0 * loffset] : 1.0;
+            s_Gqs[j][i] = lbda0 * (r_G01 * qr + r_G11 * qs + r_G12 * r_qt);
+            s_Gqr[j][i] = lbda0 * (r_G00 * qr + r_G01 * qs + r_G02 * r_qt);
+            r_Gqt = lbda0 * (r_G02 * qr + r_G12 * qs + r_G22 * r_qt);
+
+            r_Auk = 0.0;
+          }
+        }
+
+        @barrier();
+
+        for (int j = 0; j < p_Nq; ++j; @inner(1)) {
+          for (int i = 0; i < p_Nq; ++i; @inner(0)) {
+            const dlong base = element * p_Np + j * p_Nq + i;
+            dfloat lamsvv;
+#pragma unroll p_Nq
+            for (int m = 0; m < p_Nq; m++) {
+              lamsvv = t == 0 ? 1.0 : lambdasvv[base + m * p_Nq * p_Nq];
+              r_Aq[m] += lamsvv * DTERM(t,k,m) * r_Gqt;
+            }
+
+            lamsvv = t == 0 ? 1.0 : lambdasvv[base + k * p_Nq * p_Nq];
+#pragma unroll p_Nq
+            for (int m = 0; m < p_Nq; m++) {
+              r_Auk += lamsvv * DTERM(t,m,j) * s_Gqs[m][i];
+              r_Auk += lamsvv * DTERM(t,m,i) * s_Gqr[j][m];
+            }
+
+            r_Aq[k] += r_Auk;
+          }
+        }
+        @barrier();
       }
 
-      @barrier();
-
+#ifndef p_poisson
       for (int j = 0; j < p_Nq; ++j; @inner(1)) {
         for (int i = 0; i < p_Nq; ++i; @inner(0)) {
-          dfloat qr = 0;
-          dfloat qs = 0;
-
-#pragma unroll p_Nq
-          for (int m = 0; m < p_Nq; m++) {
-            qr += s_D[i][m] * s_q[j][m];
-            qs += s_D[j][m] * s_q[m][i];
-          }
-
           const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
-#ifndef p_svv
-          const dfloat lbda0 = lambda0[p_lambda*id + 0 * loffset];
-          s_Gqs[j][i] = lbda0 * (r_G01 * qr + r_G11 * qs + r_G12 * r_qt);
-          s_Gqr[j][i] = lbda0 * (r_G00 * qr + r_G01 * qs + r_G02 * r_qt);
-          r_Gqt = lbda0 * (r_G02 * qr + r_G12 * qs + r_G22 * r_qt);
-#else
-          s_Gqs[j][i] = (r_G01 * qr + r_G11 * qs + r_G12 * r_qt);
-          s_Gqr[j][i] = (r_G00 * qr + r_G01 * qs + r_G02 * r_qt);
-          r_Gqt = (r_G02 * qr + r_G12 * qs + r_G22 * r_qt);
-#endif
-
-#if defined(p_poisson) || defined(p_svv)
-          r_Auk = 0.0;
-#else
-          r_Auk = r_GwJ * lambda1[p_lambda*id + 0 * loffset] * r_q[k];
-#endif
+          r_Aq[k] += r_GwJ * lambda1[p_lambda*id + 0 * loffset] * r_q[k];
         }
       }
-
-      @barrier();
-
-      for (int j = 0; j < p_Nq; ++j; @inner(1)) {
-        for (int i = 0; i < p_Nq; ++i; @inner(0)) {
-#pragma unroll p_Nq
-          for (int m = 0; m < p_Nq; m++) {
-            r_Auk += s_D[m][j] * s_Gqs[m][i];
-            r_Aq[m] += s_D[k][m] * r_Gqt;
-            r_Auk += s_D[m][i] * s_Gqr[j][m];
-          }
-
-          r_Aq[k] += r_Auk;
-        }
-      }
+#endif
     }
-
-    @barrier();
 
     for (int j = 0; j < p_Nq; ++j; @inner(1)) {
       for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 #pragma unroll p_Nq
         for (int k = 0; k < p_Nq; k++) {
           const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
-#ifndef p_svv
           Aq[id] = r_Aq[k];
-#else
-          const dfloat lbda0 = lambda0[p_lambda*id + 0 * loffset];
-          Aq[id] += lbda0 * r_Aq[k];
-#endif          
         }
       }
     }
@@ -179,6 +208,19 @@
 #endif
 
 #if p_knl == 1
+
+#ifdef p_svv
+#define DTERM(t,a,b) ((t) == 0 ? s_D[a][b] : s_Dsvv[a][b])
+#define RDUT(t) ((t) == 0 ? r_GDut : r_SDut)
+#define SW(t,a,b) ((t) == 0 ? s_w[a][b] : s_Sw[a][b])
+#define SV(t,a,b) ((t) == 0 ? s_v[a][b] : s_Sv[a][b])
+#else
+#define DTERM(t,a,b) s_D[a][b]      
+#define RDUT(t) r_GDut
+#define SW(t,a,b) s_w[a][b]
+#define SV(t,a,b) s_v[a][b]
+#endif      
+
 @kernel void ellipticPartialAxCoeffHex3D_v1(const dlong Nelements,
                                        const dlong offset,
                                        const dlong loffset,
@@ -186,8 +228,10 @@
                                        @ restrict const gfloat *ggeo,
                                        @ restrict const dfloat *D,
                                        @ restrict const dfloat *S,
+                                       @ restrict const dfloat *Dsvv,
                                        @ restrict const dfloat *lambda0,
                                        @ restrict const dfloat *lambda1,
+                                       @ restrict const dfloat *lambdasvv,
                                        @ restrict const dfloat *q,
                                        @ restrict dfloat *Aq)
 {
@@ -208,16 +252,25 @@
     // array for results Au(i,j,0:N)
     @exclusive dfloat r_Au[p_Nq];
 
+#ifdef p_svv
+    @shared dfloat s_Dsvv[p_Nq][p_Nq + p_pad];
+    @shared dfloat s_Sv[p_Nq][p_Nq + p_pad];
+    @shared dfloat s_Sw[p_Nq][p_Nq + p_pad];
+    @exclusive dfloat r_SDut;
+#endif    
+
     @exclusive dlong element;
 
     for (int j = 0; j < p_Nq; ++j; @inner(1)) {
       for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 
+        element = elementList[e];
         // load D into local memory
         //  s_D[i][j] = d \phi_i at node j
         s_D[j][i] = D[p_Nq * j + i]; // D is column major
-
-        element = elementList[e];
+#ifdef p_svv                                     
+        s_Dsvv[j][i] = Dsvv[element * p_Nq * p_Nq + p_Nq * j + i]; // D is column major
+#endif
 
         const dlong base = i + j * p_Nq + element * p_Np;
 
@@ -263,38 +316,52 @@
           const dfloat r_G12 = ggeo[gbase + p_G12ID * p_Np];
           const dfloat r_G22 = ggeo[gbase + p_G22ID * p_Np];
 
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
           const dfloat r_GwJ = ggeo[gbase + p_GWJID * p_Np];
 #endif
 
-          dfloat ur = 0;
-          dfloat us = 0;
-          dfloat ut = 0;
-
-#pragma unroll p_Nq
-          for (int m = 0; m < p_Nq; m++) {
-            ut += s_D[k][m] * r_u[m];
-          }
-
-#pragma unroll p_Nq
-          for (int m = 0; m < p_Nq; m++) {
-            ur += s_D[i][m] * s_q[j][m];
-            us += s_D[j][m] * s_q[m][i];
-          }
-
+          int dterms = 1;
+#ifdef p_svv
+          dterms++;
+#endif          
           const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
-#ifndef p_svv          
-          const dfloat lbda0 = lambda0[p_lambda*id + 0 * loffset];
-          s_w[j][i] = lbda0 * (r_G01 * ur + r_G11 * us + r_G12 * ut);
-          s_v[j][i] = lbda0 * (r_G00 * ur + r_G01 * us + r_G02 * ut);
-          r_GDut = lbda0 * (r_G02 * ur + r_G12 * us + r_G22 * ut);
-#else          
-          s_w[j][i] = (r_G01 * ur + r_G11 * us + r_G12 * ut);
-          s_v[j][i] = (r_G00 * ur + r_G01 * us + r_G02 * ut);
-          r_GDut = (r_G02 * ur + r_G12 * us + r_G22 * ut);
-#endif
 
-#if defined(p_poisson) || defined(p_svv)
+          for (int t = 0; t < dterms; t++) {
+            dfloat ur = 0;
+            dfloat us = 0;
+            dfloat ut = 0;
+
+#pragma unroll p_Nq
+            for (int m = 0; m < p_Nq; m++) {
+              ut += DTERM(t,k,m) * r_u[m];
+            }
+
+#pragma unroll p_Nq
+            for (int m = 0; m < p_Nq; m++) {
+              ur += DTERM(t,i,m) * s_q[j][m];
+              us += DTERM(t,j,m) * s_q[m][i];
+            }
+
+            const dfloat rw = r_G01 * ur + r_G11 * us + r_G12 * ut;
+            const dfloat rv = r_G00 * ur + r_G01 * us + r_G02 * ut;
+            const dfloat rt = r_G02 * ur + r_G12 * us + r_G22 * ut;
+
+            if (t == 0) {
+              const dfloat lbda0 = lambda0[p_lambda*id + 0 * loffset];
+              s_w[j][i] = lbda0 * rw;
+              s_v[j][i] = lbda0 * rv;
+              r_GDut = lbda0 * rt;
+            } 
+#ifdef p_svv
+            else {
+              s_Sw[j][i] = rw;
+              s_Sv[j][i] = rv;
+              r_SDut = rt;
+            }
+#endif              
+          }
+
+#ifdef p_poisson
           r_Auk = 0.0;
 #else
           r_Auk = r_GwJ * lambda1[p_lambda*id + 0 * loffset] * r_u[k];
@@ -307,15 +374,25 @@
       for (int j = 0; j < p_Nq; ++j; @inner(1)) {
         for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 
+          int dterms = 1;
+#ifdef p_svv
+          dterms++;
+#endif
+          const dlong base = element * p_Np + j * p_Nq + i;
+          dfloat lamsvv;
+          for (int t = 0; t < dterms; t++) {
 #pragma unroll p_Nq
-          for (int m = 0; m < p_Nq; m++) {
-            r_Au[m] += s_D[k][m] * r_GDut;
-          }
+            for (int m = 0; m < p_Nq; m++) {
+              lamsvv = t == 0 ? 1.0 : lambdasvv[base + m * p_Nq * p_Nq];
+              r_Au[m] += lamsvv * DTERM(t,k,m) * RDUT(t);
+            }
 
+            lamsvv = t == 0 ? 1.0 : lambdasvv[base + k * p_Nq * p_Nq];
 #pragma unroll p_Nq
-          for (int m = 0; m < p_Nq; m++) {
-            r_Auk += s_D[m][j] * s_w[m][i];
-            r_Auk += s_D[m][i] * s_v[j][m];
+            for (int m = 0; m < p_Nq; m++) {
+              r_Auk += lamsvv * DTERM(t,m,j) * SW(t,m,i);
+              r_Auk += lamsvv * DTERM(t,m,i) * SV(t,j,m);
+            }
           }
 
           r_Au[k] += r_Auk;
@@ -332,12 +409,7 @@
 
 #pragma unroll p_Nq
         for (int k = 0; k < p_Nq; k++) {
-#ifndef p_svv          
           Aq[id + k * p_Nq * p_Nq] = r_Au[k];
-#else
-          const dfloat lbda0 = lambda0[p_lambda* (id + k * p_Nq * p_Nq) + 0 * loffset];
-          Aq[id + k * p_Nq * p_Nq] += lbda0 * r_Au[k];
-#endif          
         }
       }
     }
@@ -425,6 +497,13 @@
 #endif
 
 #if p_knl == 2
+
+#ifdef p_svv
+#define DTERM_ES(t,es,a,b) ((t) == 0 ? s_D[a][b] : s_Dsvv[es][a][b])
+#else
+#define DTERM_ES(t,es,a,b) s_D[a][b]
+#endif
+
 @kernel void ellipticPartialAxCoeffHex3D_v2(const dlong Nelements,
                                        const dlong offset,
                                        const dlong loffset,
@@ -432,8 +511,10 @@
                                        @ restrict const gfloat *ggeo,
                                        @ restrict const dfloat *D,
                                        @ restrict const dfloat *S,
+                                       @ restrict const dfloat *Dsvv,
                                        @ restrict const dfloat *lambda0,
                                        @ restrict const dfloat *lambda1,
+                                       @ restrict const dfloat *lambdasvv,
                                        @ restrict const dfloat *q,
                                        @ restrict dfloat *Aq)
 {
@@ -453,6 +534,13 @@
     @exclusive dfloat r_u[p_Nq];
     // array for results Au(i,j,0:N)
     @exclusive dfloat r_Au[p_Nq];
+ 
+#ifdef p_svv
+    @shared dfloat s_Dsvv[p_NelementsPerBlk][p_Nq][p_Nq + p_pad];
+    @shared dfloat s_Sv[p_NelementsPerBlk][p_Nq][p_Nq + p_pad];
+    @shared dfloat s_Sw[p_NelementsPerBlk][p_Nq][p_Nq + p_pad];
+    @exclusive dfloat r_SDut;
+#endif    
 
     @exclusive dlong r_e, element;
 
@@ -470,6 +558,9 @@
 
           if (r_e < Nelements) {
             element = elementList[r_e];
+#ifdef p_svv
+            s_Dsvv[es][j][i] = Dsvv[element * p_Nq * p_Nq + p_Nq * j + i]; // D is column major
+#endif            
 
             const dlong base = i + j * p_Nq + element * p_Np;
 
@@ -516,14 +607,11 @@
           for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 
             dfloat r_G00, r_G01, r_G02, r_G11, r_G12, r_G22;
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
             dfloat r_GwJ;
             dfloat lbda1;
 #endif
-
-#ifndef p_svv            
             dfloat lbda0;
-#endif            
 
             if (r_e < Nelements) {
               // prefetch geometric factors
@@ -538,45 +626,57 @@
               r_G22 = ggeo[gbase + p_G22ID * p_Np];
 
               const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
-#ifndef p_svv              
               lbda0 = lambda0[p_lambda*id + 0 * loffset];
-#endif
-
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
               r_GwJ = ggeo[gbase + p_GWJID * p_Np];
               lbda1 = lambda1[p_lambda*id + 0 * loffset];
 #endif
             }
 
-            dfloat ur = 0;
-            dfloat us = 0;
-            dfloat ut = 0;
+            int dterms = 1;
+#ifdef p_svv
+            dterms++;
+#endif
+            for (int t = 0; t < dterms; t++) {
+              dfloat ur = 0;
+              dfloat us = 0;
+              dfloat ut = 0;
 
 #pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              ut += s_D[k][m] * r_u[m];
-            }
+              for (int m = 0; m < p_Nq; m++) {
+                ut += DTERM_ES(t,es,k,m) * r_u[m];
+              }
 
 #pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              ur += s_D[i][m] * s_q[es][j][m];
-              us += s_D[j][m] * s_q[es][m][i];
-            }
-#ifndef p_svv
-            s_w[es][j][i] = lbda0 * (r_G01 * ur + r_G11 * us + r_G12 * ut);
-            s_v[es][j][i] = lbda0 * (r_G00 * ur + r_G01 * us + r_G02 * ut);
-            r_GDut = lbda0 * (r_G02 * ur + r_G12 * us + r_G22 * ut);
-#else            
-            s_w[es][j][i] = (r_G01 * ur + r_G11 * us + r_G12 * ut);
-            s_v[es][j][i] = (r_G00 * ur + r_G01 * us + r_G02 * ut);
-            r_GDut = (r_G02 * ur + r_G12 * us + r_G22 * ut);
-#endif            
+              for (int m = 0; m < p_Nq; m++) {
+                ur += DTERM_ES(t,es,i,m) * s_q[es][j][m];
+                us += DTERM_ES(t,es,j,m) * s_q[es][m][i];
+              }
 
-#if defined(p_poisson) || defined(p_svv) 
+              const dfloat rw = r_G01 * ur + r_G11 * us + r_G12 * ut;
+              const dfloat rv = r_G00 * ur + r_G01 * us + r_G02 * ut;
+              const dfloat rt = r_G02 * ur + r_G12 * us + r_G22 * ut;
+
+              if(t == 0) {
+                s_w[es][j][i] = lbda0 * rw;
+                s_v[es][j][i] = lbda0 * rv;
+                r_GDut = lbda0 * rt;
+              }
+#ifdef p_svv                
+              else {
+                s_Sw[es][j][i] = rw;
+                s_Sv[es][j][i] = rv;
+                r_SDut = rt;
+              }
+#endif
+            }
+
+#ifdef p_poisson
             r_Auk = 0.0;
 #else
             r_Auk = r_GwJ * lbda1 * r_u[k];
 #endif
+
           }
         }
       }
@@ -587,18 +687,35 @@
         for (int j = 0; j < p_Nq; ++j; @inner(1)) {
           for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 
-#pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              r_Au[m] += s_D[k][m] * r_GDut;
-            }
+            if(r_e < Nelements) {
+#ifdef p_svv
+              dfloat lamsvv;
+              const dlong base = element * p_Np + j * p_Nq + i;
+#endif
 
 #pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              r_Auk += s_D[m][j] * s_w[es][m][i];
-              r_Auk += s_D[m][i] * s_v[es][j][m];
-            }
+                for (int m = 0; m < p_Nq; m++) {
+                  r_Au[m] += s_D[k][m] * r_GDut;
+#ifdef p_svv
+                  lamsvv = lambdasvv[base + m * p_Nq * p_Nq];
+                  r_Au[m] += lamsvv * s_Dsvv[es][k][m] * r_SDut;
+#endif 
+                }
 
-            r_Au[k] += r_Auk;
+#ifdef p_svv
+                lamsvv = lambdasvv[base + k * p_Nq * p_Nq];
+#endif
+#pragma unroll p_Nq
+                for (int m = 0; m < p_Nq; m++) {
+                  r_Auk += s_D[m][j] * s_w[es][m][i];
+                  r_Auk += s_D[m][i] * s_v[es][j][m];
+#ifdef p_svv
+                  r_Auk += lamsvv * s_Dsvv[es][m][j] * s_Sw[es][m][i];
+                  r_Auk += lamsvv * s_Dsvv[es][m][i] * s_Sv[es][j][m];
+#endif
+                }
+              r_Au[k] += r_Auk;
+            }
           }
         }
       }
@@ -615,12 +732,7 @@
 
 #pragma unroll p_Nq
             for (int k = 0; k < p_Nq; k++) {
-#ifndef p_svv              
               Aq[id + k * p_Nq * p_Nq] = r_Au[k];
-#else
-              const dfloat lbda0 = lambda0[p_lambda * (id + k * p_Nq * p_Nq) + 0 * loffset];
-              Aq[id + k * p_Nq * p_Nq] += lbda0 * r_Au[k];
-#endif              
             }
           }
         }
@@ -682,8 +794,10 @@
                                        @ restrict const gfloat *ggeo,
                                        @ restrict const dfloat *D,
                                        @ restrict const dfloat *S,
+                                       @ restrict const dfloat *Dsvv,
                                        @ restrict const dfloat *lambda0,
                                        @ restrict const dfloat *lambda1,
+                                       @ restrict const dfloat *lambdasvv,
                                        @ restrict const dfloat *q,
                                        @ restrict dfloat *Aq)
 {
@@ -710,7 +824,7 @@
     @shared dfloat s_Gqt[p_NelementsPerBlk][p_Nq][p_Nq][p_Nq + p_pad];
 
     @exclusive dlong element;
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
     @exclusive dfloat r_wJ;
 #endif
 
@@ -764,7 +878,7 @@
             const dfloat G12 = ggeo[gbase + p_G12ID * p_Np];
             const dfloat G22 = ggeo[gbase + p_G22ID * p_Np];
 
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
             r_wJ = ggeo[gbase + p_GWJID * p_Np];
 #endif
 
@@ -802,11 +916,7 @@
             const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
             s_Gqr[es][k][j][i] += G01 * tmp;
             s_Gqs[es][k][j][i] += G11 * tmp;
-#ifndef p_svv            
             s_Gqt[es][k][j][i] += lambda0[p_lambda*id + 0 * loffset] * G12 * tmp;
-#else
-            s_Gqt[es][k][j][i] += G12 * tmp;
-#endif            
           }
         }
       }
@@ -819,12 +929,12 @@
         for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 
           if (element != -1) {
-#if defined(p_poisson) || defined(p_svv)
+#ifdef p_poisson
             dfloat tmpAp = 0.0;
 #else
+            const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
             dfloat tmpAp = s_q[es][k][j][i] * lambda1[p_lambda*id + 0 * loffset] * r_wJ;
 #endif
-            const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
 
             // use same matrix for both slices
             // #pragma unroll p_Unr
@@ -844,11 +954,7 @@
             }
 
             const dlong base = i + j * p_Nq + k * p_Nq * p_Nq + element * p_Np;
-#ifndef p_svv            
             Aq[base] = tmpAp;
-#else
-            Aq[base] += tmpAp * lambda0[p_lambda*id + 0 * loffset];
-#endif            
           }
         }
       }
@@ -902,6 +1008,17 @@
 #endif
 
 #if p_knl == 4
+
+#ifdef p_svv
+#define DTERM_ES(t,a,b,es) ((t) == 0 ? s_D[a][b] : s_Dsvv[a][b][es])
+#define SW(t,a,b,es) ((t) == 0 ? s_w[a][b][es] : s_Sw[a][b][es])
+#define SV(t,a,b,es) ((t) == 0 ? s_v[a][b][es] : s_Sv[a][b][es])
+#else
+#define DTERM_ES(t,a,b,es) s_D[a][b]
+#define SW(t,a,b,es) s_w[a][b][es]
+#define SV(t,a,b,es) s_v[a][b][es]
+#endif
+
 @kernel void ellipticPartialAxCoeffHex3D_v4(const dlong Nelements,
                                        const dlong offset,
                                        const dlong loffset,
@@ -909,8 +1026,10 @@
                                        @ restrict const gfloat *ggeo,
                                        @ restrict const dfloat *D,
                                        @ restrict const dfloat *S,
+                                       @ restrict const dfloat *Dsvv,
                                        @ restrict const dfloat *lambda0,
                                        @ restrict const dfloat *lambda1,
+                                       @ restrict const dfloat *lambdasvv,
                                        @ restrict const dfloat *q,
                                        @ restrict dfloat *Aq)
 {
@@ -931,6 +1050,12 @@
 
     @exclusive dlong r_e, element;
 
+#ifdef p_svv
+    @shared dfloat s_Dsvv[p_Nq][p_Nq + p_pad][p_NelementsPerBlk];
+    @shared dfloat s_Sv[p_Nq][p_Nq][p_NelementsPerBlk];
+    @shared dfloat s_Sw[p_Nq][p_Nq][p_NelementsPerBlk];
+#endif    
+
     for (int es = 0; es < p_NelementsPerBlk; ++es; @inner(2)) {
       for (int j = 0; j < p_Nq; ++j; @inner(1)) {
         for (int i = 0; i < p_Nq; ++i; @inner(0)) {
@@ -945,6 +1070,9 @@
 
           if (r_e < Nelements) {
             element = elementList[r_e];
+#ifdef p_svv
+            s_Dsvv[j][i][es] = Dsvv[element * p_Nq * p_Nq + p_Nq * j + i]; // D is column major
+#endif
 
             const dlong base = i + j * p_Nq + element * p_Np;
 
@@ -992,14 +1120,11 @@
           for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 
             dfloat r_G00, r_G01, r_G02, r_G11, r_G12, r_G22;
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
             dfloat r_GwJ;
             dfloat lbda1;
 #endif
-
-#ifndef p_svv            
             dfloat lbda0;
-#endif            
 
             if (r_e < Nelements) {
               // prefetch geometric factors
@@ -1014,47 +1139,61 @@
               r_G22 = ggeo[gbase + p_G22ID * p_Np];
 
               const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
-#ifndef p_svv              
               lbda0 = lambda0[p_lambda*id + 0 * loffset];
-#endif              
 
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
               lbda1 = lambda1[p_lambda*id + 0 * loffset];
               r_GwJ = ggeo[gbase + p_GWJID * p_Np];
 #endif
             }
 
-            dfloat ur = 0;
-            dfloat us = 0;
-            dfloat ut = 0;
+            int dterms = 1;
+#ifdef p_svv
+            dterms++;
+#endif
+            for (int t = 0; t < dterms; t++) {
+              dfloat ur = 0;
+              dfloat us = 0;
+              dfloat ut = 0;
 
 #pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              ur += s_D[i][m] * s_q[j][m][es];
-              us += s_D[j][m] * s_q[m][i][es];
-            }
+              for (int m = 0; m < p_Nq; m++) {
+                ur += DTERM_ES(t,i,m,es) * s_q[j][m][es];
+                us += DTERM_ES(t,j,m,es) * s_q[m][i][es];
+              }
 
 #pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              ut += s_D[k][m] * r_u[m];
-            }
+              for (int m = 0; m < p_Nq; m++) {
+                ut += DTERM_ES(t,k,m,es) * r_u[m];
+              }
 
-#ifndef p_svv            
-            s_w[j][i][es] = lbda0 * (r_G01 * ur + r_G11 * us + r_G12 * ut);
-            s_v[j][i][es] = lbda0 * (r_G00 * ur + r_G01 * us + r_G02 * ut);
-            dfloat r_GDut = lbda0 * (r_G02 * ur + r_G12 * us + r_G22 * ut);
-#else            
-            s_w[j][i][es] = (r_G01 * ur + r_G11 * us + r_G12 * ut);
-            s_v[j][i][es] = (r_G00 * ur + r_G01 * us + r_G02 * ut);
-            dfloat r_GDut = (r_G02 * ur + r_G12 * us + r_G22 * ut);
-#endif            
+              const dfloat rw = r_G01 * ur + r_G11 * us + r_G12 * ut;
+              const dfloat rv = r_G00 * ur + r_G01 * us + r_G02 * ut;
+              dfloat r_Dut = r_G02 * ur + r_G12 * us + r_G22 * ut;
 
+              if(t == 0) {
+                s_w[j][i][es] = lbda0 * rw;
+                s_v[j][i][es] = lbda0 * rv;
+                r_Dut *= lbda0;
+              } 
+#ifdef p_svv                
+              else {
+                s_Sw[j][i][es] = rw;
+                s_Sv[j][i][es] = rv;
+              }
+#endif
+
+              if(r_e < Nelements) {
+                const dlong base = element * p_Np + j * p_Nq + i;
 #pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              r_Au[m] += s_D[k][m] * r_GDut;
+                for (int m = 0; m < p_Nq; m++) {
+                  const dfloat lamsvv = t == 0 ? 1.0 : lambdasvv[base + m * p_Nq * p_Nq];
+                  r_Au[m] += lamsvv * DTERM_ES(t,k,m,es) * r_Dut;
+                }
+              }
             }
 
-#if defined(p_poisson) || defined(p_svv)
+#ifdef p_poisson
             r_Auk = 0.0;
 #else
             r_Auk = r_GwJ * lbda1 * r_u[k];
@@ -1069,13 +1208,23 @@
         for (int j = 0; j < p_Nq; ++j; @inner(1)) {
           for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 
-#pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              r_Auk += s_D[m][j] * s_w[m][i][es];
-              r_Auk += s_D[m][i] * s_v[j][m][es];
-            }
+            if(r_e < Nelements) {
+              int dterms = 1;
+#ifdef p_svv
+              dterms++;
+#endif
+              const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
 
-            r_Au[k] += r_Auk;
+              for (int t = 0; t < dterms; t++) {
+                const dfloat lamsvv = t == 0 ? 1.0 : lambdasvv[id];
+#pragma unroll p_Nq
+                for (int m = 0; m < p_Nq; m++) {
+                  r_Auk += lamsvv * DTERM_ES(t,m,j,es) * SW(t,m,i,es);
+                  r_Auk += lamsvv * DTERM_ES(t,m,i,es) * SV(t,j,m,es);
+                }
+              }
+              r_Au[k] += r_Auk;
+            }
           }
         }
       }
@@ -1092,12 +1241,7 @@
 
 #pragma unroll p_Nq
             for (int k = 0; k < p_Nq; k++) {
-#ifndef p_svv              
               Aq[id + k * p_Nq * p_Nq] = r_Au[k];
-#else
-              const dfloat lbda0 = lambda0[p_lambda * (id + k * p_Nq * p_Nq) + 0 * loffset];
-              Aq[id + k * p_Nq * p_Nq] += r_Au[k] * lbda0;
-#endif              
             }
           }
         }
@@ -1108,6 +1252,17 @@
 #endif
 
 #if p_knl == 5
+
+#ifdef p_svv
+#define DTERM_ES(t,a,b,es) ((t) == 0 ? s_D[a][b] : s_Dsvv[a][b][es])
+#define SW(t,a,b,es) ((t) == 0 ? s_w[a][b][es] : s_Sw[a][b][es])
+#define SV(t,a,b,es) ((t) == 0 ? s_v[a][b][es] : s_Sv[a][b][es])
+#else
+#define DTERM_ES(t,a,b,es) s_D[a][b]
+#define SW(t,a,b,es) s_w[a][b][es]
+#define SV(t,a,b,es) s_v[a][b][es]
+#endif
+
 @kernel void ellipticPartialAxCoeffHex3D_v5(const dlong Nelements,
                                        const dlong offset,
                                        const dlong loffset,
@@ -1115,8 +1270,10 @@
                                        @ restrict const gfloat *ggeo,
                                        @ restrict const dfloat *D,
                                        @ restrict const dfloat *S,
+                                       @ restrict const dfloat *Dsvv,
                                        @ restrict const dfloat *lambda0,
                                        @ restrict const dfloat *lambda1,
+                                       @ restrict const dfloat *lambdasvv,
                                        @ restrict const dfloat *q,
                                        @ restrict dfloat *Aq)
 {
@@ -1137,6 +1294,12 @@
 
     @exclusive dlong r_e, element;
 
+#ifdef p_svv
+    @shared dfloat s_Dsvv[p_Nq][p_Nq + p_pad][p_NelementsPerBlk];
+    @shared dfloat s_Sv[p_Nq][p_Nq][p_NelementsPerBlk];
+    @shared dfloat s_Sw[p_Nq][p_Nq][p_NelementsPerBlk];
+#endif
+
     for (int es = 0; es < p_NelementsPerBlk; ++es; @inner(2)) {
       for (int j = 0; j < p_Nq; ++j; @inner(1)) {
         for (int i = 0; i < p_Nq; ++i; @inner(0)) {
@@ -1151,6 +1314,9 @@
 
           if (r_e < Nelements) {
             element = elementList[r_e];
+#ifdef p_svv
+            s_Dsvv[j][i][es] = Dsvv[element * p_Nq * p_Nq + p_Nq * j + i]; // D is column major
+#endif
 
             const dlong base = i + j * p_Nq + element * p_Np;
 
@@ -1199,14 +1365,11 @@
           for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 
             dfloat r_G00, r_G01, r_G02, r_G11, r_G12, r_G22;
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
             dfloat r_GwJ;
             dfloat lbda1;
 #endif
-
-#ifndef p_svv            
             dfloat lbda0;
-#endif            
 
             if (r_e < Nelements) {
               // prefetch geometric factors
@@ -1222,47 +1385,60 @@
               r_G22 = ggeo[gbase + p_G22ID * p_Np];
 
               const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
-#ifndef p_svv              
               lbda0 = lambda0[p_lambda*id + 0 * loffset];
-#endif              
-
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
               r_GwJ = ggeo[gbase + p_GWJID * p_Np];
               lbda1 = lambda1[p_lambda*id + 0 * loffset];
 #endif
             }
 
-            dfloat ur = 0;
-            dfloat us = 0;
-            dfloat ut = 0;
+            int dterms = 1;
+#ifdef p_svv
+            dterms++;
+#endif
+            for (int t = 0; t < dterms; t++) {
+              dfloat ur = 0;
+              dfloat us = 0;
+              dfloat ut = 0;
 
 #pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              ur += s_D[i][m] * s_q[j][m][es];
-              us += s_D[j][m] * s_q[m][i][es];
-            }
+              for (int m = 0; m < p_Nq; m++) {
+                ur += DTERM_ES(t,i,m,es) * s_q[j][m][es];
+                us += DTERM_ES(t,j,m,es) * s_q[m][i][es];
+              }
 
 #pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              ut += s_D[k][m] * r_u[m];
-            }
+              for (int m = 0; m < p_Nq; m++) {
+                ut += DTERM_ES(t,k,m,es) * r_u[m];
+              }
 
-#ifndef p_svv            
-            s_w[j][i][es] = lbda0 * (r_G01 * ur + r_G11 * us + r_G12 * ut);
-            s_v[j][i][es] = lbda0 * (r_G00 * ur + r_G01 * us + r_G02 * ut);
-            r_GDut = lbda0 * (r_G02 * ur + r_G12 * us + r_G22 * ut);
-#else            
-            s_w[j][i][es] = (r_G01 * ur + r_G11 * us + r_G12 * ut);
-            s_v[j][i][es] = (r_G00 * ur + r_G01 * us + r_G02 * ut);
-            r_GDut = (r_G02 * ur + r_G12 * us + r_G22 * ut);
-#endif            
+              const dfloat rw = r_G01 * ur + r_G11 * us + r_G12 * ut;
+              const dfloat rv = r_G00 * ur + r_G01 * us + r_G02 * ut;
+              dfloat r_Dut = r_G02 * ur + r_G12 * us + r_G22 * ut;
 
+              if(t == 0) {
+                s_w[j][i][es] = lbda0 * rw;
+                s_v[j][i][es] = lbda0 * rv;
+                r_Dut *= lbda0;
+              } 
+#ifdef p_svv
+              else {
+                s_Sw[j][i][es] = rw;
+                s_Sv[j][i][es] = rv;
+              }
+#endif
+
+              if(r_e < Nelements) {
 #pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              r_Au[m] += s_D[k][m] * r_GDut;
+                for (int m = 0; m < p_Nq; m++) {
+                  const dlong id = element * p_Np + m * p_Nq * p_Nq + j * p_Nq + i;
+                  const dfloat lamsvv = t == 0 ? 1.0 : lambdasvv[id];
+                  r_Au[m] += lamsvv * DTERM_ES(t,k,m,es) * r_Dut;
+                }
+              }
             }
 
-#if defined(p_poisson) || defined(p_svv)
+#ifdef p_poisson
             r_Auk = 0.0;
 #else
             r_Auk = r_GwJ * lbda1 * r_u[k];
@@ -1277,13 +1453,23 @@
         for (int j = 0; j < p_Nq; ++j; @inner(1)) {
           for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 
-#pragma unroll p_Nq
-            for (int m = 0; m < p_Nq; m++) {
-              r_Auk += s_D[m][j] * s_w[m][i][es];
-              r_Auk += s_D[m][i] * s_v[j][m][es];
-            }
+            if(r_e < Nelements) {
+              int dterms = 1;
+#ifdef p_svv
+              dterms++;
+#endif
+              const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
 
-            r_Au[k] += r_Auk;
+              for (int t = 0; t < dterms; t++) {
+                const dfloat lamsvv = t == 0 ? 1.0 : lambdasvv[id];
+#pragma unroll p_Nq
+                for (int m = 0; m < p_Nq; m++) {
+                  r_Auk += lamsvv * DTERM_ES(t,m,j,es) * SW(t,m,i,es);
+                  r_Auk += lamsvv * DTERM_ES(t,m,i,es) * SV(t,j,m,es);
+                }
+              }
+              r_Au[k] += r_Auk;
+            }
           }
         }
       }
@@ -1300,12 +1486,7 @@
 
 #pragma unroll p_Nq
             for (int k = 0; k < p_Nq; k++) {
-#ifndef p_svv              
               Aq[id + k * p_Nq * p_Nq] = r_Au[k];
-#else
-              const dfloat lbda0 = lambda0[p_lambda * (id + k * p_Nq * p_Nq) + 0 * loffset];
-              Aq[id + k * p_Nq * p_Nq] += r_Au[k] * lbda0;
-#endif              
             }
           }
         }
@@ -1368,6 +1549,19 @@
 #endif
 
 #if p_knl == 6
+
+#ifdef p_svv
+#define DTERM(t,a,b) ((t) == 0 ? s_D[a][b] : s_Dsvv[a][b])
+#define RDUT(t) ((t) == 0 ? r_GDut : r_SDut)
+#define SW(t,a,b) ((t) == 0 ? s_w[a][b] : s_Sw[a][b])
+#define SV(t,a,b) ((t) == 0 ? s_v[a][b] : s_Sv[a][b])
+#else
+#define DTERM(t,a,b) s_D[a][b]      
+#define RDUT(t) r_GDut
+#define SW(t,a,b) s_w[a][b]
+#define SV(t,a,b) s_v[a][b]
+#endif      
+
 @kernel void ellipticPartialAxCoeffHex3D_v6(const dlong Nelements,
                                        const dlong offset,
                                        const dlong loffset,
@@ -1375,8 +1569,10 @@
                                        @ restrict const gfloat *ggeo,
                                        @ restrict const dfloat *D,
                                        @ restrict const dfloat *S,
+                                       @ restrict const dfloat *Dsvv,
                                        @ restrict const dfloat *lambda0,
                                        @ restrict const dfloat *lambda1,
+                                       @ restrict const dfloat *lambdasvv,
                                        @ restrict const dfloat *q,
                                        @ restrict dfloat *Aq)
 {
@@ -1399,14 +1595,23 @@
 
     @exclusive dlong element;
 
+#ifdef p_svv
+    @shared dfloat s_Dsvv[p_Nq][p_Nq + p_pad];
+    @shared dfloat s_Sv[p_Nq][p_Nq + p_pad];
+    @shared dfloat s_Sw[p_Nq][p_Nq + p_pad];
+    @exclusive dfloat r_SDut;
+#endif
+
     for (int j = 0; j < p_Nq; ++j; @inner(1)) {
       for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 
+        element = elementList[e];
         // load D into local memory
         //  s_D[i][j] = d \phi_i at node j
         s_D[j][i] = D[p_Nq * j + i]; // D is column major
-
-        element = elementList[e];
+#ifdef p_svv
+        s_Dsvv[j][i] = Dsvv[element * p_Nq * p_Nq + p_Nq * j + i]; // D is column major
+#endif
 
         const dlong base = i + j * p_Nq + element * p_Np;
 
@@ -1454,40 +1659,51 @@
           const dfloat r_G12 = ggeo[gbase + p_G12ID * p_Np];
           const dfloat r_G22 = ggeo[gbase + p_G22ID * p_Np];
 
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
           const dfloat r_GwJ = ggeo[gbase + p_GWJID * p_Np];
 #endif
 
-          dfloat ur = 0;
-          dfloat us = 0;
-          dfloat ut = 0;
-
-#pragma unroll p_Nq
-          for (int m = 0; m < p_Nq; m++) {
-            ut += s_D[k][m] * r_u[m];
-          }
-
-#pragma unroll p_Nq
-          for (int m = 0; m < p_Nq; m++) {
-            ur += s_D[i][m] * s_q[j][m];
-            us += s_D[j][m] * s_q[m][i];
-          }
-
+          int dterms = 1;
+#ifdef p_svv
+          dterms++;
+#endif
           const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
+          for (int t = 0; t < dterms; t++) {
+            dfloat ur = 0;
+            dfloat us = 0;
+            dfloat ut = 0;
 
-#ifndef p_svv          
-          const dfloat lbda0 = lambda0[p_lambda*id + 0 * loffset];
+#pragma unroll p_Nq
+            for (int m = 0; m < p_Nq; m++) {
+              ut += DTERM(t,k,m) * r_u[m];
+            }
 
-          s_w[j][i] = lbda0 * (r_G01 * ur + r_G11 * us + r_G12 * ut);
-          s_v[j][i] = lbda0 * (r_G00 * ur + r_G01 * us + r_G02 * ut);
-          r_GDut = lbda0 * (r_G02 * ur + r_G12 * us + r_G22 * ut);
-#else          
-          s_w[j][i] = (r_G01 * ur + r_G11 * us + r_G12 * ut);
-          s_v[j][i] = (r_G00 * ur + r_G01 * us + r_G02 * ut);
-          r_GDut = (r_G02 * ur + r_G12 * us + r_G22 * ut);
-#endif          
-          
-#if defined(p_poisson) || defined(p_svv)
+#pragma unroll p_Nq
+            for (int m = 0; m < p_Nq; m++) {
+              ur += DTERM(t,i,m) * s_q[j][m];
+              us += DTERM(t,j,m) * s_q[m][i];
+            }
+
+            const dfloat rw = r_G01 * ur + r_G11 * us + r_G12 * ut;
+            const dfloat rv = r_G00 * ur + r_G01 * us + r_G02 * ut;
+            const dfloat rt = r_G02 * ur + r_G12 * us + r_G22 * ut;
+
+            if(t == 0) {
+              const dfloat lbda0 = lambda0[p_lambda*id + 0 * loffset];
+
+              s_w[j][i] = lbda0 * rw;
+              s_v[j][i] = lbda0 * rv;
+              r_GDut = lbda0 * rt;
+            } 
+#ifdef p_svv
+            else {
+              s_Sw[j][i] = rw;
+              s_Sv[j][i] = rv;
+              r_SDut = rt;
+            }
+#endif
+          }
+#ifdef p_poisson
           r_Auk = 0.0;
 #else
           r_Auk = r_GwJ * lambda1[p_lambda*id + 0 * loffset] * r_u[k];
@@ -1500,17 +1716,26 @@
       for (int j = 0; j < p_Nq; ++j; @inner(1)) {
         for (int i = 0; i < p_Nq; ++i; @inner(0)) {
 
+          int dterms = 1;
+#ifdef p_svv
+          dterms++;
+#endif
+          const dlong base = element * p_Np + j * p_Nq + i;
+          dfloat lamsvv;
+          for (int t = 0; t < dterms; t++) {
 #pragma unroll p_Nq
-          for (int m = 0; m < p_Nq; m++) {
-            r_Au[m] += s_D[k][m] * r_GDut;
-          }
+            for (int m = 0; m < p_Nq; m++) {
+              lamsvv = t == 0 ? 1.0 : lambdasvv[base + m * p_Nq * p_Nq];
+              r_Au[m] += lamsvv * DTERM(t,k,m) * RDUT(t);
+            }
 
+            lamsvv = t == 0 ? 1.0 : lambdasvv[base + k * p_Nq * p_Nq];
 #pragma unroll p_Nq
-          for (int m = 0; m < p_Nq; m++) {
-            r_Auk += s_D[m][j] * s_w[m][i];
-            r_Auk += s_D[m][i] * s_v[j][m];
+            for (int m = 0; m < p_Nq; m++) {
+              r_Auk += lamsvv * DTERM(t,m,j) * SW(t,m,i);
+              r_Auk += lamsvv * DTERM(t,m,i) * SV(t,j,m);
+            }
           }
-
           r_Au[k] += r_Auk;
         }
       }
@@ -1525,12 +1750,7 @@
 
 #pragma unroll p_Nq
         for (int k = 0; k < p_Nq; k++) {
-#ifndef p_svv          
           Aq[id + k * p_Nq * p_Nq] = r_Au[k];
-#else
-          const dfloat lbda0 = lambda0[p_lambda * (id + k * p_Nq * p_Nq) + 0 * loffset];
-          Aq[id + k * p_Nq * p_Nq] += r_Au[k] * lbda0;
-#endif          
         }
       }
     }
@@ -1546,8 +1766,10 @@
                                        @restrict const gfloat *ggeo,
                                        @restrict const dfloat *D,
                                        @restrict const dfloat *S,
+                                       @restrict const dfloat *Dsvv,
                                        @restrict const dfloat *lambda0,
                                        @restrict const dfloat *lambda1,
+                                       @restrict const dfloat *lambdasvv,
                                        @restrict const dfloat *q,
                                        @restrict dfloat *Aq)
 {
@@ -1642,25 +1864,18 @@
           const dfloat r_G22 = ggeo[gbase + p_G22ID * p_Np];
 
           const dlong id = element * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
           const dfloat r_GwJ = ggeo[gbase + p_GWJID * p_Np];
           const dfloat lbda1 =  lambda1[p_lambda*id + 0 * loffset];
 #endif
-
-#ifndef p_svv          
           const dfloat lbda0 = lambda0[p_lambda*id + 0 * loffset];
           dfloat t_GDur  = lbda0 * (r_G00 * r_ur[k] + r_G01 * r_us[k] + r_G02 * r_ut[k]);
           dfloat t_GDus  = lbda0 * (r_G01 * r_ur[k] + r_G11 * r_us[k] + r_G12 * r_ut[k]);
           dfloat t_GDut  = lbda0 * (r_G02 * r_ur[k] + r_G12 * r_us[k] + r_G22 * r_ut[k]);
-#else
-          dfloat t_GDur  = (r_G00 * r_ur[k] + r_G01 * r_us[k] + r_G02 * r_ut[k]);
-          dfloat t_GDus  = (r_G01 * r_ur[k] + r_G11 * r_us[k] + r_G12 * r_ut[k]);
-          dfloat t_GDut  = (r_G02 * r_ur[k] + r_G12 * r_us[k] + r_G22 * r_ut[k]);
-#endif          
           r_ur[k] = t_GDur;
           r_us[k] = t_GDus;
           r_ut[k] = t_GDut;
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
           r_Au[k] += r_GwJ * lbda1 * s_tmp[k][j][i];
 #endif
         }
@@ -1733,12 +1948,7 @@
 
 #pragma unroll p_Nq
         for (int k = 0; k < p_Nq; k++) {
-#ifndef p_svv          
           Aq[id + k * p_Nq * p_Nq] = r_Au[k];
-#else
-          const dfloat lbda0 = lambda0[p_lambda * (id + k * p_Nq * p_Nq) + 0 * loffset];
-          Aq[id + k * p_Nq * p_Nq] += r_Au[k] * lbda0;
-#endif          
         }
       }
     }
@@ -1754,8 +1964,10 @@
                                              @restrict const gfloat *ggeo,
                                              @restrict const dfloat *D,
                                              @restrict const dfloat *S,
+                                             @restrict const dfloat *Dsvv,
                                              @restrict const dfloat *lambda0,
                                              @restrict const dfloat *lambda1,
+                                             @restrict const dfloat *lambdasvv,
                                              @restrict const dfloat *q,
                                              @restrict dfloat *Aq)
 {
@@ -1947,8 +2159,10 @@
                                              @restrict const gfloat *ggeo,
                                              @restrict const dfloat *D,
                                              @restrict const dfloat *S,
+                                             @restrict const dfloat *Dsvv,
                                              @restrict const dfloat *lambda0,
                                              @restrict const dfloat *lambda1,
+                                             @restrict const dfloat *lambdasvv,
                                              @restrict const dfloat *q,
                                              @restrict dfloat *Aq)
 {

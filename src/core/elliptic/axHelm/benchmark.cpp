@@ -172,7 +172,7 @@ occa::kernel benchmarkAx(int Nelements,
     } else {
       if (kernelName == "ellipticPartialAxCoeffHex3D") {
         int Nkernels = 10;
-        if(svv) Nkernels = 8; //exclude const differentiation matrices kernels
+        if(svv) Nkernels = 7; //exclude const differentiation matrices kernels
         for (int knl = 0; knl < Nkernels; ++knl) {
           kernelVariants.push_back(knl);
         }
@@ -294,6 +294,8 @@ occa::kernel benchmarkAx(int Nelements,
     auto gllwz = randomVector<T>(2 * Nq_g, 0, 1, true);
     auto lambda0 = randomVector<T>(Np * Nelements, 0.01, 0.02, true);
     auto lambda1 = randomVector<T>(Np * Nelements, 0.2, 0.3, true);
+    auto lambdasvv = randomVector<T>(Np * Nelements, 0.1, 1.0, true);
+    auto Dsvv = randomVector<T>(Nelements * Nq * Nq, 0.1, 1.0, true);
 
     // elementList[e] = e
     std::vector<dlong> elementList(Nelements);
@@ -311,12 +313,14 @@ occa::kernel benchmarkAx(int Nelements,
     auto o_q = platform->device.malloc((Ndim * Np) * Nelements * wordSize, q.data());
     auto o_exyz = platform->device.malloc((3 * Np_g) * Nelements * wordSize, exyz.data());
     auto o_gllwz = platform->device.malloc(2 * Nq_g * wordSize, gllwz.data());
+    auto o_Dsvv = platform->device.malloc(Nelements * Nq * Nq * wordSize, Dsvv.data());
 
     auto o_Aq = platform->device.malloc((Ndim * Np) * Nelements * wordSize);
     o_Aq.copyFrom(Aq.data());
 
     auto o_lambda0 = platform->device.malloc(Np * Nelements * wordSize, lambda0.data());
     auto o_lambda1 = platform->device.malloc(Np * Nelements * wordSize, lambda1.data());
+    auto o_lambdasvv = platform->device.malloc(Np * Nelements * wordSize, lambdasvv.data());
 
     auto kernelRunner = [&](occa::kernel &kernel) {
       const int loffset = 0;
@@ -343,8 +347,10 @@ occa::kernel benchmarkAx(int Nelements,
                  o_ggeo,
                  o_D,
                  o_S,
+                 o_Dsvv, //svv D matrix
                  o_lambda0,
                  o_lambda1,
+                 o_lambdasvv,
                  o_q,
                  o_Aq);
         } else {
@@ -355,8 +361,10 @@ occa::kernel benchmarkAx(int Nelements,
                  o_vgeo,
                  o_D,
                  o_S,
+                 o_Dsvv, //svv D matrix
                  o_lambda0,
                  o_lambda1,
+                 o_lambdasvv,
                  o_q,
                  o_Aq);
         }
@@ -405,16 +413,21 @@ occa::kernel benchmarkAx(int Nelements,
 
       size_t bytesMoved = Ndim * 2 * Np * wordSize; // x, Ax
       bytesMoved += 6 * Np_g * wordSize;            // geo
-
-      if ((!poisson && !svv) || stressForm) {
+      
+      if (!poisson || stressForm) {
         bytesMoved += 1 * Np * wordSize; // Jw
       }
 
       if (!constCoeff) {
         bytesMoved += 1 * Np * wordSize; // lambda1
-        if (!poisson && !svv) {
+        if (!poisson) {
           bytesMoved += 1 * Np * wordSize; // lambda2
         }
+      }
+
+      if(svv) {
+        bytesMoved += 1 * Np * wordSize; // lambdasvv
+        bytesMoved += Nq * Nq * wordSize; // Dsvv
       }
 
       if (stressForm) {
@@ -424,13 +437,18 @@ occa::kernel benchmarkAx(int Nelements,
       const double bw = (Nelements * bytesMoved / elapsed) / 1.e9;
 
       double flopCount = Np * 12 * Nq + 15 * Np;
+      if (svv) {
+        flopCount *= 2;
+        flopCount += 1 * Np;
+      }
+
       if (constCoeff) {
         flopCount += 1 * Np;
       } else {
         flopCount += 3 * Np;
       }
 
-      if (!poisson && !svv) {
+      if (!poisson) {
         flopCount += 3 * Np;
       }
 
@@ -502,6 +520,7 @@ occa::kernel benchmarkAx(int Nelements,
     free(o_gllwz);
     free(o_lambda0);
     free(o_lambda1);
+    free(o_lambdasvv);
     free(o_elementList);
 
     return kernelAndTime;

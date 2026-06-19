@@ -72,6 +72,11 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
   bool verbose = platform->verbose();
   const int verbosity = verbose ? 2 : 1;
 
+  auto sectionSVV = svvForm;
+  if (section.find("fluid velocity") != std::string::npos)
+    sectionSVV = false;
+
+
   for (auto &&coeffField : {true, false}) {
     if (!platform->options.compareArgs(optionsPrefix + "RHO SPLITTING", "TRUE") &&
         platform->options.compareArgs(optionsPrefix + "ELLIPTIC COEFF FIELD", "TRUE") != coeffField) {
@@ -84,9 +89,6 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
       kernelNamePrefix += "elliptic";
       if (blockSolver && !svv) {
         kernelNamePrefix += (stressForm) ? "Stress" : "Block";
-      }
-      if(svv && section == "fluid velocity") {
-        kernelNamePrefix += "Fluid";
       }
       std::string kernelName = "Ax";
       if (coeffField) {
@@ -107,28 +109,21 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
           NelemBenchmark,
           N + 1,
           N,
-          svv ? false : !coeffField,
-          svv ? false : poisson,
+          !coeffField,
+          poisson,
           false,
           svv,
-          svv ? 1 : Nfields,
-          svv ? false : stressForm,
+          Nfields,
+          stressForm,
           verbosity,
           targetTimeBenchmark,
           platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
     };
 
     {
-      auto kernel = axKernel(dfloat{}, dfloat{});
+      auto kernel = axKernel(dfloat{}, dfloat{}, sectionSVV);
       if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
-        addRequest(dfloatString, kernel);
-      }
-    }
-
-    if(svvForm && coeffField) {
-      auto kernel = axKernel(dfloat{}, dfloat{}, true);
-      if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
-        addRequest(dfloatString, kernel, true);
+        addRequest(dfloatString, kernel, sectionSVV);
       }
     }
 
@@ -140,9 +135,33 @@ void registerEllipticKernels(std::string section, bool stressForm, bool svvForm)
     }
   }
 
-  if(section == "fluid velocity") {
-    registerEllipticPreconditionerKernels(section, false);
-  } else {
-    registerEllipticPreconditionerKernels(section, svvForm);
+  //register constCoeff svv kernel for velocity
+  if (section.find("fluid velocity") != std::string::npos && svvForm) {
+    auto axKernel = benchmarkAx<dfloat, dfloat>(
+                    NelemBenchmark,
+                    N + 1,
+                    N,
+                    true,
+                    false,
+                    false,
+                    true,
+                    1,
+                    false,
+                    verbosity,
+                    targetTimeBenchmark,
+                    platform->options.compareArgs("KERNEL AUTOTUNING", "FALSE") ? false : true);
+
+    if (platform->options.compareArgs("BUILD ONLY", "FALSE")) {
+      std::string kernelNamePrefix = "svv-ellipticFluid";
+
+      std::string kernelName = "AxCoeff";
+      if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
+        kernelName += "Trilinear";
+      }
+      kernelName += "Hex3D_" + std::to_string(N) + dfloatString;
+      platform->kernelRequests.add(kernelNamePrefix + "Partial" + kernelName, axKernel);
+    }
   }
+
+  registerEllipticPreconditionerKernels(section, sectionSVV);
 }

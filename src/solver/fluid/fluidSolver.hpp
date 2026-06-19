@@ -37,7 +37,6 @@ private:
   occa::memory o_coeffEXTP;
 
   occa::memory o_svvD;
-  occa::memory o_svvDT;
   occa::memory o_svvf;
   occa::kernel svvKernel;
 

@@ -10,9 +10,9 @@ struct elliptic_t;
 class elliptic 
 {
 public:
-  elliptic(const std::string& name, mesh_t *mesh, dlong fieldOffset, const std::vector<int>& EToBIn, const occa::memory& o_lambda0, const occa::memory& o_lambda1);
+  elliptic(const std::string& name, mesh_t *mesh, dlong fieldOffset, const std::vector<int>& EToBIn, const occa::memory& o_lambda0, const occa::memory& o_lambda1, const occa::memory& o_lambdasvv = o_NULL);
 
-  elliptic(const std::string& name, mesh_t *mesh, dlong fieldOffset, const occa::memory& o_lambda0, const occa::memory& o_lambda1);
+  elliptic(const std::string& name, mesh_t *mesh, dlong fieldOffset, const occa::memory& o_lambda0, const occa::memory& o_lambda1, const occa::memory& o_lambdasvv = o_NULL);
 
 
   ~elliptic();  
@@ -54,9 +54,7 @@ public:
 
   void coeff0HLM(const occa::memory& o_lambda0);
   void coeff1HLM(const occa::memory& o_lambda1);
-
-  void mueSVV(const occa::memory& o_svvmue);
-  void setupSVV();
+  void coeffSVV(const occa::memory& o_lambdasvv);
 
   std::tuple<int, int> projectionCounters() const; 
 
@@ -67,7 +65,8 @@ private:
   void _solve(const occa::memory &o_r,
               occa::memory o_x);
   
-  void _setup(const occa::memory &o_lambda0, const occa::memory &o_lambda1);
+  void _setup(const occa::memory &o_lambda0, const occa::memory &o_lambda1, const occa::memory &o_lambdasvv);
+  void _setupSVV();
 };
 
 #endif

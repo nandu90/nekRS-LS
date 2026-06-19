@@ -6,6 +6,15 @@
 #include "nekInterfaceAdapter.hpp"
 #include "svv.hpp"
 
+static bool evalRegularization(const std::string fieldName, const std::string regString)
+{
+  std::string regMethods;
+  platform->options.getArgs(upperCase(fieldName) + " REGULARIZATION METHOD", regMethods);
+
+  const auto methods = serializeString(regMethods, '+');
+  return std::find(methods.begin(), methods.end(), regString) != methods.end();
+}
+
 fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<geomSolver_t> &_geom)
     : geom(_geom)
 {
@@ -102,18 +111,19 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
   if (!platform->options.compareArgs(upperCase(velocityName) + " SOLVER", "NONE")) {
     platform->app->bc->printBcTypeMapping(velocityName);
 
-    if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "HPFRT")) {
+    if (evalRegularization(velocityName, "HPFRT")) {
       int nModes = -1;
       platform->options.getArgs(upperCase(velocityName) + " HPFRT MODES", nModes);
       o_filterRT = lowPassFilterSetup(mesh, nModes);
     }
 
-    if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "SVV")) {
-      o_svvD = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq);
-      o_svvDT = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq);
+    if (evalRegularization(velocityName, "SVV")) {
+      o_svvD = platform->device.malloc<dfloat>(mesh->Nelements * mesh->Nq * mesh->Nq);
       dfloat NSVV = 2.0;
       platform->options.getArgs(upperCase(velocityName) + " REGULARIZATION SVV FILTER POWER", NSVV);
-      svv::convoluteDerivative(mesh, NSVV, o_svvD, o_svvDT);
+      auto o_filterPower = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+      platform->linAlg->fill(mesh->Nelements, NSVV, o_filterPower);
+      svv::convoluteDerivative(mesh, o_filterPower, o_svvD);
     }
 
     o_EToB = [&]() {
@@ -840,7 +850,7 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     return;
   }
 
-  if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "HPFRT")) {
+  if (evalRegularization(velocityName, "HPFRT")) {
     dfloat strength = NAN;
     platform->options.getArgs(upperCase(velocityName) + " HPFRT STRENGTH", strength);
 
@@ -851,7 +861,7 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     platform->flopCounter->add(velocityName + " filterRT", flops);
   }
 
-  if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "GJP")) {
+  if (evalRegularization(velocityName, "GJP")) {
     dfloat tauFactor;
     platform->options.getArgs(upperCase(velocityName) + " REGULARIZATION GJP SCALING COEFF", tauFactor);
 
@@ -861,7 +871,7 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     }
   }
 
-  if(platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "SVV")) {
+  if (evalRegularization(velocityName, "SVV")) {
     if(!o_svvf.isInitialized()) {
       o_svvf = platform->device.malloc<dfloat>(mesh->Nlocal);
       if(!platform->options.compareArgs("MOVING MESH", "TRUE"))
@@ -881,11 +891,12 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     platform->linAlg->axmyz(mesh->Nlocal, scale, o_svvf, o_umag, o_svvmu);
     
     auto loadKernel = [&](bool svv = false) {
-      std::string kernelNamePrefix = "svv-";
-      kernelNamePrefix += "ellipticFluid";
+      std::string kernelNamePrefix = "svv-ellipticFluid";
 
-      std::string kernelName = "Ax";
-      kernelName += "VarCoeff";
+      std::string kernelName = "AxCoeff";
+      if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
+        kernelName += "Trilinear";
+      }
 
       auto gen_suffix = [&](const int N) 
       {      
@@ -898,7 +909,6 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
 
         return std::string("_") + std::to_string(N) + dataType;
       };
-
       kernelName += "Hex3D" + gen_suffix(mesh->N);
 
 #if 0
@@ -911,21 +921,27 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
 
     if(!svvKernel.isInitialized()) svvKernel = loadKernel();
 
+    auto o_lam = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    platform->linAlg->fill(mesh->Nlocal, 0.0, o_lam);
+    auto o_temp = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
     for (int i = 0; i < mesh->dim; i++) {
       auto o_Ui = o_U.slice(i * fieldOffset, mesh->Nlocal);
-      auto o_EXTi = o_EXT.slice(i * fieldOffset, mesh->Nlocal);
 
       svvKernel(mesh->Nelements,
                 fieldOffset,
                 0,
                 mesh->o_elementList,
                 mesh->o_ggeo,
+                mesh->o_D,
+                mesh->o_DT,
                 o_svvD,
-                o_svvDT,
+                o_lam,
+                o_lam,
                 o_svvmu,
-                o_NULL,
                 o_Ui,
-                o_EXTi);
+                o_temp);
+      auto o_EXTi = o_EXT.slice(i * fieldOffset, mesh->Nlocal);
+      platform->linAlg->axpby(mesh->Nlocal, 1.0, o_temp, 1.0, o_EXTi);
     }
   }
 
