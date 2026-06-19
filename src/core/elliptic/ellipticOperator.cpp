@@ -95,19 +95,34 @@ void ellipticAx(elliptic_t *elliptic,
   };
 
   if (!elliptic->AxKernel.isInitialized()) elliptic->AxKernel = loadKernel(elliptic->svv);
-  elliptic->AxKernel(NelementsList,
-                     elliptic->fieldOffset,
-                     elliptic->loffset,
-                     o_elementsList,
-                     o_geom_factors,
-                     o_D,
-                     o_DT,
-                     elliptic->o_svvD,
-                     o_lambda0,
-                     o_lambda1,
-                     o_lambdasvv,
-                     o_q,
-                     o_Aq);
+  if(elliptic->Nfields > 1) { //block solver
+    elliptic->AxKernel(NelementsList,
+                       elliptic->fieldOffset,
+                       elliptic->loffset,
+                       o_elementsList,
+                       o_geom_factors,
+                       o_D,
+                       o_DT,
+                       o_lambda0,
+                       o_lambda1,
+                       o_q,
+                       o_Aq);
+
+  } else {
+    elliptic->AxKernel(NelementsList,
+                      elliptic->fieldOffset,
+                      elliptic->loffset,
+                      o_elementsList,
+                      o_geom_factors,
+                      o_D,
+                      o_DT,
+                      elliptic->o_svvD,
+                      o_lambda0,
+                      o_lambda1,
+                      o_lambdasvv,
+                      o_q,
+                      o_Aq);
+  }
 
   double flopCount = mesh->Np * 12 * mesh->Nq + 15 * mesh->Np;
 

@@ -340,20 +340,34 @@ occa::kernel benchmarkAx(int Nelements,
                o_Aq);
       } else {
         if (!stressForm) {
-          kernel(Nelements,
-                 offset,
-                 loffset,
-                 o_elementList,
-                 o_ggeo,
-                 o_D,
-                 o_S,
-                 o_Dsvv, //svv D matrix
-                 o_lambda0,
-                 o_lambda1,
-                 o_lambdasvv,
-                 o_q,
-                 o_Aq);
-        } else {
+          if(Ndim > 1) {
+            kernel(Nelements,
+                   offset,
+                   loffset,
+                   o_elementList,
+                   o_ggeo,
+                   o_D,
+                   o_S,
+                   o_lambda0,
+                   o_lambda1,
+                   o_q,
+                   o_Aq);
+          } else {
+              kernel(Nelements,
+                     offset,
+                     loffset,
+                     o_elementList,
+                     o_ggeo,
+                     o_D,
+                     o_S,
+                     o_Dsvv, //svv D matrix
+                     o_lambda0,
+                     o_lambda1,
+                     o_lambdasvv,
+                     o_q,
+                     o_Aq);
+            }
+          } else {
           kernel(Nelements,
                  offset,
                  loffset,
@@ -361,10 +375,8 @@ occa::kernel benchmarkAx(int Nelements,
                  o_vgeo,
                  o_D,
                  o_S,
-                 o_Dsvv, //svv D matrix
                  o_lambda0,
                  o_lambda1,
-                 o_lambdasvv,
                  o_q,
                  o_Aq);
         }
