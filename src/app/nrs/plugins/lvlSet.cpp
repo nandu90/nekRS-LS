@@ -688,6 +688,9 @@ void lvlSet::setup()
              "%s\n",
              "LVLSET setup called more than once!");
 
+  // Temporary fix until clsrAx is fixed
+  platform->options.setArgs("ENABLE GS COMM OVERLAP", "FALSE");
+
   nrs = dynamic_cast<nrs_t *>(platform->app);
   if (!nrs || !nrs->meshV || !nrs->scalar) {
     throw std::runtime_error("lvlSet::setup: nrs/nrs->meshV and/or nrs->scalar is null (mesh not initialized)");
