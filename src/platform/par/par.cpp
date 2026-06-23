@@ -616,8 +616,11 @@ void cleanupStaleKeys(const int rank, setupAide &options, inipp::Ini *ini)
 void checkValidity(const int rank, const std::vector<std::string> &validValues, const std::string &entry)
 {
   bool valid = false;
+
+  const auto key = serializeString(entry, '=')[0];
+
   for (auto &&v : validValues) {
-    valid |= (entry.find(v) == 0);
+    valid |= (key == v);
   }
 
   if (!valid) {
