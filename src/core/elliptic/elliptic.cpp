@@ -707,6 +707,9 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   }
 
   const auto enableSVV = [&]() {
+    if (elliptic->name.find("fluid velocity") != std::string::npos)
+      return false;
+
     std::string regMethods;
     options.getArgs("REGULARIZATION METHOD", regMethods);
 
