@@ -63,14 +63,16 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
   }
 
   if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
-    int nEXT = 2;
-    const auto key = upperCase(pressureName) + " EXT ORDER";
-    if (platform->options.getArgs(key).empty()) {
-      platform->options.setArgs(key, std::to_string(nEXT));
+    {
+      int nEXT = 2;
+      const auto key = upperCase(pressureName) + " EXT ORDER";
+      if (platform->options.getArgs(key).empty()) {
+        platform->options.setArgs(key, std::to_string(nEXT));
+      }
+      platform->options.getArgs(key, nEXT);
+      o_Pe = platform->device.malloc<dfloat>(fieldOffset);
+      o_coeffEXTP = platform->device.malloc<dfloat>(std::min(nEXT, static_cast<int>(o_coeffBDF.size())));
     }
-    platform->options.getArgs(key, nEXT);
-    o_Pe = platform->device.malloc<dfloat>(fieldOffset);
-    o_coeffEXTP = platform->device.malloc<dfloat>(std::min(nEXT, static_cast<int>(o_coeffBDF.size())));
 
     if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING FILTER", "TRUE")) {
       int nModes = 2;
@@ -78,6 +80,14 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
       if (platform->options.getArgs(key).empty()) {
         platform->options.setArgs(key, std::to_string(nModes));
       }
+    }
+
+    {
+      const auto key = upperCase(pressureName) + " RHO SPLITTING UNSPLIT STEPS";
+      if(platform->options.getArgs(key).empty()) {
+        platform->options.setArgs(key, std::to_string(10));
+      }
+      platform->options.getArgs(key, rhoSplitDelay);
     }
   }
   o_P = platform->device.malloc<dfloat>(fieldOffset * std::max(static_cast<int>(o_coeffEXTP.size()), 1));
@@ -164,7 +174,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
 
   auto o_lambda0 = [&](bool variable = true) {
     auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !variable && enableRhoSplit > 0) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !variable && !rhoSplitDelay) {
       platform->linAlg->fill(mesh->Nlocal, 1 / rho0, o_lambda);
     } else {
       platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
@@ -174,7 +184,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
 
   const auto o_rhoSplitTerm = [&]() {
     occa::memory o_del;
-    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !rhoSplitDelay) {
       // 1/rho - 1/rho0
       auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
@@ -404,7 +414,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
 
   const auto o_rhoSplitTerm = [&]() {
     occa::memory o_del;
-    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !rhoSplitDelay) {
       o_del = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
       auto o_delta = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
@@ -417,9 +427,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                    o_delta,
                    o_del);
       // o_del * rho / rho0
-      if(enableRhoSplit > 0) {
-        platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1 / rho0, o_rho, o_del);
-      }
+      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1 / rho0, o_rho, o_del);
       flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
     }
     return o_del;
@@ -429,7 +437,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     occa::memory o_gradP = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
 
     auto o_P = this->o_P;
-    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !rhoSplitDelay) {
       o_P = o_Pe;
     }
 
@@ -537,7 +545,9 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     ellipticSolver.at(2)->solve(o_rhsZ, o_U.slice(2 * fieldOffset, mesh->Nlocal));
   }
 
-  enableRhoSplit = std::min(enableRhoSplit + 1, 1);
+  if(stage == 1 && platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+    rhoSplitDelay = std::max(rhoSplitDelay - 1, 0);
+  }
 
   if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
@@ -614,10 +624,8 @@ void fluidSolver_t::setupEllipticSolver()
       auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
         rho0 = platform->linAlg->min(mesh->Nlocal, o_rho, platform->comm.mpiComm());
-        platform->linAlg->fill(mesh->Nlocal, 1 / rho0, o_lambda);
-      } else {
-        platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
       }
+      platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
       return o_lambda;
     }();
 
