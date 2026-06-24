@@ -124,6 +124,8 @@ struct elliptic_t {
 
   std::function<void(elliptic_t *elliptic, dlong NelementsList, const occa::memory &o_elementsList, const occa::memory &o_x, occa::memory &o_Ax)> userAx;
 
+  std::function<void(occa::memory &o_svvD)> userSVVD;
+
   ~elliptic_t() = default;
 };
 

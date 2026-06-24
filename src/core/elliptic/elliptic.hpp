@@ -51,6 +51,7 @@ public:
   void applyZeroNormalMask(const std::function<void(dlong Nelements, const occa::memory &o_elementList, occa::memory &o_x)>& f);
   void userPreconditioner(const std::function<void(elliptic_t *elliptic, const occa::memory &o_r, occa::memory &o_z)>& f);
   void userAx(const std::function<void(elliptic_t *elliptic, dlong NelementsList, const occa::memory &o_elementsList, const occa::memory &o_x, occa::memory &o_Ax)>& f);
+  void userSVVD(const std::function<void(occa::memory &o_svvD)>& f);
 
   void coeff0HLM(const occa::memory& o_lambda0);
   void coeff1HLM(const occa::memory& o_lambda1);

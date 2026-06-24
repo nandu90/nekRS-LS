@@ -44,7 +44,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           {"decaythreshold"},
           {"noisethreshold"},
           {"filterpower"},
-
+          {"minpower"},
         };
         const std::vector<std::string> list = serializeString(block, '+');
         for (const std::string s : list) {
@@ -88,6 +88,11 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
             const auto powerStr = parseValueForKey(s, "filterpower");
             if (!powerStr.empty()) {
               options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER", powerStr);
+            }
+
+            const auto minPowerStr = parseValueForKey(s, "minpower");
+            if (!minPowerStr.empty()) {
+              options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER MIN", minPowerStr);
             }
           }
         }

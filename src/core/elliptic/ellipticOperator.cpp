@@ -36,6 +36,10 @@ void ellipticAx(elliptic_t *elliptic,
     return;
   }
 
+  if (elliptic->userSVVD) {
+    elliptic->userSVVD(elliptic->o_svvD);
+  }
+
   if (elliptic->userAx) {
     elliptic->userAx(elliptic, NelementsList, o_elementsList, o_q, o_Aq);
     return;

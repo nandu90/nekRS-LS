@@ -256,6 +256,11 @@ void elliptic::userAx(const std::function<void(elliptic_t *elliptic,
   solver->userAx = f;
 };
 
+void elliptic::userSVVD(const std::function<void(occa::memory &o_svvD)> &f)
+{
+  solver->userSVVD = f;
+};
+
 std::tuple<int, int> elliptic::projectionCounters() const
 {
   if (solver->solutionProjection) {

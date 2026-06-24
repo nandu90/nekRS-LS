@@ -15,6 +15,7 @@
 #include "gjp.hpp"
 #include "elliptic.h"
 #include "ellipticPrecon.h"
+#include "svv.hpp"
 
 // private members
 namespace
@@ -32,6 +33,7 @@ occa::kernel clampCLSKernel;
 occa::kernel deltaKernel;
 occa::kernel fluidPropKernel;
 occa::kernel tlsrBoundaryFixKernel;
+occa::kernel spatiallyVaryingPowerKernel;
 
 static bool buildKernelCalled = false;
 static bool setupCalled = false;
@@ -44,6 +46,7 @@ static occa::memory o_normals;
 static occa::memory o_svvf;
 static occa::memory o_delta;
 static occa::memory o_curvature;
+static occa::memory o_svvD;
 
 static double elapsedTime;
 
@@ -191,6 +194,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
     deltaKernel = buildKernel(kernelInfo, "delta", oklPath, oklFile);
     fluidPropKernel = buildKernel(kernelInfo, "fluidProp", oklPath, oklFile);
     tlsrBoundaryFixKernel = buildKernel(kernelInfo, "tlsrBoundaryFix", oklPath, oklFile);
+    spatiallyVaryingPowerKernel = buildKernel(kernelInfo, "spatiallyVaryingPower", oklPath, oklFile);
   }
   {
     occa::properties kernelInfo;
@@ -994,6 +998,44 @@ void lvlSet::solve(const double &fluidTime)
         platform->linAlg->add(mesh->Nlocal, -0.5, ls->o_S);
         platform->linAlg->scale(mesh->Nlocal, tlsrRegFactor, ls->o_S);
       }
+
+      //construct spatially varying filter power
+      const auto key = upperCase(ls->name) + " REGULARIZATION SVV FILTER POWER MIN";
+      if(!platform->options.getArgs(key).empty()) {
+        dfloat basePower = 2.0;
+        platform->options.getArgs(upperCase(ls->name) + " REGULARIZATION SVV FILTER POWER", basePower);
+
+        dfloat minPower = basePower;
+        platform->options.getArgs(key, minPower);
+        
+        if(!o_svvD.isInitialized()) {
+          o_svvD = platform->device.malloc<dfloat>(mesh->Nelements * mesh->Nq * mesh->Nq);
+        }
+        auto o_filterPower = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+
+        spatiallyVaryingPowerKernel(mesh->Nelements,
+                                    basePower,
+                                    minPower,
+                                    nrs->scalar->o_solution("cls"),
+                                    o_filterPower);
+
+        svv::convoluteDerivative(mesh, o_filterPower, o_svvD);
+
+        //print number of elements excluded
+        std::vector<dfloat> filterPower(mesh->Nelements);
+        o_filterPower.copyTo(filterPower.data());
+        int count = 0;
+        for (int e = 0; e < mesh->Nelements; e++) {
+          const dfloat fp = filterPower[e];
+          if(fabs(fp - minPower) < 1e-8) count++;
+        }
+        MPI_Allreduce(MPI_IN_PLACE, &count, 1, MPI_INT, MPI_SUM, platform->comm.mpiComm());
+        int elem = mesh->Nelements;
+        MPI_Allreduce(MPI_IN_PLACE, &elem, 1, MPI_INT, MPI_SUM, platform->comm.mpiComm());
+        if(platform->comm.mpiRank() == 0) {
+          printf("%s Varying Filter: Interface elements = %d Total elements = %d\n",upperCase(ls->name).c_str(), count, elem);
+        }
+      }
       ls->pseudoStepper(fluidTime);
       resetOrder = true;
     }
@@ -1734,6 +1776,14 @@ void lvlSet_t::setupEllipticSolver()
       this->ellipticSolver[0]->userPreconditioner ([] (elliptic_t *elliptic, const occa::memory &o_r, occa::memory &o_z)
           {
           lvlSet::clsrPreconditioner(elliptic, o_r, o_z);
+          });
+    }
+
+    const auto key = upperCase(this->name) + " REGULARIZATION SVV FILTER POWER MIN";
+    if(!platform->options.getArgs(key).empty()) {
+      this->ellipticSolver[0]->userSVVD ([] (occa::memory &o_svvDIn)
+          {
+          if(o_svvD.isInitialized()) o_svvDIn = o_svvD;
           });
     }
   }
