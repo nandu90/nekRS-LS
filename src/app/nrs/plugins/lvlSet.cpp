@@ -352,7 +352,7 @@ void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::strin
     options.setArgs("LVLSET INTERFACE WIDTH MESH PARAM", upperCase(value));  
   } 
   else {
-    options.setArgs("LVLSET INTERFACE WIDTH MESH PARAM","MEAN");  
+    options.setArgs("LVLSET INTERFACE WIDTH MESH PARAM","MAX");  
   }
 
   if (ini->extract(parSection, "interfaceWidthFactor", value)) {
@@ -2018,7 +2018,7 @@ lvlSet_t::fixedDistanceAdvectionParams lvlSet_t::computeFixedDistanceAdvectionPa
   // Compute the target integration time for the prescribed propagation distance, assuming unit-speed advection
   platform->options.getArgs(upperCase(this->name) + " DISTANCE FACTOR", this->distanceFactor);
   dfloat targetTime;
-  targetTime = meanMeshScale * this->distanceFactor;
+  targetTime = maxMeshScale * this->distanceFactor;
 
   if(this->name == "tlsr") {
     dfloat rf = 0.1;
@@ -2026,7 +2026,7 @@ lvlSet_t::fixedDistanceAdvectionParams lvlSet_t::computeFixedDistanceAdvectionPa
     targetTime /= rf;
   }
 
-  if(this->name == "clsr") targetTime = interfaceWidth * this->distanceFactor;
+  if(this->name == "clsr") targetTime = maxMeshScale * this->distanceFactor;
 
   // Number of fixed time steps required to reach the target integration time (i.e. to advect the prescribed distance)
   int targetSteps = std::min(this->stepsMax, static_cast<int>(std::floor(targetTime / dt)));
