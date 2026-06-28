@@ -471,8 +471,8 @@ void parseLvlSetSections()
     }
 
     if(firstWord == "default") {
-      options.setArgs("TLSR MAXIMUM STEPS", to_string_f(500));
-      options.setArgs("CLSR MAXIMUM STEPS", to_string_f(100));
+      options.setArgs("TLSR MAXIMUM STEPS", to_string_f(1000));
+      options.setArgs("CLSR MAXIMUM STEPS", to_string_f(500));
     }
 
     {
@@ -483,8 +483,8 @@ void parseLvlSetSections()
     }
 
     if(firstWord == "default") {
-      options.setArgs("TLSR TARGET CFL", to_string_f(0.5));
-      options.setArgs("CLSR TARGET CFL", to_string_f(0.5));
+      options.setArgs("TLSR TARGET CFL", to_string_f(0.4));
+      options.setArgs("CLSR TARGET CFL", to_string_f(0.4));
     }
 
     {
