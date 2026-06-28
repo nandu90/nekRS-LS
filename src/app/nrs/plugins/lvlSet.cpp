@@ -886,6 +886,18 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
   nrs->scalar->o_solution(scalarName).copyFrom(this->o_S, this->fieldOffset());
 }
 
+dfloat lvlSet::getInterfaceWidth()
+{
+  nekrsCheck(!setupCalled || !buildKernelCalled,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "lvlSet::getInterfaceWidth called prior to lvlSet::setup()!");
+
+  setInterfaceWidth();
+  return interfaceWidth;
+}
+
 void setInterfaceWidth()
 {
   static bool widthInitialized = false;
@@ -1020,21 +1032,6 @@ void lvlSet::solve(const double &fluidTime)
                                     o_filterPower);
 
         svv::convoluteDerivative(mesh, o_filterPower, o_svvD);
-
-        //print number of elements excluded
-        std::vector<dfloat> filterPower(mesh->Nelements);
-        o_filterPower.copyTo(filterPower.data());
-        int count = 0;
-        for (int e = 0; e < mesh->Nelements; e++) {
-          const dfloat fp = filterPower[e];
-          if(fabs(fp - minPower) < 1e-8) count++;
-        }
-        MPI_Allreduce(MPI_IN_PLACE, &count, 1, MPI_INT, MPI_SUM, platform->comm.mpiComm());
-        int elem = mesh->Nelements;
-        MPI_Allreduce(MPI_IN_PLACE, &elem, 1, MPI_INT, MPI_SUM, platform->comm.mpiComm());
-        if(platform->comm.mpiRank() == 0) {
-          printf("%s Varying Filter: Interface elements = %d Total elements = %d\n",upperCase(ls->name).c_str(), count, elem);
-        }
       }
       ls->pseudoStepper(fluidTime);
       resetOrder = true;
