@@ -85,7 +85,7 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
     {
       const auto key = upperCase(pressureName) + " RHO SPLITTING UNSPLIT STEPS";
       if(platform->options.getArgs(key).empty()) {
-        platform->options.setArgs(key, std::to_string(2));
+        platform->options.setArgs(key, std::to_string(10));
       }
       platform->options.getArgs(key, rhoSplitDelay);
     }
