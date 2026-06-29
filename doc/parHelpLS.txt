@@ -1,0 +1,76 @@
+----------------------------------------------------------------------------------------------------------------------
+Key                         Value(s)                                   Description / Comment
+----------------------------------------------------------------------------------------------------------------------
+userSections                lvlset, tlsr, clsr                         optional sections to specify level-set params
+
+[GENERAL]                                                              mandatory section
+
+scalars                     cls, tls                                   mandatory scalars for level-set
+----------------------------------------------------------------------------------------------------------------------
+[PROBLEMTYPE]
+equation                    stokes
+                            navierStokes
+                              +variableViscosity                       stress formulation is mandatory for level-set
+                                                                       (required for spatially varying viscosity)
+----------------------------------------------------------------------------------------------------------------------
+[LVLSET]                                                               optional section to specify level-set params
+interfaceWidthMesh          max[D], min, mean                          mesh element based scale for interface width (H)
+
+interfaceWidthFactor        <float>                                    user specified scale for interface width (\xi)
+                            1.0 [D]
+
+interfaceWidthValue         <float>                                    user specified value for for interface width (\epsilon)                            
+
+normalAveraging             true [D], false                            enables averaging of interface normals across elements
+----------------------------------------------------------------------------------------------------------------------
+[TLSR] / [CLSR]
+boundaryTypeMap             <bcType for ID 1>, <bcType for ID 1>, ...  boundary type for each boundary ID
+                                                                       map is copied from TLS / CLS scalar field
+
+                            zeroNeumann [D - TLSR]                     TLSR assigns zeroNeumann to all boundaries
+                                                                       CLSR assigns boundaryTypeMap identical to CLS as default
+                            udfDirichlet                               
+                            udfNeumann
+
+solveFrequency              <dfloat>                                   frequency (in fluid simulation time) of TLSR/CLSR solve
+                            <dt * 100> [D - TLSR]                      dt: initial fluid simulation time step
+                            <dt * 10>  [D - CLSR]
+
+distanceFactor              <dfloat>                                   scaling factor for TLSR/CLSR re-distancing length
+                            2.5 [D - TLSR]                             multiplied internally with maxMeshScale
+                            1.0 [D - CLSR]
+
+maximumSteps                <int>                                      user specified maximum pseudo-time iterations                            
+
+targetCFL                   <dfloat>                                   user specified max target CFL for TLSR/CLSR
+
+stoppingCondition           targetSteps[D], targetTime                 pseudo-time iteration stopping condition for TLSR/CLSR
+
+regularizationFactor        <dfloat>                                   TLSR only.
+                            0.1 [D]                                    Regularization factor for initial TLSR solution
+
+boundaryFix                 true [D], false                            TLSR only                           
+                                                                       apply boundary fix for TLSR
+                            
+solver                      none                                       linear solver
+                                                                       see COMMON field settings in nrsman
+
+residualTol                 <float>                                    absolute linear solver residual tolerance 
+                            1e-8 [D]                                   see COMMON field settings in nrsman
+                            +relative=<float>                           
+
+initialGuess                previous                                   see COMMON field settings in nrsman
+                            extrapolation [D] 
+
+preconditioner              Jacobi [D]                                 see COMMON field settings in nrsman
+
+
+checkpointing               true [D], false
+
+regularization                                                         see COMMON field settings in nrsman
+----------------------------------------------------------------------------------------------------------------------
+
+NOTES
+* level-set requires two scalar fields (cls, tls) - must be added in par
+* level-set uses two auxiliary scalar fields (clsr, tlsr) that are solved in pseudo-time
+* see `nrsman par` for all parameter settings 
