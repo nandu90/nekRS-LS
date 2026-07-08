@@ -13,6 +13,7 @@
 **NekRS-LS** is a fork of the offical [NekRS](https://github.com/Nek5000/nekRS) repo based on [v26](https://github.com/Nek5000/nekRS/releases/tag/v26.0). This repository contains the two-phase solver plugin to NekRS based on the conservative level-set method.
 
 The two-phase examples are hosted [here](https://github.com/nandu90/nrsLS_Examples).
+Example simulation videos are hosted [here](https://nandu90.github.io/)
 This fork is under active development and subject to changes.
 We try hard not to break userland but the code is evolving quickly so things might change from one version to another without being backward compatible. Please consult `RELEASE.md` *before* using the code.  
 
@@ -79,8 +80,13 @@ nekRS is released under the BSD 3-clause license (see `LICENSE` file).
 All new contributions must be made under the BSD 3-clause license.
 
 ## Citing
-If you find our project useful, please cite [NekRS, a GPU-Accelerated Spectral Element Navier-Stokes Solver](https://www.sciencedirect.com/science/article/abs/pii/S0167819122000710) .
 The two-phase level-set implementation in NekRS is detailed in [A high order continuous Galerkin spectrally stabilized level-set approach for incompressible two-phase flows](https://doi.org/10.1016/j.jcp.2026.114961).
+Please cite our work if you find it useful.
+
+## Collaboration
+Feel free to reach out for any collaborative multiphase research opportunities at: nsaini.ne@gmail.com.
+New capabilites are being actively added to the coded, guided by research needs.
+Ideas on enhancing the implementation or code performance are encouraged :)
 
 ## Acknowledgment
 This research was supported by the Exascale Computing Project (17-SC-20-SC), 
