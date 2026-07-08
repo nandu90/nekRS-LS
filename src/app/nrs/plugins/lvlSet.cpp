@@ -15,6 +15,7 @@
 #include "gjp.hpp"
 #include "elliptic.h"
 #include "ellipticPrecon.h"
+#include "svv.hpp"
 
 // private members
 namespace
@@ -32,6 +33,7 @@ occa::kernel clampCLSKernel;
 occa::kernel deltaKernel;
 occa::kernel fluidPropKernel;
 occa::kernel tlsrBoundaryFixKernel;
+occa::kernel spatiallyVaryingPowerKernel;
 
 static bool buildKernelCalled = false;
 static bool setupCalled = false;
@@ -44,6 +46,7 @@ static occa::memory o_normals;
 static occa::memory o_svvf;
 static occa::memory o_delta;
 static occa::memory o_curvature;
+static occa::memory o_svvD;
 
 static double elapsedTime;
 
@@ -141,6 +144,15 @@ void processError()
   nekrsCheck(length > 0, platform->comm.mpiComm(), EXIT_FAILURE, "%s\n", errTxt().c_str());
 }
 
+static bool evalRegularization(const std::string regString, const std::string field)
+{
+  std::string regMethods;
+  platform->options.getArgs(upperCase(field) + " REGULARIZATION METHOD", regMethods);
+
+  const auto methods = serializeString(regMethods, '+');
+  return std::find(methods.begin(), methods.end(), regString) != methods.end();
+}
+
 } // namespace
 
 void setTimeIntegrationOrder (int &order);
@@ -182,6 +194,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
     deltaKernel = buildKernel(kernelInfo, "delta", oklPath, oklFile);
     fluidPropKernel = buildKernel(kernelInfo, "fluidProp", oklPath, oklFile);
     tlsrBoundaryFixKernel = buildKernel(kernelInfo, "tlsrBoundaryFix", oklPath, oklFile);
+    spatiallyVaryingPowerKernel = buildKernel(kernelInfo, "spatiallyVaryingPower", oklPath, oklFile);
   }
   {
     occa::properties kernelInfo;
@@ -339,7 +352,7 @@ void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::strin
     options.setArgs("LVLSET INTERFACE WIDTH MESH PARAM", upperCase(value));  
   } 
   else {
-    options.setArgs("LVLSET INTERFACE WIDTH MESH PARAM","MEAN");  
+    options.setArgs("LVLSET INTERFACE WIDTH MESH PARAM","MAX");  
   }
 
   if (ini->extract(parSection, "interfaceWidthFactor", value)) {
@@ -458,8 +471,8 @@ void parseLvlSetSections()
     }
 
     if(firstWord == "default") {
-      options.setArgs("TLSR MAXIMUM STEPS", to_string_f(500));
-      options.setArgs("CLSR MAXIMUM STEPS", to_string_f(100));
+      options.setArgs("TLSR MAXIMUM STEPS", to_string_f(1000));
+      options.setArgs("CLSR MAXIMUM STEPS", to_string_f(500));
     }
 
     {
@@ -470,8 +483,8 @@ void parseLvlSetSections()
     }
 
     if(firstWord == "default") {
-      options.setArgs("TLSR TARGET CFL", to_string_f(0.5));
-      options.setArgs("CLSR TARGET CFL", to_string_f(0.5));
+      options.setArgs("TLSR TARGET CFL", to_string_f(0.4));
+      options.setArgs("CLSR TARGET CFL", to_string_f(0.4));
     }
 
     {
@@ -873,6 +886,18 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
   nrs->scalar->o_solution(scalarName).copyFrom(this->o_S, this->fieldOffset());
 }
 
+dfloat lvlSet::getInterfaceWidth()
+{
+  nekrsCheck(!setupCalled || !buildKernelCalled,
+             MPI_COMM_SELF,
+             EXIT_FAILURE,
+             "%s\n",
+             "lvlSet::getInterfaceWidth called prior to lvlSet::setup()!");
+
+  setInterfaceWidth();
+  return interfaceWidth;
+}
+
 void setInterfaceWidth()
 {
   static bool widthInitialized = false;
@@ -984,6 +1009,29 @@ void lvlSet::solve(const double &fluidTime)
 
         platform->linAlg->add(mesh->Nlocal, -0.5, ls->o_S);
         platform->linAlg->scale(mesh->Nlocal, tlsrRegFactor, ls->o_S);
+      }
+
+      //construct spatially varying filter power
+      const auto key = upperCase(ls->name) + " REGULARIZATION SVV FILTER POWER MIN";
+      if(!platform->options.getArgs(key).empty()) {
+        dfloat basePower = 2.0;
+        platform->options.getArgs(upperCase(ls->name) + " REGULARIZATION SVV FILTER POWER", basePower);
+
+        dfloat minPower = basePower;
+        platform->options.getArgs(key, minPower);
+        
+        if(!o_svvD.isInitialized()) {
+          o_svvD = platform->device.malloc<dfloat>(mesh->Nelements * mesh->Nq * mesh->Nq);
+        }
+        auto o_filterPower = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+
+        spatiallyVaryingPowerKernel(mesh->Nelements,
+                                    basePower,
+                                    minPower,
+                                    nrs->scalar->o_solution("cls"),
+                                    o_filterPower);
+
+        svv::convoluteDerivative(mesh, o_filterPower, o_svvD);
       }
       ls->pseudoStepper(fluidTime);
       resetOrder = true;
@@ -1146,15 +1194,15 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   bool avmEnabled = false;
   bool svvEnabled = false;
 
-  if (options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "HPFRT")) {
+  if (evalRegularization("HPFRT", this->name)) {
     filteringEnabled = true;
   }
 
-  if (options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
+  if (evalRegularization("AVM_AVERAGED_MODAL_DECAY", this->name)) {
     avmEnabled = true;
   }
 
-  if (options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "SVV")) {
+  if (evalRegularization("SVV", this->name)) {
     svvEnabled = true;
   }
 
@@ -1184,7 +1232,7 @@ lvlSet_t::lvlSet_t(lvlSetConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
     for (int is = 0; is < nrs->scalar->NSfields; is++) {
       const auto sid = scalarDigitStr(is);
 
-      if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
+      if (evalRegularization("AVM_AVERAGED_MODAL_DECAY", "SCALAR" + sid)) {
         avmEnabledScalar = true;
       }
     }
@@ -1416,7 +1464,7 @@ void lvlSet_t::makeExplicit(double time, int tstep)
   if(this->name == "tlsr")
     this->o_EXT.copyFrom(o_signls, mesh->Nlocal); 
                                                           
-  if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "HPFRT")) {
+  if (evalRegularization("HPFRT", this->name)) {
     launchKernel("core-filterRTHex3D",
                  this->meshV->Nelements,
                  0,
@@ -1430,7 +1478,7 @@ void lvlSet_t::makeExplicit(double time, int tstep)
                  this->o_EXT);
   }
 
-  if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "GJP")) {
+  if (evalRegularization("GJP", this->name)) {
     dfloat tauFactor;
     platform->options.getArgs(parPrefix + " REGULARIZATION GJP SCALING COEFF", tauFactor);
 
@@ -1552,6 +1600,9 @@ void lvlSet_t::solve(double time, int stage)
 
   this->ellipticSolver[0]->coeff0HLM(o_lambda0);
   this->ellipticSolver[0]->coeff1HLM(o_lambda1);
+  if (evalRegularization("SVV", this->name)) {
+    this->ellipticSolver[0]->coeffSVV(this->o_svvmu);
+  }
   this->ellipticSolver[0]->solve(o_rhs, o_Si);
   o_Si.copyTo(this->o_S, o_Si.size(), this->fieldOffsetScan);
 }
@@ -1695,12 +1746,19 @@ void lvlSet_t::setupEllipticSolver()
     auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
     platform->linAlg->axpby(mesh->Nlocal, *this->g0 / this->dt[0], this->o_rho, 0.0, o_lambda1);
 
-    this->ellipticSolver[0] = new elliptic(this->name, mesh, this->_fieldOffset, o_lambda0, o_lambda1);
+    auto o_lambdasvv = [&]() {
+      if(evalRegularization("SVV", this->name)) {
+        auto o_scale = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+        dfloat scale = 0.1;
+        platform->options.getArgs(upperCase(this->name) + " REGULARIZATION SVV SCALING COEFF", scale);
+        platform->linAlg->fill(mesh->Nlocal, scale, o_scale);
+        return o_scale;
+      } else {
+        return o_NULL;
+      }
+    };
 
-    if (platform->options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "SVV")) {
-      this->ellipticSolver[0]->mueSVV(this->o_svvmu);
-      this->ellipticSolver[0]->setupSVV();
-    }
+    this->ellipticSolver[0] = new elliptic(this->name, mesh, this->_fieldOffset, o_lambda0, o_lambda1, o_lambdasvv());
 
     if(this->name == "clsr") {
       this->ellipticSolver[0]->userAx ([] (elliptic_t *elliptic,
@@ -1715,6 +1773,14 @@ void lvlSet_t::setupEllipticSolver()
       this->ellipticSolver[0]->userPreconditioner ([] (elliptic_t *elliptic, const occa::memory &o_r, occa::memory &o_z)
           {
           lvlSet::clsrPreconditioner(elliptic, o_r, o_z);
+          });
+    }
+
+    const auto key = upperCase(this->name) + " REGULARIZATION SVV FILTER POWER MIN";
+    if(!platform->options.getArgs(key).empty()) {
+      this->ellipticSolver[0]->userSVVD ([] (occa::memory &o_svvDIn)
+          {
+          if(o_svvD.isInitialized()) o_svvDIn = o_svvD;
           });
     }
   }
@@ -1732,7 +1798,7 @@ void lvlSet_t::mueSVV(int tstep)
 
   auto o_umag = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
-  if(platform->options.compareArgs(upperCase(this->name) + " REGULARIZATION METHOD", "SVV")) {
+  if (evalRegularization("SVV", this->name)) {
     if(!o_svvf.isInitialized()) {
       o_svvf = platform->device.malloc<dfloat>(mesh->Nlocal);
       if(!platform->options.compareArgs("MOVING MESH","TRUE"))
@@ -1803,7 +1869,7 @@ void lvlSet_t::mueAVM()
   auto parPrefix = upperCase(this->name);
 
   if (!initialized) {
-    if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
+    if (evalRegularization("AVM_AVERAGED_MODAL_DECAY", this->name)) {
       nekrsCheck(mesh->N < 5,
           platform->comm.mpiComm(),
           EXIT_FAILURE,
@@ -1816,7 +1882,7 @@ void lvlSet_t::mueAVM()
     initialized = true;
   }
 
-  if (platform->options.compareArgs(parPrefix + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
+  if (evalRegularization("AVM_AVERAGED_MODAL_DECAY", this->name)) {
     // restore inital viscosity
     this->o_diff.copyFrom(o_diff0, mesh->Nlocal);
 
@@ -1952,7 +2018,7 @@ lvlSet_t::fixedDistanceAdvectionParams lvlSet_t::computeFixedDistanceAdvectionPa
   // Compute the target integration time for the prescribed propagation distance, assuming unit-speed advection
   platform->options.getArgs(upperCase(this->name) + " DISTANCE FACTOR", this->distanceFactor);
   dfloat targetTime;
-  targetTime = meanMeshScale * this->distanceFactor;
+  targetTime = maxMeshScale * this->distanceFactor;
 
   if(this->name == "tlsr") {
     dfloat rf = 0.1;
@@ -1960,7 +2026,7 @@ lvlSet_t::fixedDistanceAdvectionParams lvlSet_t::computeFixedDistanceAdvectionPa
     targetTime /= rf;
   }
 
-  if(this->name == "clsr") targetTime = interfaceWidth * this->distanceFactor;
+  if(this->name == "clsr") targetTime = maxMeshScale * this->distanceFactor;
 
   // Number of fixed time steps required to reach the target integration time (i.e. to advect the prescribed distance)
   int targetSteps = std::min(this->stepsMax, static_cast<int>(std::floor(targetTime / dt)));
@@ -1989,6 +2055,7 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
   auto& o_DT = mesh->o_DT;
   auto& o_lambda0 = elliptic->o_lambda0;
   auto o_lambda1 = (elliptic->poisson) ? o_NULL : elliptic->o_lambda1;
+  auto o_lambdasvv = (elliptic->svv) ? elliptic->o_lambdasvv : o_NULL;
 
   auto loadKernel = [&](bool svv = false) {
     std::string kernelNamePrefix = (elliptic->poisson) ? "poisson-" : "";
@@ -2003,7 +2070,7 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
         kernelName += "Var";
       }
     } else {
-       if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE") || svv) {
+       if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE")) {
          kernelName += "Var";
        }
     }
@@ -2038,7 +2105,7 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
   auto o_wrk = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
   platform->linAlg->fill(mesh->Nlocal, 0.0, o_wrk);
 
-  if (!elliptic->AxKernel.isInitialized()) elliptic->AxKernel = loadKernel();
+  if (!elliptic->AxKernel.isInitialized()) elliptic->AxKernel = loadKernel(elliptic->svv);
   elliptic->AxKernel(NelementsList,
                      elliptic->fieldOffset,
                      elliptic->loffset,
@@ -2046,8 +2113,10 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
                      o_geom_factors,
                      o_D,
                      o_DT,
+                     elliptic->o_svvD,
                      o_wrk,
                      o_lambda1,
+                     o_lambdasvv,
                      o_q,
                      o_Aq);
 
@@ -2073,22 +2142,6 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
   opSEM::divergence(mesh, elliptic->fieldOffset, o_divVector, o_wrk);
 
   platform->linAlg->axpby(mesh->Nlocal, 1.0, o_wrk, 1.0, o_Aq);
-
-
-  if(elliptic->svv) {
-    if (!elliptic->AxSVVKernel.isInitialized()) elliptic->AxSVVKernel = loadKernel(true);
-    elliptic->AxSVVKernel(NelementsList,
-        elliptic->fieldOffset,
-        elliptic->loffset,
-        o_elementsList,
-        o_geom_factors,
-        elliptic->o_svvD,
-        elliptic->o_svvDT,
-        elliptic->o_svvmue,
-        o_NULL,
-        o_q,
-        o_Aq);
-  }
 
 }
 

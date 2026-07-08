@@ -5,6 +5,17 @@
 #include "gjp.hpp"
 #include <registerKernels.hpp>
 
+static bool evalRegularization(const std::string regString, const int is)
+{
+  std::string sid = scalarDigitStr(is);
+
+  std::string regMethods;
+  platform->options.getArgs("SCALAR" + sid + " REGULARIZATION METHOD", regMethods);
+
+  const auto methods = serializeString(regMethods, '+');
+  return std::find(methods.begin(), methods.end(), regString) != methods.end();
+}
+
 static void advectionFlops(mesh_t *mesh, int Nfields)
 {
   const auto cubNq = mesh->cubNq;
@@ -232,7 +243,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
 
     cvodeSolve[is] = options.compareArgs("SCALAR" + sid + " SOLVER", "CVODE");
 
-    nekrsCheck(cvodeSolve[is] && options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV"),
+    nekrsCheck(cvodeSolve[is] && evalRegularization("SVV", is),
                platform->comm.mpiComm(),
                EXIT_FAILURE,
                "%s\n",
@@ -277,15 +288,15 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   for (int is = 0; is < NSfields; is++) {
     const auto sid = scalarDigitStr(is);
 
-    if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPFRT")) {
+    if (evalRegularization("HPFRT", is)) {
       filteringEnabled = true;
     }
 
-    if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY")) {
+    if (evalRegularization("AVM_AVERAGED_MODAL_DECAY", is)) {
       avmEnabled = true;
     }
 
-    if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV")) {
+    if (evalRegularization("SVV", is)) {
       svvEnabled = true;
     }
   }
@@ -307,7 +318,7 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
         continue;
       }
 
-      if (options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPFRT")) {
+      if (evalRegularization("HPFRT", is)) {
         int filterNc = -1;
         options.getArgs("SCALAR" + sid + " HPFRT MODES", filterNc);
         dfloat strength = NAN;
@@ -412,7 +423,7 @@ void scalar_t::makeExplicit(int is, double time, int tstep)
   auto mesh = this->_mesh[is];
   const dlong isOffset = fieldOffsetScan[is];
 
-  if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "HPFRT")) {
+  if (evalRegularization("HPFRT", is)) {
     launchKernel("core-filterRTHex3D",
                  meshV->Nelements,
                  is,
@@ -430,7 +441,7 @@ void scalar_t::makeExplicit(int is, double time, int tstep)
     platform->flopCounter->add("scalarFilterRT", flops);
   }
 
-  if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "GJP")) {
+  if (evalRegularization("GJP", is)) {
     dfloat tauFactor;
     platform->options.getArgs("SCALAR" + sid + " REGULARIZATION GJP SCALING COEFF", tauFactor);
 
@@ -494,8 +505,7 @@ void scalar_t::applyAVM()
     for (int is = 0; is < NSfields; is++) {
       const auto sid = scalarDigitStr(is);
 
-      if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD",
-                                        "AVM_AVERAGED_MODAL_DECAY")) {
+      if (evalRegularization("AVM_AVERAGED_MODAL_DECAY", is)) {
         nekrsCheck(mesh->N < 5,
                    platform->comm.mpiComm(),
                    EXIT_FAILURE,
@@ -512,8 +522,7 @@ void scalar_t::applyAVM()
   for (int scalarIndex = 0; scalarIndex < NSfields; scalarIndex++) {
     const auto sid = scalarDigitStr(scalarIndex);
 
-    if (!platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD",
-                                       "AVM_AVERAGED_MODAL_DECAY")) {
+    if (!evalRegularization("AVM_AVERAGED_MODAL_DECAY", scalarIndex)) {
       continue;
     }
 
@@ -581,7 +590,7 @@ void scalar_t::mueSVV()
   for (int is = 0; is < NSfields; is++) {
     const auto sid = scalarDigitStr(is);
 
-    if(platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV")) {
+    if (evalRegularization("SVV", is)) {
       if(!initialized) {
         if(!platform->options.compareArgs("MOVING MESH","TRUE"))
           launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
@@ -735,13 +744,19 @@ void scalar_t::setupEllipticSolver()
     auto o_lambda1 = platform->deviceMemoryPool.reserve<dfloat>(_mesh[is]->Nlocal);
     platform->linAlg->axpby(_mesh[is]->Nlocal, *g0 / dt[0], o_rho_i, 0.0, o_lambda1);
 
-    ellipticSolver[is] = new elliptic("scalar" + sid, _mesh[is], _fieldOffset, o_lambda0, o_lambda1);
+    auto o_lambdasvv = [&]() {
+      if(evalRegularization("SVV", is)) {
+        auto o_scale = platform->deviceMemoryPool.reserve<dfloat>(_mesh[is]->Nlocal);
+        dfloat scale = 0.1;
+        platform->options.getArgs("SCALAR" + sid + " REGULARIZATION SVV SCALING COEFF", scale);
+        platform->linAlg->fill(_mesh[is]->Nlocal, scale, o_scale);
+        return o_scale;
+      } else {
+        return o_NULL;
+      }
+    };
 
-    if (platform->options.compareArgs("SCALAR" + sid + " REGULARIZATION METHOD", "SVV")) {
-      auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
-      ellipticSolver[is]->mueSVV(o_svvmu);
-      ellipticSolver[is]->setupSVV();
-    }
+    ellipticSolver[is] = new elliptic("scalar" + sid, _mesh[is], _fieldOffset, o_lambda0, o_lambda1, o_lambdasvv());
   }
 }
 
@@ -874,6 +889,10 @@ void scalar_t::solve(double time, int stage)
 
     this->ellipticSolver[is]->coeff0HLM(o_lambda0);
     this->ellipticSolver[is]->coeff1HLM(o_lambda1);
+    if (evalRegularization("SVV", is)) {
+      auto o_lambdasvv = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
+      this->ellipticSolver[is]->coeffSVV(o_lambdasvv);
+    }
     this->ellipticSolver[is]->solve(o_rhs, o_Si);
     o_Si.copyTo(o_S, o_Si.size(), fieldOffsetScan[is]);
   }

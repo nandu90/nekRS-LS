@@ -535,3 +535,122 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
     }
   }
 }
+
+@kernel void spatiallyVaryingPower(const dlong Nelements,
+                                   const dfloat basePower,
+                                   const dfloat minPower,
+                                   @restrict const dfloat* psi,
+                                   @restrict dfloat* power)
+{
+  for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
+    const dlong Nblocks = (p_Np + p_blockSize - 1) / p_blockSize;
+
+    dfloat emax = -1e10;
+    dfloat emin = 1e10;
+
+    for (dlong n = 0; n < Nblocks; n++) {
+      @shared dfloat s_max[p_blockSize];
+      @shared dfloat s_min[p_blockSize];
+
+
+      for (dlong t = 0; t < p_blockSize; ++t; @inner(0)) {
+        s_max[t] = -1e10;
+        s_min[t] = 1e10;
+
+        const dlong ide = n * p_blockSize + t;
+        if(ide < p_Np) {
+          const dlong id = e * p_Np + ide;
+          s_max[t] = psi[id];
+          s_min[t] = psi[id];
+        }
+      }
+      @barrier();
+
+#if p_blockSize > 512
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 512) {
+          rmax(s_max, t, 512);
+          rmin(s_min, t, 512);
+        }
+      @barrier();
+#endif
+
+#if p_blockSize > 256
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 256) {
+          rmax(s_max, t, 256);
+          rmin(s_min, t, 256);
+        }
+      @barrier();
+#endif
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 128) {
+          rmax(s_max, t, 128);
+          rmin(s_min, t, 128);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 64) {
+          rmax(s_max, t, 64);
+          rmin(s_min, t, 64);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 32) {
+          rmax(s_max, t, 32);
+          rmin(s_min, t, 32);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 16) {
+          rmax(s_max, t, 16);
+          rmin(s_min, t, 16);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 8) {
+          rmax(s_max, t, 8);
+          rmin(s_min, t, 8);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 4) {
+          rmax(s_max, t, 4);
+          rmin(s_min, t, 4);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 2) {
+          rmax(s_max, t, 2);
+          rmin(s_min, t, 2);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 1) {
+          const dfloat smax = (s_max[0] > s_max[1]) ? s_max[0] : s_max[1];
+          const dfloat smin = (s_min[0] < s_min[1]) ? s_min[0] : s_min[1];
+
+          emax = emax > smax ? emax : smax;
+          emin = emin < smin ? emin : smin;
+        }
+      @barrier();
+    }
+
+    for (int t = 0; t < p_blockSize; ++t; @inner(0))
+      if (t < 1) {
+        power[e] = basePower;
+        if (emax > 0.05 && emin < 0.95) {
+          power[e] = minPower;
+        }
+      }
+  }
+}
+

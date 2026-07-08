@@ -5,7 +5,7 @@
 
 namespace svv{
 
-void convoluteDerivative(mesh_t* mesh, const dfloat NSVV, occa::memory& o_svvD, occa::memory& o_svvDT);
+void convoluteDerivative(mesh_t* mesh, occa::memory& o_filterPower, occa::memory& o_svvD);
 
 }
 

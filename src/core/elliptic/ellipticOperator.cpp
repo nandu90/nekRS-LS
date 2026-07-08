@@ -36,6 +36,10 @@ void ellipticAx(elliptic_t *elliptic,
     return;
   }
 
+  if (elliptic->userSVVD) {
+    elliptic->userSVVD(elliptic->o_svvD);
+  }
+
   if (elliptic->userAx) {
     elliptic->userAx(elliptic, NelementsList, o_elementsList, o_q, o_Aq);
     return;
@@ -48,6 +52,7 @@ void ellipticAx(elliptic_t *elliptic,
   auto& o_DT = mesh->o_DT;
   auto& o_lambda0 = elliptic->o_lambda0;
   auto o_lambda1 = (elliptic->poisson) ? o_NULL : elliptic->o_lambda1;
+  auto o_lambdasvv = (elliptic->svv) ? elliptic->o_lambdasvv : o_NULL;
 
   auto loadKernel = [&](bool svv = false) {
     std::string kernelNamePrefix = (elliptic->poisson) ? "poisson-" : "";
@@ -62,7 +67,7 @@ void ellipticAx(elliptic_t *elliptic,
         kernelName += "Var";
       }
     } else {
-       if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE") || svv) {
+       if (elliptic->options.compareArgs("ELLIPTIC COEFF FIELD", "TRUE")) {
          kernelName += "Var";
        }
     }
@@ -93,32 +98,34 @@ void ellipticAx(elliptic_t *elliptic,
     return platform->kernelRequests.load(kernelNamePrefix + "Partial" + kernelName);
   };
 
-  if (!elliptic->AxKernel.isInitialized()) elliptic->AxKernel = loadKernel();
-  elliptic->AxKernel(NelementsList,
-                     elliptic->fieldOffset,
-                     elliptic->loffset,
-                     o_elementsList,
-                     o_geom_factors,
-                     o_D,
-                     o_DT,
-                     o_lambda0,
-                     o_lambda1,
-                     o_q,
-                     o_Aq);
+  if (!elliptic->AxKernel.isInitialized()) elliptic->AxKernel = loadKernel(elliptic->svv);
+  if(elliptic->Nfields > 1) { //block solver
+    elliptic->AxKernel(NelementsList,
+                       elliptic->fieldOffset,
+                       elliptic->loffset,
+                       o_elementsList,
+                       o_geom_factors,
+                       o_D,
+                       o_DT,
+                       o_lambda0,
+                       o_lambda1,
+                       o_q,
+                       o_Aq);
 
-  if(elliptic->svv) {
-    if (!elliptic->AxSVVKernel.isInitialized()) elliptic->AxSVVKernel = loadKernel(true);
-    elliptic->AxSVVKernel(NelementsList,
-        elliptic->fieldOffset,
-        elliptic->loffset,
-        o_elementsList,
-        o_geom_factors,
-        elliptic->o_svvD,
-        elliptic->o_svvDT,
-        elliptic->o_svvmue,
-        o_NULL,
-        o_q,
-        o_Aq);
+  } else {
+    elliptic->AxKernel(NelementsList,
+                      elliptic->fieldOffset,
+                      elliptic->loffset,
+                      o_elementsList,
+                      o_geom_factors,
+                      o_D,
+                      o_DT,
+                      elliptic->o_svvD,
+                      o_lambda0,
+                      o_lambda1,
+                      o_lambdasvv,
+                      o_q,
+                      o_Aq);
   }
 
   double flopCount = mesh->Np * 12 * mesh->Nq + 15 * mesh->Np;

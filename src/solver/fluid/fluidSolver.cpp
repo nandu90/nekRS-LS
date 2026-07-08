@@ -6,6 +6,15 @@
 #include "nekInterfaceAdapter.hpp"
 #include "svv.hpp"
 
+static bool evalRegularization(const std::string fieldName, const std::string regString)
+{
+  std::string regMethods;
+  platform->options.getArgs(upperCase(fieldName) + " REGULARIZATION METHOD", regMethods);
+
+  const auto methods = serializeString(regMethods, '+');
+  return std::find(methods.begin(), methods.end(), regString) != methods.end();
+}
+
 fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<geomSolver_t> &_geom)
     : geom(_geom)
 {
@@ -54,14 +63,16 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
   }
 
   if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
-    int nEXT = 2;
-    const auto key = upperCase(pressureName) + " EXT ORDER";
-    if (platform->options.getArgs(key).empty()) {
-      platform->options.setArgs(key, std::to_string(nEXT));
+    {
+      int nEXT = 2;
+      const auto key = upperCase(pressureName) + " EXT ORDER";
+      if (platform->options.getArgs(key).empty()) {
+        platform->options.setArgs(key, std::to_string(nEXT));
+      }
+      platform->options.getArgs(key, nEXT);
+      o_Pe = platform->device.malloc<dfloat>(fieldOffset);
+      o_coeffEXTP = platform->device.malloc<dfloat>(std::min(nEXT, static_cast<int>(o_coeffBDF.size())));
     }
-    platform->options.getArgs(key, nEXT);
-    o_Pe = platform->device.malloc<dfloat>(fieldOffset);
-    o_coeffEXTP = platform->device.malloc<dfloat>(std::min(nEXT, static_cast<int>(o_coeffBDF.size())));
 
     if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING FILTER", "TRUE")) {
       int nModes = 2;
@@ -69,6 +80,14 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
       if (platform->options.getArgs(key).empty()) {
         platform->options.setArgs(key, std::to_string(nModes));
       }
+    }
+
+    {
+      const auto key = upperCase(pressureName) + " RHO SPLITTING UNSPLIT STEPS";
+      if(platform->options.getArgs(key).empty()) {
+        platform->options.setArgs(key, std::to_string(10));
+      }
+      platform->options.getArgs(key, rhoSplitDelay);
     }
   }
   o_P = platform->device.malloc<dfloat>(fieldOffset * std::max(static_cast<int>(o_coeffEXTP.size()), 1));
@@ -102,18 +121,19 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
   if (!platform->options.compareArgs(upperCase(velocityName) + " SOLVER", "NONE")) {
     platform->app->bc->printBcTypeMapping(velocityName);
 
-    if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "HPFRT")) {
+    if (evalRegularization(velocityName, "HPFRT")) {
       int nModes = -1;
       platform->options.getArgs(upperCase(velocityName) + " HPFRT MODES", nModes);
       o_filterRT = lowPassFilterSetup(mesh, nModes);
     }
 
-    if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "SVV")) {
-      o_svvD = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq);
-      o_svvDT = platform->device.malloc<dfloat>(mesh->Nq * mesh->Nq);
+    if (evalRegularization(velocityName, "SVV")) {
+      o_svvD = platform->device.malloc<dfloat>(mesh->Nelements * mesh->Nq * mesh->Nq);
       dfloat NSVV = 2.0;
       platform->options.getArgs(upperCase(velocityName) + " REGULARIZATION SVV FILTER POWER", NSVV);
-      svv::convoluteDerivative(mesh, NSVV, o_svvD, o_svvDT);
+      auto o_filterPower = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+      platform->linAlg->fill(mesh->Nelements, NSVV, o_filterPower);
+      svv::convoluteDerivative(mesh, o_filterPower, o_svvD);
     }
 
     o_EToB = [&]() {
@@ -154,7 +174,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
 
   auto o_lambda0 = [&](bool variable = true) {
     auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !variable && enableRhoSplit > 0) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !variable && !rhoSplitDelay) {
       platform->linAlg->fill(mesh->Nlocal, 1 / rho0, o_lambda);
     } else {
       platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
@@ -164,7 +184,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
 
   const auto o_rhoSplitTerm = [&]() {
     occa::memory o_del;
-    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !rhoSplitDelay) {
       // 1/rho - 1/rho0
       auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
@@ -394,7 +414,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
 
   const auto o_rhoSplitTerm = [&]() {
     occa::memory o_del;
-    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !rhoSplitDelay) {
       o_del = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
       auto o_delta = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
@@ -407,9 +427,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                    o_delta,
                    o_del);
       // o_del * rho / rho0
-      if(enableRhoSplit > 0) {
-        platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1 / rho0, o_rho, o_del);
-      }
+      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1 / rho0, o_rho, o_del);
       flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
     }
     return o_del;
@@ -419,7 +437,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     occa::memory o_gradP = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
 
     auto o_P = this->o_P;
-    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") && !rhoSplitDelay) {
       o_P = o_Pe;
     }
 
@@ -527,7 +545,9 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     ellipticSolver.at(2)->solve(o_rhsZ, o_U.slice(2 * fieldOffset, mesh->Nlocal));
   }
 
-  enableRhoSplit = std::min(enableRhoSplit + 1, 1);
+  if(stage == 1 && platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
+    rhoSplitDelay = std::max(rhoSplitDelay - 1, 0);
+  }
 
   if (platform->verbose()) {
     const dfloat debugNorm = platform->linAlg->weightedNorm2Many(mesh->Nlocal,
@@ -604,10 +624,8 @@ void fluidSolver_t::setupEllipticSolver()
       auto o_lambda = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
       if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
         rho0 = platform->linAlg->min(mesh->Nlocal, o_rho, platform->comm.mpiComm());
-        platform->linAlg->fill(mesh->Nlocal, 1 / rho0, o_lambda);
-      } else {
-        platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
       }
+      platform->linAlg->adyz(mesh->Nlocal, 1.0, o_rho, o_lambda);
       return o_lambda;
     }();
 
@@ -840,7 +858,7 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     return;
   }
 
-  if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "HPFRT")) {
+  if (evalRegularization(velocityName, "HPFRT")) {
     dfloat strength = NAN;
     platform->options.getArgs(upperCase(velocityName) + " HPFRT STRENGTH", strength);
 
@@ -851,7 +869,7 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     platform->flopCounter->add(velocityName + " filterRT", flops);
   }
 
-  if (platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "GJP")) {
+  if (evalRegularization(velocityName, "GJP")) {
     dfloat tauFactor;
     platform->options.getArgs(upperCase(velocityName) + " REGULARIZATION GJP SCALING COEFF", tauFactor);
 
@@ -861,7 +879,7 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     }
   }
 
-  if(platform->options.compareArgs(upperCase(velocityName) + " REGULARIZATION METHOD", "SVV")) {
+  if (evalRegularization(velocityName, "SVV")) {
     if(!o_svvf.isInitialized()) {
       o_svvf = platform->device.malloc<dfloat>(mesh->Nlocal);
       if(!platform->options.compareArgs("MOVING MESH", "TRUE"))
@@ -881,11 +899,12 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
     platform->linAlg->axmyz(mesh->Nlocal, scale, o_svvf, o_umag, o_svvmu);
     
     auto loadKernel = [&](bool svv = false) {
-      std::string kernelNamePrefix = "svv-";
-      kernelNamePrefix += "ellipticFluid";
+      std::string kernelNamePrefix = "svv-ellipticFluid";
 
-      std::string kernelName = "Ax";
-      kernelName += "VarCoeff";
+      std::string kernelName = "AxCoeff";
+      if (platform->options.compareArgs("ELEMENT MAP", "TRILINEAR")) {
+        kernelName += "Trilinear";
+      }
 
       auto gen_suffix = [&](const int N) 
       {      
@@ -898,7 +917,6 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
 
         return std::string("_") + std::to_string(N) + dataType;
       };
-
       kernelName += "Hex3D" + gen_suffix(mesh->N);
 
 #if 0
@@ -911,21 +929,27 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
 
     if(!svvKernel.isInitialized()) svvKernel = loadKernel();
 
+    auto o_lam = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    platform->linAlg->fill(mesh->Nlocal, 0.0, o_lam);
+    auto o_temp = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
     for (int i = 0; i < mesh->dim; i++) {
       auto o_Ui = o_U.slice(i * fieldOffset, mesh->Nlocal);
-      auto o_EXTi = o_EXT.slice(i * fieldOffset, mesh->Nlocal);
 
       svvKernel(mesh->Nelements,
                 fieldOffset,
                 0,
                 mesh->o_elementList,
                 mesh->o_ggeo,
+                mesh->o_D,
+                mesh->o_DT,
                 o_svvD,
-                o_svvDT,
+                o_lam,
+                o_lam,
                 o_svvmu,
-                o_NULL,
                 o_Ui,
-                o_EXTi);
+                o_temp);
+      auto o_EXTi = o_EXT.slice(i * fieldOffset, mesh->Nlocal);
+      platform->linAlg->axpby(mesh->Nlocal, 1.0, o_temp, 1.0, o_EXTi);
     }
   }
 

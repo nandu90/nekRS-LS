@@ -11,7 +11,26 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
   [&]() {
     std::string regularization;
     if (ini->extract(parSection, "regularization", regularization)) {
-      const std::vector<std::string> validValues = {
+
+      if (regularization.find("none") != std::string::npos) {
+        options.setArgs(parPrefix + "REGULARIZATION METHOD", "NONE");
+        return;
+      }
+
+      const std::vector<std::string> regBlocks = serializeString(regularization, ';');
+      std::vector<std::string> regMethods;
+
+      auto addMethod = [&](const std::string& method)
+      {
+        if (std::find(regMethods.begin(), regMethods.end(), method) != regMethods.end()) {
+          append_error("regularization method '" + method + "' specified multiple times!\n");
+          return;
+        }
+        regMethods.push_back(method);
+      };
+
+      for (auto block : regBlocks) {
+        const std::vector<std::string> validValues = {
           {"none"},
           {"hpfrt"},
           {"gjp"},
@@ -24,154 +43,152 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
           {"activationwidth"},
           {"decaythreshold"},
           {"noisethreshold"},
-          {"svvcoeff"},
           {"filterpower"},
-      };
-      const std::vector<std::string> list = serializeString(regularization, '+');
-      for (const std::string s : list) {
-        checkValidity(rank, validValues, s);
-      }
-      if (regularization.find("none") != std::string::npos) {
-        options.setArgs(parPrefix + "REGULARIZATION METHOD", "NONE");
-        return;
-      }
-      const bool usesAVM = std::find(list.begin(), list.end(), "avm") != list.end();
-      const bool usesGJP = std::find(list.begin(), list.end(), "gjp") != list.end();
-      const bool usesHPFRT = std::find(list.begin(), list.end(), "hpfrt") != list.end();
-      const bool usesSVV = std::find(list.begin(), list.end(), "svv") != list.end();
-
-      if (!usesAVM && !usesHPFRT && !usesGJP && !usesSVV) {
-        append_error("unknown regularization!\n");
-      }
-
-      if (usesAVM && isVelocity) {
-        append_error("avm regularization is only enabled for scalars!\n");
-      }
-
-      if (usesGJP) {
-        options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP");
-        options.setArgs(parPrefix + "REGULARIZATION GJP SCALING COEFF", "0.8");
-        for (std::string s : list) {
-          const auto penaltyStr = parseValueForKey(s, "scalingcoeff");
-          if (!penaltyStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION GJP SCALING COEFF", penaltyStr);
-          }
+          {"minpower"},
+        };
+        const std::vector<std::string> list = serializeString(block, '+');
+        for (const std::string s : list) {
+          checkValidity(rank, validValues, s);
         }
-      }
+        const bool usesAVM = std::find(list.begin(), list.end(), "avm") != list.end();
+        const bool usesGJP = std::find(list.begin(), list.end(), "gjp") != list.end();
+        const bool usesHPFRT = std::find(list.begin(), list.end(), "hpfrt") != list.end();
+        const bool usesSVV = std::find(list.begin(), list.end(), "svv") != list.end();
 
-      if (usesSVV) {
-        options.setArgs(parPrefix + "REGULARIZATION METHOD", "SVV");
-        options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF", "0.1");
-        options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER", "2");
+        if (!usesAVM && !usesHPFRT && !usesGJP && !usesSVV) {
+          append_error("unknown regularization!\n");
+        }
+
+        if (usesAVM && isVelocity) {
+          append_error("avm regularization is only enabled for scalars!\n");
+        }
+
         if (usesGJP) {
-          options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP+SVV");
-        }
-
-        for (std::string s : list) {
-          const auto scaleStr = parseValueForKey(s, "svvcoeff");
-          if (!scaleStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF", scaleStr);
-          }
-
-          const auto powerStr = parseValueForKey(s, "filterpower");
-          if (!powerStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER", powerStr);
-          }
-        }
-      }
-
-      if (usesHPFRT) {
-        options.setArgs(parPrefix + "HPFRT MODES", "1");
-        options.setArgs(parPrefix + "REGULARIZATION METHOD", "HPFRT");
-        if (usesGJP) {
-          options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP+HPFRT");
-        }
-        if (usesSVV) {
-          options.setArgs(parPrefix + "REGULARIZATION METHOD", "SVV+HPFRT");
-        }
-      }
-
-      if (usesAVM) {
-        options.setArgs(parPrefix + "REGULARIZATION METHOD", "AVM_AVERAGED_MODAL_DECAY");
-        if (usesGJP) {
-          options.setArgs(parPrefix + "REGULARIZATION METHOD", "GJP+AVM_AVERAGED_MODAL_DECAY");
-        }
-        options.setArgs(parPrefix + "REGULARIZATION AVM ACTIVATION WIDTH", to_string_f(1.0));
-        options.setArgs(parPrefix + "REGULARIZATION AVM DECAY THRESHOLD", to_string_f(2.0));
-        options.setArgs(parPrefix + "REGULARIZATION AVM C0", "FALSE");
-
-        for (std::string s : list) {
-
-          const auto nmodeStr = parseValueForKey(s, "nmodes");
-          if (!nmodeStr.empty()) {
-            append_error("nModes qualifier is invalid for avm!\n");
-          }
-          const auto cutoffratioStr = parseValueForKey(s, "cutoffratio");
-          if (!cutoffratioStr.empty()) {
-            append_error("cutoffRatio qualifier is invalid for avm!\n");
-          }
-
-          const auto absTolStr = parseValueForKey(s, "noisethreshold");
-          if (!absTolStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION AVM ABSOLUTE TOL", absTolStr);
-          }
-
-          const auto scalingcoeffStr = parseValueForKey(s, "scalingcoeff");
-          if (!scalingcoeffStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION AVM SCALING COEFF", scalingcoeffStr);
-          }
-
-          if (s.find("c0") != std::string::npos) {
-            options.setArgs(parPrefix + "REGULARIZATION AVM C0", "TRUE");
-          }
-
-          const auto rampConstantStr = parseValueForKey(s, "activationwidth");
-          if (!rampConstantStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION AVM ACTIVATION WIDTH", rampConstantStr);
-          }
-          const auto thresholdStr = parseValueForKey(s, "decaythreshold");
-          if (!thresholdStr.empty()) {
-            options.setArgs(parPrefix + "REGULARIZATION AVM DECAY THRESHOLD", thresholdStr);
-          }
-        }
-
-        if (options.getArgs(parPrefix + "REGULARIZATION AVM ABSOLUTE TOL").empty()) {
-          append_error("absoluteTol qualifier required for avm!\n");
-        }
-      }
-
-      if (usesHPFRT) {
-        bool setsStrength = false;
-        for (std::string s : list) {
-          const auto nmodeStr = parseValueForKey(s, "nmodes");
-          if (!nmodeStr.empty()) {
-            double value = std::stod(nmodeStr);
-            value = round(value);
-            options.setArgs(parPrefix + "HPFRT MODES", to_string_f(value));
-          }
-          const auto cutoffRatioStr = parseValueForKey(s, "cutoffratio");
-          if (!cutoffRatioStr.empty()) {
-            double filterCutoffRatio = std::stod(cutoffRatioStr);
-            double NFilterModes = round((N + 1) * (1 - filterCutoffRatio));
-            options.setArgs(parPrefix + "HPFRT MODES", to_string_f(NFilterModes));
-          }
-
-          const auto scalingCoeffStr = parseValueForKey(s, "scalingcoeff");
-          if (!scalingCoeffStr.empty()) {
-            setsStrength = true;
-            int err = 0;
-            double weight = parseFormula(scalingCoeffStr.c_str(), &err);
-            if (err) {
-              append_error("Invalid expression for scalingCoeff");
+          addMethod("GJP");
+          options.setArgs(parPrefix + "REGULARIZATION GJP SCALING COEFF", "0.8");
+          for (std::string s : list) {
+            const auto penaltyStr = parseValueForKey(s, "scalingcoeff");
+            if (!penaltyStr.empty()) {
+              options.setArgs(parPrefix + "REGULARIZATION GJP SCALING COEFF", penaltyStr);
             }
-            options.setArgs(parPrefix + "HPFRT STRENGTH", to_string_f(weight));
           }
         }
-        if (!setsStrength) {
-          append_error("required parameter scalingCoeff for hpfrt regularization is not "
-                       "set!\n");
+
+        if (usesSVV) {
+          addMethod("SVV");
+          options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF", "0.1");
+          options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER", "2");
+
+          for (std::string s : list) {
+            const auto scaleStr = parseValueForKey(s, "scalingcoeff");
+            if (!scaleStr.empty()) {
+              options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF", scaleStr);
+            }
+
+            const auto powerStr = parseValueForKey(s, "filterpower");
+            if (!powerStr.empty()) {
+              options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER", powerStr);
+            }
+
+            const auto minPowerStr = parseValueForKey(s, "minpower");
+            if (!minPowerStr.empty()) {
+              options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER MIN", minPowerStr);
+            }
+          }
+        }
+
+        if (usesHPFRT) {
+          options.setArgs(parPrefix + "HPFRT MODES", "1");
+          addMethod("HPFRT");
+        }
+
+        if (usesAVM) {
+          addMethod("AVM_AVERAGED_MODAL_DECAY");
+          options.setArgs(parPrefix + "REGULARIZATION AVM ACTIVATION WIDTH", to_string_f(1.0));
+          options.setArgs(parPrefix + "REGULARIZATION AVM DECAY THRESHOLD", to_string_f(2.0));
+          options.setArgs(parPrefix + "REGULARIZATION AVM C0", "FALSE");
+
+          for (std::string s : list) {
+
+            const auto nmodeStr = parseValueForKey(s, "nmodes");
+            if (!nmodeStr.empty()) {
+              append_error("nModes qualifier is invalid for avm!\n");
+            }
+            const auto cutoffratioStr = parseValueForKey(s, "cutoffratio");
+            if (!cutoffratioStr.empty()) {
+              append_error("cutoffRatio qualifier is invalid for avm!\n");
+            }
+
+            const auto absTolStr = parseValueForKey(s, "noisethreshold");
+            if (!absTolStr.empty()) {
+              options.setArgs(parPrefix + "REGULARIZATION AVM ABSOLUTE TOL", absTolStr);
+            }
+
+            const auto scalingcoeffStr = parseValueForKey(s, "scalingcoeff");
+            if (!scalingcoeffStr.empty()) {
+              options.setArgs(parPrefix + "REGULARIZATION AVM SCALING COEFF", scalingcoeffStr);
+            }
+
+            if (s.find("c0") != std::string::npos) {
+              options.setArgs(parPrefix + "REGULARIZATION AVM C0", "TRUE");
+            }
+
+            const auto rampConstantStr = parseValueForKey(s, "activationwidth");
+            if (!rampConstantStr.empty()) {
+              options.setArgs(parPrefix + "REGULARIZATION AVM ACTIVATION WIDTH", rampConstantStr);
+            }
+            const auto thresholdStr = parseValueForKey(s, "decaythreshold");
+            if (!thresholdStr.empty()) {
+              options.setArgs(parPrefix + "REGULARIZATION AVM DECAY THRESHOLD", thresholdStr);
+            }
+          }
+
+          if (options.getArgs(parPrefix + "REGULARIZATION AVM ABSOLUTE TOL").empty()) {
+            append_error("absoluteTol qualifier required for avm!\n");
+          }
+        }
+
+        if (usesHPFRT) {
+          bool setsStrength = false;
+          for (std::string s : list) {
+            const auto nmodeStr = parseValueForKey(s, "nmodes");
+            if (!nmodeStr.empty()) {
+              double value = std::stod(nmodeStr);
+              value = round(value);
+              options.setArgs(parPrefix + "HPFRT MODES", to_string_f(value));
+            }
+            const auto cutoffRatioStr = parseValueForKey(s, "cutoffratio");
+            if (!cutoffRatioStr.empty()) {
+              double filterCutoffRatio = std::stod(cutoffRatioStr);
+              double NFilterModes = round((N + 1) * (1 - filterCutoffRatio));
+              options.setArgs(parPrefix + "HPFRT MODES", to_string_f(NFilterModes));
+            }
+
+            const auto scalingCoeffStr = parseValueForKey(s, "scalingcoeff");
+            if (!scalingCoeffStr.empty()) {
+              setsStrength = true;
+              int err = 0;
+              double weight = parseFormula(scalingCoeffStr.c_str(), &err);
+              if (err) {
+                append_error("Invalid expression for scalingCoeff");
+              }
+              options.setArgs(parPrefix + "HPFRT STRENGTH", to_string_f(weight));
+            }
+          }
+          if (!setsStrength) {
+            append_error("required parameter scalingCoeff for hpfrt regularization is not "
+                "set!\n");
+          }
         }
       }
+
+      std::string method = "";
+      for (int m = 0; m < regMethods.size(); m++) {
+        if(m) method += "+";
+        method += regMethods[m];
+      }
+      options.setArgs(parPrefix + "REGULARIZATION METHOD", method);
+
       return;
     } else {
       // if options already exist, don't overwrite them with defaults from general

@@ -92,7 +92,6 @@ struct elliptic_t {
   occa::memory o_zPfloat;
 
   occa::kernel AxKernel;
-  occa::kernel AxSVVKernel;
 
   occa::kernel fusedCopyDfloatToPfloatKernel;
 
@@ -104,16 +103,14 @@ struct elliptic_t {
 
   occa::kernel ellipticBlockBuildDiagonalKernel;
   occa::kernel ellipticBlockBuildDiagonalPfloatKernel;
-  occa::kernel ellipticBlockBuildDiagonalSVVKernel;
 
   occa::memory o_lambda0;
   dfloat lambda0Avg = NAN;
   occa::memory o_lambda1;
   dfloat lambda1Avg = NAN;
 
-  occa::memory o_svvmue;
+  occa::memory o_lambdasvv;
   occa::memory o_svvD;
-  occa::memory o_svvDT;
 
   std::vector<int> levels;
 
@@ -126,6 +123,8 @@ struct elliptic_t {
   std::function<void(elliptic_t *elliptic, const occa::memory &o_r, occa::memory &o_z)> userPreconditioner;
 
   std::function<void(elliptic_t *elliptic, dlong NelementsList, const occa::memory &o_elementsList, const occa::memory &o_x, occa::memory &o_Ax)> userAx;
+
+  std::function<void(occa::memory &o_svvD)> userSVVD;
 
   ~elliptic_t() = default;
 };

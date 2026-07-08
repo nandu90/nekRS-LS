@@ -37,7 +37,6 @@ private:
   occa::memory o_coeffEXTP;
 
   occa::memory o_svvD;
-  occa::memory o_svvDT;
   occa::memory o_svvf;
   occa::kernel svvKernel;
 
@@ -141,7 +140,7 @@ public:
 
   occa::memory o_relUrst;
 
-  int enableRhoSplit = -10;
+  int rhoSplitDelay = 2;
 
   void finalize() override
   {

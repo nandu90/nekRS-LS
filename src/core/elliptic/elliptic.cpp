@@ -49,7 +49,8 @@ elliptic::elliptic(const std::string &name,
                    dlong fieldOffset,
                    const std::vector<int> &EToBIn,
                    const occa::memory &o_lambda0,
-                   const occa::memory &o_lambda1)
+                   const occa::memory &o_lambda1,
+                   const occa::memory &o_lambdasvv)
 {
   solver = new elliptic_t();
   solver->name = name;
@@ -60,15 +61,16 @@ elliptic::elliptic(const std::string &name,
   solver->EToB = _EToB;
 
   solver->fieldOffset = (fieldOffset <= 0) ? alignStride<dfloat>(mesh->Nlocal) : fieldOffset;
-  _setup(o_lambda0, o_lambda1);
+  _setup(o_lambda0, o_lambda1, o_lambdasvv);
 }
 
 elliptic::elliptic(const std::string &name,
                    mesh_t *mesh,
                    dlong fieldOffset,
                    const occa::memory &o_lambda0,
-                   const occa::memory &o_lambda1)
-    : elliptic(name, mesh, fieldOffset, generateEllipticEToB(name, mesh), o_lambda0, o_lambda1)
+                   const occa::memory &o_lambda1,
+                   const occa::memory &o_lambdasvv)
+    : elliptic(name, mesh, fieldOffset, generateEllipticEToB(name, mesh), o_lambda0, o_lambda1, o_lambdasvv)
 {
 }
 
@@ -194,9 +196,9 @@ void elliptic::finalResidual(dfloat val)
   solver->resNorm = val;
 };
 
-void elliptic::mueSVV(const occa::memory& o_svvmue)
+void elliptic::coeffSVV(const occa::memory& o_lambdasvv)
 {
-  solver->o_svvmue = o_svvmue;
+  solver->o_lambdasvv = o_lambdasvv;
 };
 
 void elliptic::coeff0HLM(const occa::memory& o_lambda0)
@@ -252,6 +254,11 @@ void elliptic::userAx(const std::function<void(elliptic_t *elliptic,
                                                occa::memory &o_Ax)> &f)
 {
   solver->userAx = f;
+};
+
+void elliptic::userSVVD(const std::function<void(occa::memory &o_svvD)> &f)
+{
+  solver->userSVVD = f;
 };
 
 std::tuple<int, int> elliptic::projectionCounters() const
@@ -436,6 +443,7 @@ void elliptic::_solve(const occa::memory &o_rhs,
 
   elliptic->o_lambda0 = nullptr;
   elliptic->o_lambda1 = nullptr;
+  elliptic->o_lambdasvv = nullptr;
   ellipticFreeWorkspace(elliptic);
 }
 
@@ -534,7 +542,7 @@ void checkConfig(elliptic_t *elliptic)
   nekrsCheck(err, platform->comm.mpiComm(), EXIT_FAILURE, "%s", "\n");
 }
 
-void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambda1)
+void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambda1, const occa::memory &o_lambdasvv)
 {
   auto &elliptic = solver;
 
@@ -554,6 +562,7 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
 
   elliptic->o_lambda0 = o_lambda0;
   elliptic->o_lambda1 = o_lambda1;
+  elliptic->o_lambdasvv = o_lambdasvv;
 
   elliptic->lambda0Avg = platform->linAlg->innerProd(elliptic->mesh->Nlocal,
                                                      elliptic->mesh->o_LMM,
@@ -702,6 +711,21 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     elliptic->invDegreeSum = platform->linAlg->sum(mesh->Nlocal, elliptic->o_invDegree, platform->comm.mpiComm());
   }
 
+  const auto enableSVV = [&]() {
+    if (elliptic->name.find("fluid velocity") != std::string::npos)
+      return false;
+
+    std::string regMethods;
+    options.getArgs("REGULARIZATION METHOD", regMethods);
+
+    const auto methods = serializeString(regMethods, '+');
+    return std::find(methods.begin(), methods.end(), "SVV") != methods.end();
+  };
+
+  if(enableSVV()) {
+    _setupSVV();
+  }
+
   {
     std::string kernelName;
     const std::string suffix = "Hex3D";
@@ -709,13 +733,12 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
     const std::string poissonPrefix = elliptic->poisson ? "poisson-" : "";
 
     if (options.compareArgs("PRECONDITIONER", "JACOBI")) {
-      kernelName = "ellipticBlockBuildDiagonal" + suffix;
-      elliptic->ellipticBlockBuildDiagonalKernel = platform->kernelRequests.load(poissonPrefix + kernelName);
-
-      if(options.compareArgs("REGULARIZATION METHOD","SVV") && elliptic->name != "fluid velocity") {
-        kernelName = "svv-ellipticBlockBuildDiagonal" + suffix;
-        elliptic->ellipticBlockBuildDiagonalSVVKernel = platform->kernelRequests.load(kernelName);
+      kernelName = "";
+      if(elliptic->svv) {
+        kernelName += "svv-";
       }
+      kernelName += "ellipticBlockBuildDiagonal" + suffix;
+      elliptic->ellipticBlockBuildDiagonalKernel = platform->kernelRequests.load(poissonPrefix + kernelName);
     }
 
     kernelName = "fusedCopyDfloatToPfloat";
@@ -868,20 +891,22 @@ void elliptic::_setup(const occa::memory &o_lambda0, const occa::memory &o_lambd
   fflush(stdout);
 }
 
-void elliptic::setupSVV()
+void elliptic::_setupSVV()
 {
-  auto *elliptic = solver;
+  solver->svv = 1;
 
-  elliptic->svv = 1;
+  auto Nmodes = solver->mesh->Nq;
 
-  const dlong Nmodes = elliptic->mesh->Nq;
+  auto Nelements = solver->mesh->Nelements;
 
-  elliptic->o_svvD = platform->device.malloc<dfloat>(Nmodes * Nmodes);
-  elliptic->o_svvDT = platform->device.malloc<dfloat>(Nmodes * Nmodes);
+  solver->o_svvD = platform->device.malloc<dfloat>(Nelements * Nmodes * Nmodes);
 
   dfloat NSVV = 2.0;
-  elliptic->options.getArgs("REGULARIZATION SVV FILTER POWER", NSVV);
-  svv::convoluteDerivative(elliptic->mesh, NSVV, elliptic->o_svvD, elliptic->o_svvDT);
+  solver->options.getArgs("REGULARIZATION SVV FILTER POWER", NSVV);
+  //Initialize all elements with same filter power
+  auto o_filterPower = platform->deviceMemoryPool.reserve<dfloat>(Nelements);
+  platform->linAlg->fill(Nelements, NSVV, o_filterPower);
+  svv::convoluteDerivative(solver->mesh, o_filterPower, solver->o_svvD);
 }
 
 void elliptic::op(const occa::memory &o_q, occa::memory &o_Aq, bool masked)

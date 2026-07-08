@@ -1,0 +1,30 @@
+@kernel void convoluteDerivative(const dlong Nelements,
+                                 @restrict const dfloat* B,
+                                 @restrict const dfloat* Binv,
+                                 @restrict const dfloat* D,
+                                 @restrict const dfloat* power,
+                                 @restrict dfloat* svvD)
+{
+  for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
+    const dfloat NSVV = power[e];
+    const dfloat N = p_Nq - 1.0;
+
+    for (int i = 0; i < p_Nq; ++i; @inner(1)) {
+      for (int j = 0; j < p_Nq; ++j; @inner(0)) {
+        dfloat sum = 0.0;
+
+        for (int k = 0; k < p_Nq; ++k) {
+          const dfloat qk = pow(dfloat(k) / N, N / NSVV);
+
+          dfloat tmp = 0.0;
+          for (int l = 0; l < p_Nq; ++l) {
+            tmp += Binv[k * p_Nq + l] * D[l * p_Nq + j];
+          }
+          sum += B[i * p_Nq + k] * qk * tmp;
+        }
+        const dlong id = e * p_Nq * p_Nq + i * p_Nq + j;
+        svvD[id] = sum;
+      }
+    }
+  }
+}

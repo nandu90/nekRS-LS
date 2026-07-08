@@ -13,6 +13,7 @@ namespace lvlSet
 void buildKernel(occa::properties kernelInfo);
 void setup();
 void solve(const double &fluidTime);
+dfloat getInterfaceWidth();
 lvlSet_t* getTLSR();
 lvlSet_t* getCLSR();
 

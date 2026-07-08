@@ -24,6 +24,13 @@
 
  */
 #define p_MaxNFields (3)
+
+#ifdef p_svv
+#define DTERM(t,a,b) ((t) == 0 ? s_D[a][b] : s_Dsvv[a][b])
+#else
+#define DTERM(t,a,b) s_D[a][b]
+#endif
+
 @kernel void ellipticBlockBuildDiagonalHex3D(const dlong Nelements,
                                              const dlong Nfields,
                                              const dlong offset,
@@ -31,24 +38,29 @@
                                              @ restrict const dfloat *ggeo,
                                              @ restrict const dfloat *D,
                                              @ restrict const dfloat *S,
+                                             @ restrict const dfloat *Dsvv,
                                              @ restrict const dfloat *lambda0,
                                              @ restrict const dfloat *lambda1,
+                                             @ restrict const dfloat *lambdasvv,
                                              @ restrict dfloat *Aq)
 {
   for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
     @shared dfloat s_D[p_Nq][p_Nq];
 
-#ifndef p_svv
-    @exclusive dfloat s_lambdat[p_MaxNFields][p_Nq];
     @shared dfloat s_lambda0[p_MaxNFields][p_Nq][p_Nq];
-#endif    
     @shared dfloat s_Grr[p_Nq][p_Nq];
     @shared dfloat s_Gss[p_Nq][p_Nq];
     @exclusive dfloat s_Gtt[p_Nq];
+    @exclusive dfloat s_lambdat[p_MaxNFields][p_Nq];
+
+#ifdef p_svv
+    @shared dfloat s_Dsvv[p_Nq][p_Nq];
+#endif
 
 #if defined(smXX) || defined(XeHPC)
 #pragma unroll p_Nq
 #endif
+
     for (int k = 0; k < p_Nq; ++k) {
       for (int j = 0; j < p_Nq; ++j; @inner(1)) {
         for (int i = 0; i < p_Nq; ++i; @inner(0)) {
@@ -57,24 +69,22 @@
 
           if (k == 0)
             s_D[j][i] = D[i + p_Nq * j]; // column major
-
+#ifdef p_svv
+            s_Dsvv[j][i] = Dsvv[i + p_Nq * j]; // column major
+#endif
           s_Grr[j][i] = ggeo[base + p_G00ID * p_Np];
           s_Gss[j][i] = ggeo[base + p_G11ID * p_Np];
 
-#ifndef p_svv            
           for (int l = 0; l < Nfields; l++)
             s_lambda0[l][j][i] = lambda0[id + l * loffset];
-#endif          
           if (k == 0) {
 #pragma unroll p_Nq
             for (int l = 0; l < p_Nq; ++l) {
               const dlong other_base = e * p_Nggeo * p_Np + l * p_Nq * p_Nq + j * p_Nq + i;
               const dlong other_id = e * p_Np + l * p_Nq * p_Nq + j * p_Nq + i;
               s_Gtt[l] = ggeo[other_base + p_G22ID * p_Np];
-#ifndef p_svv              
               for (int field = 0; field < Nfields; field++)
                 s_lambdat[field][l] = lambda0[other_id + field * loffset];
-#endif            
             }
           }
         }
@@ -84,52 +94,50 @@
       for (int j = 0; j < p_Nq; ++j; @inner(1)) {
         for (int i = 0; i < p_Nq; ++i; @inner(0)) {
           const dlong id = e * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
-          dfloat r_q = 1.0;
+          dfloat r_qsum = 1.0;
 
           for (int l = 0; l < Nfields; l++) {
+            r_qsum = 0.0; //first make it zero
 
-            r_q = 0.0; // first make it zero
             const dlong base = e * p_Nggeo * p_Np + k * p_Nq * p_Nq + j * p_Nq + i;
 
             dfloat grs = ggeo[base + p_G01ID * p_Np];
             dfloat grt = ggeo[base + p_G02ID * p_Np];
             dfloat gst = ggeo[base + p_G12ID * p_Np];
 
-#ifndef p_svv            
-            dfloat lbda_0 = s_lambda0[l][j][i];
-            r_q += 2.0 * grs * lbda_0 * s_D[i][i] * s_D[j][j];
-            r_q += 2.0 * grt * lbda_0 * s_D[i][i] * s_D[k][k];
-            r_q += 2.0 * gst * lbda_0 * s_D[j][j] * s_D[k][k];
-#else
-            r_q += 2.0 * grs * s_D[i][i] * s_D[j][j];
-            r_q += 2.0 * grt * s_D[i][i] * s_D[k][k];
-            r_q += 2.0 * gst * s_D[j][j] * s_D[k][k];
-#endif            
-            //
-            for (int m = 0; m < p_Nq; m++) {
-#ifndef p_svv              
-              r_q += s_Grr[j][m] * s_lambda0[l][j][m] * s_D[m][i] * s_D[m][i];
-              r_q += s_Gss[m][i] * s_lambda0[l][m][i] * s_D[m][j] * s_D[m][j];
-              r_q += s_Gtt[m] * s_lambdat[l][m] * s_D[m][k] * s_D[m][k];
-#else
-              r_q += s_Grr[j][m] * s_D[m][i] * s_D[m][i];
-              r_q += s_Gss[m][i] * s_D[m][j] * s_D[m][j];
-              r_q += s_Gtt[m] * s_D[m][k] * s_D[m][k];
-#endif              
+            int dterms = 1;
+#ifdef p_svv
+            dterms++;
+#endif
+            for (int t = 0; t < dterms; t++) {
+              dfloat r_q = 0.0;
+
+              const dfloat lbda_0 = t == 0 ? s_lambda0[l][j][i] : 1.0;
+
+              r_q += 2.0 * grs * lbda_0 * DTERM(t,i,i) * DTERM(t,j,j);
+              r_q += 2.0 * grt * lbda_0 * DTERM(t,i,i) * DTERM(t,k,k);
+              r_q += 2.0 * gst * lbda_0 * DTERM(t,j,j) * DTERM(t,k,k);
+              //
+              for (int m = 0; m < p_Nq; m++) {
+                const dfloat lbda_jm = t == 0 ? s_lambda0[l][j][m] : 1.0;
+                const dfloat lbda_mi = t == 0 ? s_lambda0[l][m][i] : 1.0;
+                const dfloat lbda_t = t == 0 ? s_lambdat[l][m] : 1.0;
+                r_q += s_Grr[j][m] * lbda_jm * DTERM(t,m,i) * DTERM(t,m,i);
+                r_q += s_Gss[m][i] * lbda_mi * DTERM(t,m,j) * DTERM(t,m,j);
+                r_q += s_Gtt[m] * lbda_t * DTERM(t,m,k) * DTERM(t,m,k);
+              }
+
+              const dfloat lbda_svv = t == 0 ? 1.0 : lambdasvv[id + l * loffset];
+              r_qsum += lbda_svv * r_q ;
             }
 
-#if !defined(p_poisson) && !defined(p_svv)
+#ifndef p_poisson
             dfloat gwJ = ggeo[base + p_GWJID * p_Np];
             dfloat lbda_1 = lambda1[id + l * loffset];
-            r_q += gwJ * lbda_1;
+            r_qsum += gwJ * lbda_1;
 #endif
 
-#ifndef p_svv            
-            Aq[id + l * offset] = r_q;
-#else
-            const dfloat lbda_0 = lambda0[id + l * loffset];
-            Aq[id + l * offset] += r_q * lbda_0;
-#endif
+            Aq[id + l * offset] = r_qsum;
           }
         }
       }
