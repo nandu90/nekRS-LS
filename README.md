@@ -13,7 +13,8 @@
 **NekRS-LS** is a fork of the offical [NekRS](https://github.com/Nek5000/nekRS) repo based on [v26](https://github.com/Nek5000/nekRS/releases/tag/v26.0). This repository contains the two-phase solver plugin to NekRS based on the conservative level-set method.
 
 The two-phase examples are hosted [here](https://github.com/nandu90/nrsLS_Examples).
-Example simulation videos are hosted [here](https://nandu90.github.io/)
+Example simulation videos are hosted [here](https://nandu90.github.io/).
+
 This fork is under active development and subject to changes.
 We try hard not to break userland but the code is evolving quickly so things might change from one version to another without being backward compatible. Please consult `RELEASE.md` *before* using the code.  
 
