@@ -24,6 +24,8 @@ void clsrAx(elliptic_t* elliptic,
             occa::memory &o_Ax);
 
 void clsrPreconditioner(elliptic_t* elliptic, const occa::memory &o_r, occa::memory &o_z);
+void updateCLSRJacobiDiagonal(elliptic_t *elliptic);
+void enableCLSRJacobiDiagonalVerification();
 
 void normalVector(const occa::memory &o_phi, occa::memory &o_normals, bool avg = true);
 void initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const dfloat epsin = -1.0);

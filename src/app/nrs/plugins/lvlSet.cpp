@@ -20,6 +20,8 @@
 // private members
 namespace
 {
+static bool updateCLSRJacobiDiagonalRequired = true;
+static bool verifyCLSRJacobiDiagonalEnabled = false;
 static std::ostringstream errorLogger;
 static std::ostringstream valueErrorLogger;
 nrs_t *nrs;
@@ -27,7 +29,9 @@ occa::kernel signlsKernel;
 occa::kernel normalVectorKernel;
 occa::kernel meshScalesKernel;
 occa::kernel normalizeVectorKernel;
+occa::kernel setBasisKernel;
 occa::kernel clsrDiffusionCoeffKernel;
+occa::kernel clsrDiffusionJacobiDiagonalKernel;
 occa::kernel heavisideKernel;
 occa::kernel clampCLSKernel;
 occa::kernel deltaKernel;
@@ -188,7 +192,9 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
     normalVectorKernel = buildKernel(kernelInfo, "normalVector", oklPath, oklFile);
     meshScalesKernel = buildKernel(kernelInfo, "meshScales", oklPath, oklFile);
     normalizeVectorKernel = buildKernel(kernelInfo, "normalizeVector", oklPath, oklFile);
+    setBasisKernel = buildKernel(kernelInfo, "setBasis", oklPath, oklFile);
     clsrDiffusionCoeffKernel = buildKernel(kernelInfo, "clsrDiffusionCoeff", oklPath, oklFile);
+    clsrDiffusionJacobiDiagonalKernel = buildKernel(kernelInfo, "clsrDiffusionJacobiDiagonal", oklPath, oklFile);
     heavisideKernel = buildKernel(kernelInfo, "heaviside", oklPath, oklFile);
     clampCLSKernel = buildKernel(kernelInfo, "clampCLS", oklPath, oklFile);
     deltaKernel = buildKernel(kernelInfo, "delta", oklPath, oklFile);
@@ -824,10 +830,10 @@ void lvlSet_t::pseudoStepper(const double &fluidTime)
     throw std::logic_error("Unhandled StopMode value");
   };
 
-  //placed here for now. find a better place for this
-  //o_diff has to be filled for the preconditioner
+  // placed here for now. find a better place for this
+  // o_diff has to be filled for the preconditioner
   if(this->name == "clsr") {
-    platform->linAlg->fill(this->_mesh->Nlocal, interfaceWidth, this->o_diff);
+    platform->linAlg->fill(this->_mesh->Nlocal, 0.0, this->o_diff);
   }
 
   while(!isFinalStep()) {
@@ -1598,6 +1604,14 @@ void lvlSet_t::solve(double time, int stage)
     return o_S0;
   }();
 
+  if(this->name == "clsr") {
+    auto &ellipticOptions = this->ellipticSolver[0]->options();
+    if (ellipticOptions.compareArgs("PRECONDITIONER", "JACOBI")) {
+      // Signal the custom preconditioner to update the CLSR Jacobi diagonal on the first linear solver iteration
+      updateCLSRJacobiDiagonalRequired = true;
+    }
+  }
+
   this->ellipticSolver[0]->coeff0HLM(o_lambda0);
   this->ellipticSolver[0]->coeff1HLM(o_lambda1);
   if (evalRegularization("SVV", this->name)) {
@@ -2125,6 +2139,7 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
                            o_D,
                            elliptic->fieldOffset,
                            interfaceWidth,
+                           clsr->o_S,
                            o_q,
                            o_normals,
                            o_wrk);
@@ -2145,6 +2160,191 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
 
 }
 
+
+void lvlSet::updateCLSRJacobiDiagonal(elliptic_t *elliptic)
+{
+  nekrsCheck(elliptic->Nfields != 1,
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "%s\n",
+             "CLSR Jacobi diagonal update expects a scalar elliptic solve.");
+
+  auto mesh = elliptic->mesh;
+  auto precon = elliptic->precon;
+
+  // MG levels allocate o_invDiagA as pfloat; CLSR Jacobi updates are only
+  // expected on the fine-level solver, where o_invDiagA is dfloat
+  nekrsCheck(precon->o_invDiagA.dtype() != occa::dtype::get<dfloat>(),
+             platform->comm.mpiComm(),
+             EXIT_FAILURE,
+             "%s\n",
+             "CLSR Jacobi diagonal update expects dfloat o_invDiagA.");
+
+  static occa::memory o_zeroLambda0;
+  static occa::memory o_clsrDiagCorrection;
+
+  const dlong Nlocal = mesh->Nlocal;
+  const dlong Ntotal = elliptic->Nfields * elliptic->fieldOffset;
+
+  if (!o_zeroLambda0.isInitialized() || o_zeroLambda0.size() < Nlocal) {
+    o_zeroLambda0 = platform->device.malloc<dfloat>(Nlocal);
+  }
+
+  if (!o_clsrDiagCorrection.isInitialized() || o_clsrDiagCorrection.size() < Ntotal) {
+    o_clsrDiagCorrection = platform->device.malloc<dfloat>(Ntotal);
+  }
+
+  platform->linAlg->fill(Nlocal, 0.0, o_zeroLambda0);
+  platform->linAlg->fill(Ntotal, 0.0, o_clsrDiagCorrection);
+
+  // Build the standard elliptic Jacobi contribution with lambda0 = 0
+  // note: ellipticUpdateJacobi returns the inverse of the assembled diagonal
+  auto o_lambda0Save = elliptic->o_lambda0;
+  elliptic->o_lambda0 = o_zeroLambda0;
+  ellipticUpdateJacobi(elliptic, precon->o_invDiagA);
+  elliptic->o_lambda0 = o_lambda0Save;
+
+  // Convert invDiagA back to the assembled diagonal
+  platform->linAlg->adyMany(mesh->Nlocal,
+                            elliptic->Nfields,
+                            elliptic->fieldOffset,
+                            1.0,
+                            precon->o_invDiagA);
+
+  // Build local CLSR diffusion + compression diagonal correction
+  clsrDiffusionJacobiDiagonalKernel(mesh->Nelements,
+                                    elliptic->fieldOffset,
+                                    mesh->o_vgeo,
+                                    mesh->o_D,
+                                    interfaceWidth,
+                                    clsr->o_S,
+                                    o_normals,
+                                    o_clsrDiagCorrection);
+
+  // Assemble the CLSR diagonal correction across shared CG nodes
+  oogs::startFinish(o_clsrDiagCorrection,
+                    1, // Nfields
+                    elliptic->fieldOffset,
+                    ogsDfloat,
+                    ogsAdd,
+                    elliptic->oogs);
+
+  // Add the assembled CLSR diagonal correction to the assembled base diagonal
+  platform->linAlg->axpbyMany(mesh->Nlocal,
+                              1, // Nfields
+                              elliptic->fieldOffset,
+                              1.0,
+                              o_clsrDiagCorrection,
+                              1.0,
+                              precon->o_invDiagA);
+
+  // Invert to obtain the final Jacobi inverse diagonal for preconditioning
+  platform->linAlg->adyMany(mesh->Nlocal,
+                            1, // Nfields
+                            elliptic->fieldOffset,
+                            1.0,
+                            precon->o_invDiagA);
+}
+
+void lvlSet::enableCLSRJacobiDiagonalVerification()
+{
+  verifyCLSRJacobiDiagonalEnabled = true;
+}
+
+void verifyCLSRJacobiDiagonal(elliptic_t *elliptic)
+{
+  // Verify the CLSR Jacobi diagonal by comparing the assembled preconditioner
+  // diagonal against the diagonal obtained from applying clsrAx to basis vectors
+  // constructed to isolate the diagonal.
+  //
+  // Note: Machine-precision agreement is not expected for:
+  // (1) periodic boundary nodes, where local off-diagonal periodic-alias terms
+  // can contribute to the true global diagonal
+  // (2) at nodes where the level-set normal is undefined or singular, such as
+  // when a node is aligned with the center of a circle signed-distance function.
+  //
+  if (platform->comm.mpiRank() == 0) {
+    printf("Verifying CLSR Jacobi diagonal against clsrAx action...\n");
+  }
+
+  auto mesh = elliptic->mesh;
+  auto precon = elliptic->precon;
+  const dlong N = mesh->Nlocal;
+  const dlong fieldOffset = elliptic->fieldOffset;
+
+  occa::memory o_q = platform->device.malloc<dfloat>(fieldOffset);
+  occa::memory o_Aq = platform->device.malloc<dfloat>(fieldOffset);
+
+  std::vector<dfloat> diag(fieldOffset);
+  std::vector<dfloat> Aq(fieldOffset);
+
+  // Build the (inverse) Jacobi diagonal
+  lvlSet::updateCLSRJacobiDiagonal(elliptic);
+
+  // Copy inverse diagonal and convert to diagonal
+  occa::memory o_diag = platform->device.malloc<dfloat>(fieldOffset);
+  o_diag.copyFrom(precon->o_invDiagA, fieldOffset);
+  platform->linAlg->ady(fieldOffset, 1.0, o_diag); // o_diag = 1 / o_diag
+  o_diag.copyTo(diag.data(), fieldOffset);
+
+  double maxAbsErr = 0.0;
+  double maxRelErr = 0.0;
+
+  for (dlong i = 0; i < N; ++i) {
+    // Set q[i] = 1
+    setBasisKernel(fieldOffset, i, o_q);
+
+    // Turn it into a CG/shared-node basis across aliases --> required for shared nodes
+    oogs::startFinish(o_q,
+                      1, // Nfields
+                      elliptic->fieldOffset,
+                      ogsDfloat,
+                      ogsAdd,
+                      elliptic->oogs);
+
+    // Apply matrix-free operator
+    platform->linAlg->fill(fieldOffset, 0.0, o_Aq);
+    lvlSet::clsrAx(elliptic,
+                   mesh->Nelements,
+                   mesh->o_elementList, // or appropriate element list
+                   o_q,
+                   o_Aq);
+
+    // clsrAx returns local element contributions, as it does in the elliptic solve.
+    // The solve path assembles those contributions with OOGS before using the result,
+    // so do the same here before comparing against the assembled Jacobi diagonal.
+    oogs::startFinish(o_Aq,
+                      1, // Nfields
+                      elliptic->fieldOffset,
+                      ogsDfloat,
+                      ogsAdd,
+                      elliptic->oogs);
+
+    o_Aq.copyTo(Aq.data(), fieldOffset);
+
+    const double expected = Aq[i];
+    const double actual = diag[i];
+
+    const double absErr = std::abs(actual - expected);
+    const double relErr = absErr / std::max(1.0, std::abs(expected));
+
+    // printf("rank %d i %lld actual %.15e expected %.15e absErr %.15e\n",
+    //        platform->comm.mpiRank(),
+    //        static_cast<long long>(i),
+    //        actual,
+    //        expected,
+    //        absErr);
+
+    maxAbsErr = std::max(maxAbsErr, absErr);
+    maxRelErr = std::max(maxRelErr, relErr);
+  }
+
+  if (platform->comm.mpiRank() == 0) {
+    printf("CLSR Jacobi diagonal verification result: maxAbsErr = %.15e, maxRelErr = %.15e\n",
+           maxAbsErr, maxRelErr);
+  }
+}
+
 void lvlSet::clsrPreconditioner(elliptic_t* elliptic,
                                 const occa::memory &o_r,
                                 occa::memory &o_z)
@@ -2154,6 +2354,17 @@ void lvlSet::clsrPreconditioner(elliptic_t* elliptic,
   auto &options = elliptic->options;
 
   if(options.compareArgs("PRECONDITIONER", "JACOBI")) {
+    if (updateCLSRJacobiDiagonalRequired) {
+      // Optionally verify the CLSR Jacobi diagonal against the clsrAx action.
+      if (verifyCLSRJacobiDiagonalEnabled) {
+        verifyCLSRJacobiDiagonal(elliptic);
+      }
+
+      updateCLSRJacobiDiagonal(elliptic);
+
+      // The CLSR Jacobi diagonal only needs to be updated once per linear solve.
+      updateCLSRJacobiDiagonalRequired = false;
+    }
     platform->linAlg->axmyzMany(mesh->Nlocal, elliptic->Nfields, elliptic->fieldOffset, 1.0, o_r, precon->o_invDiagA, o_z);
   } else {
     if(platform->comm.mpiRank() == 0) {
