@@ -34,6 +34,8 @@ occa::kernel deltaKernel;
 occa::kernel fluidPropKernel;
 occa::kernel tlsrBoundaryFixKernel;
 occa::kernel spatiallyVaryingPowerKernel;
+occa::kernel clearFarFieldKernel;
+occa::kernel clearFarFieldCurvKernel;
 
 static bool buildKernelCalled = false;
 static bool setupCalled = false;
@@ -67,6 +69,8 @@ static double fluidStartTime = -1.0;
 
 static int timeIntegrationOrder = 1;
 
+static dlong farField = 0;
+
 // common keys
 static std::vector<std::string> commonKeys = {
     {"solver"},
@@ -93,6 +97,8 @@ static std::vector<std::string> lvlSetKeys = {
   {"interfacewidthfactor"},
   {"interfacewidthvalue"},
   {"normalaveraging"},
+  {"farfieldfix"},
+  {"farfieldfixtol"},
 };
 
 static std::vector<std::string> scalarKeys = {
@@ -159,6 +165,8 @@ void setTimeIntegrationOrder (int &order);
 
 void setInterfaceWidth();
 
+void setFarField();
+
 void lvlSet::buildKernel(occa::properties _kernelInfo)
 {
   auto buildKernel = [](occa::properties &kernelInfo,
@@ -195,6 +203,8 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
     fluidPropKernel = buildKernel(kernelInfo, "fluidProp", oklPath, oklFile);
     tlsrBoundaryFixKernel = buildKernel(kernelInfo, "tlsrBoundaryFix", oklPath, oklFile);
     spatiallyVaryingPowerKernel = buildKernel(kernelInfo, "spatiallyVaryingPower", oklPath, oklFile);
+    clearFarFieldKernel = buildKernel(kernelInfo, "clearFarField", oklPath, oklFile);
+    clearFarFieldCurvKernel = buildKernel(kernelInfo, "clearFarFieldCurv", oklPath, oklFile);
   }
   {
     occa::properties kernelInfo;
@@ -380,6 +390,26 @@ void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::strin
   else {
     options.setArgs("LVLSET NORMAL AVERAGING", "TRUE");
   }
+
+  if (ini->extract(parSection, "farFieldFix", value)) {
+    const std::vector<std::string> validValues = {
+      {"true"},
+      {"false"},
+    };
+    checkValidity(rank, validValues, value);
+    options.setArgs("LVLSET FARFIELD FIX", upperCase(value));
+  }
+  else {
+    options.setArgs("LVLSET FARFIELD FIX", "TRUE");
+  }
+
+  if (ini->extract(parSection, "farFieldFixTol", value)) {
+    options.setArgs("LVLSET FARFIELD FIX TOL", value);
+  }
+  else {
+    options.setArgs("LVLSET FARFIELD FIX TOL", "1e-2");
+  }
+
 }
 
 void parseLvlSetSections()
@@ -1004,6 +1034,21 @@ void lvlSet::solve(const double &fluidTime)
       ls->o_S.copyFrom(o_psi, mesh->Nlocal);
 
       if (ls->name == "tlsr") {
+        if(platform->options.compareArgs("LVLSET FARFIELD FIX", "TRUE")) {
+          auto o_delta = lvlSet::getDeltaFunction();
+          auto deltaMax = platform->linAlg->max(mesh->Nlocal, o_delta, platform->comm.mpiComm());
+
+          setFarField();
+
+          dfloat fixTol = 1e-2;
+          platform->options.getArgs("LVLSET FARFIELD FIX TOL", fixTol);
+          clearFarFieldKernel(mesh->Nlocal,
+                              farField,
+                              deltaMax,
+                              fixTol,
+                              o_delta,
+                              ls->o_S);
+        }
         double tlsrRegFactor;
         platform->options.getArgs("TLSR REGULARIZATION FACTOR", tlsrRegFactor);
 
@@ -2248,6 +2293,20 @@ void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
   lvlSet::normalVector(o_phi, o_sforce, avg);
 
   auto o_curvDeltabyRho = lvlSet::getCurvature(o_sforce);
+  if(platform->options.compareArgs("LVLSET FARFIELD FIX", "TRUE")) {
+    auto deltaMax = platform->linAlg->max(meshV->Nlocal, o_delta, platform->comm.mpiComm());
+
+    dfloat fixTol = 1e-2;
+    platform->options.getArgs("LVLSET FARFIELD FIX TOL", fixTol);
+
+    clearFarFieldCurvKernel(meshV->Nlocal,
+                            farField,
+                            deltaMax,
+                            fixTol,
+                            nrs->scalar->o_solution("cls"),
+                            o_delta,
+                            o_curvDeltabyRho);
+  }
   platform->linAlg->axmy(meshV->Nlocal, 1.0, o_delta, o_curvDeltabyRho);
 
   //Divide by density
@@ -2312,4 +2371,41 @@ void lvlSet::updateProperties(const dfloat &rhog,
                   mul,
                   o_psi,
                   nrs->fluid->o_prop);
+}
+
+dfloat lvlSet::getEnclosedVol(const int direction)
+{
+  auto mesh = nrs->scalar->meshV;
+  auto o_cls = nrs->scalar->o_solution("cls");
+
+  dfloat volume = 0.0;
+  if(direction > 0) {
+    volume = platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_cls, platform->comm.mpiComm());
+  } else {
+    auto o_temp = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    o_cls.copyTo(o_temp, mesh->Nlocal);
+    platform->linAlg->scale(mesh->Nlocal, -1.0, o_temp);
+    platform->linAlg->add(mesh->Nlocal, 1.0, o_temp);
+
+    volume = platform->linAlg->innerProd(mesh->Nlocal, mesh->o_LMM, o_temp, platform->comm.mpiComm());
+  }
+
+  return volume;
+}
+
+void setFarField()
+{
+  static bool setupFarField = false;
+
+  if(setupFarField)
+    return;
+
+  auto vol1 = lvlSet::getEnclosedVol(1);
+  auto vol0 = lvlSet::getEnclosedVol(0);
+
+  farField = 1;
+
+  if(vol0 > vol1) farField = 0;
+
+  setupFarField = true;
 }

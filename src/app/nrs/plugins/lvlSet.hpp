@@ -35,6 +35,9 @@ const occa::memory& getCurvature(const occa::memory &o_normals);
 
 void updateProperties(const dfloat &rhoRatio, const dfloat &muRatio, const dfloat &Re);
 void updateProperties(const dfloat &rhog, const dfloat &rhol, const dfloat &mug, const dfloat &mul);
+
+//Diagnostics
+dfloat getEnclosedVol(const int direction = 0);
 }
 
 struct lvlSetConfig_t : public solverCfg_t {

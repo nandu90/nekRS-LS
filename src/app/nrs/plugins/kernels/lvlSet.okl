@@ -654,3 +654,41 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
   }
 }
 
+@kernel void clearFarField(const dlong Ntotal,
+                           const dlong farfield,
+                           const dfloat deltaMax,
+                           const dfloat deltaTol,
+                           @ restrict const dfloat *DELTA,
+                           @ restrict dfloat *PSI)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    if (n < Ntotal) {
+      const dfloat delta = DELTA[n];
+      const dfloat psi = PSI[n];
+      if (delta / deltaMax < deltaTol) {
+        if (psi > 0.5 && farfield) PSI[n] = 1.0;
+        if (psi < 0.5 && !farfield) PSI[n] = 0.0;
+      }
+    }
+  }
+}
+
+@kernel void clearFarFieldCurv(const dlong Ntotal,
+                               const dlong farfield,
+                               const dfloat deltaMax,
+                               const dfloat deltaTol,
+                               @ restrict const dfloat *PSI,
+                               @ restrict const dfloat *DELTA,
+                               @ restrict dfloat *CURV)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    if (n < Ntotal) {
+      const dfloat delta = DELTA[n];
+      const dfloat psi = PSI[n];
+      if (delta / deltaMax < deltaTol) {
+        if (psi > 0.5 && farfield) CURV[n] = 0.0;
+        if (psi < 0.5 && !farfield) CURV[n] = 0.0;
+      }
+    }
+  }
+}
