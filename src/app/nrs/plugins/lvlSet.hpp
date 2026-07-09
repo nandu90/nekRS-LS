@@ -32,6 +32,8 @@ void applySurfaceTensionAcc(const dfloat& We, occa::memory &o_stForce);
 const occa::memory& getSignField(const occa::memory &o_phi);
 const occa::memory& getDeltaFunction();
 const occa::memory& getCurvature(const occa::memory &o_normals);
+void clearFarfield(occa::memory &o_psi, const occa::memory &o_delta);
+void clearFarfieldCurv(occa::memory &o_curv, const occa::memory &o_delta);
 
 void updateProperties(const dfloat &rhoRatio, const dfloat &muRatio, const dfloat &Re);
 void updateProperties(const dfloat &rhog, const dfloat &rhol, const dfloat &mug, const dfloat &mul);

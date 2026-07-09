@@ -31,6 +31,8 @@ occa::kernel clsrDiffusionCoeffKernel;
 occa::kernel heavisideKernel;
 occa::kernel clampCLSKernel;
 occa::kernel deltaKernel;
+occa::kernel clearFarfieldKernel;
+occa::kernel clearFarfieldCurvKernel;
 occa::kernel fluidPropKernel;
 occa::kernel tlsrBoundaryFixKernel;
 occa::kernel spatiallyVaryingPowerKernel;
@@ -60,6 +62,8 @@ static dfloat minMeshScale;
 static dfloat meanMeshScale;
 
 static dfloat interfaceWidth;
+static dfloat farfield = -1.0;
+static dfloat farfieldDeltaTol = 1e-3;
 
 static double tlsrTimer = 0.0;
 static double clsrTimer = 0.0;
@@ -93,6 +97,8 @@ static std::vector<std::string> lvlSetKeys = {
   {"interfacewidthfactor"},
   {"interfacewidthvalue"},
   {"normalaveraging"},
+  {"farfield"},
+  {"farfielddeltatol"},
 };
 
 static std::vector<std::string> scalarKeys = {
@@ -192,6 +198,8 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
     heavisideKernel = buildKernel(kernelInfo, "heaviside", oklPath, oklFile);
     clampCLSKernel = buildKernel(kernelInfo, "clampCLS", oklPath, oklFile);
     deltaKernel = buildKernel(kernelInfo, "delta", oklPath, oklFile);
+    clearFarfieldKernel = buildKernel(kernelInfo, "clearFarfield", oklPath, oklFile);
+    clearFarfieldCurvKernel = buildKernel(kernelInfo, "clearFarfieldCurv", oklPath, oklFile);
     fluidPropKernel = buildKernel(kernelInfo, "fluidProp", oklPath, oklFile);
     tlsrBoundaryFixKernel = buildKernel(kernelInfo, "tlsrBoundaryFix", oklPath, oklFile);
     spatiallyVaryingPowerKernel = buildKernel(kernelInfo, "spatiallyVaryingPower", oklPath, oklFile);
@@ -379,6 +387,25 @@ void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::strin
   }
   else {
     options.setArgs("LVLSET NORMAL AVERAGING", "TRUE");
+  }
+
+  // Adopted from Nek5000 clearfarfield semantics:
+  //   farfield < 0.0  -> disabled
+  //   farfield > 0.5  -> far field is phase 1; snap matching far-away psi > 0.5 to 1
+  //   farfield < 0.5  -> far field is phase 0; snap matching far-away psi < 0.5 to 0
+  //   farfield == 0.5 -> enabled but no phase selected, so no correction
+  if (ini->extract(parSection, "farfield", value)) {
+    options.setArgs("LVLSET FARFIELD", value);
+  }
+  else {
+    options.setArgs("LVLSET FARFIELD", "-1.0");
+  }
+
+  if (ini->extract(parSection, "farfieldDeltaTol", value)) {
+    options.setArgs("LVLSET FARFIELD DELTA TOL", value);
+  }
+  else {
+    options.setArgs("LVLSET FARFIELD DELTA TOL", "1e-3");
   }
 }
 
@@ -713,6 +740,9 @@ void lvlSet::setup()
   parseLvlSetSections();
   processError();
 
+  platform->options.getArgs("LVLSET FARFIELD", farfield);
+  platform->options.getArgs("LVLSET FARFIELD DELTA TOL", farfieldDeltaTol);
+
   bdrySetupFromPar();
 
   //bc from nek. TODO - need to check this
@@ -1004,6 +1034,9 @@ void lvlSet::solve(const double &fluidTime)
       ls->o_S.copyFrom(o_psi, mesh->Nlocal);
 
       if (ls->name == "tlsr") {
+        auto o_delta = lvlSet::getDeltaFunction();
+        lvlSet::clearFarfield(ls->o_S, o_delta);
+
         double tlsrRegFactor;
         platform->options.getArgs("TLSR REGULARIZATION FACTOR", tlsrRegFactor);
 
@@ -2234,6 +2267,41 @@ const occa::memory& lvlSet::getCurvature(const occa::memory& o_normals)
   return o_curvature;
 }
 
+
+void lvlSet::clearFarfield(occa::memory &o_psi,
+                           const occa::memory &o_delta)
+{
+  if (farfield < 0.0 || farfield == 0.5) return;
+
+  auto mesh = nrs->scalar->mesh(nrs->scalar->nameToIndex.find("tls")->second);
+  const dfloat deltaMax = 0.25 / interfaceWidth;
+
+  clearFarfieldKernel(mesh->Nlocal,
+                      farfield,
+                      deltaMax,
+                      farfieldDeltaTol,
+                      o_delta,
+                      o_psi);
+}
+
+void lvlSet::clearFarfieldCurv(occa::memory &o_curv,
+                               const occa::memory &o_delta)
+{
+  if (farfield < 0.0 || farfield == 0.5) return;
+
+  auto mesh = nrs->scalar->mesh(nrs->scalar->nameToIndex.find("cls")->second);
+  auto o_psi = nrs->scalar->o_solution("cls");
+  const dfloat deltaMax = 0.25 / interfaceWidth;
+
+  clearFarfieldCurvKernel(mesh->Nlocal,
+                          farfield,
+                          deltaMax,
+                          farfieldDeltaTol,
+                          o_psi,
+                          o_delta,
+                          o_curv);
+}
+
 void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
 {
   auto meshV = nrs->scalar->meshV;
@@ -2248,6 +2316,7 @@ void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
   lvlSet::normalVector(o_phi, o_sforce, avg);
 
   auto o_curvDeltabyRho = lvlSet::getCurvature(o_sforce);
+  lvlSet::clearFarfieldCurv(o_curvDeltabyRho, o_delta);
   platform->linAlg->axmy(meshV->Nlocal, 1.0, o_delta, o_curvDeltabyRho);
 
   //Divide by density
