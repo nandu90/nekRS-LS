@@ -407,7 +407,7 @@ void parseLvlSet(const int rank, setupAide &options, inipp::Ini *ini, std::strin
     options.setArgs("LVLSET FARFIELD FIX TOL", value);
   }
   else {
-    options.setArgs("LVLSET FARFIELD FIX TOL", "1e-2");
+    options.setArgs("LVLSET FARFIELD FIX TOL", "0.05");
   }
 
 }
@@ -1040,7 +1040,7 @@ void lvlSet::solve(const double &fluidTime)
 
           setFarField();
 
-          dfloat fixTol = 1e-2;
+          dfloat fixTol = 0.05;
           platform->options.getArgs("LVLSET FARFIELD FIX TOL", fixTol);
           clearFarFieldKernel(mesh->Nlocal,
                               farField,
@@ -2296,8 +2296,12 @@ void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
   if(platform->options.compareArgs("LVLSET FARFIELD FIX", "TRUE")) {
     auto deltaMax = platform->linAlg->max(meshV->Nlocal, o_delta, platform->comm.mpiComm());
 
-    dfloat fixTol = 1e-2;
+    dfloat fixTol = 0.05;
     platform->options.getArgs("LVLSET FARFIELD FIX TOL", fixTol);
+    //clearing curvature close to interface can be detrimental.
+    // TLSR can fix itself, but curvature cannot.
+    // Hence the 0.1 factor
+    fixTol *= 0.1; 
 
     clearFarFieldCurvKernel(meshV->Nlocal,
                             farField,
