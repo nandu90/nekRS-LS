@@ -133,6 +133,8 @@ public:
 
   occa::memory o_P;
   occa::memory o_Pe;
+  occa::memory o_Pgc;  //pressure gradient correction
+  occa::memory o_Pgce; //extrapolated pressure gradient correction
 
   dfloat rho0 = NAN;
   occa::memory o_rho;

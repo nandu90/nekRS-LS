@@ -89,6 +89,11 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
       }
       platform->options.getArgs(key, rhoSplitDelay);
     }
+
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
+      o_Pgc = platform->device.malloc<dfloat>(fieldOffsetSum * o_coeffEXTP.size());
+      o_Pgce = platform->device.malloc<dfloat>(fieldOffsetSum);
+    }
   }
   o_P = platform->device.malloc<dfloat>(fieldOffset * std::max(static_cast<int>(o_coeffEXTP.size()), 1));
 
@@ -198,6 +203,20 @@ void fluidSolver_t::solvePressure(double time, int stage)
       ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", "TRUE");
       ellipticSolverP->Ax(o_lambda, o_NULL, o_Pe, o_del);
       ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", valSave);
+      if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
+        auto o_cPgce = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
+        o_Pgce.copyTo(o_cPgce, fieldOffsetSum);
+        platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1.0, o_lambda, o_cPgce);
+        auto o_delc = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+        launchKernel("core-wDivergenceVolumeHex3D",
+                     mesh->Nelements,
+                     mesh->o_vgeo,
+                     mesh->o_D,
+                     fieldOffset,
+                     o_cPgce,
+                     o_delc);
+        platform->linAlg->axpby(mesh->Nlocal, -1.0, o_delc, 1.0, o_del);
+      }
     }
     return o_del;
   }();
@@ -302,6 +321,12 @@ void fluidSolver_t::solvePressure(double time, int stage)
     oogs::startFinish(o_rhs, mesh->dim, fieldOffset, ogsDfloat, ogsAdd, mesh->oogs3);
     platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1.0, mesh->o_invLMM, o_rhs);
 
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") &&
+        platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
+      auto o_temp = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
+      platform->linAlg->axmyzMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_lambda0(false), o_Pgc, o_temp);
+      platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_temp, 1.0, o_rhs);
+    }
     return o_rhs;
   }();
 
@@ -426,6 +451,11 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                    fieldOffset,
                    o_delta,
                    o_del);
+
+      if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
+        platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, -1.0, o_Pgc, 1.0, o_del);
+        platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_Pgce, 1.0, o_del);
+      }
       // o_del * rho / rho0
       platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1 / rho0, o_rho, o_del);
       flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
@@ -461,6 +491,15 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     platform->linAlg->scale(o_gradP.size(), -1.0, o_gradP);
 #endif
     flopCount += static_cast<double>(mesh->Nelements) * 18 * (mesh->Np * mesh->Nq + mesh->Np);
+
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") &&
+        platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")){
+      if(!rhoSplitDelay) {
+        platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_Pgce, 1.0, o_gradP);
+      } else {
+        platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_Pgc, 1.0, o_gradP);
+      }
+    }
 
     return o_gradP;
   }();
@@ -502,7 +541,6 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     if (o_rhoSplitTerm.isInitialized()) {
       platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, -1.0, o_rhoSplitTerm, 1.0, o_rhs);
     }
-
     return o_rhs;
   }();
 
@@ -1029,6 +1067,17 @@ void fluidSolver_t::extrapolateSolution()
                    o_filterPe,
                    o_Pe);
     }
+
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
+      launchKernel("core-extrapolate",
+                   mesh->Nlocal,
+                   mesh->dim,
+                   static_cast<int>(o_coeffEXTP.size()),
+                   fieldOffset,
+                   o_coeffEXTP,
+                   o_Pgc,
+                   o_Pgce);
+    }
   }
 }
 
@@ -1045,6 +1094,10 @@ void fluidSolver_t::lagSolution()
     const auto n = o_coeffEXTP.size();
     for (int s = n; s > 1; s--) {
       o_P.copyFrom(o_P, fieldOffset, (s - 1) * fieldOffset, (s - 2) * fieldOffset);
+      if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") &&
+          platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
+        o_Pgc.copyFrom(o_Pgc, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
+      }
     }
   }
 }
