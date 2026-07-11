@@ -2290,9 +2290,13 @@ void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
   if(platform->options.compareArgs("LVLSET NORMAL AVERAGING", "TRUE")) {
     avg = true;
   }
-  lvlSet::normalVector(o_phi, o_sforce, avg);
 
-  auto o_curvDeltabyRho = lvlSet::getCurvature(o_sforce);
+  auto gradCorrection = platform->options.compareArgs("FLUID PRESSURE RHO SPLITTING GRAD CORRECTION", "TRUE");
+
+  auto o_normal = gradCorrection ? nrs->fluid->o_Pgc : platform->deviceMemoryPool.reserve<dfloat>(nrs->fluid->fieldOffsetSum);
+  lvlSet::normalVector(o_phi, o_normal, avg);
+
+  auto o_curvature = lvlSet::getCurvature(o_normal);
   if(platform->options.compareArgs("LVLSET FARFIELD FIX", "TRUE")) {
     auto deltaMax = platform->linAlg->max(meshV->Nlocal, o_delta, platform->comm.mpiComm());
 
@@ -2309,20 +2313,32 @@ void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
                             fixTol,
                             nrs->scalar->o_solution("cls"),
                             o_delta,
-                            o_curvDeltabyRho);
+                            o_curvature);
   }
-  platform->linAlg->axmy(meshV->Nlocal, 1.0, o_delta, o_curvDeltabyRho);
+  platform->linAlg->axmy(meshV->Nlocal, 1.0, o_delta, o_curvature);
 
-  //Divide by density
-  auto o_rho = nrs->fluid->o_prop + 1 * nrs->fluid->fieldOffset;
-  platform->linAlg->aydx(meshV->Nlocal, 1.0, o_rho, o_curvDeltabyRho);
+  if(!gradCorrection) {
+    //Divide by density
+    auto o_rho = nrs->fluid->o_prop + 1 * nrs->fluid->fieldOffset;
+    platform->linAlg->aydx(meshV->Nlocal, 1.0, o_rho, o_curvature);
+  }
 
   platform->linAlg->axmyVector(meshV->Nlocal, 
-                               nrs->scalar->vFieldOffset,
-                               0,
-                               -1.0/We, //reverse sign (see Nek5000)
-                               o_curvDeltabyRho,
-                               o_sforce);
+                              nrs->scalar->vFieldOffset,
+                              0,
+                              -1.0/We, //reverse sign (see Nek5000)
+                              o_curvature,
+                              o_normal);
+
+  if(!gradCorrection) {
+    platform->linAlg->axpbyMany(meshV->Nlocal,
+                                meshV->dim,
+                                nrs->fluid->fieldOffset,
+                                1.0,
+                                o_normal,
+                                1.0,
+                                o_sforce);
+  }
 }
 
 void lvlSet::updateProperties(const dfloat &rhoRatio, const dfloat &muRatio, const dfloat &Re)
