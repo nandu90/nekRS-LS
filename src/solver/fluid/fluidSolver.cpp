@@ -92,6 +92,7 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
 
     if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
       o_Pgc = platform->device.malloc<dfloat>(fieldOffsetSum * o_coeffEXTP.size());
+      platform->linAlg->fill(o_Pgc.size(), 0.0, o_Pgc);
       o_Pgce = platform->device.malloc<dfloat>(fieldOffsetSum);
     }
   }
@@ -324,7 +325,8 @@ void fluidSolver_t::solvePressure(double time, int stage)
     if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") &&
         platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
       auto o_temp = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
-      platform->linAlg->axmyzMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_lambda0(false), o_Pgc, o_temp);
+      o_Pgc.copyTo(o_temp, fieldOffsetSum);
+      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1, o_lambda0(false), o_temp);
       platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_temp, 1.0, o_rhs);
     }
     return o_rhs;
@@ -364,7 +366,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
     // if (o_rhoSplitSurfaceTerm.isInitialized()) {
     //  platform->linAlg->axpby(mesh->Nlocal, -1.0, o_rhoSplitSurfaceTerm, 1.0, o_pRhs);
     //}
-
+    
     return o_pRhs;
   }();
 
@@ -494,11 +496,11 @@ void fluidSolver_t::solveVelocity(double time, int stage)
 
     if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") &&
         platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")){
-      if(!rhoSplitDelay) {
-        platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_Pgce, 1.0, o_gradP);
-      } else {
-        platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_Pgc, 1.0, o_gradP);
-      }
+      auto o_B = rhoSplitDelay ? o_Pgc : o_Pgce;
+      auto o_JwB = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
+      o_B.copyTo(o_JwB, fieldOffsetSum);
+      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1.0, mesh->o_LMM, o_JwB);
+      platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_JwB, 1.0, o_gradP);
     }
 
     return o_gradP;
