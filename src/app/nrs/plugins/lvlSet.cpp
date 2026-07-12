@@ -2281,7 +2281,6 @@ const occa::memory& lvlSet::getCurvature(const occa::memory& o_normals)
 
 void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
 {
-  static bool pgcInitialized = false;
   auto meshV = nrs->scalar->meshV;
 
   auto o_delta = lvlSet::getDeltaFunction();
@@ -2340,12 +2339,6 @@ void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
                                 1.0,
                                 o_sforce);
   }
-
-  if (!pgcInitialized && gradCorrection) {
-    nrs->fluid->o_Pgce.copyFrom(nrs->fluid->o_Pgc, nrs->fluid->fieldOffsetSum);
-    pgcInitialized = true;
-  }
-  
 }
 
 void lvlSet::updateProperties(const dfloat &rhoRatio, const dfloat &muRatio, const dfloat &Re)

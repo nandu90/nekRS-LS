@@ -93,8 +93,6 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
     if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
       o_Pgc = platform->device.malloc<dfloat>(fieldOffsetSum * o_coeffEXTP.size());
       platform->linAlg->fill(o_Pgc.size(), 0.0, o_Pgc);
-      o_Pgce = platform->device.malloc<dfloat>(fieldOffsetSum);
-      platform->linAlg->fill(o_Pgce.size(), 0.0, o_Pgce);
     }
   }
   o_P = platform->device.malloc<dfloat>(fieldOffset * std::max(static_cast<int>(o_coeffEXTP.size()), 1));
@@ -188,6 +186,12 @@ void fluidSolver_t::solvePressure(double time, int stage)
     }
     return o_lambda;
   };
+
+  if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE") &&
+      !o_Pgce.isInitialized()) {
+    o_Pgce = platform->device.malloc<dfloat>(fieldOffsetSum);
+    o_Pgc.copyTo(o_Pgce, fieldOffsetSum);
+  }
 
   const auto o_rhoSplitTerm = [&]() {
     occa::memory o_del;
@@ -1121,7 +1125,8 @@ void fluidSolver_t::extrapolateSolution()
                    o_Pe);
     }
 
-    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE") && 
+        o_Pgce.isInitialized()) {
       launchKernel("core-extrapolate",
                    mesh->Nlocal,
                    mesh->dim,
