@@ -83,7 +83,7 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
 
       const auto typeKey = upperCase(pressureName) + " RHO SPLITTING FILTER TYPE";
       if (platform->options.getArgs(typeKey).empty()) {
-        platform->options.setArgs(typeKey, "ROLLOFF");
+        platform->options.setArgs(typeKey, "CUTOFF");
       }
     }
 
