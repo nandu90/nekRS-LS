@@ -143,6 +143,7 @@ public:
   occa::memory o_relUrst;
 
   int rhoSplitDelay = 2;
+  int pgcDelay = 1;
 
   void finalize() override
   {

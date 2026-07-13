@@ -93,6 +93,7 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
     if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
       o_Pgc = platform->device.malloc<dfloat>(fieldOffsetSum * o_coeffEXTP.size());
       platform->linAlg->fill(o_Pgc.size(), 0.0, o_Pgc);
+      pgcDelay = 10;
     }
   }
   o_P = platform->device.malloc<dfloat>(fieldOffset * std::max(static_cast<int>(o_coeffEXTP.size()), 1));
@@ -209,7 +210,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
       ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", "TRUE");
       ellipticSolverP->Ax(o_lambda, o_NULL, o_Pe, o_del);
       ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", valSave);
-      if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
+      if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE") && !pgcDelay) {
         auto o_cPgce = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
         o_Pgce.copyTo(o_cPgce, fieldOffsetSum);
         platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1.0, o_lambda, o_cPgce);
@@ -347,7 +348,8 @@ void fluidSolver_t::solvePressure(double time, int stage)
         platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
       auto o_temp = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
       o_Pgc.copyTo(o_temp, fieldOffsetSum);
-      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1, o_lambda0(false), o_temp);
+      auto o_lam = pgcDelay ? o_lambda0(true) : o_lambda0(false);
+      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1, o_lam, o_temp);
       platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1, mesh->o_Jw, o_temp);
       platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_temp, 1.0, o_rhs);
     }
@@ -491,7 +493,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                    o_delta,
                    o_del);
 
-      if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
+      if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE") && !pgcDelay) {
         auto o_temp = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
         o_Pgc.copyTo(o_temp, fieldOffsetSum);
         platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, -1.0, o_Pgce, 1.0, o_temp);
@@ -543,7 +545,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
 
     if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") &&
         platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")){
-      auto o_B = rhoSplitDelay ? o_Pgc : o_Pgce;
+      auto o_B = (rhoSplitDelay || pgcDelay) ? o_Pgc : o_Pgce;
       auto o_JwB = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
       o_B.copyTo(o_JwB, fieldOffsetSum);
       platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1.0, mesh->o_Jw, o_JwB);
@@ -647,6 +649,9 @@ void fluidSolver_t::solveVelocity(double time, int stage)
 
   if(stage == 1 && platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE")) {
     rhoSplitDelay = std::max(rhoSplitDelay - 1, 0);
+  }
+  if(platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
+    pgcDelay = std::max(pgcDelay - 1, 0);
   }
 
   if (platform->verbose()) {

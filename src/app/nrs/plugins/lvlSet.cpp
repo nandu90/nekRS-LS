@@ -1033,6 +1033,8 @@ void lvlSet::solve(const double &fluidTime)
       auto o_psi = nrs->scalar->o_solution(scalarName);
       ls->o_S.copyFrom(o_psi, mesh->Nlocal);
 
+      if(nrs->fluid) nrs->fluid->pgcDelay = 1;
+
       if (ls->name == "tlsr") {
         if(platform->options.compareArgs("LVLSET FARFIELD FIX", "TRUE")) {
           auto o_delta = lvlSet::getDeltaFunction();
