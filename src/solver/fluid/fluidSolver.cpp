@@ -228,7 +228,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
                      o_delc);
         platform->linAlg->axpby(mesh->Nlocal, -1.0, o_delc, 1.0, o_del);
       }
-#if 1 
+#if 0 
       auto norm = platform->linAlg->norm2(mesh->Nlocal, o_del, platform->comm.mpiComm());
       printf("o_del %.8f\n", norm);
 #endif
@@ -301,7 +301,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
                    o_stressTerm);
       flopCount += static_cast<double>(mesh->Nelements) * (18 * mesh->Nq * mesh->Np + 100 * mesh->Np);
     }
-#if 1
+#if 0
     for(int i = 0; i < mesh->dim; i++) {
       auto o_x = o_stressTerm + i * fieldOffset;
       auto norm = platform->linAlg->norm2(mesh->Nlocal, o_x, platform->comm.mpiComm());
@@ -340,7 +340,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
     o_rhs.copyFrom(this->o_JwF);
 #endif
 
-#if 1
+#if 0
     for(int i = 0; i < mesh->dim; i++) {
       auto o_x = o_rhs + i * fieldOffset;
       auto norm = platform->linAlg->norm2(mesh->Nlocal, o_x, platform->comm.mpiComm());
@@ -356,7 +356,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
       platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1, mesh->o_Jw, o_temp);
       platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_temp, 1.0, o_rhs);
     }
-#if 1
+#if 0
     for(int i = 0; i < mesh->dim; i++) {
       auto o_x = o_rhs + i * fieldOffset;
       auto norm = platform->linAlg->norm2(mesh->Nlocal, o_x, platform->comm.mpiComm());
@@ -405,7 +405,7 @@ void fluidSolver_t::solvePressure(double time, int stage)
     //  platform->linAlg->axpby(mesh->Nlocal, -1.0, o_rhoSplitSurfaceTerm, 1.0, o_pRhs);
     //}
     //
-#if 1
+#if 0
     auto norm = platform->linAlg->norm2(mesh->Nlocal, o_pRhs, platform->comm.mpiComm());
     printf("o_pRhs %.8f\n", norm);
 #endif
@@ -497,13 +497,16 @@ void fluidSolver_t::solveVelocity(double time, int stage)
                    o_del);
 
       if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
-        platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, -1.0, o_Pgc, 1.0, o_del);
-        platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_Pgce, 1.0, o_del);
+        auto o_temp = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
+        o_Pgc.copyTo(o_temp, fieldOffsetSum);
+        platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, -1.0, o_Pgce, 1.0, o_temp);
+        platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1.0, mesh->o_Jw, o_temp);
+        platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, -1.0, o_temp, 1.0, o_del);
       }
       // o_del * rho / rho0
       platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1 / rho0, o_rho, o_del);
       flopCount += static_cast<double>(mesh->Nelements) * (6 * mesh->Np * mesh->Nq + 18 * mesh->Np);
-#if 1
+#if 0
       for(int i = 0; i < mesh->dim; i++) {
         auto o_x = o_del + i * fieldOffset;
         auto norm = platform->linAlg->norm2(mesh->Nlocal, o_x, platform->comm.mpiComm());
@@ -551,7 +554,7 @@ void fluidSolver_t::solveVelocity(double time, int stage)
       platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1.0, mesh->o_Jw, o_JwB);
       platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, 1.0, o_JwB, 1.0, o_gradP);
     }
-#if 1
+#if 0
     for(int i = 0; i < mesh->dim; i++) {
       auto o_x = o_gradP + i * fieldOffset;
       auto norm = platform->linAlg->norm2(mesh->Nlocal, o_x, platform->comm.mpiComm());
@@ -598,11 +601,13 @@ void fluidSolver_t::solveVelocity(double time, int stage)
     if (o_rhoSplitTerm.isInitialized()) {
       platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, -1.0, o_rhoSplitTerm, 1.0, o_rhs);
     }
+#if 0
     for(int i = 0; i < mesh->dim; i++) {
       auto o_x = o_rhs + i * fieldOffset;
       auto norm = platform->linAlg->norm2(mesh->Nlocal, o_x, platform->comm.mpiComm());
       printf("vel o_rhs %d %.8f\n", i, norm);
     }
+#endif
     return o_rhs;
   }();
 
