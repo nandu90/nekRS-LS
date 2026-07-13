@@ -80,6 +80,11 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
       if (platform->options.getArgs(key).empty()) {
         platform->options.setArgs(key, std::to_string(nModes));
       }
+
+      const auto typeKey = upperCase(pressureName) + " RHO SPLITTING FILTER TYPE";
+      if (platform->options.getArgs(typeKey).empty()) {
+        platform->options.setArgs(typeKey, "ROLLOFF");
+      }
     }
 
     {
@@ -1021,8 +1026,13 @@ void fluidSolver_t::extrapolateSolution()
       int nModes = 2;
       platform->options.getArgs(upperCase(pressureName) + " RHO SPLITTING FILTER MODES", nModes);
 
-      if(!o_filterPe.isInitialized())
-        o_filterPe = lowPassFilterSetup(mesh, nModes, true, true); //cut-off filter, C0
+      if(!o_filterPe.isInitialized()) {
+        bool cutOff = false;
+        if(platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING FILTER TYPE", "CUTOFF")) {
+          cutOff = true;
+        }
+        o_filterPe = lowPassFilterSetup(mesh, nModes, cutOff, true); //cut-off filter, C0
+      }
                                                                    
       launchKernel("fluidSolver_t::filterPeHex3D",
                    mesh->Nelements,
