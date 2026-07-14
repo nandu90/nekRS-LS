@@ -99,6 +99,8 @@ fluidSolver_t::fluidSolver_t(const fluidSolverCfg_t &cfg, const std::unique_ptr<
       o_Pgc = platform->device.malloc<dfloat>(fieldOffsetSum * o_coeffEXTP.size());
       platform->linAlg->fill(o_Pgc.size(), 0.0, o_Pgc);
       pgcDelay = 10;
+      o_Pgce = platform->device.malloc<dfloat>(fieldOffsetSum);
+      platform->linAlg->fill(o_Pgce.size(), 0.0, o_Pgce);
     }
   }
   o_P = platform->device.malloc<dfloat>(fieldOffset * std::max(static_cast<int>(o_coeffEXTP.size()), 1));
@@ -193,11 +195,6 @@ void fluidSolver_t::solvePressure(double time, int stage)
     return o_lambda;
   };
 
-  if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE") &&
-      !o_Pgce.isInitialized()) {
-    o_Pgce = platform->device.malloc<dfloat>(fieldOffsetSum);
-    o_Pgc.copyTo(o_Pgce, fieldOffsetSum);
-  }
 
   const auto o_rhoSplitTerm = [&]() {
     occa::memory o_del;
@@ -209,26 +206,28 @@ void fluidSolver_t::solvePressure(double time, int stage)
       auto o_lam0 = o_lambda0(false);
       platform->linAlg->axpby(mesh->Nlocal, -1.0, o_lam0, 1.0, o_lambda);
 
-      o_del = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      auto o_Pegrad = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
+      opSEM::strongGrad(mesh, fieldOffset, o_Pe, o_Pegrad);
 
-      const auto valSave = ellipticSolverP->options().getArgs("ELLIPTIC COEFF FIELD");
-      ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", "TRUE");
-      ellipticSolverP->Ax(o_lambda, o_NULL, o_Pe, o_del);
-      ellipticSolverP->options().setArgs("ELLIPTIC COEFF FIELD", valSave);
       if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE") && !pgcDelay) {
-        auto o_cPgce = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
-        o_Pgce.copyTo(o_cPgce, fieldOffsetSum);
-        platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1.0, o_lambda, o_cPgce);
-        auto o_delc = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-        launchKernel("core-wDivergenceVolumeHex3D",
-                     mesh->Nelements,
-                     mesh->o_vgeo,
-                     mesh->o_D,
-                     fieldOffset,
-                     o_cPgce,
-                     o_delc);
-        platform->linAlg->axpby(mesh->Nlocal, -1.0, o_delc, 1.0, o_del);
+        platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, -1.0, o_Pgce, 1.0, o_Pegrad);
       }
+#if 0
+    for(int i = 0; i < mesh->dim; i++) {
+      auto o_x = o_Pegrad + i * fieldOffset;
+      auto norm = platform->linAlg->norm2(mesh->Nlocal, o_x, platform->comm.mpiComm());
+      printf("gradP - sforce %d %.8f\n", i, norm);
+    }
+#endif
+      platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1.0, o_lambda, o_Pegrad);
+      o_del = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      launchKernel("core-wDivergenceVolumeHex3D",
+                   mesh->Nelements,
+                   mesh->o_vgeo,
+                   mesh->o_D,
+                   fieldOffset,
+                   o_Pegrad,
+                   o_del);
 #if 0 
       auto norm = platform->linAlg->norm2(mesh->Nlocal, o_del, platform->comm.mpiComm());
       printf("o_del %.8f\n", norm);
@@ -490,6 +489,10 @@ void fluidSolver_t::solveVelocity(double time, int stage)
       auto o_delta = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
 
       platform->linAlg->axpbyz(mesh->Nlocal, 1.0, o_P, -1.0, o_Pe, o_delta);
+#if 0
+      auto norm = platform->linAlg->norm2(mesh->Nlocal, o_delta, platform->comm.mpiComm());
+      printf("P-Pe %.8f\n", norm);
+#endif
       launchKernel("core-gradientVolumeHex3D",
                    mesh->Nelements,
                    mesh->o_vgeo,
@@ -502,6 +505,13 @@ void fluidSolver_t::solveVelocity(double time, int stage)
         auto o_temp = platform->deviceMemoryPool.reserve<dfloat>(fieldOffsetSum);
         o_Pgc.copyTo(o_temp, fieldOffsetSum);
         platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, -1.0, o_Pgce, 1.0, o_temp);
+#if 0
+      for(int i = 0; i < mesh->dim; i++) {
+        auto o_x = o_temp + i * fieldOffset;
+        auto norm = platform->linAlg->norm2(mesh->Nlocal, o_x, platform->comm.mpiComm());
+        printf("B-Be %d %.8f\n", i, norm);
+      }
+#endif
         platform->linAlg->axmyVector(mesh->Nlocal, fieldOffset, 0, 1.0, mesh->o_Jw, o_temp);
         platform->linAlg->axpbyMany(mesh->Nlocal, mesh->dim, fieldOffset, -1.0, o_temp, 1.0, o_del);
       }
@@ -1145,8 +1155,7 @@ void fluidSolver_t::extrapolateSolution()
                    o_Pe);
     }
 
-    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE") && 
-        o_Pgce.isInitialized()) {
+    if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
       launchKernel("core-extrapolate",
                    mesh->Nlocal,
                    mesh->dim,
@@ -1155,6 +1164,12 @@ void fluidSolver_t::extrapolateSolution()
                    o_coeffEXTP,
                    o_Pgc,
                    o_Pgce);
+
+      //lag here else history is wrong
+      const auto n = o_coeffEXTP.size();
+      for (int s = n; s > 1; s--) {
+        o_Pgc.copyFrom(o_Pgc, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
+      }
     }
   }
 }
@@ -1172,10 +1187,6 @@ void fluidSolver_t::lagSolution()
     const auto n = o_coeffEXTP.size();
     for (int s = n; s > 1; s--) {
       o_P.copyFrom(o_P, fieldOffset, (s - 1) * fieldOffset, (s - 2) * fieldOffset);
-      if (platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING", "TRUE") &&
-          platform->options.compareArgs(upperCase(pressureName) + " RHO SPLITTING GRAD CORRECTION", "TRUE")) {
-        o_Pgc.copyFrom(o_Pgc, fieldOffsetSum, (s - 1) * fieldOffsetSum, (s - 2) * fieldOffsetSum);
-      }
     }
   }
 }

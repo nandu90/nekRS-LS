@@ -28,7 +28,8 @@ void clsrPreconditioner(elliptic_t* elliptic, const occa::memory &o_r, occa::mem
 void normalVector(const occa::memory &o_phi, occa::memory &o_normals, bool avg = true);
 void initHeaviside(const occa::memory& o_phi, occa::memory& o_psi, const dfloat epsin = -1.0);
 
-void applySurfaceTensionAcc(const dfloat& We, occa::memory &o_stForce);
+void addSurfaceTensionAcc(const dfloat& We, occa::memory &o_stForceAcc);
+void applyPressureGradCorrection(const dfloat& We, occa::memory &o_stForce);
 const occa::memory& getSignField(const occa::memory &o_phi);
 const occa::memory& getDeltaFunction();
 const occa::memory& getCurvature(const occa::memory &o_normals);

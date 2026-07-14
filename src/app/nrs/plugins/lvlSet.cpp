@@ -2281,8 +2281,11 @@ const occa::memory& lvlSet::getCurvature(const occa::memory& o_normals)
   return o_curvature;
 }
 
-void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
+void lvlSet::applyPressureGradCorrection(const dfloat& We, occa::memory &o_sforce)
 {
+  if(!platform->options.compareArgs("FLUID PRESSURE RHO SPLITTING GRAD CORRECTION", "TRUE"))
+    return;
+
   auto meshV = nrs->scalar->meshV;
 
   auto o_delta = lvlSet::getDeltaFunction();
@@ -2293,9 +2296,54 @@ void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
     avg = true;
   }
 
-  auto gradCorrection = platform->options.compareArgs("FLUID PRESSURE RHO SPLITTING GRAD CORRECTION", "TRUE");
+  lvlSet::normalVector(o_phi, o_sforce, avg);
 
-  auto o_normal = gradCorrection ? nrs->fluid->o_Pgc : platform->deviceMemoryPool.reserve<dfloat>(nrs->fluid->fieldOffsetSum);
+  auto o_curvature = lvlSet::getCurvature(o_sforce);
+  if(platform->options.compareArgs("LVLSET FARFIELD FIX", "TRUE")) {
+    auto deltaMax = platform->linAlg->max(meshV->Nlocal, o_delta, platform->comm.mpiComm());
+
+    dfloat fixTol = 0.05;
+    platform->options.getArgs("LVLSET FARFIELD FIX TOL", fixTol);
+    //clearing curvature close to interface can be detrimental.
+    // TLSR can fix itself, but curvature cannot.
+    // Hence the 0.1 factor
+    fixTol *= 0.1; 
+
+    clearFarFieldCurvKernel(meshV->Nlocal,
+                            farField,
+                            deltaMax,
+                            fixTol,
+                            nrs->scalar->o_solution("cls"),
+                            o_delta,
+                            o_curvature);
+  }
+  platform->linAlg->axmy(meshV->Nlocal, 1.0, o_delta, o_curvature);
+
+  platform->linAlg->axmyVector(meshV->Nlocal, 
+                              nrs->scalar->vFieldOffset,
+                              0,
+                              -1.0/We, //reverse sign (see Nek5000)
+                              o_curvature,
+                              o_sforce);
+
+}
+
+void lvlSet::addSurfaceTensionAcc(const dfloat& We, occa::memory &o_sforceAcc)
+{
+  if(platform->options.compareArgs("FLUID PRESSURE RHO SPLITTING GRAD CORRECTION", "TRUE"))
+    return;
+
+  auto meshV = nrs->scalar->meshV;
+
+  auto o_delta = lvlSet::getDeltaFunction();
+
+  auto o_phi = nrs->scalar->o_solution("tls");
+  bool avg = false;
+  if(platform->options.compareArgs("LVLSET NORMAL AVERAGING", "TRUE")) {
+    avg = true;
+  }
+
+  auto o_normal = platform->deviceMemoryPool.reserve<dfloat>(nrs->fluid->fieldOffsetSum);
   lvlSet::normalVector(o_phi, o_normal, avg);
 
   auto o_curvature = lvlSet::getCurvature(o_normal);
@@ -2319,11 +2367,9 @@ void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
   }
   platform->linAlg->axmy(meshV->Nlocal, 1.0, o_delta, o_curvature);
 
-  if(!gradCorrection) {
-    //Divide by density
-    auto o_rho = nrs->fluid->o_prop + 1 * nrs->fluid->fieldOffset;
-    platform->linAlg->aydx(meshV->Nlocal, 1.0, o_rho, o_curvature);
-  }
+  //Divide by density
+  auto o_rho = nrs->fluid->o_prop + 1 * nrs->fluid->fieldOffset;
+  platform->linAlg->aydx(meshV->Nlocal, 1.0, o_rho, o_curvature);
 
   platform->linAlg->axmyVector(meshV->Nlocal, 
                               nrs->scalar->vFieldOffset,
@@ -2332,15 +2378,13 @@ void lvlSet::applySurfaceTensionAcc(const dfloat& We, occa::memory &o_sforce)
                               o_curvature,
                               o_normal);
 
-  if(!gradCorrection) {
-    platform->linAlg->axpbyMany(meshV->Nlocal,
+  platform->linAlg->axpbyMany(meshV->Nlocal,
                                 meshV->dim,
                                 nrs->fluid->fieldOffset,
                                 1.0,
                                 o_normal,
                                 1.0,
-                                o_sforce);
-  }
+                                o_sforceAcc);
 }
 
 void lvlSet::updateProperties(const dfloat &rhoRatio, const dfloat &muRatio, const dfloat &Re)
