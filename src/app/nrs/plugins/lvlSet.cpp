@@ -2360,17 +2360,20 @@ void lvlSet::applyPressureGradCorrection(const dfloat& We, occa::memory &o_sforc
   if(platform->options.compareArgs("LVLSET FARFIELD FIX", "TRUE")) {
     auto deltaMax = platform->linAlg->max(meshV->Nlocal, o_delta, platform->comm.mpiComm());
 
-    dfloat fixTol = 0.05;
-    platform->options.getArgs("LVLSET FARFIELD FIX TOL", fixTol);
+    dfloat farFixTol = 0.05;
+    dfloat enclosedFixTol = 0.05;
+    platform->options.getArgs("LVLSET FARFIELD FIX TOL", farFixTol);
+    platform->options.getArgs("LVLSET ENCLOSEDFIELD FIX TOL", enclosedFixTol);
     //clearing curvature close to interface can be detrimental.
     // TLSR can fix itself, but curvature cannot.
     // Hence the 0.1 factor
-    fixTol *= 0.1; 
+    farFixTol *= 0.1; 
+    enclosedFixTol *= 0.1; 
 
     clearFarFieldCurvKernel(meshV->Nlocal,
-                            farField,
                             deltaMax,
-                            fixTol,
+                            (!farField) ? farFixTol : enclosedFixTol,
+                            farField ? farFixTol : enclosedFixTol,
                             nrs->scalar->o_solution("cls"),
                             o_delta,
                             o_curvature);
