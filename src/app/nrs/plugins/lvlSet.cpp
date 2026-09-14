@@ -592,6 +592,7 @@ void parseLvlSetSections()
       std::string value;
       if (ini->extract(parScope, "maximumSteps", value)) {
         options.setArgs(parPrefix + "MAXIMUM STEPS", value);
+        options.setArgs(parPrefix + "STOPPING CONDITION", "TARGETSTEPS");
       }
     }
 
@@ -608,8 +609,8 @@ void parseLvlSetSections()
     }
 
     if(firstWord == "default") {
-      options.setArgs("TLSR STOPPING CONDITION", "TARGETSTEPS");
-      options.setArgs("CLSR STOPPING CONDITION", "TARGETSTEPS");
+      options.setArgs("TLSR STOPPING CONDITION", "TARGETTIME");
+      options.setArgs("CLSR STOPPING CONDITION", "TARGETTIME");
     }
 
     {
