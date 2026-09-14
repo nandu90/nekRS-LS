@@ -22,6 +22,24 @@
   }
 }
 
+@kernel void constrainTLSR(const dlong Ntotal,
+                           @ restrict const dfloat *CLS,
+                           @ restrict const dfloat *TLSROld,
+                           @ restrict dfloat *TLSR)
+{
+  for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
+    if (n < Ntotal) {
+      // Keep nodes that have crossed the original interface from changing
+      // further during subsequent TLSR pseudo-time iterations.
+      const dfloat clsSign = (CLS[n] >= 0.5) ? 1.0 : -1.0;
+      const dfloat tlsrOldSign = (TLSROld[n] >= 0.0) ? 1.0 : -1.0;
+      if (clsSign * tlsrOldSign < 0.0) {
+        TLSR[n] = TLSROld[n];
+      }
+    }
+  }
+}
+
 void rmax(dfloat *s_max, const dlong t, const dlong bs) {
   s_max[t] = (s_max[t] > s_max[t + bs]) ? s_max[t] : s_max[t + bs];
 }

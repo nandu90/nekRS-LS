@@ -33,6 +33,7 @@ occa::kernel normalizeVectorKernel;
 occa::kernel clsrDiffusionCoeffKernel;
 occa::kernel heavisideKernel;
 occa::kernel clampCLSKernel;
+occa::kernel constrainTLSRKernel;
 occa::kernel deltaKernel;
 occa::kernel fluidPropKernel;
 occa::kernel tlsrBoundaryFixKernel;
@@ -274,6 +275,7 @@ void lvlSet::buildKernel(occa::properties _kernelInfo)
     clsrDiffusionCoeffKernel = buildKernel(kernelInfo, "clsrDiffusionCoeff", oklPath, oklFile);
     heavisideKernel = buildKernel(kernelInfo, "heaviside", oklPath, oklFile);
     clampCLSKernel = buildKernel(kernelInfo, "clampCLS", oklPath, oklFile);
+    constrainTLSRKernel = buildKernel(kernelInfo, "constrainTLSR", oklPath, oklFile);
     deltaKernel = buildKernel(kernelInfo, "delta", oklPath, oklFile);
     fluidPropKernel = buildKernel(kernelInfo, "fluidProp", oklPath, oklFile);
     tlsrBoundaryFixKernel = buildKernel(kernelInfo, "tlsrBoundaryFix", oklPath, oklFile);
@@ -1670,6 +1672,14 @@ void lvlSet_t::solve(double time, int stage)
 
   auto mesh = this->_mesh;
 
+  // Nek5000's constrainTLSR(0): preserve the pre-solve field so nodes that
+  // have crossed the original interface can be frozen after the solve.
+  occa::memory o_tlsrOld;
+  if (this->name == "tlsr") {
+    o_tlsrOld = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+    o_tlsrOld.copyFrom(this->o_S, mesh->Nlocal, this->fieldOffsetScan);
+  }
+
   auto o_rhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
   o_rhs.copyFrom(this->o_JwF, mesh->Nlocal, 0, this->fieldOffsetScan);
 
@@ -1742,6 +1752,15 @@ void lvlSet_t::solve(double time, int stage)
   }
   this->ellipticSolver[0]->solve(o_rhs, o_Si);
   o_Si.copyTo(this->o_S, o_Si.size(), this->fieldOffsetScan);
+
+  // Nek5000's constrainTLSR(1): do not advance nodes whose saved TLSR sign
+  // differs from the phase indicated by the unshifted CLS field.
+  if (this->name == "tlsr") {
+    constrainTLSRKernel(mesh->Nlocal,
+                        nrs->scalar->o_solution("cls"),
+                        o_tlsrOld,
+                        this->o_S);
+  }
 }
 
 void lvlSet_t::saveSolutionState() { //dormant. needed for neknek
