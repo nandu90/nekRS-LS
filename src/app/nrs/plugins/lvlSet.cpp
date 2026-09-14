@@ -1672,12 +1672,11 @@ void lvlSet_t::solve(double time, int stage)
 
   auto mesh = this->_mesh;
 
-  // Nek5000's constrainTLSR(0): preserve the pre-solve field so nodes that
-  // have crossed the original interface can be frozen after the solve.
-  occa::memory o_tlsrOld;
-  if (this->name == "tlsr") {
-    o_tlsrOld = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    o_tlsrOld.copyFrom(this->o_S, mesh->Nlocal, this->fieldOffsetScan);
+  auto o_tlsr0 = this->name == "tlsr"
+                     ? platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal)
+                     : o_NULL;
+  if (o_tlsr0.isInitialized()) {
+    o_tlsr0.copyFrom(this->o_S, mesh->Nlocal, this->fieldOffsetScan);
   }
 
   auto o_rhs = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
@@ -1753,12 +1752,10 @@ void lvlSet_t::solve(double time, int stage)
   this->ellipticSolver[0]->solve(o_rhs, o_Si);
   o_Si.copyTo(this->o_S, o_Si.size(), this->fieldOffsetScan);
 
-  // Nek5000's constrainTLSR(1): do not advance nodes whose saved TLSR sign
-  // differs from the phase indicated by the unshifted CLS field.
-  if (this->name == "tlsr") {
+  if (o_tlsr0.isInitialized()) {
     constrainTLSRKernel(mesh->Nlocal,
                         nrs->scalar->o_solution("cls"),
-                        o_tlsrOld,
+                        o_tlsr0,
                         this->o_S);
   }
 }
