@@ -117,6 +117,8 @@ static std::vector<std::string> scalarKeys = {
   {"maximumsteps"},
   {"targetcfl"},
   {"stoppingcondition"},
+  {"picardmaxiterations"},
+  {"picardtolerance"},
 };
 
 static std::vector<std::string> validSections = {
@@ -547,6 +549,9 @@ void parseLvlSetSections()
     if (solver == "cvode") {
       options.setArgs(parPrefix + "SOLVER", "CVODE");
     }
+    if (firstWord == "clsr" && solver.empty()) {
+      options.setArgs(parPrefix + "SOLVER", "GMRES+FLEXIBLE");
+    }
 
     options.setArgs(parPrefix + "ELLIPTIC COEFF FIELD", "TRUE");
 
@@ -665,6 +670,18 @@ void parseLvlSetSections()
         std::ostringstream error;
         error << "unknown key: clsr::boundaryfix (TLSR only)\n";
         append_error(error.str());
+      }
+
+      if (ini->extract(parScope, "picardMaxIterations", value)) {
+        options.setArgs("CLSR PICARD MAX ITERATIONS", value);
+      } else {
+        options.setArgs("CLSR PICARD MAX ITERATIONS", "10");
+      }
+
+      if (ini->extract(parScope, "picardTolerance", value)) {
+        options.setArgs("CLSR PICARD TOLERANCE", value);
+      } else {
+        options.setArgs("CLSR PICARD TOLERANCE", "1e-6");
       }
     }
 
@@ -1744,13 +1761,51 @@ void lvlSet_t::solve(double time, int stage)
     return o_S0;
   }();
 
-  this->ellipticSolver[0]->coeff0HLM(o_lambda0);
-  this->ellipticSolver[0]->coeff1HLM(o_lambda1);
-  if (evalRegularization("SVV", this->name)) {
-    this->ellipticSolver[0]->coeffSVV(this->o_svvmu);
+  dlong maxPicardIter = 1;
+  dfloat picardTol = 1e-6;
+  if(this->name == "clsr") {
+    platform->options.getArgs("CLSR PICARD MAX ITERATIONS", maxPicardIter);
+    platform->options.getArgs("CLSR PICARD TOLERANCE", picardTol);
   }
-  this->ellipticSolver[0]->solve(o_rhs, o_Si);
-  o_Si.copyTo(this->o_S, o_Si.size(), this->fieldOffsetScan);
+
+  bool picardConverged = false;
+  dfloat relUpdate = 0.0;
+  for (int picardIter = 0; picardIter < maxPicardIter; picardIter++) {
+    this->ellipticSolver[0]->coeff0HLM(o_lambda0);
+    this->ellipticSolver[0]->coeff1HLM(o_lambda1);
+    if (evalRegularization("SVV", this->name)) {
+      this->ellipticSolver[0]->coeffSVV(this->o_svvmu);
+    }
+    this->ellipticSolver[0]->solve(o_rhs, o_Si);
+
+    if(this->name == "clsr") {
+      auto o_Sdelta = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
+      o_Sdelta.copyFrom(this->o_S, mesh->Nlocal);
+      platform->linAlg->axpby(mesh->Nlocal, 1.0, o_Si, -1.0, o_Sdelta);
+
+      const dfloat deltaNorm = platform->linAlg->weightedNorm2(mesh->Nlocal,
+                                                           mesh->o_LMM,
+                                                           o_Sdelta,
+                                                           platform->comm.mpiComm());
+      const dfloat sNorm = platform->linAlg->weightedNorm2(mesh->Nlocal,
+                                                           mesh->o_LMM,
+                                                           this->o_S,
+                                                           platform->comm.mpiComm());
+
+      relUpdate = deltaNorm / std::max(sNorm, static_cast<dfloat>(1e-12));
+    }
+    o_Si.copyTo(this->o_S, o_Si.size(), this->fieldOffsetScan);
+
+    if(this->name == "clsr" && relUpdate < picardTol) {
+      picardConverged = true;
+      if(platform->comm.mpiRank() == 0 && platform->verbose())
+        printf("CLSR picard solver converged in %d iterations\n", picardIter+1);
+      break;
+    }
+  }
+
+  if(this->name == "clsr" && !picardConverged && platform->comm.mpiRank() == 0) 
+    printf("WARNING: CLSR picard solver failed to converge in %d iterations\n", maxPicardIter);
 
   if (o_tlsr0.isInitialized()) {
     constrainTLSRKernel(mesh->Nlocal,
@@ -2245,6 +2300,7 @@ void lvlSet::clsrAx(elliptic_t* elliptic,
                            o_D,
                            elliptic->fieldOffset,
                            interfaceWidth,
+                           clsr->o_S,
                            o_q,
                            o_normals,
                            o_wrk);

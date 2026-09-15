@@ -180,6 +180,7 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
                                 @ restrict const dfloat *D,
                                 const dlong offset,
                                 const dfloat epsilon,
+                                @ restrict const dfloat *PSISTAR,
                                 @ restrict const dfloat *PSI,
                                 @ restrict const dfloat *NORMAL,
                                 @ restrict dfloat *DIFF)
@@ -254,8 +255,9 @@ void rsum(dfloat *s_sum, const dlong t, const dlong bs) {
           const dfloat gradn = gradx * nx + grady * ny + gradz * nz;
 
           const dfloat psi = PSI[id];
+          const dfloat psiStar = PSISTAR[id];
 
-          DIFF[id] = epsilon * gradn - psi * (1.0 - psi);
+          DIFF[id] = epsilon * gradn - psi * (1.0 - psiStar);
         }
       }
       @barrier();
