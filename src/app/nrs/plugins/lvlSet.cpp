@@ -536,8 +536,14 @@ void parseLvlSetSections()
     if(options.compareArgs(parPrefix + "REGULARIZATION METHOD","NONE")) {
       if(firstWord == "default") {
         options.setArgs(parPrefix + "REGULARIZATION METHOD","SVV");
-        options.setArgs("TLSR REGULARIZATION SVV SCALING COEFF", "2.0");
-        options.setArgs("TLSR REGULARIZATION SVV FILTER POWER", "6.0");
+        options.setArgs("TLSR REGULARIZATION SVV SCALING COEFF", "1.0");
+        int N;
+        options.getArgs("POLYNOMIAL DEGREE", N);
+        if(N < 6) {
+          options.setArgs("TLSR REGULARIZATION SVV FILTER POWER", "6.0");
+        } else {
+          options.setArgs("TLSR REGULARIZATION SVV FILTER POWER", "8.0");
+        }
         options.setArgs("CLSR REGULARIZATION SVV SCALING COEFF", "1.0");
         options.setArgs("CLSR REGULARIZATION SVV FILTER POWER", "4.0");
       }

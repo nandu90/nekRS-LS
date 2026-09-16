@@ -76,7 +76,7 @@ void parseRegularization(const int rank, setupAide &options, inipp::Ini *ini, st
 
         if (usesSVV) {
           addMethod("SVV");
-          options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF", "0.1");
+          options.setArgs(parPrefix + "REGULARIZATION SVV SCALING COEFF", "1.0");
           options.setArgs(parPrefix + "REGULARIZATION SVV FILTER POWER", "2");
 
           for (std::string s : list) {
