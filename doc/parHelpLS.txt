@@ -58,6 +58,12 @@ targetCFL                   <dfloat>                                   user spec
 
 stoppingCondition           targetSteps[D], targetTime                 pseudo-time iteration stopping condition for TLSR/CLSR
 
+picardMaxIterations         <int>                                      CLSR only; maximum number of outer Picard iterations
+                            10 [D]
+
+picardTolerance             <dfloat>                                   CLSR only; relative update tolerance for Picard convergence
+                            1e-6 [D]
+
 regularizationFactor        <dfloat>                                   TLSR only.
                             0.1 [D]                                    Regularization factor for initial TLSR solution
 
