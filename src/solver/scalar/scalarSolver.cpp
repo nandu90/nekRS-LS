@@ -3,6 +3,7 @@
 #include "advectionSubCycling.hpp"
 #include "avm.hpp"
 #include "gjp.hpp"
+#include "svv.hpp"
 #include <registerKernels.hpp>
 
 static bool evalRegularization(const std::string regString, const int is)
@@ -341,7 +342,6 @@ scalar_t::scalar_t(scalarConfig_t &cfg, const std::unique_ptr<geomSolver_t> &_ge
   }
 
   if (svvEnabled) {
-    this->o_svvf = platform->device.malloc<dfloat>(_fieldOffset);
     this->o_svvmu = platform->device.malloc<dfloat>(NSfields * _fieldOffset);
   }
 
@@ -581,35 +581,18 @@ void scalar_t::mueSVV()
 {
   auto mesh = this->meshV;
 
-  static auto initialized = false;
-
-  auto umagInitialized = false;
-
-  auto o_umag = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-  
   for (int is = 0; is < NSfields; is++) {
     const auto sid = scalarDigitStr(is);
 
     if (evalRegularization("SVV", is)) {
-      if(!initialized) {
-        if(!platform->options.compareArgs("MOVING MESH","TRUE"))
-          launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
-        initialized = true;
-      }
-
-      if(platform->options.compareArgs("MOVING MESH","TRUE"))
-        launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, this->o_svvf);
-
-      if(!umagInitialized) {
-        platform->linAlg->magVector(mesh->Nlocal, vFieldOffset, o_U, o_umag);
-        umagInitialized = true;
-      }
-
       dfloat scale = 0.1;
       platform->options.getArgs("SCALAR" + sid + " REGULARIZATION SVV SCALING COEFF", scale);
 
+      scale *= svv::svvMeshScale(mesh, platform->comm.mpiComm());
+
       auto o_svvmu = this->o_svvmu.slice(is * _fieldOffset, _fieldOffset);
-      platform->linAlg->axmyz(mesh->Nlocal, scale, this->o_svvf, o_umag, o_svvmu);
+      platform->linAlg->magVector(mesh->Nlocal, vFieldOffset, o_U, o_svvmu);
+      platform->linAlg->scale(mesh->Nlocal, scale, o_svvmu);
     }
   }
 }

@@ -7,6 +7,8 @@ namespace svv{
 
 void convoluteDerivative(mesh_t* mesh, occa::memory& o_filterPower, occa::memory& o_svvD);
 
+dfloat svvMeshScale(mesh_t* mesh, MPI_Comm _comm);
+
 }
 
 #endif

@@ -1,14 +1,97 @@
-@kernel void svvMeshScale(const dlong Nelements,
-                          @restrict const dfloat* vgeo,
-                          @restrict dfloat* svvf)
-{
-  for (dlong e = 0; e < Nelements; ++e; @outer(0)) {
-    for (dlong n = 0; n < p_Np; ++n; @inner(0)) {
-      const dlong id = e * p_Np + n;
-      const dlong gid = e * p_Np * p_Nvgeo + n;
-      const dfloat J = vgeo[gid + p_JID * p_Np];
+void rmax(dfloat *s_max, const dlong t, const dlong bs) {
+  s_max[t] = (s_max[t] > s_max[t + bs]) ? s_max[t] : s_max[t + bs];
+}
 
-      svvf[id] = 2.0 * pow(J, 1.0/3.0) / (p_Nq - 1.0);
+@kernel void svvMeshScale(const dlong Nelements,
+                          @ restrict const dfloat *vgeo,
+                          @ restrict dfloat *svvf)
+{
+  for (dlong e = 0; e < Nelements; e++; @outer(0)) {
+    const dlong Nblocks = (p_Np + p_blockSize - 1)/p_blockSize;
+
+    const dfloat iporder = 1.0 / (p_Nq - 1.0);
+
+    svvf[e] = -1e10;
+
+    for (dlong n = 0; n < Nblocks; n++) {
+      @shared dfloat s_max[p_blockSize];
+
+      for (dlong t = 0; t < p_blockSize; ++t; @inner(0)) {
+        s_max[t] = -1e10;
+        const dlong ide = n * p_blockSize + t;
+        if(ide < p_Np){
+          const dlong gid = e * p_Np * p_Nvgeo + ide;
+          const dfloat J = vgeo[gid + p_JID * p_Np];
+          s_max[t] = 2.0 * pow(J, 1.0/3.0) * iporder;
+        }
+      }
+      @barrier();
+
+#if p_blockSize > 512
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 512) {
+          rmax(s_max, t, 512);
+        }
+      @barrier();
+#endif
+
+#if p_blockSize > 256
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 256) {
+          rmax(s_max, t, 256);
+        }
+      @barrier();
+#endif
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 128) {
+          rmax(s_max, t, 128);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 64) {
+          rmax(s_max, t, 64);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 32) {
+          rmax(s_max, t, 32);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 16) {
+          rmax(s_max, t, 16);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 8) {
+          rmax(s_max, t, 8);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 4) {
+          rmax(s_max, t, 4);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 2) {
+          rmax(s_max, t, 2);
+        }
+      @barrier();
+
+      for (int t = 0; t < p_blockSize; ++t; @inner(0))
+        if (t < 1) {
+          const dfloat smax = (s_max[0] > s_max[1]) ? s_max[0] : s_max[1];
+
+          svvf[e] = fmax(svvf[e], smax);
+        }
+      @barrier();
     }
   }
 }

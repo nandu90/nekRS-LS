@@ -885,23 +885,13 @@ void fluidSolver_t::makeExplicit(double time, int tstep)
   }
 
   if (evalRegularization(velocityName, "SVV")) {
-    if(!o_svvf.isInitialized()) {
-      o_svvf = platform->device.malloc<dfloat>(mesh->Nlocal);
-      if(!platform->options.compareArgs("MOVING MESH", "TRUE"))
-        launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
-    }
-
-    if(platform->options.compareArgs("MOVING MESH", "TRUE"))
-      launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
-
-    auto o_umag = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->magVector(mesh->Nlocal, fieldOffset, o_U, o_umag);
-
     dfloat scale = 0.1;
     platform->options.getArgs(upperCase(velocityName) + " REGULARIZATION SVV SCALING COEFF", scale);
+    scale *= svv::svvMeshScale(mesh, platform->comm.mpiComm());
 
     auto o_svvmu = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-    platform->linAlg->axmyz(mesh->Nlocal, scale, o_svvf, o_umag, o_svvmu);
+    platform->linAlg->magVector(mesh->Nlocal, fieldOffset, o_U, o_svvmu);
+    platform->linAlg->scale(mesh->Nlocal, scale, o_svvmu);
     
     auto loadKernel = [&](bool svv = false) {
       std::string kernelNamePrefix = "svv-ellipticFluid";

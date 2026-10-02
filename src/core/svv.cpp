@@ -14,6 +14,9 @@ namespace //private
 
   bool setupCalled = false; 
 
+  dfloat meshScale = -1e10;
+  bool meshScalerCalled = false;
+
   dfloat PNLEG(const dfloat Z, const int N)
   {
     dfloat p1 = 1.0;
@@ -47,6 +50,28 @@ namespace //private
   }
 
 } //namespace
+
+dfloat svv::svvMeshScale(mesh_t *mesh, MPI_Comm _comm)
+{
+  if(meshScalerCalled)
+    return meshScale;
+
+  meshScalerCalled = true;
+
+  auto o_svvf = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nelements);
+
+  launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
+  std::vector<dfloat> svvf(mesh->Nelements);
+  o_svvf.copyTo(svvf.data(), mesh->Nelements);
+
+  for (dlong n = 0 ; n < mesh->Nelements; n++) {
+    meshScale = meshScale > svvf[n] ? meshScale : svvf[n];
+  }
+
+  MPI_Allreduce(MPI_IN_PLACE, &meshScale, 1, MPI_DFLOAT, MPI_MAX, _comm);
+
+  return meshScale;
+}
 
 void svv::convoluteDerivative(mesh_t* mesh, occa::memory& o_filterPower, occa::memory& o_svvD)
 {

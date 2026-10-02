@@ -49,7 +49,6 @@ std::unique_ptr<lvlSet_t> clsr = nullptr;
 
 static occa::memory o_signls;
 static occa::memory o_normals;
-static occa::memory o_svvf;
 static occa::memory o_delta;
 static occa::memory o_curvature;
 static occa::memory o_svvD;
@@ -2010,24 +2009,15 @@ void lvlSet_t::mueSVV(int tstep)
 {
   auto mesh = this->meshV;
 
-  auto o_umag = platform->deviceMemoryPool.reserve<dfloat>(mesh->Nlocal);
-
   if (evalRegularization("SVV", this->name)) {
-    if(!o_svvf.isInitialized()) {
-      o_svvf = platform->device.malloc<dfloat>(mesh->Nlocal);
-      if(!platform->options.compareArgs("MOVING MESH","TRUE"))
-        launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
-    }
-
-    if(platform->options.compareArgs("MOVING MESH","TRUE"))
-      launchKernel("core-svv::svvMeshScale", mesh->Nelements, mesh->o_vgeo, o_svvf);
-
-    platform->linAlg->magVector(mesh->Nlocal, this->vFieldOffset, this->o_W, o_umag); 
+    platform->linAlg->magVector(mesh->Nlocal, this->vFieldOffset, this->o_W, this->o_svvmu); 
 
     dfloat scale = 0.1;
     platform->options.getArgs(upperCase(this->name) + " REGULARIZATION SVV SCALING COEFF", scale);
 
-    platform->linAlg->axmyz(mesh->Nlocal, scale, o_svvf, o_umag, this->o_svvmu);
+    scale *= svv::svvMeshScale(mesh, platform->comm.mpiComm());
+
+    platform->linAlg->scale(mesh->Nlocal, scale, this->o_svvmu);
   }
 }
 
