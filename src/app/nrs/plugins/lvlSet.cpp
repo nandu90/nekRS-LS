@@ -119,6 +119,7 @@ static std::vector<std::string> scalarKeys = {
   {"stoppingcondition"},
   {"picardmaxiterations"},
   {"picardtolerance"},
+  {"fixedsign"},
 };
 
 static std::vector<std::string> validSections = {
@@ -678,6 +679,12 @@ void parseLvlSetSections()
         append_error(error.str());
       }
 
+      if (ini->extract(parScope, "fixedSign", value)) {
+        std::ostringstream error;
+        error << "unknown key: clsr::fixedsign (TLSR only)\n";
+        append_error(error.str());
+      }
+
       if (ini->extract(parScope, "picardMaxIterations", value)) {
         options.setArgs("CLSR PICARD MAX ITERATIONS", value);
       } else {
@@ -693,6 +700,7 @@ void parseLvlSetSections()
 
     if(firstWord == "default") {
       options.setArgs("TLSR BOUNDARY FIX", "TRUE");
+      options.setArgs("TLSR FIXED SIGN", "TRUE");
     }
 
     if (firstWord == "tlsr") {
@@ -704,6 +712,15 @@ void parseLvlSetSections()
         };
         checkValidity(rank, validValues, value);
         options.setArgs("TLSR BOUNDARY FIX", upperCase(value));
+      }
+
+      if (ini->extract(parScope, "fixedSign", value)) {
+        const std::vector<std::string> validValues = {
+          {"true"},
+          {"false"},
+        };
+        checkValidity(rank, validValues, value);
+        options.setArgs("TLSR FIXED SIGN", upperCase(value));
       }
     }
 
@@ -1162,6 +1179,11 @@ void lvlSet::solve(const double &fluidTime)
         platform->options.getArgs("TLSR REGULARIZATION FACTOR", tlsrRegFactor);
 
         platform->linAlg->add(mesh->Nlocal, -0.5, ls->o_S);
+
+        if(platform->options.compareArgs("TLSR FIXED SIGN", "TRUE")) {
+          lvlSet::getSignField(ls->o_S);
+        }
+
         platform->linAlg->scale(mesh->Nlocal, tlsrRegFactor, ls->o_S);
       }
 
@@ -1490,8 +1512,10 @@ void lvlSet_t::computeAdvectionCoeff(int tstep)
 
     lvlSet::normalVector(o_phi, this->o_W, avg);
 
-    auto o_sign = lvlSet::getSignField(o_phi);
-  
+    auto o_sign = o_signls;
+    if(platform->options.compareArgs("TLSR FIXED SIGN", "FALSE")) {
+      o_sign = lvlSet::getSignField(o_phi);
+    }
     platform->linAlg->axmyVector(meshV->Nlocal, this->vFieldOffset, 0, 1.0, o_sign, this->o_W);
 
     if(platform->options.compareArgs("TLSR BOUNDARY FIX", "TRUE")) {

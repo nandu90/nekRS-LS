@@ -5,7 +5,7 @@
   for (dlong n = 0; n < Ntotal; ++n; @tile(p_blockSize, @outer, @inner)) {
     if (n < Ntotal) {
       const dfloat phi = S[n];
-      sign[n] = tanh(phi / 0.5);
+      sign[n] = tanh(phi / 0.25);
     }
   }
 }
